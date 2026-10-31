@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+ARG BUILDPLATFORM=linux/amd64
 #
 # 单镜像全栈构建：admin + user 两个 SPA 编译后由 go:embed 打进同一个二进制，
 # 由同一个进程在同一端口（8080）提供服务。不再需要独立的前端容器与 nginx。
