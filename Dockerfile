@@ -32,9 +32,9 @@ RUN cd user  && pnpm run build
 # 版本必须 >= go.mod 的 go 指令，官方镜像默认 GOTOOLCHAIN=local 不会自动拉取更高工具链。
 FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS builder
 
-ARG TARGETOS
-ARG TARGETARCH
-ARG TARGETVARIANT
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG TARGETVARIANT=
 ARG APP_VERSION=v1.0.0
 RUN echo "Building for $TARGETOS/$TARGETARCH$TARGETVARIANT"
 
