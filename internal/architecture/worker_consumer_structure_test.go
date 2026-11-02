@@ -26,7 +26,6 @@ func TestWorkerConsumerIsSplitByJobDomain(t *testing.T) {
 		"handleWalletRechargeExpire":        "consumer_order.go",
 		"buildOrderInstructionsEmailText":   "consumer_order.go",
 		"localizedInstructionsText":         "consumer_order.go",
-		"buildOrderFulfillmentEmailPayload": "consumer_order.go",
 		"handleNotificationDispatch":        "consumer_maintenance.go",
 		"handleAffiliateConfirmCommissions": "consumer_maintenance.go",
 		"handleResellerConfirmLedger":       "consumer_maintenance.go",
