@@ -53,11 +53,7 @@
         </div>
         <div class="mt-3 flex flex-wrap gap-2 text-[12px]">
           <span class="rounded border border-border px-2 py-0.5 text-muted-foreground">{{ supplyLabel(offer) }}</span>
-<<<<<<< HEAD
           <span class="rounded border px-2 py-0.5" :class="statusClass(offer)" :title="statusTitle">{{ statusLabel(offer) }}</span>
-=======
-          <span class="rounded border border-border px-2 py-0.5 text-muted-foreground">{{ t('needtoken.models.statusPending') }}</span>
->>>>>>> origin/claude/project-thread-6r3cwt
         </div>
         <dl class="nt-mono mt-4 grid grid-cols-2 gap-3 text-[13px]">
           <div>
@@ -125,19 +121,13 @@ import {
   type ModelOffer, type OfferSort,
 } from './lib/pricing'
 import { usePricing } from './lib/usePricing'
-<<<<<<< HEAD
 import { levelFor, type PoolLevel } from './lib/poolStatus'
 import { usePoolStatus } from './lib/usePoolStatus'
-=======
->>>>>>> origin/claude/project-thread-6r3cwt
 
 const { t } = useI18n()
 const route = useRoute()
 const pricing = usePricing()
-<<<<<<< HEAD
 const pool = usePoolStatus()
-=======
->>>>>>> origin/claude/project-thread-6r3cwt
 
 usePageSeo({
   title: () => t('needtoken.models.title'),
@@ -173,7 +163,6 @@ const compared = computed(() =>
   compare.value.map(key => offers.value.find(o => o.key === key)).filter((o): o is ModelOffer => Boolean(o)),
 )
 
-<<<<<<< HEAD
 const levelClass: Record<PoolLevel, string> = {
   available: 'border-primary/60 text-primary',
   busy: 'border-amber-500/60 text-amber-500',
@@ -193,7 +182,4 @@ const statusTitle = computed(() => {
 })
 
 onMounted(() => { void pricing.ensureLoaded(); void pool.ensureLoaded() })
-=======
-onMounted(() => { void pricing.ensureLoaded() })
->>>>>>> origin/claude/project-thread-6r3cwt
 </script>

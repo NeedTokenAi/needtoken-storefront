@@ -1917,7 +1917,6 @@
       "noMatch": "沒有符合篩選條件的模型。",
       "defaultBadge": "預設",
       "statusPending": "狀態待接入",
-<<<<<<< HEAD
       "status": {
         "available": "可用",
         "busy": "繁忙",
@@ -1925,8 +1924,6 @@
       },
       "statusStale": "{status}（資料已過期）",
       "statusUpdatedAt": "狀態更新於 {time}",
-=======
->>>>>>> origin/claude/project-thread-6r3cwt
       "groupLabel": "分組 {group}",
       "columns": {
         "model": "模型",
