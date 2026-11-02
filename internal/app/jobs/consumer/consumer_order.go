@@ -10,7 +10,6 @@ import (
 	paymentapp "github.com/dujiao-next/internal/modules/payment/application"
 
 	fulfillmentapp "github.com/dujiao-next/internal/modules/fulfillment/application"
-	fulfillmentdomain "github.com/dujiao-next/internal/modules/fulfillment/domain"
 	orderapp "github.com/dujiao-next/internal/modules/order/application"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 
@@ -127,7 +126,6 @@ func (c *Consumer) handleOrderStatusEmail(ctx context.Context, task *asynq.Task)
 			tmplSetting = &setting
 		}
 	}
-	payloadText := buildOrderFulfillmentEmailPayload(order)
 	emailBrand, brandErr := c.resolveOrderEmailBrand(ctx, order)
 	if brandErr != nil {
 		logger.Warnw("worker_order_status_email_load_site_brand_failed", "order_id", order.ID, "error", brandErr)
@@ -153,13 +151,7 @@ func (c *Consumer) handleOrderStatusEmail(ctx context.Context, task *asynq.Task)
 		IsGuest:      order.UserID == 0,
 		MailBrand:    emailBrand,
 	}
-	if fulfillmentdomain.ShouldAttachFulfillmentPayload(payloadText) {
-		// 交付内容过大，正文不放交付内容，以附件形式发送
-		input.AttachmentName = fmt.Sprintf("order_%s_delivery.txt", order.OrderNo)
-		input.AttachmentContent = payloadText
-	} else {
-		input.FulfillmentInfo = payloadText
-	}
+	// 交付内容（卡密、成品号、兑换码等）只在订单页展示，邮件不带正文也不带附件。
 	// 使用说明只在交付类场景追加，避免被追加到退款/取消等无关邮件正文里。
 	if status == constants.OrderStatusDelivered || status == constants.OrderStatusCompleted {
 		input.Instructions = buildOrderInstructionsEmailText(order, locale)
@@ -402,32 +394,4 @@ func localizedInstructionsText(raw jsonmap.JSON, locale string) string {
 		}
 	}
 	return ""
-}
-
-// buildOrderFulfillmentEmailPayload 组装订单状态邮件中的交付内容文本。
-func buildOrderFulfillmentEmailPayload(order *orderdomain.Order) string {
-	if order == nil {
-		return ""
-	}
-	if order.Fulfillment != nil {
-		payload := strings.TrimSpace(order.Fulfillment.Payload)
-		if payload != "" {
-			return payload
-		}
-	}
-	if len(order.Children) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(order.Children))
-	for _, child := range order.Children {
-		if child.Fulfillment == nil {
-			continue
-		}
-		content := strings.TrimSpace(child.Fulfillment.Payload)
-		if content == "" {
-			continue
-		}
-		parts = append(parts, fmt.Sprintf("[%s]\n%s", strings.TrimSpace(child.OrderNo), content))
-	}
-	return strings.Join(parts, "\n\n")
 }

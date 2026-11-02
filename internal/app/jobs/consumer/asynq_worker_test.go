@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	fulfillmentdomain "github.com/dujiao-next/internal/modules/fulfillment/domain"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 
 	"github.com/dujiao-next/internal/app/container"
@@ -37,12 +36,6 @@ func TestBuildBotNotifyRequestURLReplacesOrderPaidPath(t *testing.T) {
 	want := "https://bot.example.com/internal/order-paid"
 	if got != want {
 		t.Fatalf("request url want %s got %s", want, got)
-	}
-}
-
-func TestBuildOrderFulfillmentEmailPayloadNilOrder(t *testing.T) {
-	if got := buildOrderFulfillmentEmailPayload(nil); got != "" {
-		t.Fatalf("expected empty payload for nil order, got %q", got)
 	}
 }
 
@@ -126,24 +119,6 @@ func TestBuildOrderInstructionsEmailText(t *testing.T) {
 			t.Fatalf("want %q, got %q", want, got)
 		}
 	})
-}
-
-func TestBuildOrderFulfillmentEmailPayloadPreferOrderFulfillment(t *testing.T) {
-	order := &orderdomain.Order{
-		Fulfillment: &fulfillmentdomain.Fulfillment{Payload: "  MAIN-LINE-1\nMAIN-LINE-2  "},
-		Children: []orderdomain.Order{
-			{
-				OrderNo:     "CHILD-1",
-				Fulfillment: &fulfillmentdomain.Fulfillment{Payload: "SECRET-1"},
-			},
-		},
-	}
-
-	got := buildOrderFulfillmentEmailPayload(order)
-	want := "MAIN-LINE-1\nMAIN-LINE-2"
-	if got != want {
-		t.Fatalf("unexpected payload, want %q, got %q", want, got)
-	}
 }
 
 type orderStatusEmailWorkerOrderRepoStub struct {
@@ -343,34 +318,5 @@ func TestHandleOrderStatusEmailSkipsCanceledRegisteredOrderWhenPayloadStatusEmpt
 	}
 	if err := consumer.handleOrderStatusEmail(context.Background(), task); err != nil {
 		t.Fatalf("expected canceled registered-order task to be dropped, got %v", err)
-	}
-}
-
-func TestBuildOrderFulfillmentEmailPayloadFromChildren(t *testing.T) {
-	order := &orderdomain.Order{
-		Children: []orderdomain.Order{
-			{
-				OrderNo:     "DJ-CHILD-01",
-				Fulfillment: &fulfillmentdomain.Fulfillment{Payload: "  SECRET-01  "},
-			},
-			{
-				OrderNo:     "DJ-CHILD-02",
-				Fulfillment: nil,
-			},
-			{
-				OrderNo:     "DJ-CHILD-03",
-				Fulfillment: &fulfillmentdomain.Fulfillment{Payload: "    "},
-			},
-			{
-				OrderNo:     "DJ-CHILD-04",
-				Fulfillment: &fulfillmentdomain.Fulfillment{Payload: "SECRET-04-L1\nSECRET-04-L2"},
-			},
-		},
-	}
-
-	got := buildOrderFulfillmentEmailPayload(order)
-	want := "[DJ-CHILD-01]\nSECRET-01\n\n[DJ-CHILD-04]\nSECRET-04-L1\nSECRET-04-L2"
-	if got != want {
-		t.Fatalf("unexpected payload, want %q, got %q", want, got)
 	}
 }
