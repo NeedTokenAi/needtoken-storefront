@@ -1740,5 +1740,277 @@
     "label": "购买身份",
     "member": "会员购买",
     "guest": "游客可购"
+  },
+  "needtoken": {
+    "common": {
+      "copy": "复制",
+      "copied": "已复制",
+      "loading": "加载中…",
+      "retry": "重试",
+      "pricingPending": "定价待公布：以控制台定价表为准，未配置价格的模型暂不展示。",
+      "priceUnitNote": "价格单位：美元 / 百万 tokens（按次计费的模型为美元 / 次），数据取自 new-api 定价表。"
+    },
+    "nav": {
+      "label": "主导航",
+      "home": "首页",
+      "recharge": "代充",
+      "rental": "租用",
+      "plans": "套餐 & Tokens",
+      "models": "模型广场",
+      "docs": "API 文档",
+      "blog": "Blog",
+      "login": "登录",
+      "register": "注册"
+    },
+    "footer": {
+      "tagline": "一把 key 接入多个模型。会员、key 与用量在控制台，商品与订单在本站。",
+      "products": "产品",
+      "developers": "开发者",
+      "support": "支持",
+      "console": "会员控制台"
+    },
+    "supply": {
+      "pool": "号池",
+      "aws": "AWS",
+      "official": "官方 API",
+      "open_source": "开源推理"
+    },
+    "home": {
+      "seoTitle": "一把 key 接入多个模型",
+      "badges": {
+        "compatible": "OpenAI 兼容接口",
+        "oneKey": "一把 key 多个模型",
+        "guestOrder": "游客邮箱下单",
+        "usage": "用量以控制台为准"
+      },
+      "title": "一把 key，接入你常用的模型",
+      "subtitle": "统一 API 入口，OpenCode 等工具填上 baseURL 和 key 即可使用；key 与用量在会员控制台查看。",
+      "ctaPrimary": "注册控制台",
+      "ctaSecondary": "查看模型广场",
+      "highlights": {
+        "models": "个默认模型",
+        "entry": "个统一 API 入口",
+        "protocol": "OpenAI 兼容路径"
+      },
+      "models": {
+        "title": "默认模型",
+        "subtitle": "以下模型 ID 可直接填进工具配置；价格与可用状态见模型广场。",
+        "preferred": "首选"
+      },
+      "features": {
+        "title": "三条产品线，一个入口",
+        "recharge": {
+          "title": "代充",
+          "b1": "订阅代充，由商家代为操作",
+          "b2": "下单留邮箱，订单页查看进度",
+          "b3": "售后口径以商品页说明为准"
+        },
+        "rental": {
+          "title": "租用",
+          "b1": "成品账号按租期使用",
+          "b2": "租期、改密、到期回收见商品页",
+          "b3": "交付内容只在订单页查看"
+        },
+        "plans": {
+          "title": "套餐 & Tokens",
+          "b1": "分组决定可用模型档位",
+          "b2": "额度与有效期写在套餐里",
+          "b3": "用量与账单以控制台为准"
+        },
+        "models": {
+          "title": "模型广场",
+          "b1": "按厂商、供应线筛选",
+          "b2": "按价格排序，2–3 个横向比价",
+          "b3": "一键复制工具配置"
+        }
+      },
+      "compare": {
+        "title": "与自己分别对接的区别",
+        "item": "项目",
+        "diy": "分别对接各家",
+        "rows": {
+          "entry": {
+            "item": "API 入口",
+            "us": "一个 baseURL",
+            "diy": "每家一个地址"
+          },
+          "keys": {
+            "item": "key 管理",
+            "us": "一个控制台管理",
+            "diy": "每家各自后台"
+          },
+          "billing": {
+            "item": "用量与账单",
+            "us": "控制台统一查看",
+            "diy": "分散在各家账单"
+          },
+          "order": {
+            "item": "购买方式",
+            "us": "本站下单，游客邮箱即可",
+            "diy": "分别注册、分别付款"
+          },
+          "models": {
+            "item": "切换模型",
+            "us": "改模型 ID 即可",
+            "diy": "改地址、改 key、改 SDK 配置"
+          }
+        }
+      },
+      "steps": {
+        "title": "三步上手",
+        "register": {
+          "title": "注册控制台",
+          "desc": "用你下单时留的邮箱注册，订单会按邮箱自动归到你名下。"
+        },
+        "key": {
+          "title": "创建 key",
+          "desc": "在控制台创建 key，只保存在你自己的终端环境变量里。"
+        },
+        "call": {
+          "title": "发起请求",
+          "desc": "baseURL 指向统一入口，模型填模型 ID。"
+        }
+      },
+      "pricing": {
+        "title": "定价摘要",
+        "subtitle": "默认模型的当前定价，数据实时读取 new-api 定价表。",
+        "more": "全部模型与比价 →"
+      },
+      "faq": {
+        "title": "常见问题",
+        "account": {
+          "q": "需要在商店注册账号吗？",
+          "a": "不需要。商店用游客邮箱下单；会员控制台用同一邮箱注册，订单按邮箱归属到你的账号。"
+        },
+        "delivery": {
+          "q": "购买后在哪里拿到交付内容？",
+          "a": "在订单页查看（凭订单号和下单邮箱查单）。我们不会通过邮件发送密码或 key，邮件只提醒你去查看。"
+        },
+        "key": {
+          "q": "API key 在哪里看、泄露了怎么办？",
+          "a": "key 在会员控制台创建和查看用量。怀疑泄露时在控制台删除旧 key 并重新创建。"
+        },
+        "unpriced": {
+          "q": "调用时提示“模型价格未配置”？",
+          "a": "这是管理端还没给该模型配价，不是你的 key 有问题。请换用模型广场里已展示价格的模型，或联系客服。"
+        },
+        "aftersale": {
+          "q": "代充、租用的售后怎么算？",
+          "a": "以各商品页写明的条款为准，请在付款前阅读。"
+        }
+      }
+    },
+    "models": {
+      "title": "模型广场",
+      "subtitle": "价格与模型列表取自 new-api 定价表；同一模型在不同供应线的价格分开列出，不混算。",
+      "search": "搜索模型 ID",
+      "vendor": "厂商",
+      "allVendors": "全部厂商",
+      "supply": "供应线",
+      "allSupply": "全部供应线",
+      "sort": "排序",
+      "sortDefault": "默认排序",
+      "sortPriceAsc": "价格从低到高",
+      "sortPriceDesc": "价格从高到低",
+      "updatedAt": "数据更新于 {time}",
+      "loadError": "暂时读不到定价表，请稍后重试；实际价格以控制台为准。",
+      "noMatch": "没有符合筛选条件的模型。",
+      "defaultBadge": "默认",
+      "statusPending": "状态待接入",
+      "groupLabel": "分组 {group}",
+      "columns": {
+        "model": "模型",
+        "supply": "供应线",
+        "input": "输入价",
+        "output": "输出价",
+        "perCall": "每次"
+      },
+      "perCallShort": "次",
+      "buy": "购买套餐",
+      "configure": "配置示例",
+      "compare": "比价",
+      "compareTitle": "比价（{n} / {max}）",
+      "compareClear": "清空",
+      "compareRemove": "移出比价",
+      "sourceNote": "可用状态将接入号池分组数据后展示。"
+    },
+    "plans": {
+      "title": "套餐 & Tokens",
+      "subtitle": "套餐对应会员控制台里的 API 额度：分组决定能用哪些模型，额度与有效期写在套餐里，用量按 Tokens 计量。",
+      "buy": "选购套餐",
+      "console": "打开会员控制台",
+      "what": {
+        "title": "套餐由三部分组成",
+        "group": {
+          "title": "分组",
+          "desc": "决定可用的模型档位与价格倍率，以控制台显示为准。"
+        },
+        "quota": {
+          "title": "额度",
+          "desc": "可消费的总额度，按实际用量扣减。"
+        },
+        "validity": {
+          "title": "有效期",
+          "desc": "套餐生效的时长，到期后按套餐规则处理。"
+        }
+      },
+      "tokens": {
+        "title": "Tokens 怎么计量",
+        "b1": "每次请求按输入 tokens 和输出 tokens 分别计价，单价见模型广场。",
+        "b2": "同一模型在不同供应线可能价格不同，以你所在分组为准。",
+        "b3": "用量明细与剩余额度在会员控制台查看，以控制台为准。",
+        "b4": "充值续费只在本站下单，不在控制台内付款。",
+        "link": "去模型广场看单价 →"
+      },
+      "flow": {
+        "title": "从购买到使用",
+        "s1": {
+          "title": "选套餐下单",
+          "desc": "游客邮箱即可下单，请填写你在会员控制台注册（或将要注册）的邮箱。"
+        },
+        "s2": {
+          "title": "自动开通",
+          "desc": "付款后系统按邮箱把套餐开通到你的控制台账号。"
+        },
+        "s3": {
+          "title": "创建 key",
+          "desc": "在控制台创建 key，配到 OpenCode 等工具里。"
+        },
+        "s4": {
+          "title": "查看用量",
+          "desc": "用量、剩余额度、到期时间都在控制台查看。"
+        }
+      },
+      "note": "如果下单邮箱还没注册控制台，订单会等待领取；用同一邮箱注册后自动到账。"
+    },
+    "docs": {
+      "title": "API 文档",
+      "subtitle": "OpenAI 兼容接口。以下示例只用环境变量引用 key，不要把 key 明文写进配置文件或代码仓库。",
+      "baseUrl": {
+        "title": "Base URL",
+        "desc": "所有请求都发到这个地址，不需要再拼接 /chat/completions 之外的前缀。"
+      },
+      "models": {
+        "title": "模型 ID",
+        "desc": "点选一个模型，下方示例会替换成对应 ID。实际可用与价格以模型广场和控制台为准。"
+      },
+      "auth": {
+        "title": "鉴权",
+        "desc": "在会员控制台创建 key，并在运行工具的同一个终端里导出为环境变量。"
+      },
+      "opencode": {
+        "desc": "放在项目根目录 opencode.json（单个项目）或 ~/.config/opencode/opencode.json（全局）。",
+        "b1": "供应商名为 needtoken，npm 包为 {'@'}ai-sdk/openai-compatible。",
+        "b2": "apiKey 使用 {'{'}env:NEEDTOKEN_API_KEY{'}'} 引用，在启动 OpenCode 的同一终端里 export。",
+        "b3": "模型引用格式为 {model}。",
+        "b4": "启动后用 /models 命令核对模型列表。"
+      },
+      "errors": {
+        "title": "常见报错",
+        "b1": "“模型价格未配置”：管理端尚未给该模型配价，不是 key 的问题，请换用模型广场中已展示价格的模型。",
+        "b2": "401 / 鉴权失败：检查环境变量是否在当前终端里生效、key 是否已在控制台删除。",
+        "b3": "额度不足：在本站购买套餐或充值后，额度会自动加到控制台账号。"
+      }
+    }
   }
 }

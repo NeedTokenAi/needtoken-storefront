@@ -220,7 +220,7 @@ const form = reactive({
   },
   scripts: [] as SiteScriptItem[],
   footer_links: [] as FooterLinkItem[],
-  storefront_template: 'classic' as 'classic' | 'vault',
+  storefront_template: 'classic' as 'classic' | 'vault' | 'needtoken',
   template_mode: 'card' as 'card' | 'list',
 })
 
@@ -459,7 +459,7 @@ const fetchSettings = async () => {
       form.template_mode = rawTemplateMode === 'list' ? 'list' : 'card'
 
       const rawStorefrontTemplate = String(data.storefront_template || 'classic').trim()
-      form.storefront_template = rawStorefrontTemplate === 'vault' ? 'vault' : 'classic'
+      form.storefront_template = rawStorefrontTemplate === 'vault' || rawStorefrontTemplate === 'needtoken' ? rawStorefrontTemplate : 'classic'
     }
 
     if (orderRes.data && orderRes.data.data) {
@@ -1141,7 +1141,7 @@ onMounted(() => {
 
       <!-- Template Mode Tab -->
       <TabsContent value="template" :forceMount="true" v-show="currentTab === 'template'" class="space-y-6 mt-0">
-      <!-- Storefront theme: classic / vault -->
+      <!-- Storefront theme: classic / vault / needtoken -->
       <div class="rounded-xl border border-border bg-card">
         <div class="flex flex-col gap-3 border-b border-border bg-muted/40 px-6 py-4">
           <div>
@@ -1150,7 +1150,7 @@ onMounted(() => {
           </div>
         </div>
         <div class="px-6 py-6">
-          <RadioGroup v-model="form.storefront_template" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <RadioGroup v-model="form.storefront_template" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <!-- Classic -->
             <Label
               class="relative flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 p-6 transition-all"
@@ -1196,6 +1196,31 @@ onMounted(() => {
                 <div class="mt-1 text-xs text-muted-foreground">{{ t('admin.settings.template.vaultModeDesc') }}</div>
               </div>
               <div v-if="form.storefront_template === 'vault'" class="absolute right-3 top-3">
+                <svg class="h-5 w-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+              </div>
+            </Label>
+
+            <!-- Needtoken -->
+            <Label
+              class="relative flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 p-6 transition-all"
+              :class="form.storefront_template === 'needtoken'
+                ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                : 'border-border hover:border-muted-foreground/30'"
+            >
+              <RadioGroupItem value="needtoken" class="sr-only" />
+              <div class="flex h-16 w-16 items-center justify-center rounded-xl" :class="form.storefront_template === 'needtoken' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'">
+                <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 9l3 3-3 3M12 15h5" />
+                </svg>
+              </div>
+              <div class="text-center">
+                <div class="font-semibold" :class="form.storefront_template === 'needtoken' ? 'text-primary' : ''">{{ t('admin.settings.template.needtokenMode') }}</div>
+                <div class="mt-1 text-xs text-muted-foreground">{{ t('admin.settings.template.needtokenModeDesc') }}</div>
+              </div>
+              <div v-if="form.storefront_template === 'needtoken'" class="absolute right-3 top-3">
                 <svg class="h-5 w-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>

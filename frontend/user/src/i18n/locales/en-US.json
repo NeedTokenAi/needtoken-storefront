@@ -1740,5 +1740,277 @@
     "authInvalid": "Credentials mismatch, please try again",
     "authSubmit": "Save and search",
     "authClear": "Clear saved info"
+  },
+  "needtoken": {
+    "common": {
+      "copy": "Copy",
+      "copied": "Copied",
+      "loading": "Loading…",
+      "retry": "Retry",
+      "pricingPending": "Pricing coming soon. The console price list is authoritative; models without a configured price are not listed.",
+      "priceUnitNote": "Prices in USD per 1M tokens (USD per call for per-call models), read from the new-api price list."
+    },
+    "nav": {
+      "label": "Main navigation",
+      "home": "Home",
+      "recharge": "Top-up",
+      "rental": "Rental",
+      "plans": "Plans & Tokens",
+      "models": "Models",
+      "docs": "API Docs",
+      "blog": "Blog",
+      "login": "Log in",
+      "register": "Sign up"
+    },
+    "footer": {
+      "tagline": "One key for many models. Members, keys and usage live in the console; products and orders live here.",
+      "products": "Products",
+      "developers": "Developers",
+      "support": "Support",
+      "console": "Member console"
+    },
+    "supply": {
+      "pool": "Pool",
+      "aws": "AWS",
+      "official": "Official API",
+      "open_source": "Open-source inference"
+    },
+    "home": {
+      "seoTitle": "One key for many models",
+      "badges": {
+        "compatible": "OpenAI-compatible API",
+        "oneKey": "One key, many models",
+        "guestOrder": "Guest checkout by email",
+        "usage": "Usage shown in the console"
+      },
+      "title": "One key for the models you use",
+      "subtitle": "A single API endpoint. Point OpenCode or any compatible tool at the base URL with your key; keys and usage live in the member console.",
+      "ctaPrimary": "Create console account",
+      "ctaSecondary": "Browse models",
+      "highlights": {
+        "models": "default models",
+        "entry": "unified API endpoint",
+        "protocol": "OpenAI-compatible path"
+      },
+      "models": {
+        "title": "Default models",
+        "subtitle": "Use these model IDs directly in your tool config. Prices and availability are on the Models page.",
+        "preferred": "Preferred"
+      },
+      "features": {
+        "title": "Three product lines, one entry point",
+        "recharge": {
+          "title": "Top-up",
+          "b1": "Subscription top-up handled by our team",
+          "b2": "Leave an email at checkout, track it on the order page",
+          "b3": "After-sales terms are on each product page"
+        },
+        "rental": {
+          "title": "Rental",
+          "b1": "Ready-made accounts for a rental period",
+          "b2": "Period, password change and return terms on the product page",
+          "b3": "Delivery is shown only on the order page"
+        },
+        "plans": {
+          "title": "Plans & Tokens",
+          "b1": "Group sets which model tiers you can use",
+          "b2": "Quota and validity are defined per plan",
+          "b3": "Usage and billing follow the console"
+        },
+        "models": {
+          "title": "Models",
+          "b1": "Filter by vendor and supply line",
+          "b2": "Sort by price, compare 2–3 side by side",
+          "b3": "Copy tool configs in one click"
+        }
+      },
+      "compare": {
+        "title": "Versus integrating each provider yourself",
+        "item": "Item",
+        "diy": "Each provider separately",
+        "rows": {
+          "entry": {
+            "item": "API endpoint",
+            "us": "One base URL",
+            "diy": "One URL per provider"
+          },
+          "keys": {
+            "item": "Key management",
+            "us": "One console",
+            "diy": "A dashboard per provider"
+          },
+          "billing": {
+            "item": "Usage & billing",
+            "us": "One place in the console",
+            "diy": "Spread across provider bills"
+          },
+          "order": {
+            "item": "How to buy",
+            "us": "Order here, guest email is enough",
+            "diy": "Separate sign-ups and payments"
+          },
+          "models": {
+            "item": "Switching models",
+            "us": "Change the model ID",
+            "diy": "Change URL, key and SDK config"
+          }
+        }
+      },
+      "steps": {
+        "title": "Get started in three steps",
+        "register": {
+          "title": "Create a console account",
+          "desc": "Sign up with the email you order with; orders are matched to you by email."
+        },
+        "key": {
+          "title": "Create a key",
+          "desc": "Create a key in the console and keep it in your own shell environment."
+        },
+        "call": {
+          "title": "Send a request",
+          "desc": "Point the base URL at the unified endpoint and set the model ID."
+        }
+      },
+      "pricing": {
+        "title": "Pricing summary",
+        "subtitle": "Current prices for the default models, read live from the new-api price list.",
+        "more": "All models and comparison →"
+      },
+      "faq": {
+        "title": "FAQ",
+        "account": {
+          "q": "Do I need a store account?",
+          "a": "No. The store takes guest orders by email. Sign up for the member console with the same email and your orders are matched to it."
+        },
+        "delivery": {
+          "q": "Where do I get what I bought?",
+          "a": "On the order page (look it up with the order number and your email). We never email passwords or keys; emails only tell you it is ready."
+        },
+        "key": {
+          "q": "Where is my API key, and what if it leaks?",
+          "a": "Create keys and view usage in the member console. If a key may have leaked, delete it there and create a new one."
+        },
+        "unpriced": {
+          "q": "I get “model price not configured”.",
+          "a": "The model has not been priced by the operator yet; your key is fine. Use a model that shows a price on the Models page, or contact support."
+        },
+        "aftersale": {
+          "q": "How do top-up and rental after-sales work?",
+          "a": "Each product page states its terms. Please read them before paying."
+        }
+      }
+    },
+    "models": {
+      "title": "Models",
+      "subtitle": "Prices and models come from the new-api price list. The same model on different supply lines is listed separately, never averaged.",
+      "search": "Search model ID",
+      "vendor": "Vendor",
+      "allVendors": "All vendors",
+      "supply": "Supply line",
+      "allSupply": "All supply lines",
+      "sort": "Sort",
+      "sortDefault": "Default order",
+      "sortPriceAsc": "Price: low to high",
+      "sortPriceDesc": "Price: high to low",
+      "updatedAt": "Updated {time}",
+      "loadError": "The price list is unavailable right now. Please retry; the console is authoritative.",
+      "noMatch": "No models match these filters.",
+      "defaultBadge": "Default",
+      "statusPending": "Status coming soon",
+      "groupLabel": "Group {group}",
+      "columns": {
+        "model": "Model",
+        "supply": "Supply line",
+        "input": "Input",
+        "output": "Output",
+        "perCall": "Per call"
+      },
+      "perCallShort": "call",
+      "buy": "Buy a plan",
+      "configure": "Config example",
+      "compare": "Compare",
+      "compareTitle": "Compare ({n} / {max})",
+      "compareClear": "Clear",
+      "compareRemove": "Remove from comparison",
+      "sourceNote": "Availability will appear once pool group data is connected."
+    },
+    "plans": {
+      "title": "Plans & Tokens",
+      "subtitle": "A plan is API quota in the member console: the group decides which models you can use, the plan sets quota and validity, and usage is metered in tokens.",
+      "buy": "Browse plans",
+      "console": "Open member console",
+      "what": {
+        "title": "What a plan contains",
+        "group": {
+          "title": "Group",
+          "desc": "Sets the model tiers and price multiplier, as shown in the console."
+        },
+        "quota": {
+          "title": "Quota",
+          "desc": "Total spendable quota, deducted by actual usage."
+        },
+        "validity": {
+          "title": "Validity",
+          "desc": "How long the plan is active; on expiry the plan's rules apply."
+        }
+      },
+      "tokens": {
+        "title": "How tokens are metered",
+        "b1": "Each request is priced by input tokens and output tokens; unit prices are on the Models page.",
+        "b2": "The same model can cost differently on different supply lines; your group decides.",
+        "b3": "Usage details and remaining quota are in the member console, which is authoritative.",
+        "b4": "Top-ups and renewals are ordered here, not paid inside the console.",
+        "link": "See unit prices on the Models page →"
+      },
+      "flow": {
+        "title": "From purchase to first request",
+        "s1": {
+          "title": "Order a plan",
+          "desc": "Guest checkout works. Enter the email you use (or will use) for the member console."
+        },
+        "s2": {
+          "title": "Automatic activation",
+          "desc": "After payment the plan is activated on your console account by email."
+        },
+        "s3": {
+          "title": "Create a key",
+          "desc": "Create a key in the console and add it to OpenCode or another tool."
+        },
+        "s4": {
+          "title": "Track usage",
+          "desc": "Usage, remaining quota and expiry are all in the console."
+        }
+      },
+      "note": "If that email has no console account yet, the order waits to be claimed and is credited once you sign up with the same email."
+    },
+    "docs": {
+      "title": "API Docs",
+      "subtitle": "OpenAI-compatible API. The examples reference your key through an environment variable; never put a key in plain text in config files or repositories.",
+      "baseUrl": {
+        "title": "Base URL",
+        "desc": "Send every request to this address."
+      },
+      "models": {
+        "title": "Model IDs",
+        "desc": "Pick a model and the examples below use its ID. Availability and price follow the Models page and the console."
+      },
+      "auth": {
+        "title": "Authentication",
+        "desc": "Create a key in the member console and export it in the same terminal that runs your tool."
+      },
+      "opencode": {
+        "desc": "Put this in opencode.json at the project root (one project) or ~/.config/opencode/opencode.json (global).",
+        "b1": "Provider name is needtoken; the npm package is {'@'}ai-sdk/openai-compatible.",
+        "b2": "apiKey references {'{'}env:NEEDTOKEN_API_KEY{'}'}; export it in the terminal that starts OpenCode.",
+        "b3": "Reference models as {model}.",
+        "b4": "After starting, run /models to check the model list."
+      },
+      "errors": {
+        "title": "Common errors",
+        "b1": "“Model price not configured”: the operator has not priced the model yet; your key is fine. Use a model that shows a price on the Models page.",
+        "b2": "401 / auth failed: check the variable is set in this terminal and the key was not deleted in the console.",
+        "b3": "Insufficient quota: buy a plan or top up here; the quota is added to your console account automatically."
+      }
+    }
   }
 }

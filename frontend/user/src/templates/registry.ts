@@ -8,9 +8,9 @@ import { useAppStore } from '../stores/app'
  *   因此可以一页一页地把新设计搬进 vault，旧站全程可用。
  */
 
-export type StorefrontTemplate = 'classic' | 'vault'
+export type StorefrontTemplate = 'classic' | 'vault' | 'needtoken'
 
-export const STOREFRONT_TEMPLATES: StorefrontTemplate[] = ['classic', 'vault']
+export const STOREFRONT_TEMPLATES: StorefrontTemplate[] = ['classic', 'vault', 'needtoken']
 export const DEFAULT_TEMPLATE: StorefrontTemplate = 'classic'
 
 const OVERRIDE_KEY = 'dj-storefront-template'
@@ -89,6 +89,8 @@ export const getActiveTemplate = (): StorefrontTemplate => {
 
 // vault 模板页面（按需动态加载）。key 形如 './vault/Home.vue'
 const vaultViews = import.meta.glob('./vault/**/*.vue')
+// needtoken 模板页面（needtoken.io 官网）。缺页时回退 classic，结算 / 支付 / 查单沿用独角原页
+const needtokenViews = import.meta.glob('./needtoken/*.vue')
 
 type ViewLoader = () => Promise<unknown>
 
@@ -98,8 +100,13 @@ type ViewLoader = () => Promise<unknown>
  */
 export const templateView = (name: string, classicLoader: ViewLoader): ViewLoader => {
     return () => {
-        if (getActiveTemplate() === 'vault') {
+        const active = getActiveTemplate()
+        if (active === 'vault') {
             const loader = vaultViews[`./vault/${name}.vue`]
+            if (loader) return loader()
+        }
+        if (active === 'needtoken') {
+            const loader = needtokenViews[`./needtoken/${name}.vue`]
             if (loader) return loader()
         }
         return classicLoader()

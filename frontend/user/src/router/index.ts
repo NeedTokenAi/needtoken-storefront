@@ -274,6 +274,22 @@ const router = createRouter({
             name: 'blog-detail',
             component: templateView('BlogDetail', () => import('../views/BlogDetail.vue')),
         },
+        // needtoken 模板专属页面；其他模板下这些路径回落到 404 页
+        {
+            path: '/models',
+            name: 'model-square',
+            component: templateView('ModelSquare', () => import('../views/NotFound.vue')),
+        },
+        {
+            path: '/plans',
+            name: 'plans',
+            component: templateView('Plans', () => import('../views/NotFound.vue')),
+        },
+        {
+            path: '/docs',
+            name: 'api-docs',
+            component: templateView('ApiDocs', () => import('../views/NotFound.vue')),
+        },
         {
             path: '/notice',
             name: 'notice',

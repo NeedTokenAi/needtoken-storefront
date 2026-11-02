@@ -1,0 +1,80 @@
+/* =========================================================================
+   needtoken 模板设计令牌（needtoken.io 官网）
+   方向: 深色科技风 · 等宽代码块 · 单一青绿高亮
+   作用域: .nt-scope 与 body.nt-tokens（浮层 Teleport 到 body，令牌双挂，同 vault 做法）。
+           只覆盖 --ui-* 令牌，classic 回落页面（结算、支付、查单）自动换成同一套深色配色。
+   ========================================================================= */
+
+.nt-scope,
+body.nt-tokens {
+  --nt-font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --ui-bg-page: #07090d;
+  --ui-bg-elevated: #0e1218;
+  --ui-bg-soft: #141a22;
+  --ui-bg-muted: #1a212b;
+  --ui-text-primary: #e8edf3;
+  --ui-text-secondary: #b4bfcc;
+  --ui-text-muted: #7d8a99;
+  --ui-text-on-accent: #04110d;
+  --ui-border: rgba(148, 163, 184, 0.16);
+  --ui-border-strong: rgba(148, 163, 184, 0.32);
+  --ui-accent: #2dd4a7;
+  --ui-accent-hover: #5eead4;
+  --ui-accent-soft: rgba(45, 212, 167, 0.12);
+  --ui-focus-ring: rgba(45, 212, 167, 0.45);
+}
+
+.nt-scope {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-bg-page);
+  color: var(--ui-text-primary);
+}
+
+.nt-scope .nt-mono,
+.nt-scope pre,
+.nt-scope code {
+  font-family: var(--nt-font-mono);
+}
+
+/* 终端代码块 */
+.nt-scope .nt-code {
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: #05070a;
+  overflow: hidden;
+}
+.nt-scope .nt-code-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  font-size: 12px;
+}
+.nt-scope .nt-code-bar i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--ui-bg-muted);
+}
+.nt-scope .nt-code pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #cfe9df;
+  white-space: pre;
+}
+
+/* 背景网格（仅装饰） */
+.nt-scope .nt-grid-bg {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
