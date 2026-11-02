@@ -1917,6 +1917,13 @@
       "noMatch": "No models match these filters.",
       "defaultBadge": "Default",
       "statusPending": "Status coming soon",
+      "status": {
+        "available": "Available",
+        "busy": "Busy",
+        "unavailable": "Unavailable"
+      },
+      "statusStale": "{status} (outdated)",
+      "statusUpdatedAt": "Status updated at {time}",
       "groupLabel": "Group {group}",
       "columns": {
         "model": "Model",

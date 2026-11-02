@@ -17,6 +17,9 @@ export const API_BASE_URL = `${CONSOLE_URL}/v1`
 /** new-api 公开定价接口（模型广场数据源） */
 export const PRICING_URL = trimSlash(env.VITE_NEEDTOKEN_PRICING_URL || `${CONSOLE_URL}/api/pricing`)
 
+/** 胶水公开的号池状态接口；不配置时模型广场显示“状态待接入” */
+export const STATUS_URL = trimSlash(env.VITE_NEEDTOKEN_STATUS_URL || '')
+
 export const CONSOLE_LOGIN_URL = `${CONSOLE_URL}/sign-in`
 export const CONSOLE_REGISTER_URL = `${CONSOLE_URL}/sign-up`
 
