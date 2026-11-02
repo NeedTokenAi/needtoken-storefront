@@ -532,7 +532,9 @@ const (
 const (
 	StorefrontTemplateClassic = "classic"
 	StorefrontTemplateVault   = "vault"
-	StorefrontTemplateDefault = StorefrontTemplateClassic
+	// StorefrontTemplateNeedtoken needtoken.io 官网模板（深色科技风 + 模型广场）
+	StorefrontTemplateNeedtoken = "needtoken"
+	StorefrontTemplateDefault   = StorefrontTemplateClassic
 )
 
 // 站点语言常量

@@ -13,6 +13,17 @@
         </ErrorBoundary>
       </VaultLayout>
 
+      <!-- needtoken 模板（needtoken.io 官网）：自带深色外壳 -->
+      <NeedtokenLayout v-else-if="isNeedtoken && !isResellerConsole">
+        <ErrorBoundary>
+          <RouterView v-slot="{ Component }">
+            <Transition name="page-fade" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </RouterView>
+        </ErrorBoundary>
+      </NeedtokenLayout>
+
       <!-- classic 模板 / 分销控制台（保持原有结构不变） -->
       <template v-else>
         <Navbar v-if="!isResellerConsole" />
@@ -53,6 +64,7 @@ import MobileBottomNav from './components/MobileBottomNav.vue'
 
 // vault 外壳按需加载，classic 用户不会拉取其 chunk/样式
 const VaultLayout = defineAsyncComponent(() => import('./templates/vault/layout/VaultLayout.vue'))
+const NeedtokenLayout = defineAsyncComponent(() => import('./templates/needtoken/layout/NeedtokenLayout.vue'))
 
 // config 由 router.beforeEach 统一加载，无需在此重复调用
 const appStore = useAppStore()
@@ -60,6 +72,7 @@ const route = useRoute()
 const isResellerConsole = computed(() => route.meta.resellerConsole === true)
 // getActiveTemplate 读取 appStore.config（响应式），config 加载后会重新计算
 const isVault = computed(() => getActiveTemplate() === 'vault')
+const isNeedtoken = computed(() => getActiveTemplate() === 'needtoken')
 
 // 模板来自异步的站点配置。已有线索（预览覆盖 / 上次访问记住的模板）时立即渲染外壳；
 // 首次访问则等配置返回再渲染，避免先闪一下 classic 外壳。配置加载失败时由首个路由就绪兜底
