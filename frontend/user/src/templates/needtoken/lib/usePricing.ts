@@ -8,6 +8,7 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 const offers = ref<ModelOffer[]>([])
 const state = ref<LoadState>('idle')
 const loadedAt = ref<Date | null>(null)
+const sourceVersion = ref<string | null>(null)
 let inflight: Promise<void> | null = null
 
 const load = async (): Promise<void> => {
@@ -23,6 +24,7 @@ const load = async (): Promise<void> => {
             supplyLineByGroup: SUPPLY_LINE_BY_GROUP,
         })
         loadedAt.value = new Date()
+        sourceVersion.value = body.pricing_version || null
         state.value = 'ready'
     } catch {
         // 接口不可用时保留上次已知数据（若有），界面按 error 提示“以控制台为准”
@@ -40,6 +42,7 @@ export const usePricing = () => {
         offers,
         state,
         loadedAt,
+        sourceVersion,
         isLoading: computed(() => state.value === 'loading' || state.value === 'idle'),
         ensureLoaded,
         reload: () => { inflight = load().finally(() => { inflight = null }); return inflight },

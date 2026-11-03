@@ -1748,7 +1748,7 @@
       "loading": "Loading…",
       "retry": "Retry",
       "pricingPending": "Pricing coming soon. The console price list is authoritative; models without a configured price are not listed.",
-      "priceUnitNote": "Prices in USD per 1M tokens (USD per call for per-call models), read from the new-api price list."
+      "priceUnitNote": "USD / million tokens or USD / call is shown only when the rule can be explained accurately. Conditional pricing has no inferred unit rate. Prices come from new-api; the source version is an API marker, not a locked quote."
     },
     "nav": {
       "label": "Main navigation",
@@ -1873,7 +1873,7 @@
       },
       "pricing": {
         "title": "Pricing summary",
-        "subtitle": "Current prices for the default models, read live from the new-api price list.",
+        "subtitle": "Last fetched prices and billing conditions for default models, sourced from new-api.",
         "more": "All models and comparison →"
       },
       "faq": {
@@ -1930,7 +1930,8 @@
         "supply": "Supply line",
         "input": "Input",
         "output": "Output",
-        "perCall": "Per call"
+        "perCall": "Per call",
+        "unit": "Billing unit / conditions"
       },
       "perCallShort": "call",
       "buy": "Buy a plan",
@@ -1939,7 +1940,24 @@
       "compareTitle": "Compare ({n} / {max})",
       "compareClear": "Clear",
       "compareRemove": "Remove from comparison",
-      "sourceNote": "Availability will appear once pool group data is connected."
+      "sourceNote": "Availability will appear once pool group data is connected.",
+      "conditionalPrice": "Conditional pricing · check the console",
+      "usageFields": "Usage fields",
+      "sourceVersion": "Source version: {version}",
+      "versionUnknown": "not supplied",
+      "stalePrice": "The latest price list could not be retrieved. Existing values are from the previous fetch; verify current prices in the console.",
+      "units": {
+        "per_million_tokens": "USD / million tokens",
+        "per_call": "USD / call",
+        "conditional": "Conditional / usage-based"
+      },
+      "conditions": {
+        "expression": "Pricing depends on an expression, tiers or request conditions. No single token rate is calculated here.",
+        "plugin": "Plugins or provider routes may use different billing rules. Confirm the applicable rule in the console.",
+        "task": "Pricing depends on task usage, duration or specifications. It is not converted to a token rate here.",
+        "multimodal": "Cache, image or audio usage has separate conditions. Check the full pricing rules in the console.",
+        "unknown": "This billing method cannot be accurately summarized here. Check the console for a quote."
+      }
     },
     "plans": {
       "title": "Plans & Tokens",
