@@ -9,6 +9,7 @@ import (
 	"github.com/dujiao-next/internal/logger"
 	procurementcontract "github.com/dujiao-next/internal/modules/procurement/contract"
 	procurementdomain "github.com/dujiao-next/internal/modules/procurement/domain"
+	"github.com/dujiao-next/internal/shared/reservationterms"
 
 	"github.com/google/uuid"
 )
@@ -67,12 +68,24 @@ func (s *Service) createProcurementForSingleOrder(order *procurementdomain.Local
 	item := order.Items[0]
 
 	// 查找商品映射
-	connectionID, found, err := s.mappingRepo.FindConnectionID(item.ProductID)
+	frozen, err := reservationterms.ParseFrozen(item.SKUSnapshot)
 	if err != nil {
-		return fmt.Errorf("lookup product mapping: %w", err)
+		return fmt.Errorf("invalid frozen checkout reservation: %w", err)
 	}
-	if !found {
-		return fmt.Errorf("no product mapping for product %d", item.ProductID)
+	connectionID := frozen.ConnectionID
+	if frozen.Required {
+		if item.Quantity != 1 {
+			return fmt.Errorf("scarce quantity requires review")
+		}
+	} else {
+		var found bool
+		connectionID, found, err = s.mappingRepo.FindConnectionID(item.ProductID)
+		if err != nil {
+			return fmt.Errorf("lookup product mapping: %w", err)
+		}
+		if !found {
+			return fmt.Errorf("no product mapping for product %d", item.ProductID)
+		}
 	}
 
 	procOrder := &procurementdomain.Order{

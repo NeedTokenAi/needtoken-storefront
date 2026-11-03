@@ -304,3 +304,31 @@ func TestCreateOrderSerializesCouponPerUserLimit(t *testing.T) {
 		couponcontract.ErrPerUserLimit,
 	)
 }
+
+func TestCheckoutFreezesUpstreamEntitlementTerms(t *testing.T) {
+	f := newCouponLimitRaceFixture(t, "entitlement-freeze", 0, 0)
+	original := jsonmap.JSON{"version": 1, "kind": "tokens", "token_quota_per_unit": 123}
+	if err := f.db.Model(&f.sku).Updates(map[string]interface{}{"entitlement_contract_json": original, "entitlement_contract_hash": "original-contract-hash"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	input := f.input(f.users[0].ID)
+	input.CouponCode = ""
+	_, err := f.service(f.couponRepo, f.usageRepo).CreateOrder(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.Model(&f.sku).Updates(map[string]interface{}{"entitlement_contract_json": jsonmap.JSON{"version": 1, "token_quota_per_unit": 999}, "entitlement_contract_hash": "new-contract-hash"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	var item orderdomain.OrderItem
+	if err := f.db.Where("sku_id = ?", f.sku.ID).First(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	if item.SKUSnapshotJSON["entitlement_contract_hash"] != "original-contract-hash" {
+		t.Fatalf("checkout contract changed with SKU: %+v", item.SKUSnapshotJSON)
+	}
+	frozen, ok := item.SKUSnapshotJSON["entitlement_contract"].(map[string]interface{})
+	if !ok || frozen["token_quota_per_unit"] != float64(123) {
+		t.Fatalf("checkout quota was not frozen: %+v", item.SKUSnapshotJSON)
+	}
+}

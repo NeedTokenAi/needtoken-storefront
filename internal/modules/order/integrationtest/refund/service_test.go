@@ -760,3 +760,40 @@ func TestOrderRefundServiceChildRefundCountsAgainstParent(t *testing.T) {
 		t.Fatalf("parent refund after full child refund must be rejected, got %v", err)
 	}
 }
+
+func TestManualRefundOperationReplayAndConflict(t *testing.T) {
+	service, db := setupOrderRefundServiceTest(t)
+	raw, _ := db.DB()
+	raw.SetMaxOpenConns(1)
+	now := time.Now()
+	order := orderdomain.Order{OrderNo: "manual-operation-replay", Status: constants.OrderStatusCompleted, Currency: "USD", TotalAmount: money.FromDecimal(decimal.NewFromInt(100)), PaidAt: &now, CreatedAt: now}
+	if err := db.Create(&order).Error; err != nil {
+		t.Fatal(err)
+	}
+	input := AdminManualRefundInput{OrderID: order.ID, Amount: money.FromDecimal(decimal.NewFromInt(25)), Remark: "verified bookkeeping", OperationID: "refund-test-operation-1"}
+	_, first, err := service.AdminManualRefund(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, again, err := service.AdminManualRefund(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID != again.ID || again.SettlementStatus != "external_unverified" {
+		t.Fatalf("replay or settlement mismatch: %+v %+v", first, again)
+	}
+	input.Amount = money.FromDecimal(decimal.NewFromInt(26))
+	if _, _, err := service.AdminManualRefund(input); !errors.Is(err, ErrRefundOperationConflict) {
+		t.Fatalf("expected payload conflict, got %v", err)
+	}
+	var stored orderdomain.Order
+	db.First(&stored, order.ID)
+	if !stored.RefundedAmount.Decimal.Equal(decimal.NewFromInt(25)) {
+		t.Fatalf("refund duplicated: %s", stored.RefundedAmount.String())
+	}
+	var count int64
+	db.Model(&orderdomain.OrderRefundRecord{}).Count(&count)
+	if count != 1 {
+		t.Fatalf("duplicate records: %d", count)
+	}
+}

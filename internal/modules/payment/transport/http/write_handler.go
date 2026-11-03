@@ -21,6 +21,8 @@ import (
 
 var (
 	ErrPaymentInvalid                      = errors.New("payment invalid")
+	ErrCheckoutReservationUnavailable      = errors.New("checkout reservation not confirmed")
+	ErrCheckoutPolicyUnknown               = errors.New("upstream reservation policy undeclared")
 	ErrPaymentNotFound                     = errors.New("payment not found")
 	ErrOrderStatusInvalid                  = errors.New("order status invalid")
 	ErrPaymentChannelNotFound              = errors.New("payment channel not found")
@@ -336,6 +338,8 @@ var paymentProviderGatewayErrorRules = []mappedError{
 
 var paymentCreateErrorRules = concatMappedErrors(
 	[]mappedError{
+		{target: ErrCheckoutPolicyUnknown, code: response.CodeBadRequest, key: "error.checkout_reservation_policy_unknown"},
+		{target: ErrCheckoutReservationUnavailable, code: response.CodeBadRequest, key: "error.checkout_reservation_unavailable"},
 		{target: ErrPaymentInvalid, code: response.CodeBadRequest, key: "error.payment_invalid"},
 		{target: ErrOrderNotFound, code: response.CodeNotFound, key: "error.order_not_found"},
 		{target: ErrOrderStatusInvalid, code: response.CodeBadRequest, key: "error.order_status_invalid"},

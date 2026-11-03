@@ -27,13 +27,25 @@ type Fulfillment struct {
 	DeliveredAt  *time.Time
 }
 
+type CustomerReference struct {
+	MerchantCustomerID string `json:"merchant_customer_id"`
+	Source             string `json:"source"`
+	Verification       string `json:"verification"`
+}
 type CreateOrderRequest struct {
-	SKUID             uint
-	Quantity          int
-	ManualFormData    jsonmap.JSON
-	DownstreamOrderNo string
-	TraceID           string
-	CallbackURL       string
+	ReservationOrderRef     string
+	ReservationHoldID       string
+	ReservationHoldVersion  string
+	ReservationExpiresAt    string
+	EntitlementContract     jsonmap.JSON
+	EntitlementContractHash string
+	CustomerReference       *CustomerReference
+	SKUID                   uint
+	Quantity                int
+	ManualFormData          jsonmap.JSON
+	DownstreamOrderNo       string
+	TraceID                 string
+	CallbackURL             string
 }
 
 type CreateOrderResult struct {

@@ -56,6 +56,11 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 	if input.OrderID == 0 {
 		return nil, ErrPaymentInvalid
 	}
+	// Scarce capacity must be durably reserved before entering the transaction
+	// that may debit a wallet or create a payment. No HTTP runs under DB locks.
+	if err := s.Guard.Ensure(input.Context, input.OrderID); err != nil {
+		return nil, err
+	}
 
 	log := paymentLogger(
 		"order_id", input.OrderID,
@@ -100,6 +105,9 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 		}
 		if lockedOrder.ExpiresAt != nil && !lockedOrder.ExpiresAt.After(time.Now()) {
 			return orderapp.ErrOrderStatusInvalid
+		}
+		if err := s.Guard.Check(tx, &lockedOrder, time.Now()); err != nil {
+			return err
 		}
 
 		paymentRepo := tx.Payments()

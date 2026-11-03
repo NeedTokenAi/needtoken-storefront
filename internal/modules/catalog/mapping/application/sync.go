@@ -73,6 +73,9 @@ func (s *Service) SyncProduct(mappingID uint) error {
 	if !upProduct.IsActive {
 		return s.markUpstreamUnavailable(mapping, mappingdomain.UpstreamStatusInactive, now)
 	}
+	if err := validateReservationCatalog(upProduct, mapping.ConnectionID); err != nil {
+		return errors.Join(fmt.Errorf("validate upstream reservation metadata: %w", err), s.quarantineReservationCatalog(mapping))
+	}
 
 	// ── 1. 同步本地商品字段（表单配置、上下架状态） ──
 	localProduct, err := s.products.GetByID(strconv.FormatUint(uint64(mapping.LocalProductID), 10))
@@ -141,14 +144,21 @@ func (s *Service) SyncProduct(mappingID uint) error {
 		localSKU, _ := s.skus.GetByID(skuMappings[i].LocalSKUID)
 		if localSKU != nil {
 			localSKU.SpecValuesJSON = upSKU.SpecValues
+			localSKU.EntitlementContractJSON = upProduct.EntitlementContract
+			localSKU.EntitlementContractHash = upProduct.EntitlementContractHash
 			localSKU.IsActive = upSKU.IsActive
+			if err := assignReservationMetadata(localSKU, upProduct, upSKU, mapping.ConnectionID); err != nil {
+				return errors.Join(fmt.Errorf("sync sku reservation metadata: %w", err), s.quarantineReservationCatalog(mapping))
+			}
 			// 如果启用了自动同步价格，按加价比例更新本地售价和成本价
 			if conn.AutoSyncPrice {
 				newLocalPrice := CalculateLocalPrice(upPrice, conn.ExchangeRate, conn.PriceMarkupPercent, conn.PriceRoundingMode)
 				localSKU.PriceAmount = money.FromDecimal(newLocalPrice.Round(2))
 				localSKU.CostPriceAmount = money.FromDecimal(convertCurrency(upPrice, conn.ExchangeRate).Round(2))
 			}
-			_ = s.skus.Update(localSKU)
+			if err := s.skus.Update(localSKU); err != nil {
+				return fmt.Errorf("persist sku reservation metadata: %w", err)
+			}
 		}
 	}
 
@@ -161,13 +171,18 @@ func (s *Service) SyncProduct(mappingID uint) error {
 		skuPrice, _ := decimal.NewFromString(upSKU.PriceAmount)
 		localPrice := CalculateLocalPrice(skuPrice, conn.ExchangeRate, conn.PriceMarkupPercent, conn.PriceRoundingMode)
 		newLocalSKU := productdomain.ProductSKU{
-			ProductID:       mapping.LocalProductID,
-			SKUCode:         upSKU.SKUCode,
-			SpecValuesJSON:  upSKU.SpecValues,
-			PriceAmount:     money.FromDecimal(localPrice.Round(2)),
-			CostPriceAmount: money.FromDecimal(convertCurrency(skuPrice, conn.ExchangeRate).Round(2)), // 成本价 = 上游价格 × 汇率（本地币种）
-			IsActive:        upSKU.IsActive,
-			SortOrder:       0,
+			ProductID:               mapping.LocalProductID,
+			SKUCode:                 upSKU.SKUCode,
+			SpecValuesJSON:          upSKU.SpecValues,
+			EntitlementContractJSON: upProduct.EntitlementContract,
+			EntitlementContractHash: upProduct.EntitlementContractHash,
+			PriceAmount:             money.FromDecimal(localPrice.Round(2)),
+			CostPriceAmount:         money.FromDecimal(convertCurrency(skuPrice, conn.ExchangeRate).Round(2)), // 成本价 = 上游价格 × 汇率（本地币种）
+			IsActive:                upSKU.IsActive,
+			SortOrder:               0,
+		}
+		if err := assignReservationMetadata(&newLocalSKU, upProduct, upSKU, mapping.ConnectionID); err != nil {
+			return errors.Join(fmt.Errorf("sync new sku reservation metadata: %w", err), s.quarantineReservationCatalog(mapping))
 		}
 		if err := s.skus.Create(&newLocalSKU); err != nil {
 			continue
@@ -183,6 +198,26 @@ func (s *Service) SyncProduct(mappingID uint) error {
 			StockSyncedAt:    &now,
 		}
 		_ = s.skuMappings.Create(newMapping)
+	}
+	// Legacy upstream products without explicit SKUs use a local DEFAULT row.
+	// A successful fresh pull can establish its ordinary policy without
+	// reviving a deleted mapped SKU or changing its activation state.
+	if len(upProduct.SKUs) == 0 && len(skuMappings) == 0 {
+		localSKUs, err := s.skus.ListByProduct(mapping.LocalProductID, false)
+		if err != nil {
+			return err
+		}
+		for i := range localSKUs {
+			if localSKUs[i].SKUCode != productdomain.DefaultSKUCode {
+				continue
+			}
+			if err := assignReservationMetadata(&localSKUs[i], upProduct, upstream.UpstreamSKU{}, mapping.ConnectionID); err != nil {
+				return errors.Join(fmt.Errorf("sync default sku reservation metadata: %w", err), s.quarantineReservationCatalog(mapping))
+			}
+			if err := s.skus.Update(&localSKUs[i]); err != nil {
+				return fmt.Errorf("persist default sku reservation metadata: %w", err)
+			}
+		}
 	}
 
 	// ── 2c. 如果启用了自动同步价格，更新 Product.PriceAmount 为最低 SKU 价格 ──
@@ -211,6 +246,50 @@ func (s *Service) SyncProduct(mappingID uint) error {
 	mapping.UpstreamFulfillmentType = upFulfillment
 	mapping.UpstreamStatus = mappingdomain.UpstreamStatusActive
 	mapping.LastSyncedAt = &now
+	return s.mappings.Update(mapping)
+}
+
+// A malformed/vanished required contract must not leave old unrestricted
+// metadata sellable. Disable the product before its SKUs; a later valid sync
+// can repair terms, but an operator must explicitly reopen the product.
+func (s *Service) quarantineReservationCatalog(mapping *mappingdomain.Mapping) error {
+	product, err := s.products.GetByID(strconv.FormatUint(uint64(mapping.LocalProductID), 10))
+	if err != nil {
+		return err
+	}
+	if product != nil {
+		product.IsActive = false
+		if err = s.products.Update(product); err != nil {
+			return err
+		}
+	}
+	skuMappings, err := s.skuMappings.ListByProductMapping(mapping.ID)
+	if err != nil {
+		return err
+	}
+	upstreamIDs := make(map[uint]uint, len(skuMappings))
+	for _, m := range skuMappings {
+		upstreamIDs[m.LocalSKUID] = m.UpstreamSKUID
+	}
+	localSKUs, err := s.skus.ListByProduct(mapping.LocalProductID, false)
+	if err != nil {
+		return err
+	}
+	for i := range localSKUs {
+		sku := &localSKUs[i]
+		sku.IsActive = false
+		sku.RequiresReservation = true
+		sku.ReservationPolicyKnown = false
+		sku.ReservationContractJSON = nil
+		sku.ReservationConnectionID = mapping.ConnectionID
+		if upstreamID, ok := upstreamIDs[sku.ID]; ok {
+			sku.ReservationUpstreamSKUID = upstreamID
+		}
+		if err = s.skus.Update(sku); err != nil {
+			return err
+		}
+	}
+	mapping.UpstreamStatus = mappingdomain.UpstreamStatusInactive
 	return s.mappings.Update(mapping)
 }
 
@@ -621,6 +700,10 @@ func (s *Service) SyncConnectionStock(connectionID uint, connMappings []mappingd
 // syncProductFromData 使用已拉取的上游数据同步单个映射（不再发 HTTP 请求）
 // 调用方应保证 upProduct.IsActive == true（下架/删除分支由 caller 处理）
 func (s *Service) syncProductFromData(mapping *mappingdomain.Mapping, conn *siteconnectiondomain.Connection, upProduct *upstream.UpstreamProduct, now *time.Time) {
+	if err := validateReservationCatalog(upProduct, mapping.ConnectionID); err != nil {
+		logger.Warnw("sync_reservation_policy_invalid", "mapping_id", mapping.ID, "error", errors.Join(err, s.quarantineReservationCatalog(mapping)))
+		return
+	}
 	// ── 1. 同步本地商品字段 ──
 	localProduct, err := s.products.GetByID(strconv.FormatUint(uint64(mapping.LocalProductID), 10))
 	if err != nil || localProduct == nil {
@@ -635,6 +718,13 @@ func (s *Service) syncProductFromData(mapping *mappingdomain.Mapping, conn *site
 	// ── 2. 同步 SKU ──
 	skuMappings, err := s.skuMappings.ListByProductMapping(mapping.ID)
 	if err != nil {
+		return
+	}
+	// Price parsing can intentionally skip rows. Refresh policy first, so a
+	// malformed price or an omitted legacy declaration cannot preserve stale
+	// unrestricted checkout metadata during incremental/batch synchronization.
+	if err := s.refreshReservationPolicies(mapping, upProduct, skuMappings); err != nil {
+		logger.Warnw("sync_reservation_policy_failed", "mapping_id", mapping.ID, "error", errors.Join(err, s.quarantineReservationCatalog(mapping)))
 		return
 	}
 
@@ -687,6 +777,8 @@ func (s *Service) syncProductFromData(mapping *mappingdomain.Mapping, conn *site
 		localSKU, _ := s.skus.GetByID(skuMappings[i].LocalSKUID)
 		if localSKU != nil {
 			localSKU.SpecValuesJSON = upSKU.SpecValues
+			localSKU.EntitlementContractJSON = upProduct.EntitlementContract
+			localSKU.EntitlementContractHash = upProduct.EntitlementContractHash
 			localSKU.IsActive = upSKU.IsActive
 			if conn.AutoSyncPrice {
 				newLocalPrice := CalculateLocalPrice(upPrice, conn.ExchangeRate, conn.PriceMarkupPercent, conn.PriceRoundingMode)
@@ -713,13 +805,19 @@ func (s *Service) syncProductFromData(mapping *mappingdomain.Mapping, conn *site
 		}
 		localPrice := CalculateLocalPrice(skuPrice, conn.ExchangeRate, conn.PriceMarkupPercent, conn.PriceRoundingMode)
 		newLocalSKU := productdomain.ProductSKU{
-			ProductID:       mapping.LocalProductID,
-			SKUCode:         upSKU.SKUCode,
-			SpecValuesJSON:  upSKU.SpecValues,
-			PriceAmount:     money.FromDecimal(localPrice.Round(2)),
-			CostPriceAmount: money.FromDecimal(convertCurrency(skuPrice, conn.ExchangeRate).Round(2)),
-			IsActive:        upSKU.IsActive,
-			SortOrder:       0,
+			ProductID:               mapping.LocalProductID,
+			SKUCode:                 upSKU.SKUCode,
+			SpecValuesJSON:          upSKU.SpecValues,
+			EntitlementContractJSON: upProduct.EntitlementContract,
+			EntitlementContractHash: upProduct.EntitlementContractHash,
+			PriceAmount:             money.FromDecimal(localPrice.Round(2)),
+			CostPriceAmount:         money.FromDecimal(convertCurrency(skuPrice, conn.ExchangeRate).Round(2)),
+			IsActive:                upSKU.IsActive,
+			SortOrder:               0,
+		}
+		if err := assignReservationMetadata(&newLocalSKU, upProduct, upSKU, mapping.ConnectionID); err != nil {
+			logger.Warnw("sync_new_sku_reservation_policy_invalid", "mapping_id", mapping.ID, "error", errors.Join(err, s.quarantineReservationCatalog(mapping)))
+			return
 		}
 		if err := s.skus.Create(&newLocalSKU); err != nil {
 			continue
@@ -762,4 +860,48 @@ func (s *Service) syncProductFromData(mapping *mappingdomain.Mapping, conn *site
 	mapping.UpstreamStatus = mappingdomain.UpstreamStatusActive
 	mapping.LastSyncedAt = now
 	_ = s.mappings.Update(mapping)
+}
+
+func (s *Service) refreshReservationPolicies(mapping *mappingdomain.Mapping, product *upstream.UpstreamProduct, skuMappings []mappingdomain.SKUMapping) error {
+	byID := make(map[uint]upstream.UpstreamSKU, len(product.SKUs))
+	for _, sku := range product.SKUs {
+		byID[sku.ID] = sku
+	}
+	for _, link := range skuMappings {
+		upSKU, exists := byID[link.UpstreamSKUID]
+		if !exists {
+			continue
+		}
+		local, err := s.skus.GetByID(link.LocalSKUID)
+		if err != nil {
+			return err
+		}
+		if local == nil {
+			continue
+		}
+		if err = assignReservationMetadata(local, product, upSKU, mapping.ConnectionID); err != nil {
+			return err
+		}
+		if err = s.skus.Update(local); err != nil {
+			return err
+		}
+	}
+	if len(product.SKUs) == 0 && len(skuMappings) == 0 {
+		locals, err := s.skus.ListByProduct(mapping.LocalProductID, false)
+		if err != nil {
+			return err
+		}
+		for i := range locals {
+			if locals[i].SKUCode != productdomain.DefaultSKUCode {
+				continue
+			}
+			if err = assignReservationMetadata(&locals[i], product, upstream.UpstreamSKU{}, mapping.ConnectionID); err != nil {
+				return err
+			}
+			if err = s.skus.Update(&locals[i]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

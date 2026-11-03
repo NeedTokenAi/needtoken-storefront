@@ -103,6 +103,8 @@ func mapTransportError(err error) error {
 		source error
 		target error
 	}{
+		{paymentapp.ErrCheckoutPolicyUnknown, paymenttransport.ErrCheckoutPolicyUnknown},
+		{paymentapp.ErrCheckoutReservationUnavailable, paymenttransport.ErrCheckoutReservationUnavailable},
 		{orderapp.ErrOrderNotFound, paymenttransport.ErrOrderNotFound},
 		{orderapp.ErrGuestOrderNotFound, paymenttransport.ErrGuestOrderNotFound},
 		{orderapp.ErrOrderStatusInvalid, paymenttransport.ErrOrderStatusInvalid},

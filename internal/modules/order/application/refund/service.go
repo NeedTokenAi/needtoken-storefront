@@ -1,30 +1,33 @@
 package refund
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
 
-	orderapp "github.com/dujiao-next/internal/modules/order/application"
-
+	"github.com/dujiao-next/internal/constants"
 	affiliatecontract "github.com/dujiao-next/internal/modules/affiliate/contract"
 	usercontract "github.com/dujiao-next/internal/modules/identity/user/contract"
 	userdomain "github.com/dujiao-next/internal/modules/identity/user/domain"
+	orderapp "github.com/dujiao-next/internal/modules/order/application"
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 	resellercontract "github.com/dujiao-next/internal/modules/reseller/contract"
 	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
 	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
-
-	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/shared/money"
-
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
 // AdminManualRefundInput 管理员手动退款输入（不处理钱包/支付渠道）
 type AdminManualRefundInput struct {
+	OperationID        string
 	OrderID            uint
 	Amount             money.Amount
 	Remark             string
@@ -259,11 +262,36 @@ func (s *Service) AdminManualRefund(input AdminManualRefundInput) (*orderdomain.
 		return nil, nil, walletcontract.ErrInvalidAmount
 	}
 	recordRemark := strings.TrimSpace(input.Remark)
+	operationID := strings.TrimSpace(input.OperationID)
+	// Legacy in-process callers receive a unique record; HTTP callers must provide
+	// their own stable ID so a lost response can be safely queried/retried.
+	if operationID == "" {
+		operationID = uuid.NewString()
+	}
+	if len(operationID) > 128 {
+		return nil, nil, ErrRefundOperationInvalid
+	}
+	raw, _ := json.Marshal(struct {
+		OrderID        uint
+		Amount, Remark string
+		Fee            bool
+	}{input.OrderID, amount.StringFixed(2), recordRemark, input.PaymentFeeRefunded})
+	sum := sha256.Sum256(raw)
+	operation := manualRefundOperation{ID: operationID, Digest: hex.EncodeToString(sum[:])}
 	var createdRecord *orderdomain.OrderRefundRecord
 	if s == nil || s.orderStore == nil {
 		return nil, nil, ErrOrderFetchFailed
 	}
 
+	if existing, err := s.orderStore.GetRefundRecordByOperationID(operation.ID); err != nil {
+		return nil, nil, err
+	} else if existing != nil {
+		if existing.OperationDigest != operation.Digest {
+			return nil, nil, ErrRefundOperationConflict
+		}
+		order, err := s.orderStore.GetByID(input.OrderID)
+		return order, existing, err
+	}
 	cfg := settingsapp.DefaultOrderRefundConfig()
 	if s.settingService != nil {
 		cfgLoaded, cfgErr := s.settingService.GetOrderRefundConfig()
@@ -295,6 +323,16 @@ func (s *Service) AdminManualRefund(input AdminManualRefundInput) (*orderdomain.
 		}
 		if locked == nil {
 			return ErrOrderNotFound
+		}
+		// Check after taking the order lock as well: concurrent retries serialize.
+		if existing, err := orders.GetRefundRecordByOperationID(operation.ID); err != nil {
+			return err
+		} else if existing != nil {
+			if existing.OperationDigest != operation.Digest {
+				return ErrRefundOperationConflict
+			}
+			createdRecord = existing
+			return nil
 		}
 		order := *locked
 		if order.PaidAt == nil {
@@ -363,6 +401,7 @@ func (s *Service) AdminManualRefund(input AdminManualRefundInput) (*orderdomain.
 			input.PaymentFeeRefunded,
 			feeRefundedAmount,
 			now,
+			operation,
 		)
 		if err != nil {
 			return err
@@ -386,6 +425,13 @@ func (s *Service) AdminManualRefund(input AdminManualRefundInput) (*orderdomain.
 		}
 		return nil
 	}); err != nil {
+		if existing, lookupErr := s.orderStore.GetRefundRecordByOperationID(operation.ID); lookupErr == nil && existing != nil {
+			if existing.OperationDigest != operation.Digest {
+				return nil, nil, ErrRefundOperationConflict
+			}
+			order, loadErr := s.orderStore.GetByID(input.OrderID)
+			return order, existing, loadErr
+		}
 		return nil, nil, err
 	}
 
@@ -482,6 +528,7 @@ func (s *Service) createRefundRecordTx(
 	paymentFeeRefunded bool,
 	paymentFeeRefundedAmount money.Amount,
 	now time.Time,
+	operations ...manualRefundOperation,
 ) (*orderdomain.OrderRefundRecord, error) {
 	if orders == nil || order == nil {
 		return nil, ErrRefundRecordCreateFailed
@@ -502,6 +549,11 @@ func (s *Service) createRefundRecordTx(
 		Remark:                   remark,
 		CreatedAt:                now,
 		UpdatedAt:                now,
+	}
+	if len(operations) > 0 {
+		record.OperationID = &operations[0].ID
+		record.OperationDigest = operations[0].Digest
+		record.SettlementStatus = "external_unverified"
 	}
 	if err := orders.CreateRefundRecord(record); err != nil {
 		return nil, ErrRefundRecordCreateFailed
@@ -672,3 +724,10 @@ func collectRefundItems(order *orderdomain.Order) []orderdomain.OrderItem {
 	}
 	return result
 }
+
+var (
+	ErrRefundOperationConflict = errors.New("refund operation content conflict")
+	ErrRefundOperationInvalid  = errors.New("refund operation ID invalid")
+)
+
+type manualRefundOperation struct{ ID, Digest string }

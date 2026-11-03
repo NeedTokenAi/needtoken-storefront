@@ -52,7 +52,16 @@ func (s *session) RetryMax() int          { return s.connection.RetryMax }
 func (s *session) RetryIntervals() string { return s.connection.RetryIntervals }
 
 func (s *session) CreateOrder(ctx context.Context, request procurementcontract.CreateOrderRequest) (*procurementcontract.CreateOrderResult, error) {
+	var customer *upstream.CustomerReference
+	if request.CustomerReference != nil {
+		customer = &upstream.CustomerReference{
+			MerchantCustomerID: request.CustomerReference.MerchantCustomerID, Source: request.CustomerReference.Source, Verification: request.CustomerReference.Verification,
+		}
+	}
 	result, err := s.adapter.CreateOrder(ctx, upstream.CreateUpstreamOrderReq{
+		ReservationOrderRef: request.ReservationOrderRef, ReservationHoldID: request.ReservationHoldID, ReservationHoldVersion: request.ReservationHoldVersion, ReservationExpiresAt: request.ReservationExpiresAt,
+		CustomerReference:   customer,
+		EntitlementContract: request.EntitlementContract, EntitlementContractHash: request.EntitlementContractHash,
 		SKUID: request.SKUID, Quantity: request.Quantity, ManualFormData: request.ManualFormData,
 		DownstreamOrderNo: request.DownstreamOrderNo, TraceID: request.TraceID, CallbackURL: request.CallbackURL,
 	})

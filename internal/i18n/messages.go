@@ -16,6 +16,7 @@ const (
 
 var messages = map[string]map[string]string{
 	LocaleZH: {
+		"error.operation_conflict":                       "相同操作编号已使用不同内容；请先核查原操作结果",
 		"error.jwt_secret_missing":                       "JWT secret 未配置",
 		"error.auth_header_missing":                      "缺少 Authorization header",
 		"error.auth_header_invalid":                      "Authorization header 格式错误",
@@ -327,6 +328,8 @@ var messages = map[string]map[string]string{
 		"error.api_credential_delete_failed":             "删除 API 凭证失败",
 		"error.api_credential_not_approved":              "API 凭证尚未审核通过",
 		"error.queue_unavailable":                        "队列服务不可用，请稍后重试",
+		"error.checkout_reservation_unavailable":         "商品预留尚未确认，暂不创建付款；请稍后查询订单或联系客服",
+		"error.checkout_reservation_policy_unknown":      "商品的预留规则尚未核实，暂不创建付款；请联系客服。管理员需升级上游并同步商品目录后重新下单",
 		"order.status.pending_payment":                   "待支付",
 		"order.status.paid":                              "已支付",
 		"order.status.fulfilling":                        "处理中",
@@ -393,6 +396,7 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "无效的商品状态参数",
 	},
 	LocaleTW: {
+		"error.operation_conflict":                       "相同操作編號已使用不同內容；請先核查原操作結果",
 		"error.jwt_secret_missing":                       "JWT secret 未配置",
 		"error.auth_header_missing":                      "缺少 Authorization header",
 		"error.auth_header_invalid":                      "Authorization header 格式錯誤",
@@ -704,6 +708,8 @@ var messages = map[string]map[string]string{
 		"error.api_credential_delete_failed":             "刪除 API 憑證失敗",
 		"error.api_credential_not_approved":              "API 憑證尚未審核通過",
 		"error.queue_unavailable":                        "隊列服務不可用，請稍後重試",
+		"error.checkout_reservation_unavailable":         "商品預留尚未確認，暫不建立付款；請稍後查詢訂單或聯絡客服",
+		"error.checkout_reservation_policy_unknown":      "商品的預留規則尚未核實，暫不建立付款；請聯絡客服。管理員需升級上游並同步商品目錄後重新下單",
 		"order.status.pending_payment":                   "待支付",
 		"order.status.paid":                              "已支付",
 		"order.status.fulfilling":                        "處理中",
@@ -770,6 +776,7 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "無效的商品狀態參數",
 	},
 	LocaleEN: {
+		"error.operation_conflict":                       "Operation ID was already used with different content; verify the original result first",
 		"error.jwt_secret_missing":                       "JWT secret is not configured",
 		"error.auth_header_missing":                      "Missing Authorization header",
 		"error.auth_header_invalid":                      "Invalid Authorization header format",
@@ -1081,6 +1088,8 @@ var messages = map[string]map[string]string{
 		"error.api_credential_delete_failed":             "Failed to delete API credential",
 		"error.api_credential_not_approved":              "API credential is not approved",
 		"error.queue_unavailable":                        "Queue service unavailable, please try again later",
+		"error.checkout_reservation_unavailable":         "Stock reservation is unconfirmed. Payment has not been created; check your order later or contact support",
+		"error.checkout_reservation_policy_unknown":      "The product reservation policy is unverified. Payment has not been created. Contact support; an administrator must update the upstream service, sync the catalog and create a new order",
 		"order.status.pending_payment":                   "Pending Payment",
 		"order.status.paid":                              "Paid",
 		"order.status.fulfilling":                        "Processing",

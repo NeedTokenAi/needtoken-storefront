@@ -64,6 +64,8 @@ func (s *PaymentService) enqueueOrderPaidAsync(order *orderdomain.Order, payment
 		}
 	}
 
+	// Procurement creation must not depend on the Redis queue switch.
+	s.enqueueProcurementAsync(order, log)
 	if s.queue == nil || !s.queue.Enabled() {
 		return
 	}
@@ -83,8 +85,6 @@ func (s *PaymentService) enqueueOrderPaidAsync(order *orderdomain.Order, payment
 				}
 			}
 		}
-		// 上游采购：为包含上游交付类型的订单创建采购单
-		s.enqueueProcurementAsync(order, log)
 		// B 侧：订单支付成功后检查是否需要回调下游
 		s.enqueueDownstreamCallbackAsync(order, log)
 		return
@@ -101,8 +101,6 @@ func (s *PaymentService) enqueueOrderPaidAsync(order *orderdomain.Order, payment
 			)
 		}
 	}
-	// 上游采购：为包含上游交付类型的订单创建采购单
-	s.enqueueProcurementAsync(order, log)
 	// B 侧：订单支付成功后检查是否需要回调下游
 	s.enqueueDownstreamCallbackAsync(order, log)
 }
@@ -110,6 +108,10 @@ func (s *PaymentService) enqueueOrderPaidAsync(order *orderdomain.Order, payment
 // enqueueProcurementAsync 如果订单包含上游交付类型商品，创建采购单
 func (s *PaymentService) enqueueProcurementAsync(order *orderdomain.Order, log *zap.SugaredLogger) {
 	if s.procurementSvc == nil || order == nil {
+		return
+	}
+	if s.Guard.DeferProcurement(order) {
+		// The durable resident outbox confirms this exact paid hold first.
 		return
 	}
 	if err := s.procurementSvc.CreateForOrder(order.ID); err != nil {

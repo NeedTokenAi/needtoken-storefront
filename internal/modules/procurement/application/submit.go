@@ -12,6 +12,8 @@ import (
 	"github.com/dujiao-next/internal/logger"
 	procurementcontract "github.com/dujiao-next/internal/modules/procurement/contract"
 	procurementdomain "github.com/dujiao-next/internal/modules/procurement/domain"
+	"github.com/dujiao-next/internal/shared/jsonmap"
+	"github.com/dujiao-next/internal/shared/reservationterms"
 )
 
 // SubmitToUpstream Worker 调用：向上游站点提交采购单
@@ -60,16 +62,31 @@ func (s *Service) SubmitToUpstream(procurementOrderID uint) error {
 		return nil // 永久性错误，不重试
 	}
 	item := localOrder.Items[0]
+	frozen, err := reservationterms.ParseFrozen(item.SKUSnapshot)
+	if err != nil {
+		s.markProcurementError(procOrder, "invalid frozen reservation; manual review required")
+		return fmt.Errorf("invalid frozen checkout reservation: %w", err)
+	}
+	if frozen.Required {
+		if item.Quantity != 1 || frozen.ConnectionID != procOrder.ConnectionID || frozen.Hold == nil || frozen.Hold.HoldID == "" || (frozen.Hold.State != "paid" && frozen.Hold.State != "bound" && frozen.Hold.State != "consumed") {
+			s.markProcurementError(procOrder, "paid reservation not confirmed; automatic procurement stopped")
+			return fmt.Errorf("paid reservation not confirmed")
+		}
+	}
 
 	// 查找 SKU 映射
-	upstreamSKUID, found, err := s.skuMapRepo.FindUpstreamSKUID(item.SKUID)
-	if err != nil {
-		s.markProcurementError(procOrder, fmt.Sprintf("lookup sku mapping failed: %v", err))
-		return fmt.Errorf("lookup sku mapping: %w", err)
-	}
-	if !found {
-		s.rejectProcurement(procOrder, fmt.Sprintf("no sku mapping for local sku %d", item.SKUID))
-		return nil // 永久性错误，不重试
+	upstreamSKUID := frozen.UpstreamSKUID
+	if !frozen.Required {
+		var found bool
+		upstreamSKUID, found, err = s.skuMapRepo.FindUpstreamSKUID(item.SKUID)
+		if err != nil {
+			s.markProcurementError(procOrder, fmt.Sprintf("lookup sku mapping failed: %v", err))
+			return fmt.Errorf("lookup sku mapping: %w", err)
+		}
+		if !found {
+			s.rejectProcurement(procOrder, fmt.Sprintf("no sku mapping for local sku %d", item.SKUID))
+			return nil
+		}
 	}
 
 	// 构建上游请求
@@ -80,7 +97,30 @@ func (s *Service) SubmitToUpstream(procurementOrderID uint) error {
 		TraceID:           procOrder.TraceID,
 		CallbackURL:       connection.CallbackURL(),
 	}
+	if frozen.Required {
+		req.ReservationOrderRef = frozen.Hold.OrderRef
+		req.ReservationHoldID = frozen.Hold.HoldID
+		req.ReservationHoldVersion = frozen.Hold.Version
+		req.ReservationExpiresAt = frozen.Hold.ExpiresAt
+	}
 
+	// Terms come only from the immutable server checkout snapshot; never consult
+	// current SKU configuration or buyer-controlled manual form fields here.
+	switch frozen := item.SKUSnapshot["entitlement_contract"].(type) {
+	case map[string]interface{}:
+		req.EntitlementContract = jsonmap.JSON(frozen)
+	case jsonmap.JSON:
+		req.EntitlementContract = frozen
+	}
+	if hash, ok := item.SKUSnapshot["entitlement_contract_hash"].(string); ok {
+		req.EntitlementContractHash = hash
+	}
+	if localOrder.UserID > 0 {
+		req.CustomerReference = &procurementcontract.CustomerReference{
+			MerchantCustomerID: fmt.Sprintf("needtoken-storefront:user:%d", localOrder.UserID),
+			Source:             "needtoken-storefront", Verification: "merchant_session",
+		}
+	}
 	// 传递人工表单数据（如有）
 	if len(item.ManualFormSubmissionJSON) > 0 {
 		req.ManualFormData = item.ManualFormSubmissionJSON

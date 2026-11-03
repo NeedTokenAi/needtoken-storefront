@@ -3,6 +3,7 @@ package middleware
 import (
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dujiao-next/internal/app/container"
@@ -83,6 +84,13 @@ func ChannelAPIAuthMiddleware(container *container.Container) gin.HandlerFunc {
 			return
 		}
 
+		// Dedicated operations credentials have no bot/wallet mutation scope;
+		// existing bot clients have no access to the operations read surface.
+		if !channelTypeAllowsPath(client.ChannelType, path) {
+			response.ChannelError(c, http.StatusForbidden, response.CodeForbidden, i18n.T(i18n.ResolveLocale(c), "error.forbidden"), "channel_scope_forbidden")
+			c.Abort()
+			return
+		}
 		// 异步更新 last_used_at
 		now := time.Now()
 		go func() {
@@ -98,4 +106,9 @@ func ChannelAPIAuthMiddleware(container *container.Container) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func channelTypeAllowsPath(channelType, path string) bool {
+	opsPath := strings.HasPrefix(path, "/api/v1/channel/needtoken-ops/")
+	return opsPath == (channelType == "needtoken_ops")
 }

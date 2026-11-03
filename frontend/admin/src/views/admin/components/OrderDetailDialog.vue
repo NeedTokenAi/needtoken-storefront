@@ -690,11 +690,17 @@ const submitManualRefund = async () => {
 
   manualRefundSubmitting.value = true
   try {
+    // Retain the operation ID across failed responses and dialog reopenings.
+    const operationKey = `needtoken:manual-refund:${selectedOrder.value.id}`
+    const operationID = sessionStorage.getItem(operationKey) || crypto.randomUUID()
+    sessionStorage.setItem(operationKey, operationID)
     await adminAPI.manualRefundOrder(Number(selectedOrder.value.id), {
+      operation_id: operationID,
       amount,
       remark: manualRefundForm.reason.trim() || undefined,
       payment_fee_refunded: manualRefundForm.paymentFeeRefunded,
     })
+    sessionStorage.removeItem(operationKey)
     manualRefundSuccess.value = t('admin.orders.manualRefundSuccess')
     manualRefundForm.amount = ''
     manualRefundForm.reason = ''

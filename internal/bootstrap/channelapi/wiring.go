@@ -220,6 +220,8 @@ func mapError(err error) error {
 		{manualform.ErrTypeInvalid, channeltransport.ErrManualFormTypeInvalid},
 		{manualform.ErrOptionInvalid, channeltransport.ErrManualFormOptionInvalid},
 		{paymentapp.ErrPaymentInvalid, channeltransport.ErrPaymentInvalid},
+		{paymentapp.ErrCheckoutPolicyUnknown, channeltransport.ErrCheckoutPolicyUnknown},
+		{paymentapp.ErrCheckoutReservationUnavailable, channeltransport.ErrCheckoutReservationUnavailable},
 		{orderapp.ErrOrderNotFound, channeltransport.ErrOrderNotFound},
 		{orderapp.ErrOrderStatusInvalid, channeltransport.ErrOrderStatusInvalid},
 		{paymentapp.ErrPaymentChannelNotFound, channeltransport.ErrPaymentChannelNotFound},

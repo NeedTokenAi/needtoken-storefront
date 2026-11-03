@@ -72,6 +72,8 @@ var channelOrderCreateErrorRules = []mappedChannelError{
 }
 
 var channelPaymentCreateErrorRules = []mappedChannelError{
+	channelErrorRule(ErrCheckoutPolicyUnknown, http.StatusConflict, response.CodeBadRequest, "reservation_policy_unknown", "error.checkout_reservation_policy_unknown"),
+	channelErrorRule(ErrCheckoutReservationUnavailable, http.StatusConflict, response.CodeBadRequest, "reservation_unconfirmed", "error.checkout_reservation_unavailable"),
 	channelErrorRule(ErrPaymentInvalid, http.StatusBadRequest, response.CodeBadRequest, "validation_error", "error.payment_invalid"),
 	channelErrorRule(ErrOrderNotFound, http.StatusNotFound, response.CodeNotFound, "order_not_found", "error.order_not_found"),
 	channelErrorRule(ErrOrderStatusInvalid, http.StatusBadRequest, response.CodeBadRequest, "order_status_invalid", "error.order_status_invalid"),
