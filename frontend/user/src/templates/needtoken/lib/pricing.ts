@@ -19,6 +19,17 @@ export interface PricingModel {
     enable_groups?: string[]
     tags?: string
     description?: string
+    billing_mode?: string
+    billing_expr?: string
+    billing_plugin_variants?: { plugin_key: string; plugin_name?: string; billing_mode?: string; billing_expr?: string }[]
+    billing_usage_schema?: Record<string, { type?: string; unit?: string }>
+    supported_endpoint_types?: string[]
+    pricing_version?: string
+    cache_ratio?: number | null
+    create_cache_ratio?: number | null
+    image_ratio?: number | null
+    audio_ratio?: number | null
+    audio_completion_ratio?: number | null
 }
 
 export interface PricingVendor {
@@ -31,6 +42,7 @@ export interface PricingResponse {
     data?: PricingModel[]
     vendors?: PricingVendor[]
     group_ratio?: Record<string, number>
+    pricing_version?: string
 }
 
 /**
@@ -39,7 +51,8 @@ export interface PricingResponse {
  */
 export const UNCONFIGURED_MODEL_RATIO = 37.5
 
-export type PriceUnit = 'per_million_tokens' | 'per_call'
+export type PriceUnit = 'per_million_tokens' | 'per_call' | 'conditional'
+export type PricingCondition = 'expression' | 'plugin' | 'task' | 'multimodal' | 'unknown'
 
 export interface ModelOffer {
     /** 唯一键：模型 + 分组 */
@@ -51,9 +64,13 @@ export interface ModelOffer {
     supplyLine: string | null
     unit: PriceUnit
     /** 美元；per_call 时 output 为 null */
-    inputPrice: number
+    inputPrice: number | null
     outputPrice: number | null
     isDefault: boolean
+    condition: PricingCondition | null
+    /** Backend cache/schema marker; never treated as an immutable checkout quote. */
+    sourceVersion: string | null
+    usageUnits: string[]
 }
 
 export interface BuildOffersOptions {
@@ -62,7 +79,18 @@ export interface BuildOffersOptions {
     supplyLineByGroup: Record<string, string>
 }
 
+export const pricingCondition = (model: PricingModel): PricingCondition | null => {
+    if (model.billing_plugin_variants?.length) return 'plugin'
+    if (String(model.billing_expr || '').trim() || (model.billing_mode && model.billing_mode !== 'ratio')) return 'expression'
+    if (Object.keys(model.billing_usage_schema || {}).length || model.supported_endpoint_types?.some(type => ['openai-video', 'image-generation'].includes(type))) return 'task'
+    if ([model.cache_ratio, model.create_cache_ratio, model.image_ratio, model.audio_ratio, model.audio_completion_ratio].some(value => value !== undefined && value !== null)) return 'multimodal'
+    if (model.quota_type !== 0 && model.quota_type !== 1) return 'unknown'
+    return null
+}
+
 export const isModelPriced = (model: PricingModel): boolean => {
+    // Never interpret expression/plugin/task prices through the legacy token formula.
+    if (pricingCondition(model)) return true
     if (model.quota_type === 1) {
         return Number.isFinite(model.model_price) && model.model_price > 0
     }
@@ -70,7 +98,7 @@ export const isModelPriced = (model: PricingModel): boolean => {
         Number.isFinite(model.model_ratio)
         && model.model_ratio > 0
         && model.model_ratio !== UNCONFIGURED_MODEL_RATIO
-        && Number.isFinite(model.completion_ratio)
+        && Number.isFinite(model.completion_ratio) && model.completion_ratio >= 0
     )
 }
 
@@ -98,21 +126,28 @@ export const buildOffers = (response: PricingResponse, options: BuildOffersOptio
     for (const model of models) {
         if (!model || !model.model_name || blocked.has(model.model_name)) continue
         if (!isModelPriced(model)) continue
-        const groups = (model.enable_groups || []).filter(g => Number.isFinite(groupRatio[g]))
+        const condition = pricingCondition(model)
+        const enabled = model.enable_groups?.includes('all') ? Object.keys(groupRatio) : (model.enable_groups || [])
+        const groups = [...new Set(enabled)].filter(g => Number.isFinite(groupRatio[g]) && groupRatio[g]! >= 0)
         for (const group of groups) {
             const ratio = groupRatio[group] as number
             const perCall = model.quota_type === 1
-            const input = perCall ? model.model_price * ratio : model.model_ratio * 2 * ratio
+            const input = condition ? null : perCall ? model.model_price * ratio : model.model_ratio * 2 * ratio
+            const output = condition || perCall || input === null ? null : input * model.completion_ratio
+            const valid = input !== null && Number.isFinite(input) && (output === null || Number.isFinite(output))
             offers.push({
                 key: `${model.model_name}@${group}`,
                 modelId: model.model_name,
                 vendor: resolveVendor(model, vendors),
                 group,
                 supplyLine: options.supplyLineByGroup[group] ?? null,
-                unit: perCall ? 'per_call' : 'per_million_tokens',
-                inputPrice: input,
-                outputPrice: perCall ? null : input * model.completion_ratio,
+                unit: valid ? perCall ? 'per_call' : 'per_million_tokens' : 'conditional',
+                inputPrice: valid ? input : null,
+                outputPrice: valid ? output : null,
                 isDefault: defaults.has(model.model_name),
+                condition: condition ?? (valid ? null : 'unknown'),
+                sourceVersion: model.pricing_version || response.pricing_version || null,
+                usageUnits: [...new Set(Object.entries(model.billing_usage_schema || {}).map(([key, field]) => `${key}${field.unit ? ` (${field.unit})` : ''}`))],
             })
         }
     }
@@ -151,7 +186,9 @@ export const sortOffers = (offers: ModelOffer[], sort: OfferSort, defaultModels:
     }
     const dir = sort === 'price_asc' ? 1 : -1
     return list.sort((a, b) => {
-        if (a.unit !== b.unit) return a.unit === 'per_million_tokens' ? -1 : 1
+        const units: Record<PriceUnit, number> = { per_million_tokens: 0, per_call: 1, conditional: 2 }
+        if (a.unit !== b.unit) return units[a.unit] - units[b.unit]
+        if (a.inputPrice === null || b.inputPrice === null) return a.modelId.localeCompare(b.modelId)
         return (a.inputPrice - b.inputPrice) * dir || a.modelId.localeCompare(b.modelId)
     })
 }
@@ -167,7 +204,8 @@ export const toggleCompare = (selected: string[], key: string): string[] => {
 
 /** 美元价格显示：去掉多余的 0，最多 6 位小数 */
 export const formatUsd = (value: number | null): string => {
-    if (value === null || !Number.isFinite(value)) return '-'
+    if (value === null || !Number.isFinite(value) || value < 0) return '-'
+    if (value > 0 && value < 0.000001) return '<$0.000001'
     const fixed = value.toFixed(6).replace(/\.?0+$/, '')
     return `$${fixed}`
 }

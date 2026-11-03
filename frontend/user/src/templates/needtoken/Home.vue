@@ -107,6 +107,7 @@
         </div>
         <RouterLink to="/models" class="text-[14px] font-semibold text-primary hover:underline">{{ t('needtoken.home.pricing.more') }}</RouterLink>
       </div>
+      <p v-if="pricing.state.value === 'error'" role="status" class="mt-4 text-[12px] text-muted-foreground">{{ t('needtoken.models.stalePrice') }}</p>
       <div class="mt-8 overflow-x-auto rounded-xl border border-border">
         <div v-if="pricing.isLoading.value" class="px-5 py-8 text-center text-[14px] text-muted-foreground">{{ t('needtoken.common.loading') }}</div>
         <div v-else-if="pricingRows.length === 0" class="px-5 py-8 text-center text-[14px] text-muted-foreground">{{ t('needtoken.common.pricingPending') }}</div>
@@ -115,6 +116,7 @@
             <tr>
               <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.model') }}</th>
               <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.supply') }}</th>
+              <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.unit') }}</th>
               <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.input') }}</th>
               <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.output') }}</th>
             </tr>
@@ -123,13 +125,15 @@
             <tr v-for="row in pricingRows" :key="row.key" class="border-t border-border">
               <td class="nt-mono px-5 py-3 text-foreground">{{ row.modelId }}</td>
               <td class="px-5 py-3 text-muted-foreground">{{ supplyLabel(row) }}</td>
-              <td class="nt-mono px-5 py-3 text-foreground">{{ formatUsd(row.inputPrice) }}</td>
-              <td class="nt-mono px-5 py-3 text-foreground">{{ formatUsd(row.outputPrice) }}</td>
+              <td class="px-5 py-3 text-muted-foreground">{{ t(`needtoken.models.units.${row.unit}`) }}</td>
+              <td v-if="row.unit === 'conditional'" colspan="2" class="px-5 py-3 text-muted-foreground">{{ t('needtoken.models.conditionalPrice') }}</td>
+              <template v-else><td class="nt-mono px-5 py-3 text-foreground">{{ formatUsd(row.inputPrice) }}</td><td class="nt-mono px-5 py-3 text-foreground">{{ formatUsd(row.outputPrice) }}</td></template>
             </tr>
           </tbody>
         </table>
       </div>
       <p class="mt-3 text-[12px] text-muted-foreground">{{ t('needtoken.common.priceUnitNote') }}</p>
+      <p class="mt-2 text-[11px] text-muted-foreground">{{ t('needtoken.models.sourceVersion', { version: pricing.sourceVersion.value || t('needtoken.models.versionUnknown') }) }}<template v-if="pricing.loadedAt.value"> · {{ t('needtoken.models.updatedAt', { time: pricing.loadedAt.value.toLocaleString() }) }}</template></p>
     </section>
 
     <!-- FAQ -->

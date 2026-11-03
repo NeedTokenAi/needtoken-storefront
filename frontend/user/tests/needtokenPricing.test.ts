@@ -89,4 +89,46 @@ test('formatUsd trims trailing zeros', () => {
     assert.equal(formatUsd(2.5), '$2.5')
     assert.equal(formatUsd(0.0006), '$0.0006')
     assert.equal(formatUsd(null), '-')
+    assert.equal(formatUsd(0.0000001), '<$0.000001')
+    assert.equal(formatUsd(-1), '-')
+})
+
+test('expression, plugin, video and conditional prices never use legacy token numbers', () => {
+    const base = { model_name: 'conditional', quota_type: 0, model_ratio: 0.5, model_price: 1, completion_ratio: 4, enable_groups: ['pool'] }
+    const variants = [
+        { ...base, model_name: 'expr', billing_mode: 'tiered_expr', billing_expr: 'p > 100 ? p * 3 : p' },
+        { ...base, model_name: 'plugin', billing_plugin_variants: [{ plugin_key: 'vendor-a', billing_expr: 'u("seconds") * 2' }] },
+        { ...base, model_name: 'video', supported_endpoint_types: ['openai-video'] },
+        { ...base, model_name: 'task', billing_usage_schema: { seconds: { type: 'number', unit: 'seconds' } } },
+        { ...base, model_name: 'audio', audio_ratio: 20 },
+        { ...base, model_name: 'cache', cache_ratio: 0.1 },
+        { ...base, model_name: 'future-mode', quota_type: 2 },
+    ]
+    const offers = buildOffers({ data: variants, group_ratio: { pool: 1 }, pricing_version: 'source-marker' }, options)
+    assert.equal(offers.length, variants.length)
+    for (const offer of offers) {
+        assert.equal(offer.unit, 'conditional', offer.modelId)
+        assert.equal(offer.inputPrice, null, offer.modelId)
+        assert.equal(offer.outputPrice, null, offer.modelId)
+        assert.equal(offer.sourceVersion, 'source-marker')
+    }
+    assert.deepEqual(offers.find(o => o.modelId === 'task')?.usageUnits, ['seconds (seconds)'])
+})
+
+test('conditional offers sort last without entering numeric price comparison', () => {
+    const offers = buildOffers({ ...response, data: [...response.data!, { model_name: 'conditional', quota_type: 0, model_ratio: 0.001, model_price: 0, completion_ratio: 1, billing_expr: 'dynamic()', enable_groups: ['pool'] }] }, options)
+    for (const sort of ['price_asc', 'price_desc'] as const) assert.equal(sortOffers(offers, sort, options.defaultModels).at(-1)?.modelId, 'conditional')
+})
+
+test('only authoritative finite nonnegative group prices are shown and all groups expand safely', () => {
+    const model = { model_name: 'known', quota_type: 0, model_ratio: 1, model_price: 0, completion_ratio: 1, enable_groups: ['all'] }
+    const offers = buildOffers({ data: [model], group_ratio: { pool: 1, free: 0, negative: -1, invalid: Number.NaN }, pricing_version: 'v-source' }, options)
+    assert.deepEqual(offers.map(o => o.group), ['pool', 'free'])
+    assert.equal(offers[1]?.inputPrice, 0)
+    assert.equal(offers[0]?.sourceVersion, 'v-source')
+    const noVersion = buildOffers({ data: [model], group_ratio: { pool: 1 } }, options)
+    assert.equal(noVersion[0]?.sourceVersion, null)
+    const overflow = buildOffers({ data: [{ ...model, model_ratio: Number.MAX_VALUE }], group_ratio: { pool: 10 } }, options)
+    assert.equal(overflow[0]?.unit, 'conditional')
+    assert.equal(overflow[0]?.inputPrice, null)
 })

@@ -28,9 +28,10 @@
         <option value="price_desc">{{ t('needtoken.models.sortPriceDesc') }}</option>
       </select>
       <span class="ml-auto text-[12px] text-muted-foreground">
-        <template v-if="pricing.loadedAt.value">{{ t('needtoken.models.updatedAt', { time: pricing.loadedAt.value.toLocaleTimeString() }) }}</template>
+        <template v-if="pricing.loadedAt.value">{{ t('needtoken.models.updatedAt', { time: pricing.loadedAt.value.toLocaleString() }) }}</template>
       </span>
     </div>
+    <p v-if="pricing.state.value === 'error' && offers.length" role="status" class="mt-5 rounded-md border border-amber-500/40 p-3 text-[12px] text-muted-foreground">{{ t('needtoken.models.stalePrice') }}</p>
 
     <!-- 状态 -->
     <div v-if="pricing.isLoading.value" class="mt-10 rounded-xl border border-border px-6 py-12 text-center text-muted-foreground">{{ t('needtoken.common.loading') }}</div>
@@ -55,7 +56,12 @@
           <span class="rounded border border-border px-2 py-0.5 text-muted-foreground">{{ supplyLabel(offer) }}</span>
           <span class="rounded border px-2 py-0.5" :class="statusClass(offer)" :title="statusTitle">{{ statusLabel(offer) }}</span>
         </div>
-        <dl class="nt-mono mt-4 grid grid-cols-2 gap-3 text-[13px]">
+        <div v-if="offer.unit === 'conditional'" class="mt-4 rounded-md bg-secondary/60 p-3 text-[12px] text-muted-foreground">
+          <p class="font-medium text-foreground">{{ t('needtoken.models.conditionalPrice') }}</p>
+          <p class="mt-1">{{ t(`needtoken.models.conditions.${offer.condition || 'unknown'}`) }}</p>
+          <p v-if="offer.usageUnits.length" class="mt-2 break-words nt-mono">{{ t('needtoken.models.usageFields') }}: {{ offer.usageUnits.join(', ') }}</p>
+        </div>
+        <dl v-else class="nt-mono mt-4 grid grid-cols-2 gap-3 text-[13px]">
           <div>
             <dt class="text-muted-foreground">{{ offer.unit === 'per_call' ? t('needtoken.models.columns.perCall') : t('needtoken.models.columns.input') }}</dt>
             <dd class="mt-0.5 text-[15px] text-foreground">{{ formatUsd(offer.inputPrice) }}</dd>
@@ -65,6 +71,8 @@
             <dd class="mt-0.5 text-[15px] text-foreground">{{ formatUsd(offer.outputPrice) }}</dd>
           </div>
         </dl>
+        <p class="mt-2 text-[10px] text-muted-foreground">{{ unitLabel(offer) }}</p>
+        <p class="mt-2 break-all text-[10px] text-muted-foreground">{{ t('needtoken.models.sourceVersion', { version: offer.sourceVersion || t('needtoken.models.versionUnknown') }) }}</p>
         <div class="mt-5 flex flex-wrap items-center gap-2 pt-1">
           <RouterLink to="/plans" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.models.buy') }}</RouterLink>
           <RouterLink :to="{ path: '/docs', query: { model: offer.modelId }, hash: '#opencode' }" class="rounded-md border border-border px-3 py-1.5 text-[13px] text-foreground hover:bg-secondary">{{ t('needtoken.models.configure') }}</RouterLink>
@@ -90,6 +98,7 @@
             <tr>
               <th class="py-2 pr-4 font-medium">{{ t('needtoken.models.columns.model') }}</th>
               <th class="py-2 pr-4 font-medium">{{ t('needtoken.models.columns.supply') }}</th>
+              <th class="py-2 pr-4 font-medium">{{ t('needtoken.models.columns.unit') }}</th>
               <th class="py-2 pr-4 font-medium">{{ t('needtoken.models.columns.input') }}</th>
               <th class="py-2 pr-4 font-medium">{{ t('needtoken.models.columns.output') }}</th>
               <th class="py-2 font-medium"></th>
@@ -99,8 +108,9 @@
             <tr v-for="o in compared" :key="`c-${o.key}`" class="border-t border-border">
               <td class="nt-mono py-2 pr-4 text-foreground">{{ o.modelId }}</td>
               <td class="py-2 pr-4 text-muted-foreground">{{ supplyLabel(o) }}</td>
-              <td class="nt-mono py-2 pr-4 text-foreground">{{ formatUsd(o.inputPrice) }}<span v-if="o.unit === 'per_call'" class="text-muted-foreground"> / {{ t('needtoken.models.perCallShort') }}</span></td>
-              <td class="nt-mono py-2 pr-4 text-foreground">{{ formatUsd(o.outputPrice) }}</td>
+              <td class="py-2 pr-4 text-muted-foreground">{{ unitLabel(o) }}</td>
+              <td v-if="o.unit === 'conditional'" colspan="2" class="py-2 pr-4 text-muted-foreground">{{ t('needtoken.models.conditionalPrice') }}</td>
+              <template v-else><td class="nt-mono py-2 pr-4 text-foreground">{{ formatUsd(o.inputPrice) }}</td><td class="nt-mono py-2 pr-4 text-foreground">{{ formatUsd(o.outputPrice) }}</td></template>
               <td class="py-2 text-right"><button type="button" class="text-muted-foreground hover:text-foreground" :aria-label="t('needtoken.models.compareRemove')" @click="compare = toggleCompare(compare, o.key)">×</button></td>
             </tr>
           </tbody>
@@ -144,6 +154,7 @@ const offers = computed(() => pricing.offers.value)
 
 const supplyLabel = (offer: ModelOffer) =>
   offer.supplyLine ? t(`needtoken.supply.${offer.supplyLine}`) : t('needtoken.models.groupLabel', { group: offer.group })
+const unitLabel = (offer: ModelOffer) => t(`needtoken.models.units.${offer.unit}`)
 
 const vendorOptions = computed(() => [...new Set(offers.value.map(o => o.vendor))].sort())
 const supplyOptions = computed(() => {

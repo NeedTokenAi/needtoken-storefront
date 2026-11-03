@@ -1748,7 +1748,7 @@
       "loading": "載入中…",
       "retry": "重試",
       "pricingPending": "定價待公佈：以控制檯定價表為準，未配置價格的模型暫不展示。",
-      "priceUnitNote": "價格單位：美元 / 百萬 tokens（按次計費的模型為美元 / 次），資料取自 new-api 定價表。"
+      "priceUnitNote": "僅在規則可準確解釋時顯示美元 / 百萬 tokens 或美元 / 次；條件計費不顯示推算單價。價格來自 new-api，來源版本是介面標記，不是鎖定報價。"
     },
     "nav": {
       "label": "主導航",
@@ -1873,7 +1873,7 @@
       },
       "pricing": {
         "title": "定價摘要",
-        "subtitle": "預設模型的當前定價，資料實時讀取 new-api 定價表。",
+        "subtitle": "預設模型的最近擷取定價與計費條件，權威來源為 new-api。",
         "more": "全部模型與比價 →"
       },
       "faq": {
@@ -1930,7 +1930,8 @@
         "supply": "供應線",
         "input": "輸入價",
         "output": "輸出價",
-        "perCall": "每次"
+        "perCall": "每次",
+        "unit": "計價單位 / 條件"
       },
       "perCallShort": "次",
       "buy": "購買套餐",
@@ -1939,7 +1940,24 @@
       "compareTitle": "比價（{n} / {max}）",
       "compareClear": "清空",
       "compareRemove": "移出比價",
-      "sourceNote": "可用狀態將接入號池分組資料後展示。"
+      "sourceNote": "可用狀態將接入號池分組資料後展示。",
+      "conditionalPrice": "依條件計費，請在控制檯核價",
+      "usageFields": "計量欄位",
+      "sourceVersion": "來源版本：{version}",
+      "versionUnknown": "未提供",
+      "stalePrice": "本次未取得最新定價。既有資料僅為上次擷取記錄，請到控制檯核實價格。",
+      "units": {
+        "per_million_tokens": "美元 / 百萬 tokens",
+        "per_call": "美元 / 次",
+        "conditional": "條件 / 用量計費"
+      },
+      "conditions": {
+        "expression": "價格取決於運算式、級距或請求條件；此處不計算單一 token 價格。",
+        "plugin": "不同外掛或供應路徑可能採用不同計費規則，請在控制檯確認。",
+        "task": "價格取決於任務用量、時長或規格；此處不換算為 token 單價。",
+        "multimodal": "涉及快取、影像或音訊等獨立計量條件，請在控制檯確認完整計價。",
+        "unknown": "目前計費方式無法準確解釋，請在控制檯核價。"
+      }
     },
     "plans": {
       "title": "套餐 & Tokens",
