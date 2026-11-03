@@ -10,6 +10,14 @@ import (
 // Store 是支付记录持久化与事务边界。
 type Store interface {
 	Create(payment *paymentdomain.Payment) error
+	ListCheckoutReservations(rootOrderID uint) ([]paymentdomain.CheckoutReservation, error)
+	CreateCheckoutReservation(record paymentdomain.CheckoutReservation) (*paymentdomain.CheckoutReservation, error)
+	SaveCheckoutReservation(record paymentdomain.CheckoutReservation) (*paymentdomain.CheckoutReservation, error)
+	RecordPaidFulfillment(orderID uint, now time.Time) error
+	BackfillPaidFulfillment(now time.Time, limit int) error
+	ListPendingPaidFulfillment(now time.Time, limit int) ([]paymentdomain.PaidFulfillmentEvent, error)
+	ClaimPaidFulfillment(orderID uint, leaseID string, now time.Time) (bool, error)
+	FinishPaidFulfillment(orderID uint, leaseID string, completed bool, now time.Time) error
 	Update(payment *paymentdomain.Payment) error
 	GetByID(id uint) (*paymentdomain.Payment, error)
 	GetByIDs(ids []uint) ([]paymentdomain.Payment, error)

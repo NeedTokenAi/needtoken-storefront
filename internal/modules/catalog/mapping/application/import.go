@@ -19,6 +19,7 @@ import (
 	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/jsonslice"
 	"github.com/dujiao-next/internal/shared/money"
+	"github.com/dujiao-next/internal/shared/reservationterms"
 	"github.com/dujiao-next/internal/upstream"
 
 	"github.com/shopspring/decimal"
@@ -98,6 +99,9 @@ func (s *Service) importUpstreamProduct(connectionID uint, upstreamProductID uin
 	// 新版上游对下架商品返回 200 + is_active=false → 同样禁止导入
 	if !upProduct.IsActive {
 		return nil, mappingcontract.ErrUpstreamProductNotFound
+	}
+	if err := validateReservationCatalog(upProduct, connectionID); err != nil {
+		return nil, fmt.Errorf("validate upstream reservation metadata: %w", err)
 	}
 
 	if autoCreateCategory && categoryID == 0 && upProduct.CategoryID > 0 {
@@ -207,13 +211,18 @@ func (s *Service) importUpstreamProduct(connectionID uint, upstreamProductID uin
 			}
 			localPrice := CalculateLocalPrice(skuPrice, exchangeRate, markupPercent, roundingMode)
 			localSKU := productdomain.ProductSKU{
-				ProductID:       product.ID,
-				SKUCode:         upSKU.SKUCode,
-				SpecValuesJSON:  upSKU.SpecValues,
-				PriceAmount:     money.FromDecimal(localPrice.Round(2)),
-				CostPriceAmount: money.FromDecimal(convertCurrency(skuPrice, exchangeRate).Round(2)), // 成本价 = 上游价格 × 汇率（本地币种）
-				IsActive:        upSKU.IsActive,
-				SortOrder:       0,
+				ProductID:               product.ID,
+				SKUCode:                 upSKU.SKUCode,
+				SpecValuesJSON:          upSKU.SpecValues,
+				EntitlementContractJSON: upProduct.EntitlementContract,
+				EntitlementContractHash: upProduct.EntitlementContractHash,
+				PriceAmount:             money.FromDecimal(localPrice.Round(2)),
+				CostPriceAmount:         money.FromDecimal(convertCurrency(skuPrice, exchangeRate).Round(2)), // 成本价 = 上游价格 × 汇率（本地币种）
+				IsActive:                upSKU.IsActive,
+				SortOrder:               0,
+			}
+			if err := assignReservationMetadata(&localSKU, upProduct, upSKU, connectionID); err != nil {
+				return fmt.Errorf("freeze sku reservation metadata: %w", err)
 			}
 			if err := repos.SKUs.Create(&localSKU); err != nil {
 				return fmt.Errorf("create local sku: %w", err)
@@ -230,6 +239,9 @@ func (s *Service) importUpstreamProduct(connectionID uint, upstreamProductID uin
 				PriceAmount:    money.FromDecimal(priceAmount.Round(2)),
 				IsActive:       true,
 				SortOrder:      0,
+			}
+			if err := assignReservationMetadata(&defaultSKU, upProduct, upstream.UpstreamSKU{}, connectionID); err != nil {
+				return fmt.Errorf("freeze default sku reservation metadata: %w", err)
 			}
 			if err := repos.SKUs.Create(&defaultSKU); err != nil {
 				return fmt.Errorf("create default sku: %w", err)
@@ -281,6 +293,51 @@ func (s *Service) importUpstreamProduct(connectionID uint, upstreamProductID uin
 	}
 
 	return mapping, nil
+}
+
+// Reservation identity comes from the actual signed connection/mapping, never
+// from metadata fields supplied by a buyer or copied from an upstream payload.
+func assignReservationMetadata(local *productdomain.ProductSKU, product *upstream.UpstreamProduct, sku upstream.UpstreamSKU, connectionID uint) error {
+	// Default false distinguishes legacy cached catalog rows from a completed
+	// trusted policy refresh, including a known non-scarce product.
+	local.ReservationPolicyKnown = false
+	required, contract, err := upstream.ReservationMetadata(product, sku)
+	if local.RequiresReservation && !required {
+		// Losing an upstream field cannot silently reopen unrestricted sales.
+		local.IsActive = false
+		return reservationterms.ErrInvalid
+	}
+	local.RequiresReservation, local.ReservationContractJSON = required, contract
+	local.ReservationConnectionID, local.ReservationUpstreamSKUID = 0, 0
+	if required {
+		local.ReservationConnectionID, local.ReservationUpstreamSKUID = connectionID, sku.ID
+		if err != nil || connectionID == 0 || sku.ID == 0 {
+			local.IsActive = false
+			return reservationterms.ErrInvalid
+		}
+	}
+	if err != nil {
+		return err
+	}
+	// A freshly fetched legacy object can still omit this protocol field.
+	// Only an explicit boolean declaration, or unambiguous scarce terms, can
+	// establish policy; transport success alone cannot assert non-scarcity.
+	local.ReservationPolicyKnown = required || product.ReservationPolicyDeclared || sku.ReservationPolicyDeclared
+	return nil
+}
+
+func validateReservationCatalog(product *upstream.UpstreamProduct, connectionID uint) error {
+	if len(product.SKUs) == 0 {
+		var local productdomain.ProductSKU
+		return assignReservationMetadata(&local, product, upstream.UpstreamSKU{}, connectionID)
+	}
+	for _, sku := range product.SKUs {
+		var local productdomain.ProductSKU
+		if err := assignReservationMetadata(&local, product, sku, connectionID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // fetchUpstreamCategoryMap 拉取上游分类列表并构建 ID → 分类映射，供批量导入预取共用。

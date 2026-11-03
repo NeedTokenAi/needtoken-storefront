@@ -3,6 +3,7 @@ package httpserver
 import (
 	"github.com/dujiao-next/internal/app/container"
 	"github.com/dujiao-next/internal/app/httpserver/middleware"
+	"github.com/dujiao-next/internal/bootstrap/opsbridge"
 	affiliatetransport "github.com/dujiao-next/internal/modules/affiliate/transport/http"
 	channeltransport "github.com/dujiao-next/internal/modules/channelapi/transport/http"
 	giftcardtransport "github.com/dujiao-next/internal/modules/giftcard/transport/http"
@@ -31,6 +32,9 @@ func registerChannelRoutes(
 	channelAPI.Use(middleware.RateLimitMiddleware(redisClient, channelAPIRule, middleware.KeyByIPAndHeader("Dujiao-Next-Channel-Key")))
 	channelAPI.Use(middleware.ChannelAPIAuthMiddleware(c))
 	{
+		opsHandler := opsbridge.NewHandler(c)
+		channelAPI.GET("/needtoken-ops/overview", opsHandler.Overview)
+		channelAPI.GET("/needtoken-ops/orders", opsHandler.Orders)
 		telegramtransport.RegisterChannelBotRoutes(channelAPI, channelTelegramBotHandler)
 		channeltransport.RegisterRoutes(channelAPI, channelHandler)
 		affiliatetransport.RegisterChannelRoutes(channelAPI, channelAffiliateHandler)

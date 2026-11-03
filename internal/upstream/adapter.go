@@ -2,6 +2,7 @@ package upstream
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/shared/jsonmap"
+	"github.com/dujiao-next/internal/shared/reservationterms"
 )
 
 // 上游商品状态相关哨兵错误（adapter 层归一化）
@@ -55,25 +57,32 @@ type ProductListResult struct {
 
 // UpstreamProduct 上游商品信息
 type UpstreamProduct struct {
-	ID               uint                              `json:"id"`
-	Slug             string                            `json:"slug"`
-	SeoMeta          jsonmap.JSON                      `json:"seo_meta"`
-	Title            jsonmap.JSON                      `json:"title"`
-	Description      jsonmap.JSON                      `json:"description"`
-	Content          jsonmap.JSON                      `json:"content"`
-	Images           []string                          `json:"images"`
-	Tags             []string                          `json:"tags"`
-	PriceAmount      string                            `json:"price_amount"`
-	OriginalPrice    string                            `json:"original_price,omitempty"`
-	MemberPrice      string                            `json:"member_price,omitempty"`
-	WholesalePrices  productdomain.WholesalePriceTiers `json:"wholesale_prices,omitempty"`
-	Currency         string                            `json:"currency"`
-	FulfillmentType  string                            `json:"fulfillment_type"`
-	ManualFormSchema jsonmap.JSON                      `json:"manual_form_schema"`
-	IsActive         bool                              `json:"is_active"`
-	CategoryID       uint                              `json:"category_id"`
-	SKUs             []UpstreamSKU                     `json:"skus"`
-	UpdatedAt        time.Time                         `json:"updated_at"`
+	// Set only by decoding the actual policy field on the upstream wire. An
+	// omitted legacy field must not become a known non-scarce declaration.
+	ReservationPolicyDeclared bool                              `json:"-"`
+	RequiresReservation       bool                              `json:"requires_reservation,omitempty"`
+	ReservationContract       jsonmap.JSON                      `json:"reservation_contract,omitempty"`
+	EntitlementContract       jsonmap.JSON                      `json:"entitlement_contract,omitempty"`
+	EntitlementContractHash   string                            `json:"entitlement_contract_hash,omitempty"`
+	ID                        uint                              `json:"id"`
+	Slug                      string                            `json:"slug"`
+	SeoMeta                   jsonmap.JSON                      `json:"seo_meta"`
+	Title                     jsonmap.JSON                      `json:"title"`
+	Description               jsonmap.JSON                      `json:"description"`
+	Content                   jsonmap.JSON                      `json:"content"`
+	Images                    []string                          `json:"images"`
+	Tags                      []string                          `json:"tags"`
+	PriceAmount               string                            `json:"price_amount"`
+	OriginalPrice             string                            `json:"original_price,omitempty"`
+	MemberPrice               string                            `json:"member_price,omitempty"`
+	WholesalePrices           productdomain.WholesalePriceTiers `json:"wholesale_prices,omitempty"`
+	Currency                  string                            `json:"currency"`
+	FulfillmentType           string                            `json:"fulfillment_type"`
+	ManualFormSchema          jsonmap.JSON                      `json:"manual_form_schema"`
+	IsActive                  bool                              `json:"is_active"`
+	CategoryID                uint                              `json:"category_id"`
+	SKUs                      []UpstreamSKU                     `json:"skus"`
+	UpdatedAt                 time.Time                         `json:"updated_at"`
 }
 
 // UpstreamCategory 上游分类信息
@@ -94,25 +103,110 @@ type CategoryListResult struct {
 
 // UpstreamSKU 上游 SKU 信息
 type UpstreamSKU struct {
-	ID            uint         `json:"id"`
-	SKUCode       string       `json:"sku_code"`
-	SpecValues    jsonmap.JSON `json:"spec_values"`
-	PriceAmount   string       `json:"price_amount"`
-	OriginalPrice string       `json:"original_price,omitempty"`
-	MemberPrice   string       `json:"member_price,omitempty"`
-	StockStatus   string       `json:"stock_status"`
-	StockQuantity int          `json:"stock_quantity"` // 实际可用库存（-1=无限）
-	IsActive      bool         `json:"is_active"`
+	ReservationPolicyDeclared bool         `json:"-"`
+	RequiresReservation       bool         `json:"requires_reservation,omitempty"`
+	ReservationContract       jsonmap.JSON `json:"reservation_contract,omitempty"`
+	ID                        uint         `json:"id"`
+	SKUCode                   string       `json:"sku_code"`
+	SpecValues                jsonmap.JSON `json:"spec_values"`
+	PriceAmount               string       `json:"price_amount"`
+	OriginalPrice             string       `json:"original_price,omitempty"`
+	MemberPrice               string       `json:"member_price,omitempty"`
+	StockStatus               string       `json:"stock_status"`
+	StockQuantity             int          `json:"stock_quantity"` // 实际可用库存（-1=无限）
+	IsActive                  bool         `json:"is_active"`
+}
+
+func (p *UpstreamProduct) UnmarshalJSON(data []byte) error {
+	type wireProduct UpstreamProduct
+	var decoded wireProduct
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	declared, err := reservationPolicyDeclared(data)
+	if err != nil {
+		return err
+	}
+	decoded.ReservationPolicyDeclared = declared
+	*p = UpstreamProduct(decoded)
+	return nil
+}
+
+func (s *UpstreamSKU) UnmarshalJSON(data []byte) error {
+	type wireSKU UpstreamSKU
+	var decoded wireSKU
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	declared, err := reservationPolicyDeclared(data)
+	if err != nil {
+		return err
+	}
+	decoded.ReservationPolicyDeclared = declared
+	*s = UpstreamSKU(decoded)
+	return nil
+}
+
+func reservationPolicyDeclared(data []byte) (bool, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return false, err
+	}
+	value, present := fields["requires_reservation"]
+	if !present {
+		return false, nil
+	}
+	var flag *bool
+	if err := json.Unmarshal(value, &flag); err != nil || flag == nil {
+		return false, reservationterms.ErrInvalid
+	}
+	return true, nil
+}
+
+// ReservationMetadata accepts catalog metadata fetched through the configured
+// upstream connection. A SKU may specialize its product's contract; it cannot
+// use a false flag to downgrade a product that requires authoritative capacity.
+// A contract without its flag is also treated as required, so inconsistent
+// metadata cannot silently turn a scarce product into unrestricted checkout.
+func ReservationMetadata(product *UpstreamProduct, sku UpstreamSKU) (bool, jsonmap.JSON, error) {
+	if product == nil {
+		return false, nil, reservationterms.ErrInvalid
+	}
+	required := product.RequiresReservation || sku.RequiresReservation || len(product.ReservationContract) > 0 || len(sku.ReservationContract) > 0
+	if !required {
+		return false, nil, nil
+	}
+	contract := sku.ReservationContract
+	if len(contract) == 0 {
+		contract = product.ReservationContract
+	}
+	terms, err := reservationterms.Parse(contract)
+	if err != nil {
+		return true, nil, err
+	}
+	return true, terms.Snapshot(), nil
 }
 
 // CreateUpstreamOrderReq 创建上游采购单请求
+type CustomerReference struct {
+	MerchantCustomerID string `json:"merchant_customer_id"`
+	Source             string `json:"source"`
+	Verification       string `json:"verification"`
+}
 type CreateUpstreamOrderReq struct {
-	SKUID             uint         `json:"sku_id"`
-	Quantity          int          `json:"quantity"`
-	ManualFormData    jsonmap.JSON `json:"manual_form_data,omitempty"`
-	DownstreamOrderNo string       `json:"downstream_order_no"`
-	TraceID           string       `json:"trace_id"`
-	CallbackURL       string       `json:"callback_url"`
+	ReservationOrderRef     string             `json:"reservation_order_ref,omitempty"`
+	ReservationHoldID       string             `json:"reservation_hold_id,omitempty"`
+	ReservationHoldVersion  string             `json:"reservation_hold_version,omitempty"`
+	ReservationExpiresAt    string             `json:"reservation_expires_at,omitempty"`
+	EntitlementContract     jsonmap.JSON       `json:"entitlement_contract,omitempty"`
+	EntitlementContractHash string             `json:"entitlement_contract_hash,omitempty"`
+	CustomerReference       *CustomerReference `json:"customer_reference,omitempty"`
+	SKUID                   uint               `json:"sku_id"`
+	Quantity                int                `json:"quantity"`
+	ManualFormData          jsonmap.JSON       `json:"manual_form_data,omitempty"`
+	DownstreamOrderNo       string             `json:"downstream_order_no"`
+	TraceID                 string             `json:"trace_id"`
+	CallbackURL             string             `json:"callback_url"`
 }
 
 // CreateUpstreamOrderResp 创建上游采购单响应

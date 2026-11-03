@@ -5,7 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
 
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 
@@ -14,7 +16,57 @@ import (
 	"github.com/dujiao-next/internal/constants"
 	procurementcontract "github.com/dujiao-next/internal/modules/procurement/contract"
 	siteconnectionapp "github.com/dujiao-next/internal/modules/siteconnection/application"
+	"github.com/dujiao-next/internal/shared/jsonmap"
 )
+
+func TestSubmitScarceOrderRequiresPaidProofAndUsesFrozenSupplierSKU(t *testing.T) {
+	db := setupProcurementTestDB(t)
+	order := createProcTestOrder(t, db, "SCARCE-PAID-PROOF", constants.OrderStatusPaid, constants.FulfillmentTypeUpstream)
+	calls := 0
+	expiry := time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond).Format(time.RFC3339Nano)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var request map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		if request["sku_id"] != float64(990) || request["reservation_order_ref"] != "sf_order_proof_01" || request["reservation_hold_id"] != "hold_proof_01" || request["reservation_hold_version"] != "2" || request["reservation_expires_at"] != expiry {
+			t.Errorf("frozen hold association lost: %+v", request)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "order_id": 999, "order_no": "UP-PROOF-999", "status": "accepted", "amount": "50.00", "currency": "CNY"})
+	}))
+	defer server.Close()
+	connections := newTestSiteConnectionService(db, "test-key", t.TempDir())
+	conn, err := connections.Create(siteconnectionapp.CreateInput{Name: "frozen-upstream", BaseURL: server.URL, ApiKey: "key", ApiSecret: "secret", Protocol: constants.ConnectionProtocolDujiaoNext})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hold := jsonmap.JSON{"order_ref": "sf_order_proof_01", "hold_id": "hold_proof_01", "version": "1", "state": "reserved", "expires_at": expiry}
+	snapshot := jsonmap.JSON{"reservation_policy_known": true, "requires_reservation": true, "reservation_connection_id": strconv.FormatUint(uint64(conn.ID), 10), "reservation_upstream_sku_id": "990", "reservation_contract": jsonmap.JSON{"version": 1, "sku": "ChatGPT-Plus-US", "region": "US", "currency": "USD", "required_minor": "2000", "ttl_seconds": 900}, "reservation_hold": hold}
+	if err := db.Model(&orderdomain.OrderItem{}).Where("order_id = ?", order.ID).Updates(map[string]any{"sku_snapshot_json": snapshot, "manual_form_submission_json": jsonmap.JSON{"reservation_hold_id": "attacker"}}).Error; err != nil {
+		t.Fatal(err)
+	}
+	service := newTestProcurementService(db, connections)
+	// No current mappings exist: scarce routing must retain the supplier/SKU
+	// frozen at checkout rather than consult today's mutable mapping tables.
+	if err := service.CreateForOrder(order.ID); err != nil {
+		t.Fatal(err)
+	}
+	var proc ProcurementOrder
+	if err := db.Where("local_order_id = ?", order.ID).First(&proc).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SubmitToUpstream(proc.ID); err == nil || calls != 0 {
+		t.Fatal("unpaid hold was procured", err, calls)
+	}
+	hold["state"], hold["version"] = "paid", "2"
+	if err := db.Model(&orderdomain.OrderItem{}).Where("order_id = ?", order.ID).Update("sku_snapshot_json", snapshot).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := service.SubmitToUpstream(proc.ID); err != nil || calls != 1 {
+		t.Fatal("paid frozen hold not forwarded", err, calls)
+	}
+}
 
 // ── SubmitToUpstream tests ──
 
@@ -22,6 +74,14 @@ func TestSubmitToUpstream_Success(t *testing.T) {
 	db := setupProcurementTestDB(t)
 
 	order := createProcTestOrder(t, db, "PROC-SUBMIT-001", constants.OrderStatusPaid, constants.FulfillmentTypeUpstream)
+	// An immutable checkout snapshot, separate from self-entered form claims.
+	frozen := jsonmap.JSON{"version": 1, "token_quota_per_unit": 10}
+	if err := db.Model(&orderdomain.OrderItem{}).Where("order_id = ?", order.ID).Updates(map[string]interface{}{
+		"sku_snapshot_json":           jsonmap.JSON{"entitlement_contract": frozen, "entitlement_contract_hash": "frozen-hash"},
+		"manual_form_submission_json": jsonmap.JSON{"customer_reference": "attacker", "entitlement_contract_hash": "attacker"},
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
 	// 创建 product mapping 和 sku mapping
 	pm := &mappingdomain.Mapping{
 		ConnectionID:      1,
@@ -40,6 +100,21 @@ func TestSubmitToUpstream_Success(t *testing.T) {
 
 	// mock upstream server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		customer, ok := request["customer_reference"].(map[string]interface{})
+		if !ok || customer["merchant_customer_id"] != "needtoken-storefront:user:1" || customer["verification"] != "merchant_session" {
+			t.Errorf("untrusted customer reference: %+v", request)
+		}
+		if request["entitlement_contract_hash"] != "frozen-hash" {
+			t.Errorf("frozen contract lost/replaced: %+v", request)
+		}
+		contract, ok := request["entitlement_contract"].(map[string]interface{})
+		if !ok || contract["token_quota_per_unit"] != float64(10) {
+			t.Errorf("invalid frozen quota: %+v", request)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":       true,

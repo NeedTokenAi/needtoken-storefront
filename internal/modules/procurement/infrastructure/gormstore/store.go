@@ -59,7 +59,14 @@ func (s *Store) first(query string, argument any) (*procurementdomain.Order, err
 }
 
 func (s *Store) Create(order *procurementdomain.Order) error {
-	return s.db.Omit(clause.Associations).Create(order).Error
+	result := s.db.Omit(clause.Associations).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "local_order_id"}}, DoNothing: true}).Create(order)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return procurementcontract.ErrExists
+	}
+	return nil
 }
 
 func (s *Store) UpdateStatus(id uint, fromStatus, toStatus string, updates map[string]interface{}) (bool, error) {

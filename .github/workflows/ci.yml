@@ -53,6 +53,18 @@ jobs:
     name: Verify API
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16.15-alpine3.24
+        env:
+          POSTGRES_USER: glue
+          POSTGRES_DB: gluetest
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U glue" --health-interval 5s
+          --health-timeout 5s --health-retries 15
 
     steps:
       - name: Checkout
@@ -83,6 +95,11 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+      - name: Verify payment outbox and checkout holds on PostgreSQL
+        env:
+          NEEDTOKEN_STOREFRONT_TEST_POSTGRES_DSN: postgres://glue@127.0.0.1:5432/gluetest?sslmode=disable
+        run: go test -race ./internal/modules/payment/integrationtest/paidfulfillment -count=1 -timeout=180s
 
       - name: Build server
         run: go build ./cmd/server

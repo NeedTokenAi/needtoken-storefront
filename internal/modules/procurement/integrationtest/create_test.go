@@ -1,6 +1,9 @@
 package procurement_test
 
 import (
+	"errors"
+	procurementcontract "github.com/dujiao-next/internal/modules/procurement/contract"
+	procurementstore "github.com/dujiao-next/internal/modules/procurement/infrastructure/gormstore"
 	"testing"
 
 	mappingdomain "github.com/dujiao-next/internal/modules/catalog/mapping/domain"
@@ -49,5 +52,24 @@ func TestCreateForOrder_IdempotentSkipsDuplicate(t *testing.T) {
 	err := svc.CreateForOrder(order.ID)
 	if err != ErrExists {
 		t.Errorf("expected ErrExists on duplicate, got: %v", err)
+	}
+}
+
+func TestProcurementUniqueOrderConstraintSurvivesDuplicateWriters(t *testing.T) {
+	db := setupProcurementTestDB(t)
+	order := createProcTestOrder(t, db, "PROC-DB-UNIQUE", constants.OrderStatusPaid, constants.FulfillmentTypeUpstream)
+	store := procurementstore.New(db)
+	first := &ProcurementOrder{LocalOrderID: order.ID, ConnectionID: 1, Status: "pending", Currency: "USD"}
+	if err := store.Create(first); err != nil {
+		t.Fatal(err)
+	}
+	// Bypass application pre-check to exercise racing writers' database boundary.
+	if err := store.Create(&ProcurementOrder{LocalOrderID: order.ID, ConnectionID: 1, Status: "pending", Currency: "USD"}); !errors.Is(err, procurementcontract.ErrExists) {
+		t.Fatalf("expected unique business conflict, got %v", err)
+	}
+	var count int64
+	db.Model(&ProcurementOrder{}).Where("local_order_id = ?", order.ID).Count(&count)
+	if count != 1 {
+		t.Fatalf("duplicate procurement count: %d", count)
 	}
 }

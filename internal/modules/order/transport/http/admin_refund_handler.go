@@ -2,22 +2,22 @@ package orderhttp
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 
-	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
-
-	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
-
+	"github.com/dujiao-next/internal/i18n"
 	"github.com/dujiao-next/internal/logger"
+	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	"github.com/dujiao-next/internal/platform/http/ginutil"
 	"github.com/dujiao-next/internal/platform/http/response"
 	"github.com/dujiao-next/internal/shared/money"
-
 	"github.com/gin-gonic/gin"
 )
 
 var (
 	ErrOrderFetchFailed           = errors.New("order fetch failed")
+	ErrRefundOperationConflict    = errors.New("refund operation content conflict")
 	ErrOrderRefundExpired         = errors.New("order refund expired")
 	ErrWalletInvalidAmount        = errors.New("wallet invalid amount")
 	ErrWalletRefundExceeded       = errors.New("wallet refund exceeded")
@@ -58,6 +58,7 @@ type AdminRefundToWalletInput struct {
 
 // AdminManualRefundInput 管理端手动退款输入。
 type AdminManualRefundInput struct {
+	OperationID        string
 	OrderID            uint
 	Amount             money.Amount
 	Remark             string
@@ -133,6 +134,7 @@ type AdminRefundOrderToWalletRequest struct {
 
 // AdminManualRefundOrderRequest 管理端手动退款请求（不处理钱包/支付渠道）
 type AdminManualRefundOrderRequest struct {
+	OperationID        string `json:"operation_id" binding:"required,max=128"`
 	Amount             string `json:"amount" binding:"required"`
 	Remark             string `json:"remark"`
 	PaymentFeeRefunded bool   `json:"payment_fee_refunded"`
@@ -258,12 +260,17 @@ func (h *AdminRefundHandler) AdminManualRefundOrder(c *gin.Context) {
 		ginutil.RespondBindError(c, err)
 		return
 	}
+	if strings.TrimSpace(req.OperationID) == "" {
+		ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
+		return
+	}
 	amount, err := h.writes.ParseRefundAmount(req.Amount)
 	if err != nil {
 		ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 	order, refundRecord, err := h.writes.AdminManualRefund(AdminManualRefundInput{
+		OperationID:        req.OperationID,
 		OrderID:            orderID,
 		Amount:             amount,
 		Remark:             req.Remark,
@@ -271,6 +278,8 @@ func (h *AdminRefundHandler) AdminManualRefundOrder(c *gin.Context) {
 	})
 	if err != nil {
 		switch {
+		case errors.Is(err, ErrRefundOperationConflict):
+			response.ErrorWithHTTPStatus(c, http.StatusConflict, response.CodeBadRequest, i18n.T(i18n.ResolveLocale(c), "error.operation_conflict"))
 		case errors.Is(err, ErrOrderNotFound):
 			ginutil.RespondError(c, response.CodeNotFound, "error.order_not_found", nil)
 		case errors.Is(err, ErrOrderStatusInvalid):

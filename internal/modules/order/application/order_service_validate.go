@@ -246,10 +246,17 @@ func (s *OrderService) buildOrderResult(input orderCreateParams) (*orderBuildRes
 			SKUID:     sku.ID,
 			TitleJSON: product.TitleJSON,
 			SKUSnapshotJSON: jsonmap.JSON{
-				"sku_id":      sku.ID,
-				"sku_code":    sku.SKUCode,
-				"spec_values": sku.SpecValuesJSON,
-				"image":       firstProductImage(product.Images),
+				"sku_id":                      sku.ID,
+				"entitlement_contract":        sku.EntitlementContractJSON,
+				"entitlement_contract_hash":   sku.EntitlementContractHash,
+				"requires_reservation":        sku.RequiresReservation,
+				"reservation_policy_known":    sku.ReservationPolicyKnown,
+				"reservation_contract":        copyReservationContract(sku.ReservationContractJSON),
+				"reservation_connection_id":   strconv.FormatUint(uint64(sku.ReservationConnectionID), 10),
+				"reservation_upstream_sku_id": strconv.FormatUint(uint64(sku.ReservationUpstreamSKUID), 10),
+				"sku_code":                    sku.SKUCode,
+				"spec_values":                 sku.SpecValuesJSON,
+				"image":                       firstProductImage(product.Images),
 			},
 			Tags:                         product.Tags,
 			OriginalUnitPrice:            money.FromDecimal(basePrice),
@@ -363,6 +370,19 @@ func (s *OrderService) buildOrderResult(input orderCreateParams) (*orderBuildRes
 		MemberLevelID:           memberLevelIDSnapshot,
 		AppliedCoupon:           appliedCoupon,
 	}, nil
+}
+
+// Reservation terms are populated only by server-side catalog mapping. Keep a
+// separate snapshot map; manual form submissions never participate in it.
+func copyReservationContract(source jsonmap.JSON) jsonmap.JSON {
+	if source == nil {
+		return nil
+	}
+	out := make(jsonmap.JSON, len(source))
+	for key, value := range source {
+		out[key] = value
+	}
+	return out
 }
 
 func normalizeGuestEmail(raw string) (string, error) {

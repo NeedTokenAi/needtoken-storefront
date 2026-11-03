@@ -146,3 +146,15 @@ func (r *Store) ListRefundRecordsAdmin(filter ordercontract.RefundRecordListFilt
 	}
 	return records, total, nil
 }
+
+func (r *Store) GetRefundRecordByOperationID(operationID string) (*orderdomain.OrderRefundRecord, error) {
+	var record orderdomain.OrderRefundRecord
+	err := r.db.Where("operation_id = ?", operationID).First(&record).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &record, nil
+}

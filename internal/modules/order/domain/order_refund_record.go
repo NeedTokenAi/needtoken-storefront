@@ -9,6 +9,10 @@ import (
 
 // OrderRefundRecord 退款记录
 type OrderRefundRecord struct {
+	OperationID     *string `gorm:"size:128;uniqueIndex" json:"operation_id,omitempty"`
+	OperationDigest string  `gorm:"size:64" json:"operation_digest,omitempty"`
+	// A manual record is bookkeeping; external payment settlement needs evidence.
+	SettlementStatus         string       `gorm:"size:32;not null;default:''" json:"settlement_status"`
 	ID                       uint         `gorm:"primarykey" json:"id"`
 	UserID                   uint         `gorm:"index;not null;default:0" json:"user_id"`
 	GuestEmail               string       `gorm:"index;type:varchar(255)" json:"guest_email,omitempty"`

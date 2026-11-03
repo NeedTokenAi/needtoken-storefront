@@ -11,6 +11,7 @@ import (
 	notificationcontract "github.com/dujiao-next/internal/modules/notification/contract"
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
+	reservationguard "github.com/dujiao-next/internal/modules/payment/application/reservation"
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	resellercontract "github.com/dujiao-next/internal/modules/reseller/contract"
@@ -42,12 +43,15 @@ var (
 	ErrPaymentChannelNotAllowedForRecharge = errors.New("payment channel not allowed for wallet recharge")
 	ErrProductFetchFailed                  = errors.New("product fetch failed")
 	ErrQueueUnavailable                    = errors.New("queue unavailable")
+	ErrCheckoutReservationUnavailable      = reservationguard.ErrUnavailable
+	ErrCheckoutPolicyUnknown               = reservationguard.ErrPolicyUnknown
 	ErrPaymentUnderpaidCredited            = errors.New("payment underpaid already credited to wallet")
 	ErrPaymentCanceledOrderUnderpaid       = errors.New("canceled order payment does not cover total")
 )
 
 // PaymentService 支付服务
 type PaymentService struct {
+	*reservationguard.Guard
 	orderRepo               ordercontract.Store
 	productRepo             productcontract.Repository
 	productSKURepo          productcontract.SKURepository
@@ -127,11 +131,13 @@ type PaymentServiceOptions struct {
 	NotificationService     notificationcontract.NotificationEnqueuer
 	PaymentProviderRegistry paymentcontract.GatewayRegistry
 	ResellerAccounting      resellerAccountingTransactions
+	CheckoutReservations    paymentcontract.CheckoutReservationGate
 }
 
 // NewPaymentService 创建支付服务
 func NewPaymentService(opts PaymentServiceOptions) *PaymentService {
 	return &PaymentService{
+		Guard:                   reservationguard.New(opts.OrderStore, opts.ProductSKURepo, opts.CheckoutReservations),
 		orderRepo:               opts.OrderStore,
 		productRepo:             opts.ProductRepo,
 		productSKURepo:          opts.ProductSKURepo,

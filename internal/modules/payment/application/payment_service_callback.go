@@ -476,6 +476,27 @@ func (s *PaymentService) markOrderPaid(tx paymentcontract.Transaction, order *or
 	if !orderapp.IsTransitionAllowed(order.Status, constants.OrderStatusPaid) {
 		return orderapp.ErrOrderStatusInvalid
 	}
+	// Persist before leaving the payment transaction: either payment and event
+	// both commit, or neither does. No queue or upstream call is made here.
+	var hasUpstream func(*orderdomain.Order) bool
+	hasUpstream = func(current *orderdomain.Order) bool {
+		for _, item := range current.Items {
+			if item.FulfillmentType == constants.FulfillmentTypeUpstream {
+				return true
+			}
+		}
+		for i := range current.Children {
+			if hasUpstream(&current.Children[i]) {
+				return true
+			}
+		}
+		return false
+	}
+	if hasUpstream(order) {
+		if err := tx.Payments().RecordPaidFulfillment(order.ID, now); err != nil {
+			return err
+		}
+	}
 	orderRepo := tx.Orders()
 	productRepo := tx.Products()
 	var productSKURepo productcontract.SKURepository

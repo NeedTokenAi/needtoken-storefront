@@ -22,6 +22,7 @@ import (
 	notificationfeishu "github.com/dujiao-next/internal/modules/notification/infrastructure/feishu"
 	paymentapp "github.com/dujiao-next/internal/modules/payment/application"
 	paymentqueue "github.com/dujiao-next/internal/modules/payment/infrastructure/queueadapter"
+	paymentreservations "github.com/dujiao-next/internal/modules/payment/infrastructure/reservationgateway"
 	procurementapp "github.com/dujiao-next/internal/modules/procurement/application"
 	procurementmapping "github.com/dujiao-next/internal/modules/procurement/infrastructure/mappingreader"
 	procurementnotification "github.com/dujiao-next/internal/modules/procurement/infrastructure/notificationadapter"
@@ -38,6 +39,7 @@ import (
 	notifyapp "github.com/dujiao-next/internal/modules/telegram/notify/application"
 	notifybotapi "github.com/dujiao-next/internal/modules/telegram/notify/infrastructure/botapi"
 	"github.com/dujiao-next/internal/platform/database/gormdb"
+	"github.com/dujiao-next/internal/workflows/checkoutreservation"
 )
 
 // initIntegrationServices 装配通知、站点对接、支付、采购、渠道与 Telegram 集成。
@@ -112,6 +114,7 @@ func (c *Container) initIntegrationServices() {
 		NotificationService:     c.NotificationService,
 		PaymentProviderRegistry: c.PaymentProviderRegistry,
 		ResellerAccounting:      c.ResellerAccountingLedger,
+		CheckoutReservations:    checkoutreservation.New(c.PaymentStore, paymentreservations.New(c.SiteConnectionService)),
 	})
 	c.ProcurementOrderService = procurementapp.NewService(procurementapp.Options{
 		Repository:         c.ProcurementOrderRepo,
