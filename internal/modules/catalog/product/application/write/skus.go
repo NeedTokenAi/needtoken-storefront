@@ -28,9 +28,18 @@ func (s *WriteService) syncSingleProductSKU(
 	priceAmount decimal.Decimal,
 	costPriceAmount decimal.Decimal,
 	manualStockTotal *int,
+	displayMeta ...map[string]interface{},
 ) error {
 	if skuRepo == nil || productID == 0 {
 		return nil
+	}
+	var normalizedMeta jsonmap.JSON
+	if len(displayMeta) > 0 && displayMeta[0] != nil {
+		var metaErr error
+		normalizedMeta, metaErr = productdomain.NormalizeSKUDisplayMeta(displayMeta[0])
+		if metaErr != nil {
+			return metaErr
+		}
 	}
 	skus, err := skuRepo.ListByProduct(productID, false)
 	if err != nil {
@@ -41,6 +50,7 @@ func (s *WriteService) syncSingleProductSKU(
 			ProductID:         productID,
 			SKUCode:           productdomain.DefaultSKUCode,
 			SpecValuesJSON:    jsonmap.JSON{},
+			DisplayMetaJSON:   normalizedMeta,
 			PriceAmount:       money.FromDecimal(priceAmount),
 			CostPriceAmount:   money.FromDecimal(costPriceAmount),
 			ManualStockTotal:  derefStock(manualStockTotal),
@@ -74,6 +84,9 @@ func (s *WriteService) syncSingleProductSKU(
 	}
 	target.IsActive = true
 	target.SpecValuesJSON = jsonmap.JSON{}
+	if normalizedMeta != nil {
+		target.DisplayMetaJSON = normalizedMeta
+	}
 	if strings.ToUpper(strings.TrimSpace(target.SKUCode)) != strings.ToUpper(productdomain.DefaultSKUCode) {
 		// 改名为 DEFAULT 前先清理同编码的软删除残留，否则会撞唯一索引。
 		if err := skuRepo.PurgeSoftDeletedByProductAndCode(productID, productdomain.DefaultSKUCode); err != nil {
@@ -138,6 +151,8 @@ type normalizedProductSKU struct {
 	ID               uint
 	SKUCode          string
 	SpecValuesJSON   jsonmap.JSON
+	DisplayMetaJSON  jsonmap.JSON
+	KeepDisplayMeta  bool
 	PriceAmount      money.Amount
 	CostPriceAmount  money.Amount
 	ManualStockTotal int
@@ -208,10 +223,21 @@ func (s *WriteService) normalizeProductSKUInputs(inputs []ProductSKUInput, fulfi
 			specValues = jsonmap.JSON(input.SpecValuesJSON)
 		}
 
+		var displayMeta jsonmap.JSON
+		if input.DisplayMetaJSON != nil {
+			var metaErr error
+			displayMeta, metaErr = productdomain.NormalizeSKUDisplayMeta(input.DisplayMetaJSON)
+			if metaErr != nil {
+				return nil, decimal.Zero, 0, metaErr
+			}
+		}
+
 		normalized = append(normalized, normalizedProductSKU{
 			ID:               input.ID,
 			SKUCode:          skuCode,
 			SpecValuesJSON:   specValues,
+			DisplayMetaJSON:  displayMeta,
+			KeepDisplayMeta:  input.DisplayMetaJSON == nil,
 			PriceAmount:      money.FromDecimal(priceAmount),
 			CostPriceAmount:  money.FromDecimal(costPriceAmount),
 			ManualStockTotal: manualTotal,
@@ -296,6 +322,9 @@ func (s *WriteService) applyProductSKUsWithStockGuard(
 			}
 			existing.SKUCode = row.SKUCode
 			existing.SpecValuesJSON = row.SpecValuesJSON
+			if !row.KeepDisplayMeta {
+				existing.DisplayMetaJSON = row.DisplayMetaJSON
+			}
 			existing.PriceAmount = row.PriceAmount
 			existing.CostPriceAmount = row.CostPriceAmount
 			if !row.KeepManualStock {
@@ -314,6 +343,9 @@ func (s *WriteService) applyProductSKUsWithStockGuard(
 		codeKey := strings.ToLower(strings.TrimSpace(row.SKUCode))
 		if existing, ok := existingByCode[codeKey]; ok {
 			existing.SpecValuesJSON = row.SpecValuesJSON
+			if !row.KeepDisplayMeta {
+				existing.DisplayMetaJSON = row.DisplayMetaJSON
+			}
 			existing.PriceAmount = row.PriceAmount
 			existing.CostPriceAmount = row.CostPriceAmount
 			if !row.KeepManualStock {
@@ -336,6 +368,7 @@ func (s *WriteService) applyProductSKUsWithStockGuard(
 			ProductID:         productID,
 			SKUCode:           row.SKUCode,
 			SpecValuesJSON:    row.SpecValuesJSON,
+			DisplayMetaJSON:   row.DisplayMetaJSON,
 			PriceAmount:       row.PriceAmount,
 			CostPriceAmount:   row.CostPriceAmount,
 			ManualStockTotal:  row.ManualStockTotal,

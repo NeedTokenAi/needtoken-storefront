@@ -26,11 +26,21 @@ export interface AdminCategory {
 }
 
 // --- Product ---
+export interface AdminSKUDisplayMeta {
+  label: LocalizedText
+  title: LocalizedText
+  description: LocalizedText
+  feature_lines: LocalizedText
+  price_suffix: LocalizedText
+  official_price_usd: string
+}
+
 export interface AdminProductSKU {
   id: number
   product_id: number
   sku_code: string
   spec_values: Record<string, string>
+  display_meta?: AdminSKUDisplayMeta
   price_amount: number
   cost_price_amount: number
   manual_stock_total: number

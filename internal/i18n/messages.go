@@ -18,6 +18,7 @@ var messages = map[string]map[string]string{
 	LocaleZH: {
 		"error.needtoken_support_invalid":                "客服设置无效，请检查邮箱及链接；二维码可使用站内上传地址",
 		"error.needtoken_resources_invalid":              "公开资源设置无效，请检查唯一编号、标题、链接、发布时间及数量（最多 40 条）",
+		"error.needtoken_pricing_invalid":                "币种与汇率设置无效。汇率须为 0 至 1000 之间的正十进制数（最多六位小数）；跨币种默认展示须先配置汇率。",
 		"error.operation_conflict":                       "相同操作编号已使用不同内容；请先核查原操作结果",
 		"error.jwt_secret_missing":                       "JWT secret 未配置",
 		"error.auth_header_missing":                      "缺少 Authorization header",
@@ -400,6 +401,7 @@ var messages = map[string]map[string]string{
 	LocaleTW: {
 		"error.needtoken_support_invalid":                "客服設定無效，請檢查信箱及連結；二維碼可使用站內上傳位址",
 		"error.needtoken_resources_invalid":              "公開資源設定無效，請檢查唯一編號、標題、連結、發布時間及數量（最多 40 筆）",
+		"error.needtoken_pricing_invalid":                "幣別與匯率設定無效。匯率須為 0 至 1000 之間的正十進位數（最多六位小數）；跨幣別預設展示須先設定匯率。",
 		"error.operation_conflict":                       "相同操作編號已使用不同內容；請先核查原操作結果",
 		"error.jwt_secret_missing":                       "JWT secret 未配置",
 		"error.auth_header_missing":                      "缺少 Authorization header",
@@ -782,6 +784,7 @@ var messages = map[string]map[string]string{
 	LocaleEN: {
 		"error.needtoken_support_invalid":                "Invalid support settings. Check the email and URLs; QR images may use local upload paths.",
 		"error.needtoken_resources_invalid":              "Invalid public resources. Check unique IDs, titles, URLs, publication times and the 40-entry limit.",
+		"error.needtoken_pricing_invalid":                "Invalid display currency or exchange rate. Use a positive decimal no greater than 1000, with up to six decimal places. Configure a rate before selecting another display currency.",
 		"error.operation_conflict":                       "Operation ID was already used with different content; verify the original result first",
 		"error.jwt_secret_missing":                       "JWT secret is not configured",
 		"error.auth_header_missing":                      "Missing Authorization header",

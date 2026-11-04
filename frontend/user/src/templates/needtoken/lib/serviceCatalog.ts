@@ -8,6 +8,7 @@ export interface ServiceSku {
   id: number
   sku_code?: string
   spec_values?: unknown
+  display_meta?: unknown
   is_active?: boolean
   price_amount?: unknown
   promotion_price_amount?: unknown

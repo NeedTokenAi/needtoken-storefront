@@ -5,6 +5,7 @@
       <h1>{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.titlePrefix`) }}<span class="nt-service-catalog__title-subject">{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.titleSubject`) }}</span>{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.titleSuffix`) }}</h1>
       <ul class="nt-service-catalog__promises" :aria-label="t('needtoken.catalogServices.serviceNotes')">
         <li v-for="(note, index) in serviceNotes" :key="note"><component :is="noteIcons[index]" :size="15" aria-hidden="true" />{{ t(`needtoken.catalogServices.${note}`) }}</li>
+        <li class="nt-service-catalog__rate"><StandardExchangeRate placement="below" /></li>
       </ul>
     </header>
 
@@ -43,7 +44,7 @@
       <template v-else>
         <div class="nt-service-catalog__result" aria-live="polite">
           <span>{{ t(`needtoken.catalogServices.${serviceKind}.section`) }}</span>
-          <span>{{ t('needtoken.catalogServices.resultCount', { count: totalProducts }) }}</span>
+          <div class="nt-service-catalog__result-actions"><span>{{ t('needtoken.catalogServices.resultCount', { count: totalProducts }) }}</span><DisplayCurrencySelector compact /></div>
         </div>
         <div class="nt-service-catalog__grid">
           <ServiceProductCard v-for="product in products" :key="product.id" :product="product" :kind="serviceKind!" :category-label="categoryLabel(product.category_id)" />
@@ -71,6 +72,8 @@ import PaginationNav from '../../components/PaginationNav.vue'
 import { useLocalized } from '../../composables/useProduct'
 import { usePageSeo } from '../../composables/usePageSeo'
 import ServiceProductCard from './components/ServiceProductCard.vue'
+import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
+import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import { useServiceCatalog } from './composables/useServiceCatalog'
 
 const { t } = useI18n()
@@ -100,9 +103,10 @@ usePageSeo({
 .nt-service-catalog__intro { text-align: center; margin-bottom: 34px; }
 h1 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.055em; line-height: 1.25; text-wrap: balance; }
 .nt-service-catalog__title-subject { color: var(--ui-accent); }
-.nt-service-catalog__promises { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; margin-top: 20px; font-size: 12px; }
-.nt-service-catalog__promises li { display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; padding: 9px 13px; border: 1px solid rgba(255, 224, 126, .45); border-radius: 11px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24); }
+.nt-service-catalog__promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 20px; font-size: 12px; }
+.nt-service-catalog__promises li { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; padding: 9px 13px; border: 1px solid rgba(255, 224, 126, .45); border-radius: 11px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24); }
 .nt-service-catalog__promises svg { flex: none; color: currentColor; opacity: .85; }
+.nt-service-catalog__rate { position: relative; z-index: 3; }
 .nt-service-catalog__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; border-top: 1px solid var(--ui-border); }
 .nt-service-catalog__filters { min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
 .nt-service-catalog__filter { min-height: 40px; flex-shrink: 0; border: 1px solid rgba(204, 219, 235, .17); border-radius: 12px; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.018)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 4px 16px rgba(0,0,0,.08); backdrop-filter: blur(18px); padding: 8px 17px; color: var(--ui-text-secondary); font-size: 12px; white-space: nowrap; cursor: pointer; transition: .15s; }
@@ -112,7 +116,8 @@ h1 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.05
 .nt-service-catalog__search { display: flex; align-items: center; gap: 8px; width: 220px; flex-shrink: 0; min-height: 40px; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 12px; background: rgba(255,255,255,.025); color: var(--ui-text-muted); }
 .nt-service-catalog__search input { min-width: 0; flex: 1; width: 100%; outline: none; background: transparent; font-size: 12px; color: var(--ui-text-primary); }
 .nt-service-catalog__search button { display: grid; width: 24px; height: 28px; place-items: center; }
-.nt-service-catalog__result { display: flex; justify-content: space-between; gap: 12px; margin: 9px 0 18px; color: var(--ui-text-muted); font-size: 11px; }
+.nt-service-catalog__result { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 9px 0 18px; color: var(--ui-text-muted); font-size: 11px; }
+.nt-service-catalog__result-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px 16px; min-width: 0; }
 .nt-service-catalog__result > span:first-child { color: var(--ui-text-primary); font-size: 13px; font-weight: 600; }
 .nt-service-catalog__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .nt-service-catalog__skeleton { min-height: 406px; border: 1px solid var(--ui-border); border-radius: 24px; padding: 24px; }
@@ -126,7 +131,7 @@ h1 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.05
 .nt-service-catalog__help { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 17px; margin-top: 35px; padding-top: 24px; border-top: 1px solid var(--ui-border); font-size: 11px; color: var(--ui-text-muted); }
 .nt-service-catalog__help > div, .nt-service-catalog__help a { display: inline-flex; align-items: center; gap: 7px; }
 .nt-service-catalog__help a:hover { color: var(--ui-accent); }
-@media (max-width: 1023px) { .nt-service-catalog__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1023px) { .nt-service-catalog__promises { grid-template-columns: repeat(2, minmax(0, 1fr)); } .nt-service-catalog__rate { grid-column: 1 / -1; } .nt-service-catalog__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) {
   .nt-service-catalog { padding-top: 28px; }
   .nt-service-catalog__intro { margin-bottom: 24px; }
@@ -136,6 +141,6 @@ h1 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.05
   .nt-service-catalog__result { margin-top: 6px; margin-bottom: 12px; }
   .nt-service-catalog__skeleton { min-height: 280px; padding: 18px; border-radius: 20px; }
 }
-@media (max-width: 640px) { .nt-service-catalog { padding-top: 32px; } .nt-service-catalog__intro { margin-bottom: 27px; } .nt-service-catalog__promises { gap: 8px; margin-top: 18px; font-size: 11px; } .nt-service-catalog__promises li { padding: 8px 10px; gap: 6px; border-radius: 10px; } .nt-service-catalog__promises svg { width: 14px; height: 14px; } .nt-service-catalog__toolbar { align-items: stretch; flex-direction: column; gap: 15px; } .nt-service-catalog__search { width: 100%; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 29px; } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
+@media (max-width: 640px) { .nt-service-catalog { padding-top: 32px; } .nt-service-catalog__intro { margin-bottom: 27px; } .nt-service-catalog__promises { gap: 8px; margin-top: 18px; font-size: 11px; } .nt-service-catalog__promises li { padding: 8px 10px; gap: 6px; border-radius: 10px; } .nt-service-catalog__promises svg { width: 14px; height: 14px; } .nt-service-catalog__toolbar { align-items: stretch; flex-direction: column; gap: 15px; } .nt-service-catalog__search { width: 100%; } .nt-service-catalog__result-actions { justify-content: flex-start; width: 100%; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 29px; } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
 @media (prefers-reduced-motion: reduce) { .nt-service-catalog__filter { transition: none; } }
 </style>

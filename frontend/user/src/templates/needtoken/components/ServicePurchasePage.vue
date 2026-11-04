@@ -10,8 +10,8 @@
     <template v-else-if="product">
       <header class="purchase-heading">
         <div class="purchase-eyebrow"><span></span>{{ categoryName || t('needtoken.purchaseServices.eyebrow') }}</div>
-        <h1>{{ getLocalizedText(product.title) }}</h1>
-        <p v-if="getLocalizedText(product.description)">{{ getLocalizedText(product.description) }}</p>
+        <h1>{{ selectedTitle }}</h1>
+        <p v-if="selectedDescription">{{ selectedDescription }}</p>
         <ol class="purchase-steps" :aria-label="t('needtoken.purchaseServices.stepsLabel')">
           <li class="current"><span>1</span>{{ t('needtoken.purchaseServices.stepChoose') }}</li>
           <li><ChevronRight :size="14" aria-hidden="true" /><span>2</span>{{ t('needtoken.purchaseServices.stepPay') }}</li>
@@ -23,7 +23,7 @@
         <section class="purchase-main">
           <div class="purchase-section-head">
             <div><h2>{{ t('needtoken.purchaseServices.selectPlan') }}</h2><p>{{ t('needtoken.purchaseServices.planHint') }}</p></div>
-            <span class="purchase-count">{{ t('needtoken.purchaseServices.optionCount', { count: activeSkus.length }) }}</span>
+            <div class="purchase-display-controls"><DisplayCurrencySelector compact /><span class="purchase-count">{{ t('needtoken.purchaseServices.optionCount', { count: activeSkus.length }) }}</span></div>
           </div>
 
           <p v-if="requestedSkuInvalid" class="purchase-message warning" role="alert"><Info :size="17" />{{ t('needtoken.purchaseServices.expiredSelection') }}</p>
@@ -34,11 +34,14 @@
               :aria-pressed="normalizeSkuId(sku.id) === selectedSkuId" :disabled="!isOptionPurchasable(sku)" @click="selectSku(sku)">
               <div class="option-top"><span>{{ skuDisplayText(sku) }}</span><span class="option-check"><Check v-if="normalizeSkuId(sku.id) === selectedSkuId" :size="13" /></span></div>
               <div class="option-price" :class="{ unconfirmed: !isKnownPurchasePrice(skuCatalogPrice(sku)) }">{{ isKnownPurchasePrice(skuCatalogPrice(sku)) ? formatDisplayPrice(skuCatalogPrice(sku)) : t('needtoken.purchaseServices.priceUnavailable') }}</div>
+              <p v-if="skuPresentation(sku).description" class="option-description">{{ skuPresentation(sku).description }}</p>
               <div v-if="hasSkuPromotionPrice(sku) && isKnownPurchasePrice(sku.price_amount)" class="option-original">{{ formatDisplayPrice(sku.price_amount) }}</div>
               <div class="option-stock">{{ optionStockText(sku) }}</div>
             </button>
           </div>
           <p v-if="!activeSkus.length" class="purchase-message" role="status">{{ t('productDetail.stockUnavailable') }}</p>
+
+          <div v-if="selectedPresentation.features.length" class="purchase-variant-features" aria-live="polite"><p v-for="(feature, index) in selectedPresentation.features" :key="index"><Check :size="15" aria-hidden="true" /><span>{{ feature }}</span></p></div>
 
           <div v-if="hasPromotionRules(product)" class="purchase-promotion">
             <h3>{{ t('products.promotionRulesTitle') }}</h3>
@@ -61,9 +64,11 @@
 
         <aside class="purchase-summary">
           <div class="summary-label">{{ t('needtoken.purchaseServices.orderSummary') }}</div>
-          <h2>{{ getLocalizedText(product.title) }}</h2>
+          <h2>{{ selectedTitle }}</h2>
           <p class="summary-option">{{ selectedSku ? skuDisplayText(selectedSku) : t('productDetail.skuRequired') }}</p>
-          <div class="summary-price" :class="{ unconfirmed: !selectedSku || !isKnownPurchasePrice(currentUnitPrice) }">{{ !selectedSku ? t('productDetail.skuRequired') : isKnownPurchasePrice(currentUnitPrice) ? formatDisplayPrice(currentUnitPrice) : t('needtoken.purchaseServices.priceUnavailable') }}<span>{{ t('needtoken.purchaseServices.unitPrice') }}</span></div>
+          <div class="summary-price" :class="{ unconfirmed: !selectedSku || !isKnownPurchasePrice(currentUnitPrice) }">{{ !selectedSku ? t('productDetail.skuRequired') : isKnownPurchasePrice(currentUnitPrice) ? formatDisplayPrice(currentUnitPrice) : t('needtoken.purchaseServices.priceUnavailable') }}<span>{{ selectedPresentation.priceSuffix || t('needtoken.purchaseServices.unitPrice') }}</span></div>
+          <p v-if="isConverted && selectedSku && isKnownPurchasePrice(currentUnitPrice)" class="summary-price-reference">{{ t('needtoken.variants.settlementPrice', { price: formatSettlement(currentUnitPrice) }) }}</p>
+          <p v-if="officialReference" class="summary-price-reference">{{ t('needtoken.variants.officialReference', { price: officialReference }) }}</p>
           <div v-if="hasSelectedDiscount" class="summary-original">{{ formatDisplayPrice(selectedSku?.price_amount) }}</div>
           <div v-if="showSelectedSkuMemberBadge" class="summary-badge">{{ t('products.memberPriceTag') }}</div>
 
@@ -146,6 +151,10 @@ import { amountToCents } from '../../../utils/money'
 import { processHtmlForDisplay } from '../../../utils/content'
 import { isKnownPurchasePrice, resolveRequestedSku } from '../lib/purchaseSelection'
 import { formatServiceMoney } from '../lib/displayMoney'
+import { serviceDescriptionText } from '../lib/serviceCatalog'
+import { serviceSkuPresentation, serviceVariantLabel } from '../lib/serviceVariants'
+import { useDisplayCurrency } from '../composables/useDisplayCurrency'
+import DisplayCurrencySelector from './DisplayCurrencySelector.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -186,13 +195,13 @@ onUnmounted(() => {
 // Keep native purchase/pricing/stock/authentication logic shared with the
 // original storefront. This view only changes presentation and link selection.
 const {
-  getLocalizedText, siteCurrency, formatPrice, formatRelatedPostDate,
+  getLocalizedText, formatRelatedPostDate,
   hasSkuPromotionPrice, getSkuPromotionPriceAmount, hasPromotionRules, getPromotionRules,
   formatPromotionRule, normalizeSkuId,
   loading, product, relatedPosts, selectedSkuId, quantity, purchaseWarning, activeSkus, selectedSku,
   selectedSkuMemberPrice, hasMemberPrice, hasSelectedSkuWholesalePrice, selectedSkuWholesaleFinalPrice,
   selectedSkuWholesaleRules, selectedSkuPromotionFinalPrice, showSelectedSkuMemberBadge,
-  isSkuPurchasable, skuDisplayText, skuStockText, quantityEffectiveLimit, quantityEffectiveMin, handleQuantityInput,
+  isSkuPurchasable, skuStockText, quantityEffectiveLimit, quantityEffectiveMin, handleQuantityInput,
   requiresLogin, canPurchase, cannotPurchaseReason, categoryName, backToListTo, images,
   addToCart, buyNow, goLogin, loadProduct,
 } = useProductDetail({ onLoaded: () => {
@@ -200,7 +209,17 @@ const {
   void loadSiteNotices()
 } })
 
-const formatDisplayPrice = (amount: unknown) => formatServiceMoney(amount, siteCurrency.value, appStore.locale) ?? formatPrice(amount, siteCurrency.value)
+const { format, formatSettlement, isConverted } = useDisplayCurrency()
+const formatDisplayPrice = (amount: unknown) => {
+  const result = format(amount)
+  return result === null ? t('needtoken.purchaseServices.priceUnavailable') : `${isConverted.value ? '≈ ' : ''}${result}`
+}
+const skuPresentation = (sku: any) => serviceSkuPresentation(sku, appStore.locale)
+const selectedPresentation = computed(() => skuPresentation(selectedSku.value))
+const selectedTitle = computed(() => selectedPresentation.value.title || getLocalizedText(product.value?.title))
+const selectedDescription = computed(() => selectedPresentation.value.description || serviceDescriptionText(getLocalizedText(product.value?.description)))
+const officialReference = computed(() => selectedPresentation.value.officialPriceUsd ? formatServiceMoney(selectedPresentation.value.officialPriceUsd, 'USD', appStore.locale) : null)
+const skuDisplayText = (sku: any) => serviceVariantLabel(sku, appStore.locale, t('needtoken.variants.optionNumber', { number: activeSkus.value.findIndex((item: any) => normalizeSkuId(item.id) === normalizeSkuId(sku.id)) + 1 }))
 const formatWholesaleTier = (tier: any) => t('products.wholesaleTier', { count: Number(tier?.min_quantity || 0), price: formatDisplayPrice(tier?.unit_price) })
 
 usePageSeo({
@@ -276,6 +295,13 @@ const submitCart = () => {
 .purchase-section-head h2 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
 .purchase-section-head p { margin-top: 7px; font-size: 12px; line-height: 1.65; color: var(--ui-text-muted); }
 .purchase-count { flex: none; font-size: 10px; color: var(--ui-text-muted); border: 1px solid var(--ui-border); padding: 5px 8px; border-radius: 7px; }
+.purchase-display-controls { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 9px; min-width: 0; }
+.option-description { margin-top: 11px; font-size: 12px; line-height: 1.7; font-weight: 400; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+.purchase-variant-features { display: grid; gap: 10px; margin-top: 20px; padding: 17px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-bg-soft); }
+.purchase-variant-features p { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.75; min-width: 0; overflow-wrap: anywhere; }
+.purchase-variant-features svg { flex: none; margin-top: 3px; color: var(--ui-accent); }
+.summary-price-reference { margin-top: 9px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; }
+.option-top > span:first-child, .summary-option { min-width: 0; overflow-wrap: anywhere; }
 .purchase-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .purchase-option { padding: 19px; border-radius: 13px; border: 1px solid var(--ui-border-strong); background: rgba(255,255,255,.015); color: var(--ui-text-primary); text-align: left; transition: border-color .18s, background .18s; min-width: 0; }
 .purchase-option:hover:not(:disabled) { border-color: var(--ui-accent); background: rgba(45,212,167,.03); }

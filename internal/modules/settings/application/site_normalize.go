@@ -1,10 +1,13 @@
 package settingsapp
 
 import (
+	"encoding/json"
+	"math/big"
 	"net/mail"
 	"net/url"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +48,7 @@ func normalizeSiteSetting(value map[string]interface{}) jsonmap.JSON {
 	normalized["contact"] = normalizeSiteContact(value["contact"])
 	normalized["needtoken_support"] = normalizeNeedtokenSupport(value["needtoken_support"])
 	normalized["needtoken_resources"] = normalizeNeedtokenResources(value["needtoken_resources"])
+	normalized["needtoken_pricing"] = normalizeNeedtokenPricing(value["needtoken_pricing"], normalizeSiteCurrency(value[constants.SettingFieldSiteCurrency]))
 	normalized["seo"] = normalizeSiteLocalizedBlock(value["seo"], []string{"title", "keywords", "description"})
 	normalized["legal"] = normalizeSiteLocalizedBlock(value["legal"], []string{"terms", "privacy"})
 	normalized["about"] = normalizeSiteAbout(value["about"])
@@ -163,6 +167,9 @@ func validateSiteSetting(value jsonmap.JSON) error {
 	}
 	if whatsApp, _ := contact["whatsapp"].(string); whatsApp != "" && !contactlink.IsWhatsApp(whatsApp) {
 		return &SettingFieldError{Field: "contact_whatsapp"}
+	}
+	if err := validateNeedtokenPricing(value); err != nil {
+		return err
 	}
 	return validateNeedtokenSite(value)
 }
@@ -681,4 +688,106 @@ func publicNeedtokenResources(raw interface{}) map[string]interface{} {
 		}
 	}
 	return map[string]interface{}{"apple_ids": result}
+}
+
+// Display pricing never rewrites a SKU amount or the order's settlement currency.
+// Store exact decimal strings so a configured rate cannot become a binary float.
+var needtokenRatePattern = regexp.MustCompile(`^[0-9]{1,4}(?:\.[0-9]{1,6})?$`)
+
+func validNeedtokenRate(rate string) bool {
+	if !needtokenRatePattern.MatchString(rate) {
+		return false
+	}
+	value, ok := new(big.Rat).SetString(rate)
+	return ok && value.Sign() > 0 && value.Cmp(big.NewRat(1000, 1)) <= 0
+}
+
+func needtokenDefaultDisplayCurrency(settlement string) string {
+	if settlement == "USD" {
+		return "USD"
+	}
+	return "CNY"
+}
+
+func normalizeNeedtokenPricing(raw interface{}, settlement string) map[string]interface{} {
+	value, _ := raw.(map[string]interface{})
+	currency := needtokenDefaultDisplayCurrency(settlement)
+	if rawCurrency, exists := value["default_display_currency"]; exists {
+		currency = strings.ToUpper(normalizeSettingText(rawCurrency))
+	}
+	rate := normalizeSettingText(value["usd_cny_rate"])
+	if rawRate, exists := value["usd_cny_rate"]; exists && rawRate != nil {
+		switch number := rawRate.(type) {
+		case string:
+		case float64:
+			rate = strconv.FormatFloat(number, 'f', -1, 64)
+		case int:
+			rate = strconv.Itoa(number)
+		case json.Number:
+			rate = number.String()
+		default:
+			rate = "invalid"
+		}
+	}
+	if validNeedtokenRate(rate) {
+		parts := strings.SplitN(rate, ".", 2)
+		integer := strings.TrimLeft(parts[0], "0")
+		if integer == "" {
+			integer = "0"
+		}
+		rate = integer
+		if len(parts) == 2 {
+			if fraction := strings.TrimRight(parts[1], "0"); fraction != "" {
+				rate += "." + fraction
+			}
+		}
+	}
+	return map[string]interface{}{
+		"default_display_currency": currency,
+		"usd_cny_rate":             rate,
+		"rate_updated_at":          normalizeSettingText(value["rate_updated_at"]),
+	}
+}
+
+func validateNeedtokenPricing(value jsonmap.JSON) error {
+	pricing, ok := value["needtoken_pricing"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	currency, _ := pricing["default_display_currency"].(string)
+	rate, _ := pricing["usd_cny_rate"].(string)
+	if currency != "CNY" && currency != "USD" {
+		return &SettingFieldError{Field: "needtoken_pricing"}
+	}
+	if rate != "" && !validNeedtokenRate(rate) {
+		return &SettingFieldError{Field: "needtoken_pricing"}
+	}
+	settlement := normalizeSiteCurrency(value[constants.SettingFieldSiteCurrency])
+	if (settlement == "CNY" || settlement == "USD") && currency != settlement && rate == "" {
+		return &SettingFieldError{Field: "needtoken_pricing"}
+	}
+	if timestamp, _ := pricing["rate_updated_at"].(string); timestamp != "" {
+		if _, err := time.Parse(time.RFC3339, timestamp); err != nil {
+			return &SettingFieldError{Field: "needtoken_pricing"}
+		}
+	}
+	return nil
+}
+
+func publicNeedtokenPricing(raw interface{}, settlement string) map[string]interface{} {
+	normalized := normalizeNeedtokenPricing(raw, settlement)
+	if !validNeedtokenRate(normalized["usd_cny_rate"].(string)) {
+		normalized["usd_cny_rate"] = ""
+		normalized["rate_updated_at"] = ""
+		normalized["default_display_currency"] = needtokenDefaultDisplayCurrency(settlement)
+	}
+	if currency := normalized["default_display_currency"]; currency != "CNY" && currency != "USD" {
+		normalized["default_display_currency"] = needtokenDefaultDisplayCurrency(settlement)
+	}
+	if timestamp := normalized["rate_updated_at"].(string); timestamp != "" {
+		if _, err := time.Parse(time.RFC3339, timestamp); err != nil {
+			normalized["rate_updated_at"] = ""
+		}
+	}
+	return normalized
 }

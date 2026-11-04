@@ -244,6 +244,7 @@ func (h *Handler) GetConfig(c *gin.Context) {
 	if tenant.ResellerID != nil {
 		delete(data, "needtoken_support")
 		delete(data, "needtoken_resources")
+		delete(data, "needtoken_pricing")
 	}
 
 	_ = h.cache.SetJSON(c.Request.Context(), cacheKey, data, publicConfigCacheTTL)

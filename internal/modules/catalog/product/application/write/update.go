@@ -158,7 +158,7 @@ func (s *WriteService) Update(id string, input CreateProductInput) (*productdoma
 			if err := s.applyProductSKUsWithStockGuard(skuRepo, cardSecretRepo, product.ID, fulfillmentType, normalizedSKUs); err != nil {
 				return err
 			}
-		} else if err := s.syncSingleProductSKU(skuRepo, cardSecretRepo, product.ID, fulfillmentType, priceAmount, product.CostPriceAmount.Decimal, singleSKUStock); err != nil {
+		} else if err := s.syncSingleProductSKU(skuRepo, cardSecretRepo, product.ID, fulfillmentType, priceAmount, product.CostPriceAmount.Decimal, singleSKUStock, input.DefaultSKUDisplayMeta); err != nil {
 			return err
 		}
 		// SKU 落库之后才处理批发价：此时的规格集合才是最终形态。

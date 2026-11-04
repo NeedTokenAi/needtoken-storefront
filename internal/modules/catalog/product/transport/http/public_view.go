@@ -55,6 +55,7 @@ func (v *publicProductView) toProductResp() productpresenter.Product {
 			ID:                   sv.ID,
 			SKUCode:              sv.SKUCode,
 			SpecValues:           sv.SpecValuesJSON,
+			DisplayMeta:          productdomain.PublicSKUDisplayMeta(sv.DisplayMetaJSON),
 			PriceAmount:          sv.PriceAmount,
 			ManualStockTotal:     domaincatalog.MaskStockInt(mode, sv.ManualStockTotal),
 			ManualStockSold:      domaincatalog.MaskSoldCount(mode, sv.ManualStockSold),

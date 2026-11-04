@@ -2454,6 +2454,29 @@
           "description": "遇到过期或不可用资源，请停止重试并联系客服反馈，勿修改共享账号的安全设置。"
         }
       ]
+    },
+    "variants": {
+      "optionNumber": "方案 {number}",
+      "convertedPrice": "折算参考价",
+      "settlementPrice": "实际结算：{price}",
+      "officialReference": "官方参考价：{price}"
+    },
+    "displayPricing": {
+      "selectorLabel": "显示币种",
+      "currencyNames": {
+        "CNY": "CNY · 人民币",
+        "USD": "USD · 美元"
+      },
+      "settlementHint": "订单以 {currency} 结算",
+      "rateBadge": "标准汇率 · 换算透明",
+      "rateTitle": "当前展示汇率",
+      "closeRate": "关闭汇率说明",
+      "rateUpdated": "更新于 {time}",
+      "rateSource": "本站设定的展示换算汇率。",
+      "ratePending": "汇率待设置",
+      "ratePendingHint": "目前按商品原价币种 {currency} 展示，暂不提供折算价。",
+      "rateSettlementHint": "换算用于价格参考，订单金额与付款均以 {currency} 为准。",
+      "referenceOption": "{name}（折算参考）"
     }
   }
 }

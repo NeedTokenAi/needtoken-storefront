@@ -887,3 +887,100 @@ func TestNeedtokenResourceValidationAndLegacyReads(t *testing.T) {
 		t.Fatalf("unsafe legacy support config published: %#v", safe)
 	}
 }
+
+func TestNeedtokenDisplayPricingKeepsSettlementAndExactRate(t *testing.T) {
+	svc := NewService(newMockSettingRepo())
+	result, err := svc.Update(constants.SettingKeySiteConfig, map[string]interface{}{
+		"currency": "CNY", "brand": map[string]interface{}{"site_name": "NeedToken.AI"},
+		"needtoken_pricing": map[string]interface{}{"default_display_currency": " usd ", "usd_cny_rate": " 7.250000 ", "rate_updated_at": "2026-11-04T16:00:00Z", "secret": "drop"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result["currency"] != "CNY" {
+		t.Fatal("display currency changed settlement")
+	}
+	pricing := result["needtoken_pricing"].(map[string]interface{})
+	if pricing["default_display_currency"] != "USD" || pricing["usd_cny_rate"] != "7.25" {
+		t.Fatalf("unexpected pricing: %+v", pricing)
+	}
+	if _, exists := pricing["secret"]; exists {
+		t.Fatal("unknown pricing field retained")
+	}
+	public, err := svc.GetConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(public["needtoken_pricing"], pricing) {
+		t.Fatalf("unexpected public pricing: %+v", public["needtoken_pricing"])
+	}
+}
+
+func TestNeedtokenDisplayPricingRejectsUnsafeAndAmbiguousRates(t *testing.T) {
+	for _, rate := range []interface{}{"0", "-1", "NaN", "Infinity", "7e0", "7.1234567", "1000.000001", "1001", true, []string{"7"}, map[string]interface{}{"rate": "7"}} {
+		t.Run(fmt.Sprint(rate), func(t *testing.T) {
+			svc := NewService(newMockSettingRepo())
+			_, err := svc.Update(constants.SettingKeySiteConfig, map[string]interface{}{
+				"currency": "CNY", "needtoken_pricing": map[string]interface{}{"default_display_currency": "CNY", "usd_cny_rate": rate},
+			})
+			var field *SettingFieldError
+			if !errors.As(err, &field) || field.Field != "needtoken_pricing" {
+				t.Fatalf("rate %v: expected field error, got %v", rate, err)
+			}
+		})
+	}
+}
+
+func TestNeedtokenDisplayPricingRateRequirementAndLegacyDefaults(t *testing.T) {
+	for _, currency := range []string{"CNY", "USD"} {
+		svc := NewService(newMockSettingRepo())
+		result, err := svc.Update(constants.SettingKeySiteConfig, map[string]interface{}{"currency": currency})
+		if err != nil {
+			t.Fatal(err)
+		}
+		pricing := result["needtoken_pricing"].(map[string]interface{})
+		if pricing["default_display_currency"] != currency || pricing["usd_cny_rate"] != "" {
+			t.Fatalf("invented FX default: %+v", pricing)
+		}
+		other := "USD"
+		if currency == "USD" {
+			other = "CNY"
+		}
+		_, err = svc.Update(constants.SettingKeySiteConfig, map[string]interface{}{"currency": currency, "needtoken_pricing": map[string]interface{}{"default_display_currency": other}})
+		if err == nil {
+			t.Fatal("cross-currency default accepted without a rate")
+		}
+	}
+	for _, rate := range []string{"0.000001", "1000", "1", "7.123456", "0007.25"} {
+		if !validNeedtokenRate(rate) {
+			t.Fatalf("valid rate rejected: %s", rate)
+		}
+	}
+}
+
+func TestNeedtokenDisplayPricingSanitizesLegacyPublicData(t *testing.T) {
+	pricing := publicNeedtokenPricing(map[string]interface{}{"default_display_currency": "USD", "usd_cny_rate": "NaN", "rate_updated_at": "not-a-time", "token": "private"}, "CNY")
+	if pricing["default_display_currency"] != "CNY" || pricing["usd_cny_rate"] != "" || pricing["rate_updated_at"] != "" || len(pricing) != 3 {
+		t.Fatalf("invalid legacy public value: %+v", pricing)
+	}
+	_, err := NewService(newMockSettingRepo()).Update(constants.SettingKeySiteConfig, map[string]interface{}{
+		"currency": "CNY", "needtoken_pricing": map[string]interface{}{"default_display_currency": "CNY", "usd_cny_rate": "7", "rate_updated_at": "yesterday"},
+	})
+	if err == nil {
+		t.Fatal("invalid rate timestamp accepted")
+	}
+}
+
+func TestNeedtokenRateNormalizesNumericAndPaddedDecimalInputs(t *testing.T) {
+	for _, rate := range []interface{}{7.25, "0007.250000"} {
+		result, err := NewService(newMockSettingRepo()).Update(constants.SettingKeySiteConfig, map[string]interface{}{
+			"currency": "CNY", "needtoken_pricing": map[string]interface{}{"default_display_currency": "USD", "usd_cny_rate": rate},
+		})
+		if err != nil {
+			t.Fatalf("rate %v: %v", rate, err)
+		}
+		if result["needtoken_pricing"].(map[string]interface{})["usd_cny_rate"] != "7.25" {
+			t.Fatalf("unexpected canonical rate: %+v", result["needtoken_pricing"])
+		}
+	}
+}

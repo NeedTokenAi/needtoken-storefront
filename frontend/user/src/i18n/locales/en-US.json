@@ -2454,6 +2454,29 @@
           "description": "If a resource has expired or no longer works, stop retrying and let support know. Do not change a shared account’s security settings."
         }
       ]
+    },
+    "variants": {
+      "optionNumber": "Option {number}",
+      "convertedPrice": "Converted estimate",
+      "settlementPrice": "Charged in: {price}",
+      "officialReference": "Official reference: {price}"
+    },
+    "displayPricing": {
+      "selectorLabel": "Display currency",
+      "currencyNames": {
+        "CNY": "CNY · Chinese yuan",
+        "USD": "USD · US dollar"
+      },
+      "settlementHint": "Orders are charged in {currency}",
+      "rateBadge": "Standard rate · Clear conversion",
+      "rateTitle": "Current display exchange rate",
+      "closeRate": "Close exchange rate details",
+      "rateUpdated": "Updated {time}",
+      "rateSource": "A display conversion rate set by this store.",
+      "ratePending": "Exchange rate not set",
+      "ratePendingHint": "Prices are shown in their original currency, {currency}. Conversion is currently unavailable.",
+      "rateSettlementHint": "Converted prices are for reference. Order totals and payments use {currency}.",
+      "referenceOption": "{name} (estimate)"
     }
   }
 }

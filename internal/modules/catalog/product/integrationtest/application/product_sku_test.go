@@ -269,3 +269,81 @@ func TestProductServiceUpdateWithoutStockKeepsReservedSKUStock(t *testing.T) {
 		t.Fatalf("multi spec: expected live stock 7 kept, got %d", reloaded.ManualStockTotal)
 	}
 }
+
+func TestProductSKUDisplayMetadataRoundTripPreservesLegacyUpdates(t *testing.T) {
+	svc, db := newProductServiceForTest(t)
+	category := categorydomain.Category{Slug: "sku-display-category", NameJSON: jsonmap.JSON{"zh-CN": "展示"}}
+	if err := db.Create(&category).Error; err != nil {
+		t.Fatal(err)
+	}
+	input := productwrite.CreateProductInput{
+		CategoryID: category.ID, Slug: "sku-display-product", TitleJSON: map[string]interface{}{"zh-CN": "Product"},
+		PriceAmount: decimal.NewFromInt(879), PurchaseType: constants.ProductPurchaseGuest, FulfillmentType: constants.FulfillmentTypeManual,
+		SKUs: []productwrite.ProductSKUInput{{SKUCode: "PRO-100", PriceAmount: decimal.NewFromInt(879), ManualStockTotal: stockDisplayInt(10), DisplayMetaJSON: map[string]interface{}{
+			"label": map[string]interface{}{"zh-CN": "100"}, "description": map[string]interface{}{"zh-CN": "日常编程"}, "official_price_usd": "100", "token": "private",
+		}}},
+	}
+	created, err := svc.Write.Create(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(created.SKUs) != 1 {
+		t.Fatalf("unexpected SKUs: %#v", created.SKUs)
+	}
+	original := created.SKUs[0]
+	if original.DisplayMetaJSON["official_price_usd"] != "100.00" || original.DisplayMetaJSON["token"] != nil || !original.PriceAmount.Decimal.Equal(decimal.NewFromInt(879)) {
+		t.Fatalf("bad display/price: %#v", original)
+	}
+	input.SKUs[0].ID = original.ID
+	input.SKUs[0].DisplayMetaJSON = nil // A pre-upgrade client knows nothing about display_meta.
+	updated, err := svc.Write.Update(strconv.FormatUint(uint64(created.ID), 10), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SKUs[0].ID != original.ID || updated.SKUs[0].DisplayMetaJSON["official_price_usd"] != "100.00" {
+		t.Fatalf("legacy update erased metadata: %#v", updated.SKUs[0])
+	}
+	input.SKUs[0].DisplayMetaJSON = map[string]interface{}{}
+	updated, err = svc.Write.Update(strconv.FormatUint(uint64(created.ID), 10), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SKUs[0].DisplayMetaJSON["official_price_usd"] != "" || updated.SKUs[0].ID != original.ID || updated.SKUs[0].ManualStockTotal != 10 {
+		t.Fatalf("explicit clearing changed SKU identity/stock: %#v", updated.SKUs[0])
+	}
+}
+
+func TestDefaultSKUDisplayMetadataDoesNotEnableVariants(t *testing.T) {
+	svc, db := newProductServiceForTest(t)
+	category := categorydomain.Category{Slug: "default-display-category", NameJSON: jsonmap.JSON{"zh-CN": "展示"}}
+	if err := db.Create(&category).Error; err != nil {
+		t.Fatal(err)
+	}
+	input := productwrite.CreateProductInput{CategoryID: category.ID, Slug: "default-display-product", TitleJSON: map[string]interface{}{"zh-CN": "Product"}, PriceAmount: decimal.NewFromInt(179), ManualStockTotal: stockDisplayInt(7), PurchaseType: constants.ProductPurchaseGuest, FulfillmentType: constants.FulfillmentTypeManual, DefaultSKUDisplayMeta: map[string]interface{}{"official_price_usd": "20"}}
+	created, err := svc.Write.Create(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(created.SKUs) != 1 || created.SKUs[0].SKUCode != productdomain.DefaultSKUCode || created.SKUs[0].DisplayMetaJSON["official_price_usd"] != "20.00" {
+		t.Fatalf("wrong default metadata: %#v", created.SKUs)
+	}
+	id := created.SKUs[0].ID
+	input.DefaultSKUDisplayMeta = nil
+	updated, err := svc.Write.Update(strconv.FormatUint(uint64(created.ID), 10), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SKUs[0].ID != id || updated.SKUs[0].DisplayMetaJSON["official_price_usd"] != "20.00" {
+		t.Fatalf("legacy default save erased metadata: %#v", updated.SKUs)
+	}
+	input.DefaultSKUDisplayMeta = map[string]interface{}{}
+	updated, err = svc.Write.Update(strconv.FormatUint(uint64(created.ID), 10), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.SKUs[0].ID != id || updated.SKUs[0].DisplayMetaJSON["official_price_usd"] != "" || updated.SKUs[0].ManualStockTotal != 7 {
+		t.Fatalf("default clear changed identity/stock: %#v", updated.SKUs)
+	}
+}
+
+func stockDisplayInt(value int) *int { return &value }

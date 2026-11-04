@@ -196,6 +196,7 @@ type ProductSKURequest struct {
 	ID               uint                   `json:"id"`
 	SKUCode          string                 `json:"sku_code" binding:"required"`
 	SpecValuesJSON   map[string]interface{} `json:"spec_values"`
+	DisplayMetaJSON  map[string]interface{} `json:"display_meta"`
 	PriceAmount      float64                `json:"price_amount" binding:"required"`
 	CostPriceAmount  float64                `json:"cost_price_amount"`
 	ManualStockTotal *int                   `json:"manual_stock_total"`
@@ -212,30 +213,31 @@ type WholesalePriceRequest struct {
 
 // CreateProductRequest 创建商品请求
 type CreateProductRequest struct {
-	CategoryID          uint                     `json:"category_id" binding:"required"`
-	Slug                string                   `json:"slug" binding:"required"`
-	SeoMetaJSON         map[string]interface{}   `json:"seo_meta"`
-	TitleJSON           map[string]interface{}   `json:"title" binding:"required"`
-	DescriptionJSON     map[string]interface{}   `json:"description"`
-	ContentJSON         map[string]interface{}   `json:"content"`
-	InstructionsJSON    map[string]interface{}   `json:"instructions"`
-	ManualFormSchema    map[string]interface{}   `json:"manual_form_schema"`
-	PriceAmount         float64                  `json:"price_amount" binding:"required"`
-	CostPriceAmount     float64                  `json:"cost_price_amount"`
-	WholesalePrices     *[]WholesalePriceRequest `json:"wholesale_prices"`
-	Images              []string                 `json:"images"`
-	Tags                []string                 `json:"tags"`
-	PurchaseType        string                   `json:"purchase_type"`
-	MinPurchaseQuantity *int                     `json:"min_purchase_quantity"`
-	MaxPurchaseQuantity *int                     `json:"max_purchase_quantity"`
-	StockDisplayMode    string                   `json:"stock_display_mode"`
-	FulfillmentType     string                   `json:"fulfillment_type"`
-	ManualStockTotal    *int                     `json:"manual_stock_total"`
-	SKUs                []ProductSKURequest      `json:"skus"`
-	PaymentChannelIDs   []uint                   `json:"payment_channel_ids"`
-	IsAffiliateEnabled  *bool                    `json:"is_affiliate_enabled"`
-	IsActive            *bool                    `json:"is_active"`
-	SortOrder           int                      `json:"sort_order"`
+	CategoryID            uint                     `json:"category_id" binding:"required"`
+	Slug                  string                   `json:"slug" binding:"required"`
+	SeoMetaJSON           map[string]interface{}   `json:"seo_meta"`
+	TitleJSON             map[string]interface{}   `json:"title" binding:"required"`
+	DescriptionJSON       map[string]interface{}   `json:"description"`
+	ContentJSON           map[string]interface{}   `json:"content"`
+	InstructionsJSON      map[string]interface{}   `json:"instructions"`
+	ManualFormSchema      map[string]interface{}   `json:"manual_form_schema"`
+	PriceAmount           float64                  `json:"price_amount" binding:"required"`
+	CostPriceAmount       float64                  `json:"cost_price_amount"`
+	WholesalePrices       *[]WholesalePriceRequest `json:"wholesale_prices"`
+	Images                []string                 `json:"images"`
+	Tags                  []string                 `json:"tags"`
+	PurchaseType          string                   `json:"purchase_type"`
+	MinPurchaseQuantity   *int                     `json:"min_purchase_quantity"`
+	MaxPurchaseQuantity   *int                     `json:"max_purchase_quantity"`
+	StockDisplayMode      string                   `json:"stock_display_mode"`
+	FulfillmentType       string                   `json:"fulfillment_type"`
+	ManualStockTotal      *int                     `json:"manual_stock_total"`
+	SKUs                  []ProductSKURequest      `json:"skus"`
+	DefaultSKUDisplayMeta map[string]interface{}   `json:"default_sku_display_meta"`
+	PaymentChannelIDs     []uint                   `json:"payment_channel_ids"`
+	IsAffiliateEnabled    *bool                    `json:"is_affiliate_enabled"`
+	IsActive              *bool                    `json:"is_active"`
+	SortOrder             int                      `json:"sort_order"`
 }
 
 // toWholesalePriceInputs 透传「是否提供」语义：请求未携带 wholesale_prices 时返回 nil
@@ -266,6 +268,7 @@ func toProductSKUInputs(items []ProductSKURequest) []productwrite.ProductSKUInpu
 			ID:               item.ID,
 			SKUCode:          item.SKUCode,
 			SpecValuesJSON:   item.SpecValuesJSON,
+			DisplayMetaJSON:  item.DisplayMetaJSON,
 			PriceAmount:      decimal.NewFromFloat(item.PriceAmount),
 			CostPriceAmount:  decimal.NewFromFloat(item.CostPriceAmount),
 			ManualStockTotal: item.ManualStockTotal,
@@ -285,30 +288,31 @@ func (h *AdminProductHandler) CreateProduct(c *gin.Context) {
 	}
 
 	product, err := h.writer.Create(productwrite.CreateProductInput{
-		CategoryID:           req.CategoryID,
-		Slug:                 req.Slug,
-		SeoMetaJSON:          req.SeoMetaJSON,
-		TitleJSON:            req.TitleJSON,
-		DescriptionJSON:      req.DescriptionJSON,
-		ContentJSON:          req.ContentJSON,
-		InstructionsJSON:     req.InstructionsJSON,
-		ManualFormSchemaJSON: req.ManualFormSchema,
-		PriceAmount:          decimal.NewFromFloat(req.PriceAmount),
-		CostPriceAmount:      decimal.NewFromFloat(req.CostPriceAmount),
-		WholesalePrices:      toWholesalePriceInputs(req.WholesalePrices),
-		Images:               req.Images,
-		Tags:                 req.Tags,
-		PurchaseType:         req.PurchaseType,
-		MinPurchaseQuantity:  req.MinPurchaseQuantity,
-		MaxPurchaseQuantity:  req.MaxPurchaseQuantity,
-		StockDisplayMode:     req.StockDisplayMode,
-		FulfillmentType:      req.FulfillmentType,
-		ManualStockTotal:     req.ManualStockTotal,
-		SKUs:                 toProductSKUInputs(req.SKUs),
-		PaymentChannelIDs:    req.PaymentChannelIDs,
-		IsAffiliateEnabled:   req.IsAffiliateEnabled,
-		IsActive:             req.IsActive,
-		SortOrder:            req.SortOrder,
+		CategoryID:            req.CategoryID,
+		Slug:                  req.Slug,
+		SeoMetaJSON:           req.SeoMetaJSON,
+		TitleJSON:             req.TitleJSON,
+		DescriptionJSON:       req.DescriptionJSON,
+		ContentJSON:           req.ContentJSON,
+		InstructionsJSON:      req.InstructionsJSON,
+		ManualFormSchemaJSON:  req.ManualFormSchema,
+		PriceAmount:           decimal.NewFromFloat(req.PriceAmount),
+		CostPriceAmount:       decimal.NewFromFloat(req.CostPriceAmount),
+		WholesalePrices:       toWholesalePriceInputs(req.WholesalePrices),
+		Images:                req.Images,
+		Tags:                  req.Tags,
+		PurchaseType:          req.PurchaseType,
+		MinPurchaseQuantity:   req.MinPurchaseQuantity,
+		MaxPurchaseQuantity:   req.MaxPurchaseQuantity,
+		StockDisplayMode:      req.StockDisplayMode,
+		FulfillmentType:       req.FulfillmentType,
+		ManualStockTotal:      req.ManualStockTotal,
+		SKUs:                  toProductSKUInputs(req.SKUs),
+		DefaultSKUDisplayMeta: req.DefaultSKUDisplayMeta,
+		PaymentChannelIDs:     req.PaymentChannelIDs,
+		IsAffiliateEnabled:    req.IsAffiliateEnabled,
+		IsActive:              req.IsActive,
+		SortOrder:             req.SortOrder,
 	})
 	if err != nil {
 		if errors.Is(err, productcontract.ErrSlugExists) {
@@ -351,7 +355,7 @@ func (h *AdminProductHandler) CreateProduct(c *gin.Context) {
 			ginutil.RespondError(c, response.CodeBadRequest, "error.wholesale_price_invalid", nil)
 			return
 		}
-		if errors.Is(err, productcontract.ErrProductSKUInvalid) {
+		if errors.Is(err, productcontract.ErrProductSKUInvalid) || errors.Is(err, productdomain.ErrSKUDisplayMetaInvalid) {
 			ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 			return
 		}
@@ -377,30 +381,31 @@ func (h *AdminProductHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	product, err := h.writer.Update(id, productwrite.CreateProductInput{
-		CategoryID:           req.CategoryID,
-		Slug:                 req.Slug,
-		SeoMetaJSON:          req.SeoMetaJSON,
-		TitleJSON:            req.TitleJSON,
-		DescriptionJSON:      req.DescriptionJSON,
-		ContentJSON:          req.ContentJSON,
-		InstructionsJSON:     req.InstructionsJSON,
-		ManualFormSchemaJSON: req.ManualFormSchema,
-		PriceAmount:          decimal.NewFromFloat(req.PriceAmount),
-		CostPriceAmount:      decimal.NewFromFloat(req.CostPriceAmount),
-		WholesalePrices:      toWholesalePriceInputs(req.WholesalePrices),
-		Images:               req.Images,
-		Tags:                 req.Tags,
-		PurchaseType:         req.PurchaseType,
-		MinPurchaseQuantity:  req.MinPurchaseQuantity,
-		MaxPurchaseQuantity:  req.MaxPurchaseQuantity,
-		StockDisplayMode:     req.StockDisplayMode,
-		FulfillmentType:      req.FulfillmentType,
-		ManualStockTotal:     req.ManualStockTotal,
-		SKUs:                 toProductSKUInputs(req.SKUs),
-		PaymentChannelIDs:    req.PaymentChannelIDs,
-		IsAffiliateEnabled:   req.IsAffiliateEnabled,
-		IsActive:             req.IsActive,
-		SortOrder:            req.SortOrder,
+		CategoryID:            req.CategoryID,
+		Slug:                  req.Slug,
+		SeoMetaJSON:           req.SeoMetaJSON,
+		TitleJSON:             req.TitleJSON,
+		DescriptionJSON:       req.DescriptionJSON,
+		ContentJSON:           req.ContentJSON,
+		InstructionsJSON:      req.InstructionsJSON,
+		ManualFormSchemaJSON:  req.ManualFormSchema,
+		PriceAmount:           decimal.NewFromFloat(req.PriceAmount),
+		CostPriceAmount:       decimal.NewFromFloat(req.CostPriceAmount),
+		WholesalePrices:       toWholesalePriceInputs(req.WholesalePrices),
+		Images:                req.Images,
+		Tags:                  req.Tags,
+		PurchaseType:          req.PurchaseType,
+		MinPurchaseQuantity:   req.MinPurchaseQuantity,
+		MaxPurchaseQuantity:   req.MaxPurchaseQuantity,
+		StockDisplayMode:      req.StockDisplayMode,
+		FulfillmentType:       req.FulfillmentType,
+		ManualStockTotal:      req.ManualStockTotal,
+		SKUs:                  toProductSKUInputs(req.SKUs),
+		DefaultSKUDisplayMeta: req.DefaultSKUDisplayMeta,
+		PaymentChannelIDs:     req.PaymentChannelIDs,
+		IsAffiliateEnabled:    req.IsAffiliateEnabled,
+		IsActive:              req.IsActive,
+		SortOrder:             req.SortOrder,
 	})
 	if err != nil {
 		if errors.Is(err, productcontract.ErrNotFound) {
@@ -447,7 +452,7 @@ func (h *AdminProductHandler) UpdateProduct(c *gin.Context) {
 			ginutil.RespondError(c, response.CodeBadRequest, "error.wholesale_price_invalid", nil)
 			return
 		}
-		if errors.Is(err, productcontract.ErrProductSKUInvalid) {
+		if errors.Is(err, productcontract.ErrProductSKUInvalid) || errors.Is(err, productdomain.ErrSKUDisplayMetaInvalid) {
 			ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 			return
 		}

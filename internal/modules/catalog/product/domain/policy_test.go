@@ -147,3 +147,49 @@ func TestPruneWholesalePricesForSKUs(t *testing.T) {
 		t.Fatalf("unexpected kept tiers: %+v", got)
 	}
 }
+
+func TestSKUDisplayMetadataNormalizesOnlyPublicFields(t *testing.T) {
+	if PublicSKUDisplayMeta(nil) != nil {
+		t.Fatal("unconfigured metadata must remain distinguishable from an explicit cleared reference")
+	}
+	cleared, err := NormalizeSKUDisplayMeta(map[string]interface{}{})
+	if err != nil || PublicSKUDisplayMeta(cleared) == nil || PublicSKUDisplayMeta(cleared)["official_price_usd"] != "" {
+		t.Fatal("explicit cleared metadata must retain its empty reference")
+	}
+	meta, err := NormalizeSKUDisplayMeta(map[string]interface{}{
+		"label":              map[string]interface{}{"zh-CN": " 月度 ", "unsupported": "hidden"},
+		"feature_lines":      map[string]interface{}{"zh-CN": " 第一条\r\n\n第二条 "},
+		"official_price_usd": " 200 ",
+		"token":              "not-public",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta["official_price_usd"] != "200.00" || meta["token"] != nil {
+		t.Fatalf("unexpected metadata: %#v", meta)
+	}
+	label := meta["label"].(map[string]interface{})
+	if label["zh-CN"] != "月度" || len(label) != 3 {
+		t.Fatalf("unexpected label: %#v", label)
+	}
+	if meta["feature_lines"].(map[string]interface{})["zh-CN"] != "第一条\n第二条" {
+		t.Fatalf("unexpected features: %#v", meta)
+	}
+	if PublicSKUDisplayMeta(map[string]interface{}{"password": "private"})["password"] != nil {
+		t.Fatal("public metadata leaked unknown fields")
+	}
+}
+
+func TestSKUDisplayMetadataRejectsInvalidOfficialPricesAndCopy(t *testing.T) {
+	invalid := []map[string]interface{}{
+		{"official_price_usd": "-1"}, {"official_price_usd": "0"}, {"official_price_usd": "1e3"},
+		{"official_price_usd": "1.001"}, {"official_price_usd": 200.0}, {"official_price_usd": "100000000"},
+		{"title": "wrong type"}, {"label": map[string]interface{}{"zh-CN": 42}},
+		{"feature_lines": map[string]interface{}{"zh-CN": "1\n2\n3\n4\n5\n6\n7\n8\n9"}},
+	}
+	for _, meta := range invalid {
+		if _, err := NormalizeSKUDisplayMeta(meta); !errors.Is(err, ErrSKUDisplayMetaInvalid) {
+			t.Fatalf("accepted invalid metadata %#v: %v", meta, err)
+		}
+	}
+}
