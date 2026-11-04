@@ -1753,9 +1753,9 @@
     "nav": {
       "label": "Main navigation",
       "home": "Home",
-      "recharge": "Top-up",
-      "rental": "Rental",
-      "plans": "Plans & Tokens",
+      "recharge": "Top-up services",
+      "rental": "Accounts",
+      "plans": "API plans",
       "models": "Models",
       "docs": "API Docs",
       "blog": "Blog",
@@ -1763,11 +1763,11 @@
       "register": "Sign up"
     },
     "footer": {
-      "tagline": "One key for many models. Members, keys and usage live in the console; products and orders live here.",
-      "products": "Products",
-      "developers": "Developers",
+      "tagline": "Top-ups, ready-made accounts and API plans. Shop in one place and track your orders.",
+      "products": "Products & services",
+      "developers": "API & docs",
       "support": "Support",
-      "console": "Member console"
+      "console": "API console"
     },
     "supply": {
       "pool": "Pool",
@@ -1960,15 +1960,15 @@
       }
     },
     "plans": {
-      "title": "Plans & Tokens",
-      "subtitle": "A plan is API quota in the member console: the group decides which models you can use, the plan sets quota and validity, and usage is metered in tokens.",
+      "title": "API Plans",
+      "subtitle": "One key for your everyday models. Choose a personal plan or discuss dedicated supply and higher usage needs for your team.",
       "buy": "Browse plans",
       "console": "Open member console",
       "what": {
         "title": "What a plan contains",
         "group": {
-          "title": "Group",
-          "desc": "Sets the model tiers and price multiplier, as shown in the console."
+          "title": "Model access",
+          "desc": "Available models and service tiers follow the product terms and the permissions shown in your API console."
         },
         "quota": {
           "title": "Quota",
@@ -1981,7 +1981,7 @@
       },
       "tokens": {
         "title": "How tokens are metered",
-        "b1": "Each request is priced by input tokens and output tokens; unit prices are on the Models page.",
+        "b1": "Billing follows each model’s rules and may include input, output, cache, or other usage units. See the model directory and API console.",
         "b2": "The same model can cost differently on different supply lines; your group decides.",
         "b3": "Usage details and remaining quota are in the member console, which is authoritative.",
         "b4": "Top-ups and renewals are ordered here, not paid inside the console.",
@@ -1991,11 +1991,11 @@
         "title": "From purchase to first request",
         "s1": {
           "title": "Order a plan",
-          "desc": "Guest checkout works. Enter the email you use (or will use) for the member console."
+          "desc": "Choose a product and variant here, then verify the account association as described on the product page."
         },
         "s2": {
-          "title": "Automatic activation",
-          "desc": "After payment the plan is activated on your console account by email."
+          "title": "Verify and fulfill",
+          "desc": "After payment, fulfillment follows the confirmed order benefits. Track progress and any items needing review on the order page."
         },
         "s3": {
           "title": "Create a key",
@@ -2006,7 +2006,7 @@
           "desc": "Usage, remaining quota and expiry are all in the console."
         }
       },
-      "note": "If that email has no console account yet, the order waits to be claimed and is credited once you sign up with the same email."
+      "note": "Purchase and renew here. Manage keys, quota, and usage in the API console. Account associations require verification; a matching email alone is not sufficient."
     },
     "docs": {
       "title": "API Docs",
@@ -2036,6 +2036,189 @@
         "b2": "401 / auth failed: check the variable is set in this terminal and the key was not deleted in the console.",
         "b3": "Insufficient quota: buy a plan or top up here; the quota is added to your console account automatically."
       }
+    },
+    "apiServices": {
+      "title": "One key. Your everyday models.",
+      "options": "Personal and business API options",
+      "personal": {
+        "title": "Individuals & developers",
+        "desc": "Choose an API plan for development, writing, and your everyday tools.",
+        "b1": "Connect models and developer tools",
+        "b2": "Choose quota and validity from product terms",
+        "b3": "Manage keys and usage in the API console"
+      },
+      "enterprise": {
+        "title": "Business & dedicated supply",
+        "desc": "Discuss a tailored plan based on your team’s models, usage, and concurrency needs.",
+        "b1": "Discuss volume plans and tiered discounts",
+        "b2": "Assess dedicated account pools and capacity",
+        "b3": "Confirm service scope and pricing together"
+      },
+      "connectTitle": "Connect the tools you already use",
+      "connectDesc": "Create a key in the API console, then enter this base URL in a tool that supports OpenAI-compatible APIs."
+    },
+    "homeServices": {
+      "seoTitle": "Recharges, ready-made products and API plans",
+      "eyebrow": "NeedToken.AI · AI services made simpler",
+      "title": "Your AI services,",
+      "titleAccent": "all start here.",
+      "subtitle": "Recharge an existing account, choose a ready-made product, or connect your application to model APIs. Find the service that fits your needs.",
+      "services": {
+        "recharge": {
+          "tag": "Keep your account",
+          "title": "Recharge services",
+          "description": "Choose a recharge or subscription renewal for your existing account, then follow the order instructions.",
+          "note": "Review options, specifications and support terms",
+          "action": "Recharge now"
+        },
+        "products": {
+          "tag": "Delivered in your order",
+          "title": "Ready-made products",
+          "description": "Choose a ready-made package and collect account details or other delivery content from your order page.",
+          "note": "Check delivery contents and usage terms first",
+          "action": "Shop now"
+        },
+        "api": {
+          "tag": "One key, multiple models",
+          "title": "API plans",
+          "description": "Choose model access for development, applications and teams, from everyday usage to business needs.",
+          "note": "Choose a plan, connect models and track usage",
+          "action": "Get API access"
+        }
+      },
+      "benefits": {
+        "selfService": "24/7 self-service ordering",
+        "orderTracking": "Track your order",
+        "afterSales": "Clear support terms",
+        "business": "Invoices and business purchasing"
+      },
+      "steps": {
+        "eyebrow": "From choosing to using",
+        "title": "Choose your service. Then follow three steps.",
+        "description": "Specifications, prices and service terms are shown on each product page. Follow your order instructions after purchasing.",
+        "choose": {
+          "title": "Choose a product and option",
+          "description": "Browse by service and check the plan, duration and purchase instructions."
+        },
+        "pay": {
+          "title": "Place and pay for your order",
+          "description": "Confirm your selection and order total, then use an available payment method."
+        },
+        "receive": {
+          "title": "Follow your delivery instructions",
+          "description": "Submit recharge information, collect your product or follow the setup guide for your API plan."
+        }
+      },
+      "orders": {
+        "title": "Already placed an order? Continue here.",
+        "description": "Check recharge progress, delivery content and support updates from your order.",
+        "action": "Find my order"
+      },
+      "faq": {
+        "eyebrow": "Before you buy",
+        "title": "Find the right service for you",
+        "description": "Each service has a different purpose. Check the product description and service terms before ordering.",
+        "notices": "Read service notices",
+        "service": {
+          "question": "Which service should I choose?",
+          "answer": "Choose recharge services to top up or renew an existing account. Choose ready-made products to receive the items described on a product page. Choose an API plan to call models from tools, applications or development projects."
+        },
+        "recharge": {
+          "question": "What information does a recharge need?",
+          "answer": "Requirements vary by product. Read the purchase instructions and submit the requested information through your order. Activation timing depends on actual processing progress."
+        },
+        "delivery": {
+          "question": "Where can I check progress and delivery?",
+          "answer": "Use order lookup to find your order. The order page shows recharge progress, product delivery and support information. API keys and usage are managed in the model console."
+        },
+        "business": {
+          "question": "How do business usage, invoices and bank transfers work?",
+          "answer": "Discuss business usage, dedicated supply, invoices and bank transfers before purchasing. Quotas, discounts, delivery scope and service terms depend on the final agreed plan."
+        }
+      }
+    },
+    "catalogServices": {
+      "recharge": {
+        "label": "Recharge services",
+        "title": "Choose your recharge plan",
+        "subtitle": "Order anytime, 24/7 · Fast recharge",
+        "section": "Recharge plans",
+        "descriptionFallback": "Choose an option and follow the product instructions to recharge.",
+        "delivery": "Submit details as instructed",
+        "cta": "Recharge now"
+      },
+      "rental": {
+        "label": "Ready-to-use accounts",
+        "title": "Choose your ready-to-use plan",
+        "subtitle": "Choose a plan and order online · View delivery in your order",
+        "section": "Account plans",
+        "descriptionFallback": "Choose an option and receive the delivery described on the product page.",
+        "delivery": "View delivery in your order",
+        "cta": "Buy now"
+      },
+      "all": "ALL",
+      "serviceNotes": "Service information",
+      "warrantyNote": "30-day warranty",
+      "refundNote": "Full refund if recharge is unsuccessful",
+      "invoiceNote": "Invoices available",
+      "businessTransferNote": "Business bank transfers supported",
+      "deliveryNote": "Delivery available in your order",
+      "afterSaleNote": "Support terms on each product page",
+      "filterLabel": "Filter product categories",
+      "search": "Search products in this service",
+      "searchSubmit": "Search",
+      "chooseOption": "Choose a plan option",
+      "standardOption": "Standard plan",
+      "optionsPending": "Options not yet configured",
+      "pricePending": "Price pending",
+      "availabilityPending": "Currently unavailable",
+      "termsInDetail": "See product terms and support",
+      "viewDetails": "View product details",
+      "resultCount": "{count} products",
+      "loadError": "Products could not be loaded",
+      "empty": "Plans coming soon",
+      "emptySearch": "No matching plans found",
+      "emptyDescription": "Check back later or adjust your search.",
+      "help": "Read the product and delivery details before ordering",
+      "guides": "Guides",
+      "notices": "Announcements",
+      "orders": "Track an order"
+    },
+    "purchaseServices": {
+      "eyebrow": "Choose your product and plan",
+      "stepsLabel": "Order steps",
+      "stepChoose": "Choose a plan",
+      "stepPay": "Confirm and pay",
+      "stepDelivery": "View delivery",
+      "selectPlan": "Choose the plan that fits",
+      "planHint": "Choose an option, then continue to secure checkout.",
+      "optionCount": "{count} options",
+      "expiredSelection": "The linked option has changed or is unavailable. Please choose an option below.",
+      "beforeOrder": "Before you order",
+      "orderHint": "Review the product description, eligibility and support terms. After payment, view delivery details and progress on your order page.",
+      "serviceHint": "If account details or a token are required, submit them only through the dedicated page linked from your order. Update expired details as instructed and never share them in public comments.",
+      "digitalHint": "Digital products use the existing order delivery flow. Account details, passwords or codes depend on the actual delivery recorded in your order; keep them secure.",
+      "notices": "Order notices",
+      "orderSummary": "YOUR ORDER",
+      "unitPrice": "Current unit price",
+      "decreaseQuantity": "Decrease quantity",
+      "increaseQuantity": "Increase quantity",
+      "priceNote": "Member and volume discounts update with your selection. The checkout page confirms the total and available payment methods.",
+      "continueOrder": "Confirm plan and order",
+      "secureOrder": "Track order and payment status",
+      "productInfo": "Product details and instructions",
+      "infoHint": "Service coverage, recharge requirements and support policies are defined in this product description.",
+      "relatedHint": "Guides, frequently asked questions and instructions linked to this product.",
+      "allGuides": "All guides",
+      "priceUnavailable": "Price pending confirmation",
+      "resourcesTitle": "Guides and site notices",
+      "resourcesHint": "Review how the service works before choosing your plan.",
+      "noProductGuides": "No articles are linked to this product yet. Browse all guides for more instructions.",
+      "siteNotices": "Site notices",
+      "allNotices": "All notices",
+      "siteNoticeScope": "These notices apply to the site. Product benefits and requirements are defined in the product description.",
+      "noticeLoadFailed": "Notices could not be loaded. Retry or open all notices to check them.",
+      "noSiteNotices": "There are no site notices at present."
     }
   }
 }

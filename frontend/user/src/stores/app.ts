@@ -7,15 +7,27 @@ import { getLocalizedText } from '../utils/resellerSiteConfig'
 import { detectLocale, setI18nLocale } from '../i18n'
 import { useHead } from '@unhead/vue'
 
+export interface StorefrontBrandOverride {
+    siteName: string
+    siteIcon: string
+    touchIcon?: string
+}
+
 export const useAppStore = defineStore('app', () => {
     // 与 vue-i18n 复用同一套语言检测逻辑，避免首次访问时
     // UI 语言（vue-i18n）与商品多语言取值（appStore.locale）不一致
     const locale = ref(detectLocale())
     const config = ref<any>(null)
     const loading = ref(false)
+    // 仅当前模板挂载期间生效；不写回站点或分销商配置。
+    const storefrontBrandOverride = ref<StorefrontBrandOverride | null>(null)
+    const setStorefrontBrandOverride = (brand: StorefrontBrandOverride | null) => {
+        storefrontBrandOverride.value = brand
+    }
     // 服务器与客户端的时间偏移量（毫秒），serverTime = clientTime + offset
     const serverTimeOffset = ref(0)
     const siteIconHref = computed(() => {
+        if (storefrontBrandOverride.value) return storefrontBrandOverride.value.siteIcon
         const siteIcon = String(config.value?.brand?.site_icon || '').trim()
         return siteIcon ? getImageUrl(siteIcon) : '/dj.svg'
     })
@@ -37,6 +49,7 @@ export const useAppStore = defineStore('app', () => {
     useHead({
         htmlAttrs: { lang: computed(() => locale.value) },
         title: () => {
+            if (storefrontBrandOverride.value) return storefrontBrandOverride.value.siteName
             const seo = config.value?.seo
             const lang = locale.value
             const localized = getLocalizedText(seo?.title, lang)
@@ -44,7 +57,14 @@ export const useAppStore = defineStore('app', () => {
             const siteName = String(config.value?.brand?.site_name || '').trim()
             return siteName || undefined
         },
-        link: () => [{ key: 'favicon', rel: 'icon', href: siteIconHref.value }],
+        link: () => [
+            { key: 'favicon', rel: 'icon', href: siteIconHref.value },
+            ...(storefrontBrandOverride.value?.touchIcon ? [{
+                key: 'apple-touch-icon',
+                rel: 'apple-touch-icon',
+                href: storefrontBrandOverride.value.touchIcon,
+            }] : []),
+        ],
         meta: () => {
             const seo = config.value?.seo
             if (!seo) return []
@@ -115,6 +135,8 @@ export const useAppStore = defineStore('app', () => {
         locale,
         config,
         loading,
+        storefrontBrandOverride,
+        setStorefrontBrandOverride,
         serverTimeOffset,
         isResellerTenant,
         canAccessResellerConsole,

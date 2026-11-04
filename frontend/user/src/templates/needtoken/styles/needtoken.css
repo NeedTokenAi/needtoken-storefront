@@ -1,5 +1,5 @@
 /* =========================================================================
-   needtoken 模板设计令牌（needtoken.io 官网）
+   NeedToken.AI 模板设计令牌
    方向: 深色科技风 · 等宽代码块 · 单一青绿高亮
    作用域: .nt-scope 与 body.nt-tokens（浮层 Teleport 到 body，令牌双挂，同 vault 做法）。
            只覆盖 --ui-* 令牌，classic 回落页面（结算、支付、查单）自动换成同一套深色配色。
@@ -31,6 +31,62 @@ body.nt-tokens {
   flex-direction: column;
   background: var(--ui-bg-page);
   color: var(--ui-text-primary);
+}
+
+.nt-scope .nt-brand {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: -0.035em;
+}
+
+/* 分类与规格筛选共用的玻璃按钮；非支持 backdrop-filter 的浏览器仍有可读底色。 */
+.nt-scope .nt-glass-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 42px;
+  border: 1px solid rgba(180, 205, 201, 0.16);
+  border-radius: 999px;
+  padding: 9px 18px;
+  background: rgba(30, 42, 47, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 4px 16px rgba(0, 0, 0, 0.1);
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.nt-scope .nt-glass-pill:hover {
+  border-color: rgba(94, 234, 192, 0.38);
+  background: rgba(53, 77, 73, 0.5);
+  color: var(--ui-text-primary);
+}
+
+.nt-scope .nt-glass-pill[aria-pressed="true"],
+.nt-scope .nt-glass-pill[aria-selected="true"] {
+  border-color: rgba(94, 234, 192, 0.58);
+  background: rgba(45, 212, 167, 0.14);
+  box-shadow: inset 0 1px 0 rgba(190, 255, 234, 0.12), 0 0 20px rgba(45, 212, 167, 0.07);
+  color: #a5f3d6;
+}
+
+.nt-scope :where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-scope *,
+  .nt-scope *::before,
+  .nt-scope *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .nt-scope .nt-mono,
