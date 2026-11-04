@@ -48,6 +48,9 @@ func (s *PostStore) List(ctx context.Context, query contract.PostQuery) ([]domai
 	if query.OnlyPublished {
 		statement = statement.Where("is_published = ?", true)
 	}
+	if len(query.CategoryIDs) > 0 {
+		statement = statement.Where("category_id IN ?", query.CategoryIDs)
+	}
 	if query.Type != "" {
 		statement = statement.Where("type = ?", query.Type)
 	}

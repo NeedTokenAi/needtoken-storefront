@@ -1,6 +1,7 @@
 <template>
   <div class="nt-home">
     <section class="home-hero" aria-labelledby="home-title">
+      <GhostFibersBackground variant="hero" />
       <div class="home-container hero-content">
         <div class="hero-eyebrow">
           <Sparkles :size="13" aria-hidden="true" />
@@ -107,6 +108,7 @@ import { ArrowRight, ArrowUpRight, BadgeCheck, Check, ClipboardList, Clock3, Key
 import { usePageSeo } from '../../composables/usePageSeo'
 import { CATEGORY_SLUGS } from './config'
 import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
+import GhostFibersBackground from './components/GhostFibersBackground.vue'
 
 const { t } = useI18n()
 usePageSeo({
@@ -191,9 +193,8 @@ onUnmounted(() => {
 <style scoped>
 .nt-home { --home-secondary: var(--ui-text-secondary, #b4bfcc); --home-muted: var(--ui-text-muted, #7d8a99); }
 .home-container { width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: 24px; }
-.home-hero { position: relative; isolation: isolate; overflow: hidden; border-bottom: 1px solid var(--ui-border); background: radial-gradient(ellipse at 50% -16%, rgba(45, 212, 167, 0.12), transparent 56%); }
-.home-hero::before { content: ''; position: absolute; z-index: -1; inset: 0; opacity: 0.42; background-image: radial-gradient(rgba(148, 163, 184, 0.26) 0.7px, transparent 0.7px); background-size: 25px 25px; mask-image: linear-gradient(#000, transparent 72%); pointer-events: none; }
-.hero-content { padding-block: 38px 26px; }
+.home-hero { position: relative; isolation: isolate; overflow: hidden; border-bottom: 1px solid var(--ui-border); }
+.hero-content { position: relative; z-index: 1; padding-block: 38px 26px; }
 .hero-eyebrow { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--home-secondary); }
 .hero-eyebrow svg { color: var(--ui-accent); }
 .hero-title { margin: 17px 0 0; text-align: center; font-size: clamp(35px, 4.1vw, 56px); font-weight: 750; line-height: 1.17; letter-spacing: -0.045em; text-wrap: balance; }

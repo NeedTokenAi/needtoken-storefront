@@ -16,6 +16,8 @@ const (
 
 var messages = map[string]map[string]string{
 	LocaleZH: {
+		"error.needtoken_support_invalid":                "客服设置无效，请检查邮箱及链接；二维码可使用站内上传地址",
+		"error.needtoken_resources_invalid":              "公开资源设置无效，请检查唯一编号、标题、链接、发布时间及数量（最多 40 条）",
 		"error.operation_conflict":                       "相同操作编号已使用不同内容；请先核查原操作结果",
 		"error.jwt_secret_missing":                       "JWT secret 未配置",
 		"error.auth_header_missing":                      "缺少 Authorization header",
@@ -396,6 +398,8 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "无效的商品状态参数",
 	},
 	LocaleTW: {
+		"error.needtoken_support_invalid":                "客服設定無效，請檢查信箱及連結；二維碼可使用站內上傳位址",
+		"error.needtoken_resources_invalid":              "公開資源設定無效，請檢查唯一編號、標題、連結、發布時間及數量（最多 40 筆）",
 		"error.operation_conflict":                       "相同操作編號已使用不同內容；請先核查原操作結果",
 		"error.jwt_secret_missing":                       "JWT secret 未配置",
 		"error.auth_header_missing":                      "缺少 Authorization header",
@@ -776,6 +780,8 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "無效的商品狀態參數",
 	},
 	LocaleEN: {
+		"error.needtoken_support_invalid":                "Invalid support settings. Check the email and URLs; QR images may use local upload paths.",
+		"error.needtoken_resources_invalid":              "Invalid public resources. Check unique IDs, titles, URLs, publication times and the 40-entry limit.",
 		"error.operation_conflict":                       "Operation ID was already used with different content; verify the original result first",
 		"error.jwt_secret_missing":                       "JWT secret is not configured",
 		"error.auth_header_missing":                      "Missing Authorization header",

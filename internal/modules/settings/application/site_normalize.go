@@ -1,11 +1,15 @@
 package settingsapp
 
 import (
-	settingsvalue "github.com/dujiao-next/internal/modules/settings/schema/value"
+	"net/mail"
+	"net/url"
+	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/dujiao-next/internal/constants"
+	settingsvalue "github.com/dujiao-next/internal/modules/settings/schema/value"
 	"github.com/dujiao-next/internal/shared/contactlink"
 	"github.com/dujiao-next/internal/shared/jsonmap"
 )
@@ -39,6 +43,8 @@ func normalizeSiteSetting(value map[string]interface{}) jsonmap.JSON {
 
 	normalized["brand"] = normalizeSiteBrand(value["brand"])
 	normalized["contact"] = normalizeSiteContact(value["contact"])
+	normalized["needtoken_support"] = normalizeNeedtokenSupport(value["needtoken_support"])
+	normalized["needtoken_resources"] = normalizeNeedtokenResources(value["needtoken_resources"])
 	normalized["seo"] = normalizeSiteLocalizedBlock(value["seo"], []string{"title", "keywords", "description"})
 	normalized["legal"] = normalizeSiteLocalizedBlock(value["legal"], []string{"terms", "privacy"})
 	normalized["about"] = normalizeSiteAbout(value["about"])
@@ -158,7 +164,7 @@ func validateSiteSetting(value jsonmap.JSON) error {
 	if whatsApp, _ := contact["whatsapp"].(string); whatsApp != "" && !contactlink.IsWhatsApp(whatsApp) {
 		return &SettingFieldError{Field: "contact_whatsapp"}
 	}
-	return nil
+	return validateNeedtokenSite(value)
 }
 
 func normalizeSiteBrand(raw interface{}) map[string]interface{} {
@@ -518,4 +524,161 @@ func normalizeRegistrationSetting(value map[string]interface{}) jsonmap.JSON {
 	normalized[constants.SettingFieldRegistrationInviteOnly] = settingsvalue.ParseBool(value[constants.SettingFieldRegistrationInviteOnly])
 
 	return normalized
+}
+
+const needtokenResourceLimit = 40
+
+var needtokenResourceID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
+
+// Only explicitly public support and resource fields are accepted. Apple account
+// credentials belong to the private asset system, never to public site settings.
+func normalizeNeedtokenSupport(raw interface{}) map[string]interface{} {
+	value, _ := raw.(map[string]interface{})
+	enabled := true
+	if field, ok := value["enabled"]; ok {
+		enabled = settingsvalue.ParseBool(field)
+	}
+	email := "business@needtoken.ai"
+	if field, ok := value["business_email"]; ok {
+		email = normalizeSettingText(field)
+	}
+	return map[string]interface{}{
+		"enabled":        enabled,
+		"business_email": email,
+		"service_hours":  normalizeSettingTextWithRuneLimit(value["service_hours"], 120),
+		"contact_url":    normalizeSettingText(value["contact_url"]),
+		"wecom_qr":       normalizeSettingText(value["wecom_qr"]),
+		"qq_qr":          normalizeSettingText(value["qq_qr"]),
+	}
+}
+
+func normalizeNeedtokenLocalized(raw interface{}, limit int) map[string]interface{} {
+	value, _ := raw.(map[string]interface{})
+	result := make(map[string]interface{}, len(settingSupportedLanguages))
+	for _, language := range settingSupportedLanguages {
+		result[language] = normalizeSettingTextWithRuneLimit(value[language], limit)
+	}
+	return result
+}
+
+func normalizeNeedtokenResources(raw interface{}) map[string]interface{} {
+	value, _ := raw.(map[string]interface{})
+	items, _ := value["apple_ids"].([]interface{})
+	result := make([]interface{}, 0, min(len(items), needtokenResourceLimit+1))
+	for _, rawItem := range items {
+		item, ok := rawItem.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		result = append(result, map[string]interface{}{
+			"id":          normalizeSettingText(item["id"]),
+			"title":       normalizeNeedtokenLocalized(item["title"], 160),
+			"region":      normalizeSettingTextWithRuneLimit(item["region"], 80),
+			"description": normalizeNeedtokenLocalized(item["description"], 600),
+			"url":         normalizeSettingText(item["url"]),
+			"enabled":     settingsvalue.ParseBool(item["enabled"]),
+			"updated_at":  normalizeSettingText(item["updated_at"]),
+		})
+		// Keep one overflow row so validation rejects a too-large list instead
+		// of silently deleting the operator's entries.
+		if len(result) > needtokenResourceLimit {
+			break
+		}
+	}
+	return map[string]interface{}{"apple_ids": result}
+}
+
+func isNeedtokenPublicURL(value string, image bool) bool {
+	if value == "" {
+		return true
+	}
+	if len(value) > 2000 || strings.ContainsAny(value, "\r\n\t\\") {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.User != nil {
+		return false
+	}
+	if image && parsed.Host == "" && parsed.Scheme == "" && strings.HasPrefix(parsed.Path, "/uploads/") {
+		return parsed.RawPath == "" && path.Clean(parsed.Path) == parsed.Path
+	}
+	return (parsed.Scheme == "https" || parsed.Scheme == "http") && parsed.Hostname() != "" && !strings.ContainsAny(parsed.Host, "<>\"' ")
+}
+
+func validateNeedtokenSite(value jsonmap.JSON) error {
+	support, _ := value["needtoken_support"].(map[string]interface{})
+	email, _ := support["business_email"].(string)
+	if email != "" {
+		address, err := mail.ParseAddress(email)
+		if err != nil || address.Address != email || len(email) > 254 {
+			return &SettingFieldError{Field: "needtoken_support"}
+		}
+	}
+	for _, field := range []string{"contact_url", "wecom_qr", "qq_qr"} {
+		text, _ := support[field].(string)
+		if !isNeedtokenPublicURL(text, field != "contact_url") {
+			return &SettingFieldError{Field: "needtoken_support"}
+		}
+	}
+	resources, _ := value["needtoken_resources"].(map[string]interface{})
+	items, _ := resources["apple_ids"].([]interface{})
+	if len(items) > needtokenResourceLimit {
+		return &SettingFieldError{Field: "needtoken_resources"}
+	}
+	seen := make(map[string]bool, len(items))
+	for _, rawItem := range items {
+		item, _ := rawItem.(map[string]interface{})
+		id, _ := item["id"].(string)
+		link, _ := item["url"].(string)
+		if !needtokenResourceID.MatchString(id) || seen[id] || !isNeedtokenPublicURL(link, false) {
+			return &SettingFieldError{Field: "needtoken_resources"}
+		}
+		seen[id] = true
+		if enabled, _ := item["enabled"].(bool); enabled {
+			title, _ := item["title"].(map[string]interface{})
+			hasTitle := false
+			for _, raw := range title {
+				text, _ := raw.(string)
+				hasTitle = hasTitle || text != ""
+			}
+			if link == "" || !hasTitle {
+				return &SettingFieldError{Field: "needtoken_resources"}
+			}
+		}
+		if timestamp, _ := item["updated_at"].(string); timestamp != "" {
+			if _, err := time.Parse(time.RFC3339, timestamp); err != nil {
+				return &SettingFieldError{Field: "needtoken_resources"}
+			}
+		}
+	}
+	return nil
+}
+
+func publicNeedtokenSupport(raw interface{}) map[string]interface{} {
+	normalized := normalizeNeedtokenSupport(raw)
+	for _, field := range []string{"contact_url", "wecom_qr", "qq_qr"} {
+		if !isNeedtokenPublicURL(normalized[field].(string), field != "contact_url") {
+			normalized[field] = ""
+		}
+	}
+	if email := normalized["business_email"].(string); email != "" {
+		address, err := mail.ParseAddress(email)
+		if err != nil || address.Address != email || len(email) > 254 {
+			normalized["business_email"] = ""
+		}
+	}
+	return normalized
+}
+
+func publicNeedtokenResources(raw interface{}) map[string]interface{} {
+	normalized := normalizeNeedtokenResources(raw)
+	result := make([]interface{}, 0)
+	for _, rawItem := range normalized["apple_ids"].([]interface{}) {
+		item := rawItem.(map[string]interface{})
+		link := item["url"].(string)
+		if item["enabled"] == true && link != "" && isNeedtokenPublicURL(link, false) && validateNeedtokenSite(jsonmap.JSON{"needtoken_resources": map[string]interface{}{"apple_ids": []interface{}{item}}}) == nil {
+			result = append(result, item)
+		}
+	}
+	return map[string]interface{}{"apple_ids": result}
 }

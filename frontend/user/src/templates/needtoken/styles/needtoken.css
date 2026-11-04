@@ -134,3 +134,24 @@ body.nt-tokens {
     linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
   background-size: 40px 40px;
 }
+
+/* A single hover/focus target receives this edge light; ordinary text links stay plain.
+   The delegate only updates that target once per animation frame. */
+:is(.nt-scope, body.nt-tokens) .nt-specular-position { position: relative; }
+:is(.nt-scope, body.nt-tokens) .nt-specular::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  background: radial-gradient(125px circle at var(--nt-pointer-x, 50%) var(--nt-pointer-y, 0%), rgba(219, 255, 246, .82), rgba(94, 234, 192, .28) 43%, transparent 75%) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+:is(.nt-scope, body.nt-tokens) .nt-specular:active { filter: brightness(1.08); }
+@media (prefers-reduced-motion: reduce) {
+  :is(.nt-scope, body.nt-tokens) .nt-specular::after { background: linear-gradient(115deg, transparent, rgba(190, 255, 236, .55), transparent) border-box; }
+}
