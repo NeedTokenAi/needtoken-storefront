@@ -68,6 +68,21 @@ export const resolveServiceScope = (categories: PublicCategory[], slug: string):
   return kind ? { kind, root: null, selected: null, categories: [] } : null
 }
 
+const defaultChildSlug: Record<ServiceKind, string> = {
+  recharge: 'chatgpt-recharge',
+  rental: 'chatgpt-accounts',
+}
+
+/** Root visits open the ChatGPT child when it exists. Passing the root slug keeps ALL selected. */
+export const defaultServiceChild = (
+  scope: ServiceScope | null,
+  explicitRootSlug: string | null = null,
+): PublicCategory | null => {
+  if (!scope?.root || scope.selected?.id !== scope.root.id) return null
+  if (explicitRootSlug === scope.root.slug) return null
+  return scope.categories.find(category => category.slug === defaultChildSlug[scope.kind]) || null
+}
+
 export const serviceCategoryIds = (scope: ServiceScope): number[] => {
   if (!scope.root || !scope.selected) return []
   if (scope.selected.id !== scope.root.id) return [scope.selected.id]

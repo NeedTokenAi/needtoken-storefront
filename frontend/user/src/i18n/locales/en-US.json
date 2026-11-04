@@ -1800,13 +1800,13 @@
       "features": {
         "title": "Three product lines, one entry point",
         "recharge": {
-          "title": "Top-up",
-          "b1": "Subscription top-up handled by our team",
+          "title": "Recharge services",
+          "b1": "Subscription recharge services, handled by our team",
           "b2": "Leave an email at checkout, track it on the order page",
           "b3": "After-sales terms are on each product page"
         },
         "rental": {
-          "title": "Rental",
+          "title": "Ready-to-use accounts",
           "b1": "Ready-made accounts for a rental period",
           "b2": "Period, password change and return terms on the product page",
           "b3": "Delivery is shown only on the order page"
@@ -1895,7 +1895,7 @@
           "a": "The model has not been priced by the operator yet; your key is fine. Use a model that shows a price on the Models page, or contact support."
         },
         "aftersale": {
-          "q": "How do top-up and rental after-sales work?",
+          "q": "How do after-sales work for recharge services and ready-to-use accounts?",
           "a": "Each product page states its terms. Please read them before paying."
         }
       }

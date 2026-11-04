@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  activeServiceSkus, filterServiceProducts, resolveServiceScope, serviceAvailability,
+  activeServiceSkus, defaultServiceChild, filterServiceProducts, resolveServiceScope, serviceAvailability,
   serviceCategoryIds, serviceDescriptionText, serviceSkuPrice,
 } from '../src/templates/needtoken/lib/serviceCatalog.ts'
 
@@ -22,6 +22,35 @@ test('ALL remains scoped to the current service and root-category products', () 
     { id: 3, slug: 'account', category_id: 5 },
     { id: 4, slug: 'unclassified', category_id: 0 },
   ], scope).map(row => row.slug), ['direct', 'child'])
+})
+
+test('root visits prefer the ChatGPT child and keep other deep links unchanged', () => {
+  const rows = [
+    { id: 1, slug: 'recharge', parent_id: 0 },
+    { id: 2, slug: 'chatgpt-recharge', parent_id: 1 },
+    { id: 3, slug: 'claude-recharge', parent_id: 1 },
+    { id: 4, slug: 'rental', parent_id: 0 },
+    { id: 5, slug: 'chatgpt-accounts', parent_id: 4 },
+    { id: 6, slug: 'claude-accounts', parent_id: 4 },
+  ]
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'recharge'))?.slug, 'chatgpt-recharge')
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'rental'))?.slug, 'chatgpt-accounts')
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'claude-recharge')), null)
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'chatgpt-recharge')), null)
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'claude-accounts')), null)
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'recharge'), 'recharge'), null)
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'rental'), 'recharge')?.slug, 'chatgpt-accounts')
+})
+
+test('root without the ChatGPT child stays on ALL', () => {
+  const rows = [
+    { id: 1, slug: 'recharge', parent_id: 0 },
+    { id: 3, slug: 'claude-recharge', parent_id: 1 },
+    { id: 4, slug: 'rental', parent_id: 0 },
+    { id: 5, slug: 'chatgpt-account', parent_id: 4 },
+  ]
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'recharge')), null)
+  assert.equal(defaultServiceChild(resolveServiceScope(rows, 'rental')), null)
 })
 
 test('direct child category retains its service identity and sibling filters', () => {
