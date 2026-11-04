@@ -1,0 +1,53 @@
+# 每天 00:00 UTC（北京时间 08:00）把上游 dujiao-next 的一个固定提交开成 PR。
+# 没有 id-token，不接触 GCP。不要改成 pull_request_target。
+# 见 docs/ops/upstream-sync.md。
+name: sync-upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync upstream
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Choose token
+        id: auth
+        env:
+          SYNC_GITHUB_TOKEN: ${{ secrets.SYNC_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -n ${SYNC_GITHUB_TOKEN} ]]; then
+            echo "mode=pat" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=github_token" >> "$GITHUB_OUTPUT"
+            echo "::warning::SYNC_GITHUB_TOKEN 未配置。将用 GITHUB_TOKEN 开 PR，并额外 workflow_dispatch ci。请阅读 docs/ops/upstream-sync.md。"
+          fi
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ steps.auth.outputs.mode == 'pat' && secrets.SYNC_GITHUB_TOKEN || github.token }}
+
+      - name: Open upstream sync PR
+        env:
+          GH_TOKEN: ${{ steps.auth.outputs.mode == 'pat' && secrets.SYNC_GITHUB_TOKEN || github.token }}
+          SYNC_AUTH_MODE: ${{ steps.auth.outputs.mode }}
+          UPSTREAM_CHANNEL: ${{ vars.UPSTREAM_CHANNEL }}
+          UPSTREAM_REPO: dujiao-next/dujiao-next
+        run: .github/scripts/sync-upstream.sh
