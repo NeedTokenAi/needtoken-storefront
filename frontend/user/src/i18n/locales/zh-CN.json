@@ -1961,9 +1961,9 @@
     },
     "plans": {
       "title": "API 套餐",
-      "subtitle": "一把 Key 接入常用模型。按需选购个人套餐，或为团队规划高用量与专属供给方案。",
-      "buy": "选购套餐",
-      "console": "打开会员控制台",
+      "subtitle": "按需充值，灵活选配 Token 额度。套餐在本站购买，APIKey 和用量在控制台管理。",
+      "buy": "选购 API 套餐",
+      "console": "打开 API 控制台",
       "what": {
         "title": "套餐由三部分组成",
         "group": {
@@ -2038,59 +2038,69 @@
       }
     },
     "apiServices": {
-      "title": "一把 Key，连接常用模型。",
+      "title": "One APIKey，多模型随需调用。",
       "options": "个人与企业 API 方案",
       "personal": {
         "title": "个人与开发者",
-        "desc": "为日常开发、写作与工具调用选择合适的 API 套餐。",
+        "desc": "日常写作、编程或工具调用，按用量选购套餐。",
         "b1": "常用模型与开发工具接入",
         "b2": "按商品说明选择额度与有效期",
         "b3": "在 API 控制台管理 Key 与用量"
       },
       "enterprise": {
         "title": "企业与专属方案",
-        "desc": "面向团队和高频调用场景，按模型、用量与并发需求评估专属方案。",
+        "desc": "团队用量与专属供给，按模型、并发和预算确认方案。",
         "b1": "高用量套餐与阶梯优惠咨询",
         "b2": "专属号池与容量方案评估",
         "b3": "服务范围与报价逐项确认"
       },
       "connectTitle": "兼容常用工具，轻松接入",
-      "connectDesc": "使用 API 控制台创建的 Key，将以下地址填入支持 OpenAI 兼容接口的工具。"
+      "connectDesc": "使用 API 控制台创建的 Key，将以下地址填入支持 OpenAI 兼容接口的工具。",
+      "keyLabel": "One APIKey",
+      "titleRest": "，多模型随需调用。",
+      "benefitsLabel": "API 套餐特点",
+      "benefits": {
+        "models": "多模型接入",
+        "quota": "按需补充额度",
+        "usage": "用量可查"
+      },
+      "quotaNote": "实际额度、有效期和调用速率以所购套餐为准。"
     },
     "homeServices": {
       "seoTitle": "充值服务、成品订购与 API 套餐",
       "eyebrow": "NeedToken.AI · 让 AI 服务更简单",
       "title": "你的 AI 服务，",
       "titleAccent": "从这里开始。",
-      "subtitle": "为常用账号充值，选购即用成品，或为应用接入模型 API。按你的需求，选择合适的服务。",
+      "subtitle": "充值续费、成品账号与 API 套餐，按需选择。",
       "services": {
         "recharge": {
           "tag": "原号继续用",
           "title": "充值服务",
-          "description": "为已有账号选择充值或订阅续期方案，按订单引导完成办理。",
+          "description": "为已有账号选择充值或订阅续费，立刻生效。",
           "note": "方案、规格与售后说明清晰可查",
           "action": "立即充值"
         },
         "products": {
           "tag": "订单内交付",
           "title": "成品订购",
-          "description": "按需选购成品方案，账号、密码等交付内容在订单页领取。",
+          "description": "支付成功立刻获取已订阅账号及密码。",
           "note": "购买前查看交付内容与使用范围",
           "action": "立即购买"
         },
         "api": {
-          "tag": "一把 key，多种模型",
+          "tag": "One APIKey · 多模型",
           "title": "API 套餐",
-          "description": "为开发、应用与团队选择模型调用方案，兼顾日常用量与企业需求。",
-          "note": "套餐选购、模型接入与用量管理",
+          "description": "按需充值，灵活选配 Token 额度。",
+          "note": "多模型调用，额度与速率以套餐为准",
           "action": "立即调用"
         }
       },
       "benefits": {
-        "selfService": "7×24 自助下单",
+        "selfService": "7×24小时自助下单",
         "orderTracking": "订单进度可查",
-        "afterSales": "售后保障有据",
-        "business": "发票与对公采购咨询"
+        "afterSales": "售后保障质保",
+        "business": "可开票与对公转账",
+        "channels": "正规充值渠道"
       },
       "steps": {
         "eyebrow": "从选择到使用",
@@ -2107,7 +2117,8 @@
         "receive": {
           "title": "按订单引导获取服务",
           "description": "继续提交充值信息、领取成品交付，或查看 API 套餐的使用说明。"
-        }
+        },
+        "suffix": "三步完成"
       },
       "orders": {
         "title": "已有订单？从这里继续",
@@ -2116,24 +2127,76 @@
       },
       "faq": {
         "eyebrow": "购买前了解",
-        "title": "先找到适合你的服务",
-        "description": "三类服务各有用途，购买前请确认商品说明与服务范围。",
+        "title": "下单前，先了解这些",
+        "description": "充值、成品和 API 套餐，各有适用场景。",
         "notices": "查看服务公告",
         "service": {
           "question": "充值服务、成品订购和 API 套餐怎么选？",
-          "answer": "已有账号需要充值或续期，选择充值服务；需要按商品说明领取账号等成品，选择成品订购；需要在工具、应用或开发项目中调用模型，选择 API 套餐。"
+          "answer": "已有账号要续费，选充值；需要已订阅账号，选成品；在工具或应用里调用模型，选 API 套餐。"
         },
         "recharge": {
           "question": "充值需要提交什么信息？",
-          "answer": "不同商品所需信息不同，请先阅读购买须知，再按订单引导提交。具体生效时间以实际处理进度为准。"
+          "answer": "先选套餐并付款，再按订单专属页面提交所需资料。Token 与账号凭证请只通过订单指引提交，办理进度在订单页查看。"
         },
         "delivery": {
           "question": "下单后在哪里查看进度和交付？",
-          "answer": "通过订单查询入口查看相应订单。充值办理进度、成品交付内容和售后信息均以订单页面为准；API 套餐的 key 与用量在模型控制台管理。"
+          "answer": "充值进度、账号密码和售后处理都在订单页查看。APIKey 和调用用量在 API 控制台管理。"
         },
         "business": {
-          "question": "企业大用量、发票和对公采购怎么安排？",
-          "answer": "可在购买前沟通企业用量、专属供给、发票和对公转账需求。套餐额度、折扣、交付范围及服务约定，以最终确认的方案为准。"
+          "question": "能开发票或对公转账吗？",
+          "answer": "可以。下单前请确认抬头、税号、开票内容和对公转账安排；企业用量与专属方案可单独沟通。"
+        }
+      },
+      "flowControls": {
+        "label": "选择服务流程",
+        "pause": "暂停自动切换",
+        "resume": "继续自动切换"
+      },
+      "flows": {
+        "recharge": {
+          "label": "充值服务",
+          "s1": {
+            "title": "选择订阅档位",
+            "description": "按账号类型选择套餐，确认时长、额度和适用地区。"
+          },
+          "s2": {
+            "title": "提交订单并付款",
+            "description": "核对商品与金额，选择结算页提供的支付方式。"
+          },
+          "s3": {
+            "title": "按订单指引完成订阅",
+            "description": "在订单专属入口提交所需资料，查看办理进度与结果。"
+          }
+        },
+        "products": {
+          "label": "成品",
+          "s1": {
+            "title": "选择成品档位",
+            "description": "查看订阅等级、使用期限、交付内容和售后说明。"
+          },
+          "s2": {
+            "title": "提交订单并付款",
+            "description": "确认规格和订单金额，完成支付后查看交付。"
+          },
+          "s3": {
+            "title": "登录账号验收",
+            "description": "在订单页领取账号与密码，登录检查订阅状态。"
+          }
+        },
+        "api": {
+          "label": "API 服务",
+          "s1": {
+            "title": "注册并创建 APIKey",
+            "description": "进入 API 控制台注册，创建自己的 APIKey。"
+          },
+          "s2": {
+            "title": "充值或选购套餐",
+            "description": "回到本站购买额度或套餐，按商品说明核验账号关联。"
+          },
+          "s3": {
+            "title": "配置后开始调用",
+            "description": "在工具中填写 API 地址和 APIKey，用量可在控制台查看。"
+          }
         }
       }
     },
@@ -2145,7 +2208,10 @@
         "section": "充值方案",
         "descriptionFallback": "选择所需规格，按商品指引完成充值。",
         "delivery": "按指引提交充值信息",
-        "cta": "立即充值"
+        "cta": "立即充值",
+        "titlePrefix": "选择适合您的",
+        "titleSubject": "充值方案",
+        "titleSuffix": ""
       },
       "rental": {
         "label": "成品订购",
@@ -2154,7 +2220,10 @@
         "section": "成品方案",
         "descriptionFallback": "选择所需规格，按商品说明获取交付内容。",
         "delivery": "交付内容订单内查看",
-        "cta": "立即购买"
+        "cta": "立即购买",
+        "titlePrefix": "选择适合您的",
+        "titleSubject": "成品方案",
+        "titleSuffix": ""
       },
       "all": "ALL",
       "serviceNotes": "服务说明",
@@ -2219,6 +2288,16 @@
       "siteNoticeScope": "以下为全站公告，具体商品权益与要求以商品说明为准。",
       "noticeLoadFailed": "公告暂时无法加载，请重试或前往全部公告查看。",
       "noSiteNotices": "当前暂无站点公告。"
+    },
+    "paymentMarks": {
+      "label": "支付方式",
+      "alipay": "支付宝",
+      "wechat": "微信支付",
+      "unionpay": "银联",
+      "crypto": "加密货币",
+      "card": "信用卡",
+      "paypal": "PayPal",
+      "checkoutNote": "实际可用方式以结算页为准"
     }
   }
 }
