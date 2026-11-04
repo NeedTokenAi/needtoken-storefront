@@ -16,6 +16,7 @@ import { notifyError, notifySuccess } from '@/utils/notify'
 import { applySiteIcon } from '@/utils/favicon'
 import { getImageUrl } from '@/utils/image'
 import { mergeSiteSettingPatch } from '@/utils/needtokenSettings'
+import { pricingPatchForSettlementCurrencyChange } from '@/utils/needtokenPricing'
 import { orderEmailSceneKeys } from '@/utils/orderEmailTemplates'
 import MediaPicker from '@/components/admin/MediaPicker.vue'
 import SettingsSMTPTab from './components/SettingsSMTPTab.vue'
@@ -25,6 +26,7 @@ import SettingsNavigationTab from './components/SettingsNavigationTab.vue'
 import SettingsHomeAnnouncementTab from './components/SettingsHomeAnnouncementTab.vue'
 import SettingsUpstreamSyncTab from './components/SettingsUpstreamSyncTab.vue'
 import SettingsNeedtokenTab from './components/SettingsNeedtokenTab.vue'
+import SettingsPricingTab from './components/SettingsPricingTab.vue'
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -35,6 +37,7 @@ const navigationTabRef = ref<InstanceType<typeof SettingsNavigationTab>>()
 const homeAnnouncementTabRef = ref<InstanceType<typeof SettingsHomeAnnouncementTab>>()
 const upstreamSyncTabRef = ref<InstanceType<typeof SettingsUpstreamSyncTab>>()
 const needtokenTabRef = ref<InstanceType<typeof SettingsNeedtokenTab>>()
+const pricingTabRef = ref<InstanceType<typeof SettingsPricingTab>>()
 const siteIconPickerRef = ref<InstanceType<typeof MediaPicker> | null>(null)
 const siteLogoPickerRef = ref<InstanceType<typeof MediaPicker> | null>(null)
 const supportedLanguages = ['zh-CN', 'zh-TW', 'en-US'] as const
@@ -78,6 +81,7 @@ const languages = computed(() => [
 const tabs = computed(() => [
   { label: t('admin.settings.tabs.basic'), value: 'basic' },
   { label: t('needtokenSettings.tab'), value: 'needtoken' },
+  { label: t('needtokenPricing.tab'), value: 'pricing' },
   { label: t('admin.settings.tabs.template'), value: 'template' },
   { label: t('admin.settings.tabs.navigation'), value: 'navigation' },
   { label: t('admin.settings.tabs.about'), value: 'about' },
@@ -614,11 +618,13 @@ const saveRegistrationSettings = async () => {
 
 const saveSiteSettings = async () => {
   const latest = await adminAPI.getSettings({ key: 'site_config' })
+  const nextCurrency = String(form.currency || 'CNY').trim().toUpperCase()
   const payload = {
     key: 'site_config',
     value: mergeSiteSettingPatch(latest.data.data, {
+      ...pricingPatchForSettlementCurrencyChange(latest.data.data, nextCurrency),
       brand: form.brand,
-      currency: String(form.currency || 'CNY').trim().toUpperCase(),
+      currency: nextCurrency,
       contact: form.contact,
       seo: form.seo,
       about: form.about,
@@ -769,6 +775,10 @@ const saveDashboardSettings = async () => {
 }
 
 const saveSettings = async () => {
+  if (currentTab.value === 'pricing') {
+    await pricingTabRef.value?.save()
+    return
+  }
   if (currentTab.value === 'needtoken') {
     await needtokenTabRef.value?.save()
     return
@@ -1443,6 +1453,10 @@ onMounted(() => {
 
       <TabsContent value="needtoken" :forceMount="true" v-show="currentTab === 'needtoken'" class="space-y-6 mt-0">
         <SettingsNeedtokenTab ref="needtokenTabRef" />
+      </TabsContent>
+
+      <TabsContent value="pricing" :forceMount="true" v-show="currentTab === 'pricing'" class="space-y-6 mt-0">
+        <SettingsPricingTab ref="pricingTabRef" />
       </TabsContent>
 
       <TabsContent value="telegram" :forceMount="true" v-show="currentTab === 'telegram'" class="space-y-6 mt-0">

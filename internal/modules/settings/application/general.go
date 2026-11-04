@@ -106,6 +106,9 @@ func (s *Service) GetConfig(defaults map[string]interface{}) (map[string]interfa
 	if raw, ok := value["needtoken_resources"]; ok {
 		data["needtoken_resources"] = publicNeedtokenResources(raw)
 	}
+	if raw, ok := value["needtoken_pricing"]; ok {
+		data["needtoken_pricing"] = publicNeedtokenPricing(raw, normalizeSiteCurrency(data[constants.SettingFieldSiteCurrency]))
+	}
 	return data, nil
 }
 

@@ -35,8 +35,10 @@
             <component :is="benefit.icon" :size="15" :stroke-width="1.7" aria-hidden="true" />
             <span>{{ t(`needtoken.homeServices.benefits.${benefit.key}`) }}</span>
           </div>
+          <div class="hero-benefit hero-benefit--rate"><StandardExchangeRate /></div>
         </div>
         <PaymentMethodStrip />
+        <div class="hero-currency"><DisplayCurrencySelector compact /></div>
       </div>
     </section>
 
@@ -109,6 +111,8 @@ import { usePageSeo } from '../../composables/usePageSeo'
 import { CATEGORY_SLUGS } from './config'
 import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import GhostFibersBackground from './components/GhostFibersBackground.vue'
+import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
+import StandardExchangeRate from './components/StandardExchangeRate.vue'
 
 const { t } = useI18n()
 usePageSeo({
@@ -215,9 +219,12 @@ onUnmounted(() => {
 .service-action:hover { background: rgba(var(--service-rgb), 0.16); }
 .service--recharge .service-action { color: #07120f; border-color: transparent; background: #2dd4a7; }
 .service--recharge .service-action:hover { background: #5eead4; }
-.hero-benefits { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 25px; }
-.hero-benefit { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 11px 13px; border: 1px solid rgba(255, 226, 126, .6); border-radius: 12px; background: linear-gradient(135deg, #f5cf59, #edb928); color: #242012; font-size: 13px; font-weight: 650; line-height: 1.6; text-align: center; box-shadow: inset 0 1px 0 rgba(255, 249, 222, .4); }
+.hero-benefits { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 25px; }
+.hero-benefit { display: flex; align-items: center; justify-content: center; min-width: 0; gap: 8px; min-height: 46px; padding: 11px 13px; border: 1px solid rgba(255, 226, 126, .6); border-radius: 12px; background: linear-gradient(135deg, #f5cf59, #edb928); color: #242012; font-size: 13px; font-weight: 650; line-height: 1.6; text-align: center; box-shadow: inset 0 1px 0 rgba(255, 249, 222, .4); }
+.hero-benefit > span { min-width: 0; overflow-wrap: anywhere; }
 .hero-benefit svg { flex: none; color: #4d3b09; }
+.hero-currency { display: flex; justify-content: center; margin-top: 12px; }
+.hero-benefit--rate { position: relative; z-index: 3; }
 .purchase-section { padding-top: 67px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 22px; }
 .section-eyebrow { margin-bottom: 11px; color: var(--ui-accent); font-size: 11px; font-weight: 650; letter-spacing: 0.09em; }
@@ -259,6 +266,10 @@ onUnmounted(() => {
 .question[open] .question-toggle { transform: rotate(45deg); color: var(--ui-accent); }
 .question > p { padding: 0 30px 20px 0; color: var(--home-muted); font-size: 13px; line-height: 1.9; }
 .nt-home a:focus-visible, .nt-home button:focus-visible, .question summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 5px; }
+@media (min-width: 641px) and (max-width: 1023px) {
+  .hero-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-benefit--rate { grid-column: 1 / -1; }
+}
 @media (max-width: 900px) {
   .service-card { padding: 21px; }
   .service-card h2 { font-size: 23px; }
@@ -288,6 +299,7 @@ onUnmounted(() => {
   .hero-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 20px; }
   .hero-benefit { gap: 6px; min-height: 42px; padding: 9px; font-size: 11px; }
   .hero-benefit svg { width: 14px; height: 14px; }
+  .hero-benefit--rate { grid-column: 1 / -1; }
   .purchase-section { padding-top: 43px; }
   .section-heading { align-items: start; flex-direction: column; gap: 12px; }
   .flow-title, .questions-intro h2 { font-size: 24px; }

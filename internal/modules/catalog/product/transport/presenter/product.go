@@ -99,6 +99,7 @@ type SKU struct {
 	ID                  uint         `json:"id"`
 	SKUCode             string       `json:"sku_code"`
 	SpecValues          jsonmap.JSON `json:"spec_values"`
+	DisplayMeta         jsonmap.JSON `json:"display_meta"`
 	PriceAmount         money.Amount `json:"price_amount"`
 	ManualStockTotal    int          `json:"manual_stock_total"`
 	ManualStockSold     int          `json:"manual_stock_sold"`

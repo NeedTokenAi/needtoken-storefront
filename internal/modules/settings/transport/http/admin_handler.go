@@ -61,6 +61,7 @@ var settingFieldErrorKeys = map[string]string{
 	"contact_whatsapp":    "error.reseller_support_whatsapp_invalid",
 	"needtoken_support":   "error.needtoken_support_invalid",
 	"needtoken_resources": "error.needtoken_resources_invalid",
+	"needtoken_pricing":   "error.needtoken_pricing_invalid",
 }
 
 // dedicatedSettingEndpoints 有专用接口的设置：专用接口负责校验、归一化与运行时生效（如 SMTP、登录方式），

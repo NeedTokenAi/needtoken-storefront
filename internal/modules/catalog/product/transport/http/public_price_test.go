@@ -8,6 +8,7 @@ import (
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
 
 	reseller "github.com/dujiao-next/internal/modules/reseller/contract"
+	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/money"
 	"github.com/shopspring/decimal"
 )
@@ -182,5 +183,22 @@ func TestDecoratePublicProductForTenantInvalidDisplayPricingIsHidden(t *testing.
 				t.Fatalf("expected ErrResellerProductNotListed, got %v", err)
 			}
 		})
+	}
+}
+
+func TestPublicSKUDisplayMetadataDoesNotExposePrivateOrReferenceAsSalePrice(t *testing.T) {
+	handler := &PublicHandler{}
+	product := &productdomain.Product{ID: 1, PriceAmount: money.FromDecimal(decimal.NewFromInt(879)), SKUs: []productdomain.ProductSKU{{
+		ID: 11, SKUCode: "PRO", IsActive: true, PriceAmount: money.FromDecimal(decimal.NewFromInt(879)),
+		DisplayMetaJSON:         jsonmap.JSON{"label": map[string]interface{}{"zh-CN": "100"}, "official_price_usd": "100", "token": "private"},
+		EntitlementContractJSON: jsonmap.JSON{"private_contract": "private"},
+	}}}
+	view, err := handler.decoratePublicProduct(product, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := view
+	if len(response.SKUs) != 1 || response.SKUs[0].DisplayMeta["official_price_usd"] != "100.00" || response.SKUs[0].DisplayMeta["token"] != nil || !response.SKUs[0].PriceAmount.Decimal.Equal(decimal.NewFromInt(879)) {
+		t.Fatalf("unexpected public SKU: %#v", response.SKUs)
 	}
 }
