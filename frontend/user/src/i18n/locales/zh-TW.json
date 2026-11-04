@@ -1961,9 +1961,9 @@
     },
     "plans": {
       "title": "API 套餐",
-      "subtitle": "一把 Key 接入常用模型。按需選購個人套餐，或為團隊規劃高用量與專屬供給方案。",
-      "buy": "選購套餐",
-      "console": "開啟會員控制檯",
+      "subtitle": "按需儲值，靈活選配 Token 額度。套餐在本站購買，APIKey 和用量在控制台管理。",
+      "buy": "選購 API 套餐",
+      "console": "開啟 API 控制台",
       "what": {
         "title": "套餐由三部分組成",
         "group": {
@@ -2038,59 +2038,69 @@
       }
     },
     "apiServices": {
-      "title": "一把 Key，連接常用模型。",
+      "title": "One APIKey，多模型隨需呼叫。",
       "options": "個人與企業 API 方案",
       "personal": {
         "title": "個人與開發者",
-        "desc": "為日常開發、寫作與工具呼叫選擇合適的 API 套餐。",
+        "desc": "日常寫作、程式開發或工具呼叫，按用量選購套餐。",
         "b1": "常用模型與開發工具接入",
         "b2": "按商品說明選擇額度與有效期",
         "b3": "在 API 控制台管理 Key 與用量"
       },
       "enterprise": {
         "title": "企業與專屬方案",
-        "desc": "面向團隊和高頻呼叫情境，按模型、用量與並行需求評估專屬方案。",
+        "desc": "團隊用量與專屬供給，按模型、並行與預算確認方案。",
         "b1": "高用量套餐與階梯優惠諮詢",
         "b2": "專屬帳號池與容量方案評估",
         "b3": "服務範圍與報價逐項確認"
       },
       "connectTitle": "相容常用工具，輕鬆接入",
-      "connectDesc": "使用 API 控制台建立的 Key，將以下位址填入支援 OpenAI 相容介面的工具。"
+      "connectDesc": "使用 API 控制台建立的 Key，將以下位址填入支援 OpenAI 相容介面的工具。",
+      "keyLabel": "One APIKey",
+      "titleRest": "，多模型隨需呼叫。",
+      "benefitsLabel": "API 套餐特點",
+      "benefits": {
+        "models": "多模型接入",
+        "quota": "按需補充額度",
+        "usage": "用量可查"
+      },
+      "quotaNote": "實際額度、有效期和呼叫速率以所購套餐為準。"
     },
     "homeServices": {
       "seoTitle": "儲值服務、成品訂購與 API 套餐",
       "eyebrow": "NeedToken.AI · 讓 AI 服務更簡單",
       "title": "你的 AI 服務，",
       "titleAccent": "從這裡開始。",
-      "subtitle": "為常用帳號儲值，選購即用成品，或為應用程式接入模型 API。依你的需求，選擇合適的服務。",
+      "subtitle": "儲值續費、成品帳號與 API 套餐，按需選擇。",
       "services": {
         "recharge": {
           "tag": "原帳號繼續用",
           "title": "儲值服務",
-          "description": "為既有帳號選擇儲值或訂閱續期方案，依訂單指引完成辦理。",
+          "description": "為既有帳號選擇儲值或訂閱續費，立即生效。",
           "note": "方案、規格與售後說明清楚可查",
           "action": "立即儲值"
         },
         "products": {
           "tag": "訂單內交付",
           "title": "成品訂購",
-          "description": "依需求選購成品方案，帳號、密碼等交付內容在訂單頁領取。",
+          "description": "付款成功立即取得已訂閱帳號及密碼。",
           "note": "購買前查看交付內容與使用範圍",
           "action": "立即購買"
         },
         "api": {
-          "tag": "一把 key，多種模型",
+          "tag": "One APIKey · 多模型",
           "title": "API 套餐",
-          "description": "為開發、應用程式與團隊選擇模型呼叫方案，兼顧日常用量與企業需求。",
-          "note": "套餐選購、模型接入與用量管理",
+          "description": "按需儲值，靈活選配 Token 額度。",
+          "note": "多模型呼叫，額度與速率以套餐為準",
           "action": "立即呼叫"
         }
       },
       "benefits": {
-        "selfService": "7×24 自助下單",
+        "selfService": "7×24小時自助下單",
         "orderTracking": "訂單進度可查",
-        "afterSales": "售後保障有據",
-        "business": "發票與企業採購諮詢"
+        "afterSales": "售後保障質保",
+        "business": "可開票與企業轉帳",
+        "channels": "正規儲值管道"
       },
       "steps": {
         "eyebrow": "從選擇到使用",
@@ -2107,7 +2117,8 @@
         "receive": {
           "title": "依訂單指引取得服務",
           "description": "繼續提交儲值資訊、領取成品交付，或查看 API 套餐的使用說明。"
-        }
+        },
+        "suffix": "三步完成"
       },
       "orders": {
         "title": "已有訂單？從這裡繼續",
@@ -2116,24 +2127,76 @@
       },
       "faq": {
         "eyebrow": "購買前了解",
-        "title": "先找到適合你的服務",
-        "description": "三類服務各有用途，購買前請確認商品說明與服務範圍。",
+        "title": "下單前，先了解這些",
+        "description": "儲值、成品與 API 套餐，各有適用情境。",
         "notices": "查看服務公告",
         "service": {
           "question": "儲值服務、成品訂購與 API 套餐怎麼選？",
-          "answer": "已有帳號需要儲值或續期，選擇儲值服務；需要依商品說明領取帳號等成品，選擇成品訂購；需要在工具、應用程式或開發專案中呼叫模型，選擇 API 套餐。"
+          "answer": "已有帳號要續費，選儲值；需要已訂閱帳號，選成品；在工具或應用程式裡呼叫模型，選 API 套餐。"
         },
         "recharge": {
           "question": "儲值需要提交哪些資訊？",
-          "answer": "不同商品所需資訊不同，請先閱讀購買須知，再依訂單指引提交。實際生效時間以處理進度為準。"
+          "answer": "先選套餐並付款，再依訂單專屬頁面提交所需資料。Token 與帳號憑證請只透過訂單指引提交，辦理進度在訂單頁查看。"
         },
         "delivery": {
           "question": "下單後在哪裡查看進度與交付？",
-          "answer": "透過訂單查詢入口查看對應訂單。儲值辦理進度、成品交付內容與售後資訊均以訂單頁面為準；API 套餐的 key 與用量在模型控制台管理。"
+          "answer": "儲值進度、帳號密碼與售後處理都在訂單頁查看。APIKey 與呼叫用量在 API 控制台管理。"
         },
         "business": {
-          "question": "企業大用量、發票與企業採購如何安排？",
-          "answer": "可在購買前溝通企業用量、專屬供給、發票與企業轉帳需求。套餐額度、折扣、交付範圍與服務約定，以最終確認的方案為準。"
+          "question": "能開發票或企業轉帳嗎？",
+          "answer": "可以。下單前請確認抬頭、統一編號、開票內容與企業轉帳安排；企業用量與專屬方案可另行討論。"
+        }
+      },
+      "flowControls": {
+        "label": "選擇服務流程",
+        "pause": "暫停自動切換",
+        "resume": "繼續自動切換"
+      },
+      "flows": {
+        "recharge": {
+          "label": "儲值服務",
+          "s1": {
+            "title": "選擇訂閱級別",
+            "description": "依帳號類型選擇套餐，確認期間、額度與適用地區。"
+          },
+          "s2": {
+            "title": "提交訂單並付款",
+            "description": "核對商品與金額，選擇結帳頁提供的付款方式。"
+          },
+          "s3": {
+            "title": "依訂單指引完成訂閱",
+            "description": "在訂單專屬入口提交所需資料，查看辦理進度與結果。"
+          }
+        },
+        "products": {
+          "label": "成品",
+          "s1": {
+            "title": "選擇成品級別",
+            "description": "查看訂閱等級、使用期限、交付內容與售後說明。"
+          },
+          "s2": {
+            "title": "提交訂單並付款",
+            "description": "確認規格與訂單金額，完成付款後查看交付。"
+          },
+          "s3": {
+            "title": "登入帳號驗收",
+            "description": "在訂單頁領取帳號與密碼，登入檢查訂閱狀態。"
+          }
+        },
+        "api": {
+          "label": "API 服務",
+          "s1": {
+            "title": "註冊並建立 APIKey",
+            "description": "進入 API 控制台註冊，建立自己的 APIKey。"
+          },
+          "s2": {
+            "title": "儲值或選購套餐",
+            "description": "回到本站購買額度或套餐，依商品說明核驗帳號關聯。"
+          },
+          "s3": {
+            "title": "設定後開始呼叫",
+            "description": "在工具中填寫 API 位址與 APIKey，用量可在控制台查看。"
+          }
         }
       }
     },
@@ -2145,7 +2208,10 @@
         "section": "儲值方案",
         "descriptionFallback": "選擇所需規格，依商品指引完成儲值。",
         "delivery": "依指引提交儲值資訊",
-        "cta": "立即儲值"
+        "cta": "立即儲值",
+        "titlePrefix": "選擇適合您的",
+        "titleSubject": "儲值方案",
+        "titleSuffix": ""
       },
       "rental": {
         "label": "成品訂購",
@@ -2154,7 +2220,10 @@
         "section": "成品方案",
         "descriptionFallback": "選擇所需規格，依商品說明取得交付內容。",
         "delivery": "交付內容於訂單內查看",
-        "cta": "立即購買"
+        "cta": "立即購買",
+        "titlePrefix": "選擇適合您的",
+        "titleSubject": "成品方案",
+        "titleSuffix": ""
       },
       "all": "ALL",
       "serviceNotes": "服務說明",
@@ -2219,6 +2288,16 @@
       "siteNoticeScope": "以下為全站公告，具體商品權益與要求以商品說明為準。",
       "noticeLoadFailed": "公告暫時無法載入，請重試或前往全部公告查看。",
       "noSiteNotices": "目前暫無站點公告。"
+    },
+    "paymentMarks": {
+      "label": "付款方式",
+      "alipay": "支付寶",
+      "wechat": "微信支付",
+      "unionpay": "銀聯",
+      "crypto": "加密貨幣",
+      "card": "信用卡",
+      "paypal": "PayPal",
+      "checkoutNote": "實際可用方式以結帳頁為準"
     }
   }
 }

@@ -2,9 +2,7 @@
   <ClassicProducts v-if="!categoriesLoading && !categoriesError && !serviceKind" />
   <div v-else class="nt-service-catalog mx-auto w-full max-w-[1200px] px-4 sm:px-6">
     <header class="nt-service-catalog__intro">
-      <span class="nt-service-catalog__eyebrow">{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.label`) }}</span>
-      <h1>{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.title`) }}</h1>
-      <p class="nt-service-catalog__subtitle">{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.subtitle`) }}</p>
+      <h1>{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.titlePrefix`) }}<span class="nt-service-catalog__title-subject">{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.titleSubject`) }}</span>{{ t(`needtoken.catalogServices.${serviceKind || 'recharge'}.titleSuffix`) }}</h1>
       <ul class="nt-service-catalog__promises" :aria-label="t('needtoken.catalogServices.serviceNotes')">
         <li v-for="(note, index) in serviceNotes" :key="note"><component :is="noteIcons[index]" :size="15" aria-hidden="true" />{{ t(`needtoken.catalogServices.${note}`) }}</li>
       </ul>
@@ -100,13 +98,11 @@ usePageSeo({
 <style scoped>
 .nt-service-catalog { padding-top: 48px; padding-bottom: 32px; }
 .nt-service-catalog__intro { text-align: center; margin-bottom: 34px; }
-.nt-service-catalog__eyebrow { display: inline-flex; align-items: center; gap: 7px; color: var(--ui-accent); font-size: 11px; font-weight: 650; letter-spacing: .12em; }
-.nt-service-catalog__eyebrow::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-h1 { margin-top: 12px; font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.055em; line-height: 1.25; }
-.nt-service-catalog__subtitle { color: var(--ui-text-secondary); margin-top: 14px; font-size: 15px; }
-.nt-service-catalog__promises { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px 23px; margin-top: 22px; color: var(--ui-text-muted); font-size: 12px; }
-.nt-service-catalog__promises li { display: inline-flex; align-items: center; gap: 7px; }
-.nt-service-catalog__promises svg { color: var(--ui-accent); opacity: .75; }
+h1 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.055em; line-height: 1.25; text-wrap: balance; }
+.nt-service-catalog__title-subject { color: var(--ui-accent); }
+.nt-service-catalog__promises { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; margin-top: 20px; font-size: 12px; }
+.nt-service-catalog__promises li { display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; padding: 9px 13px; border: 1px solid rgba(255, 224, 126, .45); border-radius: 11px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24); }
+.nt-service-catalog__promises svg { flex: none; color: currentColor; opacity: .85; }
 .nt-service-catalog__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; border-top: 1px solid var(--ui-border); }
 .nt-service-catalog__filters { min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
 .nt-service-catalog__filter { min-height: 40px; flex-shrink: 0; border: 1px solid rgba(204, 219, 235, .17); border-radius: 12px; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.018)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 4px 16px rgba(0,0,0,.08); backdrop-filter: blur(18px); padding: 8px 17px; color: var(--ui-text-secondary); font-size: 12px; white-space: nowrap; cursor: pointer; transition: .15s; }
@@ -134,13 +130,12 @@ h1 { margin-top: 12px; font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; le
 @media (min-width: 1024px) {
   .nt-service-catalog { padding-top: 28px; }
   .nt-service-catalog__intro { margin-bottom: 24px; }
-  h1 { margin-top: 9px; font-size: 38px; }
-  .nt-service-catalog__subtitle { margin-top: 10px; }
-  .nt-service-catalog__promises { margin-top: 15px; }
+  h1 { font-size: 38px; }
+  .nt-service-catalog__promises { margin-top: 18px; }
   .nt-service-catalog__toolbar { padding-top: 16px; padding-bottom: 16px; }
   .nt-service-catalog__result { margin-top: 6px; margin-bottom: 12px; }
   .nt-service-catalog__skeleton { min-height: 280px; padding: 18px; border-radius: 20px; }
 }
-@media (max-width: 640px) { .nt-service-catalog { padding-top: 32px; } .nt-service-catalog__intro { margin-bottom: 27px; } .nt-service-catalog__promises { gap: 10px 15px; font-size: 10px; } .nt-service-catalog__toolbar { align-items: stretch; flex-direction: column; gap: 15px; } .nt-service-catalog__search { width: 100%; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 29px; } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
+@media (max-width: 640px) { .nt-service-catalog { padding-top: 32px; } .nt-service-catalog__intro { margin-bottom: 27px; } .nt-service-catalog__promises { gap: 8px; margin-top: 18px; font-size: 11px; } .nt-service-catalog__promises li { padding: 8px 10px; gap: 6px; border-radius: 10px; } .nt-service-catalog__promises svg { width: 14px; height: 14px; } .nt-service-catalog__toolbar { align-items: stretch; flex-direction: column; gap: 15px; } .nt-service-catalog__search { width: 100%; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 29px; } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
 @media (prefers-reduced-motion: reduce) { .nt-service-catalog__filter { transition: none; } }
 </style>
