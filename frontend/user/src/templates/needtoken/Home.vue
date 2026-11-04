@@ -1,151 +1,93 @@
 <template>
-  <div>
-    <!-- Hero：徽章条 + 主标题 + 副标题 + 主按钮 -->
-    <section class="nt-grid-bg border-b border-border">
-      <div class="mx-auto w-full max-w-[1200px] px-6 pb-20 pt-16 text-center">
-        <div class="flex flex-wrap justify-center gap-2">
-          <span v-for="key in badgeKeys" :key="key" class="nt-mono rounded-full border border-border bg-card px-3 py-1 text-[12px] text-muted-foreground">{{ t(`needtoken.home.badges.${key}`) }}</span>
+  <div class="nt-home">
+    <section class="home-hero" aria-labelledby="home-title">
+      <div class="home-container hero-content">
+        <div class="hero-eyebrow">
+          <Sparkles :size="13" aria-hidden="true" />
+          {{ t('needtoken.homeServices.eyebrow') }}
         </div>
-        <h1 class="mx-auto mt-8 max-w-[18ch] text-[40px] font-bold leading-[1.1] tracking-tight text-foreground sm:text-[56px]">
-          {{ t('needtoken.home.title') }}
+        <h1 id="home-title" class="hero-title">
+          {{ t('needtoken.homeServices.title') }}
+          <span>{{ t('needtoken.homeServices.titleAccent') }}</span>
         </h1>
-        <p class="mx-auto mt-5 max-w-[56ch] text-[16px] text-muted-foreground sm:text-[18px]">{{ t('needtoken.home.subtitle') }}</p>
-        <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <a :href="CONSOLE_REGISTER_URL" class="rounded-md bg-primary px-5 py-2.5 text-[15px] font-semibold text-primary-foreground hover:bg-primary/90" rel="noopener">{{ t('needtoken.home.ctaPrimary') }}</a>
-          <RouterLink to="/models" class="rounded-md border border-border px-5 py-2.5 text-[15px] font-semibold text-foreground hover:bg-secondary">{{ t('needtoken.home.ctaSecondary') }}</RouterLink>
+        <p class="hero-description">{{ t('needtoken.homeServices.subtitle') }}</p>
+
+        <div class="service-grid">
+          <article v-for="service in services" :key="service.key" class="service-card" :class="`service--${service.key}`">
+            <div class="service-topline">
+              <span class="service-icon"><component :is="service.icon" :size="23" :stroke-width="1.6" aria-hidden="true" /></span>
+              <span class="service-tag">{{ t(`needtoken.homeServices.services.${service.key}.tag`) }}</span>
+            </div>
+            <h2>{{ t(`needtoken.homeServices.services.${service.key}.title`) }}</h2>
+            <p class="service-description">{{ t(`needtoken.homeServices.services.${service.key}.description`) }}</p>
+            <div class="service-footnote">
+              <Check :size="14" aria-hidden="true" />
+              {{ t(`needtoken.homeServices.services.${service.key}.note`) }}
+            </div>
+            <RouterLink :to="service.to" class="service-action">
+              <span>{{ t(`needtoken.homeServices.services.${service.key}.action`) }}</span>
+              <ArrowUpRight :size="18" aria-hidden="true" />
+            </RouterLink>
+          </article>
         </div>
-        <div class="nt-mono mx-auto mt-8 inline-flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-[13px] text-muted-foreground">
-          <span class="text-primary">baseURL</span>
-          <span class="text-foreground">{{ API_BASE_URL }}</span>
-        </div>
-      </div>
-    </section>
 
-    <!-- 亮点区：只写可核对的事实 -->
-    <section class="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-px overflow-hidden border-x border-b border-border bg-border sm:grid-cols-3">
-      <div v-for="item in highlights" :key="item.key" class="bg-background px-6 py-8">
-        <div class="nt-mono text-[32px] font-bold text-primary">{{ item.value }}</div>
-        <div class="mt-1 text-[14px] text-muted-foreground">{{ t(`needtoken.home.highlights.${item.key}`) }}</div>
-      </div>
-    </section>
-
-    <!-- 默认模型 -->
-    <section class="mx-auto w-full max-w-[1200px] px-6 pt-20">
-      <h2 class="text-[28px] font-bold text-foreground">{{ t('needtoken.home.models.title') }}</h2>
-      <p class="mt-2 text-[15px] text-muted-foreground">{{ t('needtoken.home.models.subtitle') }}</p>
-      <div class="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <RouterLink
-          v-for="(model, idx) in DEFAULT_MODELS"
-          :key="model"
-          :to="{ path: '/models', query: { q: model } }"
-          class="nt-mono flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-[14px] text-foreground transition-colors hover:border-primary"
-        >
-          <span>{{ model }}</span>
-          <span v-if="idx === 0" class="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">{{ t('needtoken.home.models.preferred') }}</span>
-        </RouterLink>
-      </div>
-    </section>
-
-    <!-- 编号功能卡片 01–04 -->
-    <section class="mx-auto w-full max-w-[1200px] px-6 pt-20">
-      <h2 class="text-[28px] font-bold text-foreground">{{ t('needtoken.home.features.title') }}</h2>
-      <div class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <RouterLink v-for="(card, idx) in featureCards" :key="card.key" :to="card.to" class="group rounded-xl border border-border bg-card p-6 transition-colors hover:border-primary">
-          <div class="nt-mono text-[13px] text-primary">{{ String(idx + 1).padStart(2, '0') }}</div>
-          <h3 class="mt-3 text-[18px] font-semibold text-foreground">{{ t(`needtoken.home.features.${card.key}.title`) }}</h3>
-          <ul class="mt-4 space-y-2 text-[14px] text-muted-foreground">
-            <li v-for="n in 3" :key="n" class="flex gap-2"><span class="text-primary">›</span>{{ t(`needtoken.home.features.${card.key}.b${n}`) }}</li>
-          </ul>
-        </RouterLink>
-      </div>
-    </section>
-
-    <!-- 对比表：只写可验证项 -->
-    <section class="mx-auto w-full max-w-[1200px] px-6 pt-20">
-      <h2 class="text-[28px] font-bold text-foreground">{{ t('needtoken.home.compare.title') }}</h2>
-      <div class="mt-8 overflow-x-auto rounded-xl border border-border">
-        <table class="w-full min-w-[560px] text-left text-[14px]">
-          <thead class="bg-card text-muted-foreground">
-            <tr>
-              <th class="px-5 py-3 font-medium">{{ t('needtoken.home.compare.item') }}</th>
-              <th class="px-5 py-3 font-medium text-primary">{{ brandName }}</th>
-              <th class="px-5 py-3 font-medium">{{ t('needtoken.home.compare.diy') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in compareRows" :key="row" class="border-t border-border">
-              <td class="px-5 py-3 text-foreground">{{ t(`needtoken.home.compare.rows.${row}.item`) }}</td>
-              <td class="px-5 py-3 text-foreground">{{ t(`needtoken.home.compare.rows.${row}.us`) }}</td>
-              <td class="px-5 py-3 text-muted-foreground">{{ t(`needtoken.home.compare.rows.${row}.diy`) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- 三步快速上手 -->
-    <section class="mx-auto w-full max-w-[1200px] px-6 pt-20">
-      <h2 class="text-[28px] font-bold text-foreground">{{ t('needtoken.home.steps.title') }}</h2>
-      <div class="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div v-for="(step, idx) in steps" :key="step.key" class="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
-          <div>
-            <div class="nt-mono text-[13px] text-primary">STEP {{ idx + 1 }}</div>
-            <h3 class="mt-2 text-[17px] font-semibold text-foreground">{{ t(`needtoken.home.steps.${step.key}.title`) }}</h3>
-            <p class="mt-1 text-[14px] text-muted-foreground">{{ t(`needtoken.home.steps.${step.key}.desc`) }}</p>
+        <div class="hero-benefits">
+          <div v-for="benefit in benefits" :key="benefit.key" class="hero-benefit">
+            <component :is="benefit.icon" :size="15" :stroke-width="1.7" aria-hidden="true" />
+            <span>{{ t(`needtoken.homeServices.benefits.${benefit.key}`) }}</span>
           </div>
-          <CodeBlock :code="step.code" :title="step.title" class="mt-auto" />
         </div>
       </div>
     </section>
 
-    <!-- 定价摘要：只读 new-api 定价表，未配价不写 -->
-    <section class="mx-auto w-full max-w-[1200px] px-6 pt-20">
-      <div class="flex flex-wrap items-end justify-between gap-3">
+    <section class="home-container purchase-section" aria-labelledby="purchase-title">
+      <div class="section-heading">
         <div>
-          <h2 class="text-[28px] font-bold text-foreground">{{ t('needtoken.home.pricing.title') }}</h2>
-          <p class="mt-2 text-[15px] text-muted-foreground">{{ t('needtoken.home.pricing.subtitle') }}</p>
+          <p class="section-eyebrow">{{ t('needtoken.homeServices.steps.eyebrow') }}</p>
+          <h2 id="purchase-title">{{ t('needtoken.homeServices.steps.title') }}</h2>
         </div>
-        <RouterLink to="/models" class="text-[14px] font-semibold text-primary hover:underline">{{ t('needtoken.home.pricing.more') }}</RouterLink>
+        <p class="section-description">{{ t('needtoken.homeServices.steps.description') }}</p>
       </div>
-      <p v-if="pricing.state.value === 'error'" role="status" class="mt-4 text-[12px] text-muted-foreground">{{ t('needtoken.models.stalePrice') }}</p>
-      <div class="mt-8 overflow-x-auto rounded-xl border border-border">
-        <div v-if="pricing.isLoading.value" class="px-5 py-8 text-center text-[14px] text-muted-foreground">{{ t('needtoken.common.loading') }}</div>
-        <div v-else-if="pricingRows.length === 0" class="px-5 py-8 text-center text-[14px] text-muted-foreground">{{ t('needtoken.common.pricingPending') }}</div>
-        <table v-else class="w-full min-w-[560px] text-left text-[14px]">
-          <thead class="bg-card text-muted-foreground">
-            <tr>
-              <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.model') }}</th>
-              <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.supply') }}</th>
-              <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.unit') }}</th>
-              <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.input') }}</th>
-              <th class="px-5 py-3 font-medium">{{ t('needtoken.models.columns.output') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in pricingRows" :key="row.key" class="border-t border-border">
-              <td class="nt-mono px-5 py-3 text-foreground">{{ row.modelId }}</td>
-              <td class="px-5 py-3 text-muted-foreground">{{ supplyLabel(row) }}</td>
-              <td class="px-5 py-3 text-muted-foreground">{{ t(`needtoken.models.units.${row.unit}`) }}</td>
-              <td v-if="row.unit === 'conditional'" colspan="2" class="px-5 py-3 text-muted-foreground">{{ t('needtoken.models.conditionalPrice') }}</td>
-              <template v-else><td class="nt-mono px-5 py-3 text-foreground">{{ formatUsd(row.inputPrice) }}</td><td class="nt-mono px-5 py-3 text-foreground">{{ formatUsd(row.outputPrice) }}</td></template>
-            </tr>
-          </tbody>
-        </table>
+      <ol class="purchase-steps">
+        <li v-for="(step, index) in steps" :key="step" class="purchase-step">
+          <span class="step-index" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
+          <div>
+            <h3>{{ t(`needtoken.homeServices.steps.${step}.title`) }}</h3>
+            <p>{{ t(`needtoken.homeServices.steps.${step}.description`) }}</p>
+          </div>
+          <ArrowRight v-if="index < steps.length - 1" class="step-arrow" :size="17" aria-hidden="true" />
+        </li>
+      </ol>
+      <div class="order-help">
+        <div class="order-help-copy">
+          <span class="order-help-icon"><ClipboardList :size="22" :stroke-width="1.6" aria-hidden="true" /></span>
+          <div>
+            <h3>{{ t('needtoken.homeServices.orders.title') }}</h3>
+            <p>{{ t('needtoken.homeServices.orders.description') }}</p>
+          </div>
+        </div>
+        <RouterLink to="/guest/orders" class="text-action">
+          {{ t('needtoken.homeServices.orders.action') }}<ArrowRight :size="16" aria-hidden="true" />
+        </RouterLink>
       </div>
-      <p class="mt-3 text-[12px] text-muted-foreground">{{ t('needtoken.common.priceUnitNote') }}</p>
-      <p class="mt-2 text-[11px] text-muted-foreground">{{ t('needtoken.models.sourceVersion', { version: pricing.sourceVersion.value || t('needtoken.models.versionUnknown') }) }}<template v-if="pricing.loadedAt.value"> · {{ t('needtoken.models.updatedAt', { time: pricing.loadedAt.value.toLocaleString() }) }}</template></p>
     </section>
 
-    <!-- FAQ -->
-    <section class="mx-auto w-full max-w-[900px] px-6 pt-20">
-      <h2 class="text-center text-[28px] font-bold text-foreground">{{ t('needtoken.home.faq.title') }}</h2>
-      <div class="mt-8 divide-y divide-border rounded-xl border border-border">
-        <details v-for="key in faqKeys" :key="key" class="group px-5 py-4">
-          <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-medium text-foreground">
-            {{ t(`needtoken.home.faq.${key}.q`) }}
-            <span class="nt-mono text-muted-foreground transition-transform group-open:rotate-45">+</span>
+    <section class="home-container information-section" aria-labelledby="questions-title">
+      <div class="questions-intro">
+        <p class="section-eyebrow">{{ t('needtoken.homeServices.faq.eyebrow') }}</p>
+        <h2 id="questions-title">{{ t('needtoken.homeServices.faq.title') }}</h2>
+        <p class="section-description">{{ t('needtoken.homeServices.faq.description') }}</p>
+        <RouterLink to="/notice" class="text-action">
+          {{ t('needtoken.homeServices.faq.notices') }}<ArrowUpRight :size="16" aria-hidden="true" />
+        </RouterLink>
+      </div>
+      <div class="questions-list">
+        <details v-for="key in faqKeys" :key="key" class="question">
+          <summary>
+            {{ t(`needtoken.homeServices.faq.${key}.question`) }}
+            <Plus :size="18" :stroke-width="1.5" class="question-toggle" aria-hidden="true" />
           </summary>
-          <p class="mt-3 text-[14px] leading-relaxed text-muted-foreground">{{ t(`needtoken.home.faq.${key}.a`) }}</p>
+          <p>{{ t(`needtoken.homeServices.faq.${key}.answer`) }}</p>
         </details>
       </div>
     </section>
@@ -153,59 +95,132 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAppStore } from '../../stores/app'
+import { ArrowRight, ArrowUpRight, Check, ClipboardList, Clock3, KeyRound, PackageCheck, Plus, ReceiptText, ShieldCheck, Sparkles, Zap } from 'lucide-vue-next'
 import { usePageSeo } from '../../composables/usePageSeo'
-import CodeBlock from './components/CodeBlock.vue'
-import { API_BASE_URL, CATEGORY_SLUGS, CONSOLE_REGISTER_URL, CONSOLE_URL, DEFAULT_MODELS } from './config'
-import { formatUsd, sortOffers, type ModelOffer } from './lib/pricing'
-import { usePricing } from './lib/usePricing'
-import { curlSnippet, exportKeySnippet } from './lib/snippets'
+import { CATEGORY_SLUGS } from './config'
 
 const { t } = useI18n()
-const appStore = useAppStore()
-const pricing = usePricing()
-
-const brandName = computed(() => String(appStore.config?.brand?.site_name || '').trim() || 'needtoken')
-
 usePageSeo({
-  title: () => t('needtoken.home.seoTitle'),
-  description: () => t('needtoken.home.subtitle'),
+  title: () => t('needtoken.homeServices.seoTitle'),
+  description: () => t('needtoken.homeServices.subtitle'),
 })
-
-const badgeKeys = ['compatible', 'oneKey', 'guestOrder', 'usage']
-
-const highlights = [
-  { key: 'models', value: String(DEFAULT_MODELS.length) },
-  { key: 'entry', value: '1' },
-  { key: 'protocol', value: '/v1' },
+const services = [
+  { key: 'recharge', icon: Zap, to: `/categories/${CATEGORY_SLUGS.recharge}` },
+  { key: 'products', icon: PackageCheck, to: `/categories/${CATEGORY_SLUGS.rental}` },
+  { key: 'api', icon: KeyRound, to: '/plans' },
 ]
-
-const featureCards = [
-  { key: 'recharge', to: `/categories/${CATEGORY_SLUGS.recharge}` },
-  { key: 'rental', to: `/categories/${CATEGORY_SLUGS.rental}` },
-  { key: 'plans', to: '/plans' },
-  { key: 'models', to: '/models' },
+const benefits = [
+  { key: 'selfService', icon: Clock3 },
+  { key: 'orderTracking', icon: ClipboardList },
+  { key: 'afterSales', icon: ShieldCheck },
+  { key: 'business', icon: ReceiptText },
 ]
-
-const compareRows = ['entry', 'keys', 'billing', 'order', 'models']
-
-const steps = computed(() => [
-  { key: 'register', title: 'browser', code: `open ${CONSOLE_REGISTER_URL}` },
-  { key: 'key', title: 'shell', code: `# ${CONSOLE_URL}\n${exportKeySnippet()}` },
-  { key: 'call', title: 'shell', code: curlSnippet() },
-])
-
-const faqKeys = ['account', 'delivery', 'key', 'unpriced', 'aftersale']
-
-// 定价摘要只列默认模型，且只列 new-api 已配价的
-const pricingRows = computed<ModelOffer[]>(() =>
-  sortOffers(pricing.offers.value.filter(o => o.isDefault), 'default', DEFAULT_MODELS).slice(0, 8),
-)
-
-const supplyLabel = (offer: ModelOffer) =>
-  offer.supplyLine ? t(`needtoken.supply.${offer.supplyLine}`) : offer.group
-
-onMounted(() => { void pricing.ensureLoaded() })
+const steps = ['choose', 'pay', 'receive']
+const faqKeys = ['service', 'recharge', 'delivery', 'business']
 </script>
+
+<style scoped>
+.nt-home { --home-secondary: var(--ui-text-secondary, #b4bfcc); --home-muted: var(--ui-text-muted, #7d8a99); }
+.home-container { width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: 24px; }
+.home-hero { position: relative; isolation: isolate; overflow: hidden; border-bottom: 1px solid var(--ui-border); background: radial-gradient(ellipse at 50% -16%, rgba(45, 212, 167, 0.12), transparent 56%); }
+.home-hero::before { content: ''; position: absolute; z-index: -1; inset: 0; opacity: 0.42; background-image: radial-gradient(rgba(148, 163, 184, 0.26) 0.7px, transparent 0.7px); background-size: 25px 25px; mask-image: linear-gradient(#000, transparent 72%); pointer-events: none; }
+.hero-content { padding-block: 38px 26px; }
+.hero-eyebrow { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--home-secondary); }
+.hero-eyebrow svg { color: var(--ui-accent); }
+.hero-title { margin: 17px 0 0; text-align: center; font-size: clamp(35px, 4.1vw, 56px); font-weight: 750; line-height: 1.17; letter-spacing: -0.045em; text-wrap: balance; }
+.hero-title span { color: var(--ui-accent); }
+.hero-description { max-width: 720px; margin: 15px auto 0; color: var(--home-muted); font-size: 15px; line-height: 1.8; text-align: center; text-wrap: balance; }
+.service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
+.service-card { --service-color: #2dd4a7; --service-rgb: 45, 212, 167; display: flex; flex-direction: column; position: relative; overflow: hidden; padding: 25px; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 20px; background: linear-gradient(145deg, rgba(var(--service-rgb), 0.065), rgba(14, 18, 24, 0.9) 56%); backdrop-filter: blur(18px); transition: border-color 180ms ease, transform 180ms ease; }
+.service-card:hover { border-color: rgba(var(--service-rgb), 0.48); transform: translateY(-3px); }
+.service--products { --service-color: #b1baff; --service-rgb: 177, 186, 255; }
+.service--api { --service-color: #efcc88; --service-rgb: 239, 204, 136; }
+.service-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.service-icon { display: grid; width: 44px; height: 44px; place-items: center; color: var(--service-color); border: 1px solid rgba(var(--service-rgb), 0.18); border-radius: 13px; background: rgba(var(--service-rgb), 0.075); }
+.service-tag { padding: 4px 9px; border: 1px solid rgba(var(--service-rgb), 0.16); border-radius: 999px; color: var(--service-color); background: rgba(var(--service-rgb), 0.045); font-size: 11px; line-height: 1.5; }
+.service-card h2 { margin-top: 22px; font-size: 27px; line-height: 1.25; font-weight: 700; letter-spacing: -0.035em; }
+.service-description { flex: 1; margin-top: 11px; min-height: 48px; color: var(--home-secondary); font-size: 13px; line-height: 1.8; text-wrap: pretty; }
+.service-footnote { display: flex; align-items: center; gap: 6px; margin-top: 15px; color: var(--home-muted); font-size: 11px; }
+.service-footnote svg { flex: none; color: var(--service-color); }
+.service-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 23px; padding: 11px 15px; border: 1px solid rgba(var(--service-rgb), 0.3); border-radius: 10px; color: var(--service-color); background: rgba(var(--service-rgb), 0.085); font-size: 14px; font-weight: 650; transition: background 180ms ease; }
+.service-action:hover { background: rgba(var(--service-rgb), 0.16); }
+.service--recharge .service-action { color: #07120f; border-color: transparent; background: #2dd4a7; }
+.service--recharge .service-action:hover { background: #5eead4; }
+.hero-benefits { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 35px; margin-top: 25px; }
+.hero-benefit { display: flex; align-items: center; gap: 7px; color: var(--home-muted); font-size: 12px; }
+.hero-benefit svg { color: var(--home-secondary); }
+.purchase-section { padding-top: 67px; }
+.section-heading { display: flex; align-items: end; justify-content: space-between; gap: 22px; }
+.section-eyebrow { margin-bottom: 11px; color: var(--ui-accent); font-size: 11px; font-weight: 650; letter-spacing: 0.09em; }
+.section-heading h2, .questions-intro h2 { font-size: 27px; line-height: 1.4; font-weight: 650; letter-spacing: -0.035em; text-wrap: balance; }
+.section-description { max-width: 365px; color: var(--home-muted); font-size: 13px; line-height: 1.85; text-wrap: pretty; }
+.purchase-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 28px; border: 1px solid var(--ui-border); border-radius: 16px; background: rgba(14, 18, 24, 0.45); list-style: none; }
+.purchase-step { display: flex; align-items: start; gap: 14px; position: relative; padding: 25px; }
+.purchase-step + .purchase-step { border-left: 1px solid var(--ui-border); }
+.step-index { flex: none; padding-top: 3px; color: var(--ui-accent); font-family: var(--nt-font-mono); font-size: 12px; }
+.purchase-step h3 { font-size: 15px; line-height: 1.5; font-weight: 600; }
+.purchase-step p { margin-top: 8px; color: var(--home-muted); font-size: 12px; line-height: 1.8; }
+.step-arrow { flex: none; position: absolute; right: -9px; top: 29px; z-index: 1; color: var(--home-muted); background: var(--ui-bg-page); }
+.order-help { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 24px 0; border-bottom: 1px solid var(--ui-border); }
+.order-help-copy { display: flex; align-items: center; gap: 14px; }
+.order-help-icon { display: grid; width: 43px; height: 43px; flex: none; place-items: center; border: 1px solid var(--ui-border); border-radius: 12px; color: var(--home-secondary); background: rgba(148, 163, 184, 0.035); }
+.order-help h3 { font-size: 14px; font-weight: 600; line-height: 1.5; }
+.order-help p { margin-top: 4px; color: var(--home-muted); font-size: 12px; line-height: 1.8; }
+.text-action { display: inline-flex; flex: none; align-items: center; gap: 7px; color: var(--ui-accent); font-size: 13px; font-weight: 550; line-height: 1.8; }
+.text-action:hover { text-decoration: underline; text-underline-offset: 4px; }
+.information-section { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr); gap: 80px; padding-top: 67px; padding-bottom: 5px; }
+.questions-intro .section-description { margin-top: 13px; }
+.questions-intro .text-action { margin-top: 22px; }
+.questions-list { border-top: 1px solid var(--ui-border); }
+.question { border-bottom: 1px solid var(--ui-border); }
+.question summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; color: var(--ui-text-primary); cursor: pointer; font-size: 14px; font-weight: 500; line-height: 1.6; list-style: none; }
+.question summary::-webkit-details-marker { display: none; }
+.question-toggle { flex: none; color: var(--home-muted); transition: transform 180ms ease; }
+.question[open] .question-toggle { transform: rotate(45deg); color: var(--ui-accent); }
+.question > p { padding: 0 30px 20px 0; color: var(--home-muted); font-size: 13px; line-height: 1.9; }
+.nt-home a:focus-visible, .question summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 5px; }
+@media (max-width: 900px) {
+  .service-card { padding: 21px; }
+  .service-card h2 { font-size: 23px; }
+  .service-description { min-height: 72px; }
+  .service-tag, .service-footnote { font-size: 10px; }
+  .purchase-step { padding: 21px 17px; gap: 11px; }
+  .information-section { gap: 40px; }
+}
+@media (max-width: 640px) {
+  .home-container { padding-inline: 20px; }
+  .hero-content { padding-block: 24px 22px; }
+  .hero-eyebrow { font-size: 11px; }
+  .hero-title { margin-top: 12px; font-size: 31px; }
+  .hero-title span { display: block; }
+  .hero-description { display: none; }
+  .service-grid { grid-template-columns: 1fr; gap: 10px; margin-top: 23px; }
+  .service-card { display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 5px 12px; min-height: 118px; padding: 16px; border-radius: 15px; }
+  .service-topline { position: absolute; top: 16px; left: 16px; }
+  .service-icon { width: 30px; height: 30px; border-radius: 9px; }
+  .service-icon svg { width: 18px; height: 18px; }
+  .service-card h2 { display: flex; align-items: center; grid-column: 1; grid-row: 1; min-height: 30px; margin: 0; padding-left: 40px; font-size: 20px; }
+  .service-description { grid-column: 1; grid-row: 2; min-height: 0; margin: 3px 0 0; font-size: 11px; line-height: 1.65; }
+  .service-tag, .service-footnote { display: none; }
+  .service-action { align-self: center; justify-content: center; grid-column: 2; grid-row: 1 / span 2; min-height: 44px; margin: 0; padding: 9px 8px; border-radius: 10px; font-size: 12px; text-align: center; }
+  .service-action svg { display: none; }
+  .hero-benefits { display: grid; grid-template-columns: repeat(2, max-content); gap: 10px 23px; margin-top: 20px; }
+  .hero-benefit { font-size: 11px; }
+  .purchase-section { padding-top: 43px; }
+  .section-heading { align-items: start; flex-direction: column; gap: 10px; }
+  .section-heading h2, .questions-intro h2 { font-size: 24px; }
+  .purchase-steps { grid-template-columns: 1fr; margin-top: 22px; }
+  .purchase-step { padding: 22px; }
+  .purchase-step + .purchase-step { border-left: none; border-top: 1px solid var(--ui-border); }
+  .step-arrow { display: none; }
+  .order-help { align-items: start; flex-direction: column; gap: 15px; }
+  .order-help .text-action { margin-left: 57px; }
+  .information-section { grid-template-columns: 1fr; gap: 26px; padding-top: 44px; }
+  .questions-intro .text-action { margin-top: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .service-card, .service-action, .question-toggle { transition: none; }
+  .service-card:hover { transform: none; }
+}
+</style>

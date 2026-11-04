@@ -42,6 +42,7 @@ export function usePageSeo(options: PageSeoOptions = {}) {
   })
 
   const siteName = computed(() => {
+    if (appStore.storefrontBrandOverride) return appStore.storefrontBrandOverride.siteName
     const lang = appStore.locale
     const seo = appStore.config?.seo
     const localized = seo?.title?.[lang]

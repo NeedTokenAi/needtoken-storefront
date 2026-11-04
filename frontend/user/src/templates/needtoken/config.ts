@@ -8,8 +8,13 @@ const env = import.meta.env as Record<string, string | undefined>
 
 const trimSlash = (value: string) => value.replace(/\/+$/, '')
 
+/** NeedToken 主站品牌。分销站点继续使用各自的品牌配置。 */
+export const NEEDTOKEN_BRAND_NAME = 'NeedToken.AI'
+export const NEEDTOKEN_BRAND_ICON = '/needtoken-icon.svg'
+export const NEEDTOKEN_TOUCH_ICON = '/needtoken-touch.png'
+
 /** new-api 控制台（会员注册 / 登录 / key / 用量） */
-export const CONSOLE_URL = trimSlash(env.VITE_NEEDTOKEN_CONSOLE_URL || 'https://api.needtoken.io')
+export const CONSOLE_URL = trimSlash(env.VITE_NEEDTOKEN_CONSOLE_URL || 'https://api.needtoken.ai')
 
 /** 对外唯一 API 入口 */
 export const API_BASE_URL = `${CONSOLE_URL}/v1`

@@ -1753,9 +1753,9 @@
     "nav": {
       "label": "主导航",
       "home": "首页",
-      "recharge": "代充",
-      "rental": "租用",
-      "plans": "套餐 & Tokens",
+      "recharge": "充值服务",
+      "rental": "成品订购",
+      "plans": "API 套餐",
       "models": "模型广场",
       "docs": "API 文档",
       "blog": "Blog",
@@ -1763,11 +1763,11 @@
       "register": "注册"
     },
     "footer": {
-      "tagline": "一把 key 接入多个模型。会员、key 与用量在控制台，商品与订单在本站。",
-      "products": "产品",
-      "developers": "开发者",
+      "tagline": "充值服务、成品订购与 API 套餐，一站选购，订单随时可查。",
+      "products": "产品与服务",
+      "developers": "API 与文档",
       "support": "支持",
-      "console": "会员控制台"
+      "console": "API 控制台"
     },
     "supply": {
       "pool": "号池",
@@ -1960,15 +1960,15 @@
       }
     },
     "plans": {
-      "title": "套餐 & Tokens",
-      "subtitle": "套餐对应会员控制台里的 API 额度：分组决定能用哪些模型，额度与有效期写在套餐里，用量按 Tokens 计量。",
+      "title": "API 套餐",
+      "subtitle": "一把 Key 接入常用模型。按需选购个人套餐，或为团队规划高用量与专属供给方案。",
       "buy": "选购套餐",
       "console": "打开会员控制台",
       "what": {
         "title": "套餐由三部分组成",
         "group": {
-          "title": "分组",
-          "desc": "决定可用的模型档位与价格倍率，以控制台显示为准。"
+          "title": "模型范围",
+          "desc": "可调用的模型与服务档位，以商品说明和 API 控制台的实际权限为准。"
         },
         "quota": {
           "title": "额度",
@@ -1981,7 +1981,7 @@
       },
       "tokens": {
         "title": "Tokens 怎么计量",
-        "b1": "每次请求按输入 tokens 和输出 tokens 分别计价，单价见模型广场。",
+        "b1": "按模型计价规则结算，可能涉及输入、输出、缓存或其他计量单位，详见模型广场与控制台。",
         "b2": "同一模型在不同供应线可能价格不同，以你所在分组为准。",
         "b3": "用量明细与剩余额度在会员控制台查看，以控制台为准。",
         "b4": "充值续费只在本站下单，不在控制台内付款。",
@@ -1991,11 +1991,11 @@
         "title": "从购买到使用",
         "s1": {
           "title": "选套餐下单",
-          "desc": "游客邮箱即可下单，请填写你在会员控制台注册（或将要注册）的邮箱。"
+          "desc": "在本站选择商品与规格，按商品说明完成账号关联。"
         },
         "s2": {
-          "title": "自动开通",
-          "desc": "付款后系统按邮箱把套餐开通到你的控制台账号。"
+          "title": "核验并履约",
+          "desc": "付款后按订单已确认的权益处理，进度与待核查事项在订单页查看。"
         },
         "s3": {
           "title": "创建 key",
@@ -2006,7 +2006,7 @@
           "desc": "用量、剩余额度、到期时间都在控制台查看。"
         }
       },
-      "note": "如果下单邮箱还没注册控制台，订单会等待领取；用同一邮箱注册后自动到账。"
+      "note": "购买与续费在本站完成；Key、额度及调用明细在 API 控制台查看。账号关联需要核验，不以邮箱相同自动认定。"
     },
     "docs": {
       "title": "API 文档",
@@ -2036,6 +2036,189 @@
         "b2": "401 / 鉴权失败：检查环境变量是否在当前终端里生效、key 是否已在控制台删除。",
         "b3": "额度不足：在本站购买套餐或充值后，额度会自动加到控制台账号。"
       }
+    },
+    "apiServices": {
+      "title": "一把 Key，连接常用模型。",
+      "options": "个人与企业 API 方案",
+      "personal": {
+        "title": "个人与开发者",
+        "desc": "为日常开发、写作与工具调用选择合适的 API 套餐。",
+        "b1": "常用模型与开发工具接入",
+        "b2": "按商品说明选择额度与有效期",
+        "b3": "在 API 控制台管理 Key 与用量"
+      },
+      "enterprise": {
+        "title": "企业与专属方案",
+        "desc": "面向团队和高频调用场景，按模型、用量与并发需求评估专属方案。",
+        "b1": "高用量套餐与阶梯优惠咨询",
+        "b2": "专属号池与容量方案评估",
+        "b3": "服务范围与报价逐项确认"
+      },
+      "connectTitle": "兼容常用工具，轻松接入",
+      "connectDesc": "使用 API 控制台创建的 Key，将以下地址填入支持 OpenAI 兼容接口的工具。"
+    },
+    "homeServices": {
+      "seoTitle": "充值服务、成品订购与 API 套餐",
+      "eyebrow": "NeedToken.AI · 让 AI 服务更简单",
+      "title": "你的 AI 服务，",
+      "titleAccent": "从这里开始。",
+      "subtitle": "为常用账号充值，选购即用成品，或为应用接入模型 API。按你的需求，选择合适的服务。",
+      "services": {
+        "recharge": {
+          "tag": "原号继续用",
+          "title": "充值服务",
+          "description": "为已有账号选择充值或订阅续期方案，按订单引导完成办理。",
+          "note": "方案、规格与售后说明清晰可查",
+          "action": "立即充值"
+        },
+        "products": {
+          "tag": "订单内交付",
+          "title": "成品订购",
+          "description": "按需选购成品方案，账号、密码等交付内容在订单页领取。",
+          "note": "购买前查看交付内容与使用范围",
+          "action": "立即购买"
+        },
+        "api": {
+          "tag": "一把 key，多种模型",
+          "title": "API 套餐",
+          "description": "为开发、应用与团队选择模型调用方案，兼顾日常用量与企业需求。",
+          "note": "套餐选购、模型接入与用量管理",
+          "action": "立即调用"
+        }
+      },
+      "benefits": {
+        "selfService": "7×24 自助下单",
+        "orderTracking": "订单进度可查",
+        "afterSales": "售后保障有据",
+        "business": "发票与对公采购咨询"
+      },
+      "steps": {
+        "eyebrow": "从选择到使用",
+        "title": "选好服务，接着三步完成",
+        "description": "规格、价格与服务范围以商品页面为准；购买后按照订单提示继续办理。",
+        "choose": {
+          "title": "选择商品与规格",
+          "description": "按服务类型筛选商品，确认套餐档位、时长与购买须知。"
+        },
+        "pay": {
+          "title": "提交订单并付款",
+          "description": "核对所选方案和订单金额，使用页面提供的付款方式完成支付。"
+        },
+        "receive": {
+          "title": "按订单引导获取服务",
+          "description": "继续提交充值信息、领取成品交付，或查看 API 套餐的使用说明。"
+        }
+      },
+      "orders": {
+        "title": "已有订单？从这里继续",
+        "description": "充值进度、交付内容与售后记录，在订单里继续查看。",
+        "action": "查询我的订单"
+      },
+      "faq": {
+        "eyebrow": "购买前了解",
+        "title": "先找到适合你的服务",
+        "description": "三类服务各有用途，购买前请确认商品说明与服务范围。",
+        "notices": "查看服务公告",
+        "service": {
+          "question": "充值服务、成品订购和 API 套餐怎么选？",
+          "answer": "已有账号需要充值或续期，选择充值服务；需要按商品说明领取账号等成品，选择成品订购；需要在工具、应用或开发项目中调用模型，选择 API 套餐。"
+        },
+        "recharge": {
+          "question": "充值需要提交什么信息？",
+          "answer": "不同商品所需信息不同，请先阅读购买须知，再按订单引导提交。具体生效时间以实际处理进度为准。"
+        },
+        "delivery": {
+          "question": "下单后在哪里查看进度和交付？",
+          "answer": "通过订单查询入口查看相应订单。充值办理进度、成品交付内容和售后信息均以订单页面为准；API 套餐的 key 与用量在模型控制台管理。"
+        },
+        "business": {
+          "question": "企业大用量、发票和对公采购怎么安排？",
+          "answer": "可在购买前沟通企业用量、专属供给、发票和对公转账需求。套餐额度、折扣、交付范围及服务约定，以最终确认的方案为准。"
+        }
+      }
+    },
+    "catalogServices": {
+      "recharge": {
+        "label": "充值服务",
+        "title": "选择适合您的充值方案",
+        "subtitle": "7×24 自助下单 · 极速到账",
+        "section": "充值方案",
+        "descriptionFallback": "选择所需规格，按商品指引完成充值。",
+        "delivery": "按指引提交充值信息",
+        "cta": "立即充值"
+      },
+      "rental": {
+        "label": "成品订购",
+        "title": "选择适合您的成品方案",
+        "subtitle": "选好方案，自助下单 · 交付信息订单内查看",
+        "section": "成品方案",
+        "descriptionFallback": "选择所需规格，按商品说明获取交付内容。",
+        "delivery": "交付内容订单内查看",
+        "cta": "立即购买"
+      },
+      "all": "ALL",
+      "serviceNotes": "服务说明",
+      "warrantyNote": "30 天质保",
+      "refundNote": "充值未成功，全额退款",
+      "invoiceNote": "支持开票",
+      "businessTransferNote": "支持对公转账",
+      "deliveryNote": "订单内查看交付",
+      "afterSaleNote": "售后以商品说明为准",
+      "filterLabel": "筛选商品分类",
+      "search": "搜索当前服务的商品",
+      "searchSubmit": "搜索",
+      "chooseOption": "选择方案规格",
+      "standardOption": "标准方案",
+      "optionsPending": "规格待配置",
+      "pricePending": "价格待确认",
+      "availabilityPending": "暂不可下单",
+      "termsInDetail": "权益与售后见商品说明",
+      "viewDetails": "查看商品说明",
+      "resultCount": "共 {count} 款商品",
+      "loadError": "暂时无法加载商品",
+      "empty": "方案即将上架",
+      "emptySearch": "没有找到匹配的方案",
+      "emptyDescription": "请稍后查看，或调整搜索条件。",
+      "help": "下单前，先了解商品与交付说明",
+      "guides": "使用指南",
+      "notices": "公告提醒",
+      "orders": "查询订单"
+    },
+    "purchaseServices": {
+      "eyebrow": "选择商品与套餐",
+      "stepsLabel": "下单流程",
+      "stepChoose": "选择方案",
+      "stepPay": "确认并付款",
+      "stepDelivery": "查看订单交付",
+      "selectPlan": "选择适合您的方案",
+      "planHint": "选择套餐规格，确认后进入安全结算。",
+      "optionCount": "{count} 种规格",
+      "expiredSelection": "链接中的套餐已变更或不可用，请重新选择下方规格。",
+      "beforeOrder": "下单前请确认",
+      "orderHint": "请阅读商品说明、适用范围与售后条款。付款后可在订单页查看交付内容和处理进度。",
+      "serviceHint": "如订单需要补充账号或 Token，请仅按订单专属页面的指引提交。资料失效时按提示更新，勿在公开留言中分享。",
+      "digitalHint": "数字商品通过原有订单交付流程发放。账号、密码或卡密以订单实际交付内容为准，请妥善保存。",
+      "notices": "购买公告",
+      "orderSummary": "您的订单",
+      "unitPrice": "当前单价",
+      "decreaseQuantity": "减少购买数量",
+      "increaseQuantity": "增加购买数量",
+      "priceNote": "会员及阶梯优惠会随选项更新；订单总额与可用支付方式以结算页为准。",
+      "continueOrder": "确认方案，立即下单",
+      "secureOrder": "订单与付款状态全程可查",
+      "productInfo": "商品说明与使用须知",
+      "infoHint": "服务范围、充值要求与售后政策以本商品说明为准。",
+      "relatedHint": "该商品关联的教程、常见问题与使用说明。",
+      "allGuides": "全部指南",
+      "priceUnavailable": "价格待确认",
+      "resourcesTitle": "购买指南与站点公告",
+      "resourcesHint": "先了解使用方式，再确认适合自己的方案。",
+      "noProductGuides": "该商品暂无关联文章，更多使用说明可前往全部指南查看。",
+      "siteNotices": "站点公告",
+      "allNotices": "全部公告",
+      "siteNoticeScope": "以下为全站公告，具体商品权益与要求以商品说明为准。",
+      "noticeLoadFailed": "公告暂时无法加载，请重试或前往全部公告查看。",
+      "noSiteNotices": "当前暂无站点公告。"
     }
   }
 }
