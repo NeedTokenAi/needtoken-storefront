@@ -240,6 +240,12 @@ func (h *Handler) GetConfig(c *gin.Context) {
 		data["tenant"] = map[string]interface{}{"mode": "main", "host": tenant.Host}
 	}
 
+	// Main-store public contacts/resources are not inherited by reseller sites.
+	if tenant.ResellerID != nil {
+		delete(data, "needtoken_support")
+		delete(data, "needtoken_resources")
+	}
+
 	_ = h.cache.SetJSON(c.Request.Context(), cacheKey, data, publicConfigCacheTTL)
 	data["server_time"] = time.Now().UnixMilli()
 	data["app_version"] = version.Version

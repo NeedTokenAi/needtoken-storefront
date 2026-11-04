@@ -1760,7 +1760,12 @@
       "docs": "API Docs",
       "blog": "Blog",
       "login": "Log in",
-      "register": "Sign up"
+      "register": "Sign up",
+      "help": "Help",
+      "tools": "Tools",
+      "faq": "FAQ",
+      "environment": "Environment check",
+      "appleIds": "Free Apple IDs"
     },
     "footer": {
       "tagline": "Top-ups, ready-made accounts and API plans. Shop in one place and track your orders.",
@@ -2298,6 +2303,157 @@
       "card": "Credit card",
       "paypal": "PayPal",
       "checkoutNote": "Available methods are shown at checkout"
+    },
+    "effects": {
+      "soundOn": "Button sounds: on",
+      "soundOff": "Button sounds: off"
+    },
+    "environment": {
+      "eyebrow": "Browser & connection",
+      "title": "Environment check",
+      "subtitle": "Check browser settings and your connection to this storefront. A useful first step for sign-in, checkout, or page-loading issues.",
+      "privacy": "Checks start only when you choose. Language and time zone stay on this page and are never uploaded. The connection test requests only this site’s health endpoint. No password or token is needed.",
+      "checks": "Browser checks",
+      "runningHint": "Browser checks complete. Testing this site’s connection…",
+      "checkedAt": "Checked at {time}",
+      "idleHint": "Select “Start checks” to inspect this browser.",
+      "cancel": "Stop",
+      "running": "Checking",
+      "runAgain": "Check again",
+      "run": "Start checks",
+      "connectionTitle": "Storefront connection",
+      "requestTime": "Request duration",
+      "httpStatus": "HTTP status: {status}",
+      "connectionScope": "Tests one request to this site’s /health endpoint, including network and server response time. This does not measure model API latency, access to external services, or the speed of future requests.",
+      "limitsTitle": "What do these results tell you?",
+      "limits": "These checks help troubleshoot storefront access and browser features. They cannot determine regional support for Claude or other platforms, account eligibility, IP reputation, or suspension risk. Refer to the platform’s own messages.",
+      "faq": "Browse FAQs",
+      "reportTitle": "Share your results",
+      "reportHint": "The report contains check statuses and the storefront request result. It omits language, time zone, and browser identifiers. Copy it to help support troubleshoot.",
+      "copyReport": "Copy redacted report",
+      "viewReport": "View report text",
+      "cancelled": "Connection test stopped. You can start again.",
+      "copied": "Report copied.",
+      "copyFailed": "Could not copy. Expand the report and copy the text manually.",
+      "labels": {
+        "secure": "Secure context",
+        "online": "Browser network status",
+        "cookies": "Cookie read/write",
+        "storage": "Local storage",
+        "crypto": "Web Crypto",
+        "wasm": "WebAssembly",
+        "language": "Browser language",
+        "timezone": "System time zone"
+      },
+      "status": {
+        "ok": "Available",
+        "warning": "Review",
+        "unknown": "Unconfirmed",
+        "idle": "Not checked"
+      },
+      "details": {
+        "notChecked": "Not checked yet.",
+        "secureReady": "This page is in a secure context and can use browser features that require HTTPS.",
+        "secureLimited": "This page is not in a secure context. Some browser features may be restricted.",
+        "onlineHint": "The browser reports a network connection. See the connection test below for an actual request result.",
+        "offlineHint": "The browser reports that it is offline. Check your network connection.",
+        "cookiesReady": "A temporary cookie was written, read, and deleted. This does not verify third-party cookies.",
+        "cookiesLimited": "Temporary cookies could not be read or written. Browser settings may affect sign-in or payment redirects.",
+        "storageReady": "Temporary data was written, read, and deleted. Existing stored values were not read.",
+        "storageLimited": "Local storage is unavailable or full. Preferences and shopping cart features may be affected.",
+        "cryptoReady": "The browser provides the Web Crypto interface.",
+        "cryptoLimited": "Web Crypto is unavailable. Some security features may be restricted.",
+        "wasmReady": "The browser provides the WebAssembly interface.",
+        "wasmLimited": "No WebAssembly interface was detected. Tools that require it may not work.",
+        "localOnly": "From this browser, displayed only on this page. Not used to assess region or account status."
+      },
+      "connection": {
+        "notChecked": "No connection test has been sent.",
+        "reachable": "The storefront health check responded successfully.",
+        "httpError": "The site returned an unsuccessful status. Try again later; share the report with support if this persists.",
+        "invalidResponse": "A response arrived, but it could not be verified as this site’s health result. It may be an access restriction, redirect, or proxy page.",
+        "timeout": "The health check did not finish within 5 seconds. Connection status remains unconfirmed. Check your network and try again.",
+        "networkError": "The request could not complete. Network conditions, browser restrictions, or service availability may be involved. Try again."
+      }
+    },
+    "support": {
+      "title": "Contact NeedToken.AI",
+      "intro": "Orders, product help and business enquiries",
+      "open": "Contact support",
+      "close": "Close support panel",
+      "tabsLabel": "Support and bookmarks",
+      "contact": "Contact",
+      "bookmark": "Bookmark",
+      "wecom": "WeCom",
+      "qq": "QQ support",
+      "hours": "Service hours: {hours}",
+      "openContact": "Open contact channel",
+      "sendEmail": "Send an enquiry",
+      "emailIntro": "Need help? Contact us by email.",
+      "orderNote": "Include your order number. Do not send passwords, verification codes or APIKeys.",
+      "bookmarkTitle": "Keep us within reach",
+      "bookmarkIntro": "Save this site with your browser’s bookmark feature.",
+      "windows": "Windows",
+      "mac": "Mac",
+      "mobile": "Mobile browser",
+      "mobileHelp": "Open Share or the menu and add a bookmark",
+      "business": "Business enquiries",
+      "scanTitle": "Scan to get in touch",
+      "scanIntro": "Scan a contact code for orders, after-sales support and business enquiries."
+    },
+    "faq": {
+      "eyebrow": "Help center",
+      "title": "Frequently asked questions",
+      "subtitle": "Find answers about recharges, account delivery, and API access.",
+      "search": "Search questions",
+      "searchAction": "Search",
+      "categories": "Topics",
+      "all": "All questions",
+      "needHelp": "Need help with an order?",
+      "contactDescription": "Have your order number ready. Check payment and delivery progress on the order page, or open support on the right.",
+      "orderHelp": "View my orders",
+      "questions": "Questions and answers",
+      "count": "{count} questions",
+      "loadError": "Questions could not be loaded",
+      "loadErrorDescription": "Try again later, or contact us through the support panel.",
+      "noResults": "No matching questions",
+      "noResultsDescription": "Try a shorter search or choose another topic.",
+      "empty": "Answers are on the way",
+      "emptyDescription": "Guides and answers will appear here as they are published. For now, check your order or contact support.",
+      "clear": "Clear search",
+      "readArticle": "Read the full guide"
+    },
+    "freeAppleId": {
+      "eyebrow": "Utilities",
+      "title": "Free Apple IDs",
+      "subtitle": "Review regions and instructions, then open the resource you need.",
+      "noticeTitle": "Read the resource instructions before use",
+      "notice": "Choose a region and open a resource for account details and instructions. Resources are updated periodically; check the resource page for current availability.",
+      "resources": "Shared resources",
+      "count": "{count} resources",
+      "help": "Frequently asked questions",
+      "empty": "No shared resources published yet",
+      "emptyDescription": "New resources will appear here when published. You can browse the guides in the meantime.",
+      "guides": "Read the guides",
+      "resourceFallback": "Shared Apple ID resource",
+      "manualRecord": "Manually maintained",
+      "updated": "Updated {date}",
+      "openResource": "View resource and instructions",
+      "beforeUse": "Three things to check first",
+      "steps": [
+        {
+          "title": "Check the source and region",
+          "description": "Read the publisher’s instructions and confirm the resource source, supported region, and permitted use."
+        },
+        {
+          "title": "Protect your personal account",
+          "description": "Use a shared account only for App Store downloads. Keep your own account signed in to iCloud."
+        },
+        {
+          "title": "Follow instructions and report issues",
+          "description": "If a resource has expired or no longer works, stop retrying and let support know. Do not change a shared account’s security settings."
+        }
+      ]
     }
   }
 }

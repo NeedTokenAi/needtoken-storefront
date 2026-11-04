@@ -291,6 +291,23 @@ const router = createRouter({
             component: templateView('ApiDocs', () => import('../views/NotFound.vue')),
         },
         {
+            path: '/faq',
+            name: 'faq',
+            component: templateView('FAQ', () => import('../views/NotFound.vue')),
+        },
+        {
+            path: '/tools/environment',
+            alias: '/claude-env-check',
+            name: 'environment-tools',
+            component: templateView('EnvironmentTools', () => import('../views/NotFound.vue')),
+        },
+        {
+            path: '/free-apple-id',
+            alias: '/download',
+            name: 'free-apple-id',
+            component: templateView('FreeAppleId', () => import('../views/NotFound.vue')),
+        },
+        {
             path: '/notice',
             name: 'notice',
             component: templateView('Notice', noticeViewLoader),

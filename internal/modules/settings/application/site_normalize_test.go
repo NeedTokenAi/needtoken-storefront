@@ -2,7 +2,9 @@ package settingsapp
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dujiao-next/internal/config"
@@ -757,5 +759,131 @@ func TestNormalizeStorefrontTemplate(t *testing.T) {
 		if got := normalizeStorefrontTemplate(raw); got != want {
 			t.Fatalf("normalizeStorefrontTemplate(%v) = %q, want %q", raw, got, want)
 		}
+	}
+}
+
+func needtokenResourceFixture(id string, enabled bool) map[string]interface{} {
+	return map[string]interface{}{
+		"id": id, "enabled": enabled,
+		"title":       map[string]interface{}{"zh-CN": "授权共享资源"},
+		"description": map[string]interface{}{"en-US": "An authorized download guide."},
+		"url":         "https://example.com/download", "region": "US",
+		"updated_at": "2026-11-05T01:00:00Z",
+		"password":   "must-not-persist", "token": "must-not-persist",
+	}
+}
+
+func TestNeedtokenSettingsRoundTripAndPublicProjection(t *testing.T) {
+	repo := newMockSettingRepo()
+	svc := NewService(repo)
+	stored, err := svc.Update(constants.SettingKeySiteConfig, map[string]interface{}{
+		"needtoken_support": map[string]interface{}{
+			"enabled": false, "business_email": "business@example.com", "contact_url": "https://support.example.com",
+			"wecom_qr": "/uploads/support/wecom.png", "qq_qr": "https://example.com/qq.png", "private_key": "must-not-persist",
+		},
+		"needtoken_resources": map[string]interface{}{"apple_ids": []interface{}{needtokenResourceFixture("public", true), needtokenResourceFixture("draft", false)}},
+		"unrelated":           "preserved",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored["unrelated"] != "preserved" {
+		t.Fatal("unrelated site fields changed")
+	}
+	support := stored["needtoken_support"].(map[string]interface{})
+	if support["enabled"] != false || support["business_email"] != "business@example.com" {
+		t.Fatalf("support settings did not round-trip: %#v", support)
+	}
+	if _, exists := support["private_key"]; exists {
+		t.Fatal("unknown support fields were retained")
+	}
+	items := stored["needtoken_resources"].(map[string]interface{})["apple_ids"].([]interface{})
+	if len(items) != 2 {
+		t.Fatal("admin drafts were lost")
+	}
+	if _, exists := items[0].(map[string]interface{})["password"]; exists {
+		t.Fatal("account credentials retained in public resources")
+	}
+	public, err := svc.GetConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visible := public["needtoken_resources"].(map[string]interface{})["apple_ids"].([]interface{})
+	if len(visible) != 1 || visible[0].(map[string]interface{})["id"] != "public" {
+		t.Fatalf("draft resource leaked to public config: %#v", visible)
+	}
+	// Publishing is a projection, not a destructive mutation of stored drafts.
+	admin, _ := svc.GetByKey(constants.SettingKeySiteConfig)
+	if len(admin["needtoken_resources"].(map[string]interface{})["apple_ids"].([]interface{})) != 2 {
+		t.Fatal("public projection mutated the admin source")
+	}
+}
+
+func TestNeedtokenSettingsRejectUnsafeValuesBeforeWrite(t *testing.T) {
+	for _, link := range []string{"javascript:alert(1)", "data:image/svg+xml,a", "//example.com/qr.png", "https://user:password@example.com", "/uploads/../secrets", "/uploads/%2e%2e/secrets", "https://example.com\\@evil.test/", "https://example.com/\npath"} {
+		t.Run(link, func(t *testing.T) {
+			repo := newMockSettingRepo()
+			svc := NewService(repo)
+			_, err := svc.Update(constants.SettingKeySiteConfig, map[string]interface{}{"needtoken_support": map[string]interface{}{"wecom_qr": link}})
+			var fieldError *SettingFieldError
+			if !errors.As(err, &fieldError) || fieldError.Field != "needtoken_support" {
+				t.Fatalf("expected support validation error, got %v", err)
+			}
+			if _, exists := repo.store[constants.SettingKeySiteConfig]; exists {
+				t.Fatal("invalid settings persisted")
+			}
+		})
+	}
+	for _, invalid := range []string{"not-an-email", "Name <business@example.com>", strings.Repeat("x", 255) + "@example.com"} {
+		if err := validateNeedtokenSite(map[string]interface{}{"needtoken_support": map[string]interface{}{"business_email": invalid}}); err == nil {
+			t.Fatalf("invalid email accepted: %s", invalid)
+		}
+	}
+}
+
+func TestNeedtokenResourceValidationAndLegacyReads(t *testing.T) {
+	tests := []struct {
+		name   string
+		change func(map[string]interface{})
+	}{
+		{"unsafe URL", func(item map[string]interface{}) { item["url"] = "javascript:alert(1)" }},
+		{"relative URL", func(item map[string]interface{}) { item["url"] = "/private/accounts" }},
+		{"invalid ID", func(item map[string]interface{}) { item["id"] = "a/b" }},
+		{"invalid time", func(item map[string]interface{}) { item["updated_at"] = "unknown" }},
+		{"published without URL", func(item map[string]interface{}) { item["url"] = "" }},
+		{"published without title", func(item map[string]interface{}) { item["title"] = nil }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			item := needtokenResourceFixture("entry", true)
+			test.change(item)
+			svc := NewService(newMockSettingRepo())
+			_, err := svc.Update(constants.SettingKeySiteConfig, map[string]interface{}{"needtoken_resources": map[string]interface{}{"apple_ids": []interface{}{item}}})
+			var fieldError *SettingFieldError
+			if !errors.As(err, &fieldError) || fieldError.Field != "needtoken_resources" {
+				t.Fatalf("expected resource validation error, got %v", err)
+			}
+			if len(publicNeedtokenResources(map[string]interface{}{"apple_ids": []interface{}{item}})["apple_ids"].([]interface{})) != 0 {
+				t.Fatal("invalid legacy row was published")
+			}
+		})
+	}
+	for _, count := range []int{2, 41} {
+		items := make([]interface{}, count)
+		for i := range items {
+			id := fmt.Sprintf("entry-%d", i)
+			if count == 2 {
+				id = "duplicate"
+			}
+			items[i] = needtokenResourceFixture(id, true)
+		}
+		_, err := NewService(newMockSettingRepo()).Update(constants.SettingKeySiteConfig, map[string]interface{}{"needtoken_resources": map[string]interface{}{"apple_ids": items}})
+		if err == nil {
+			t.Fatal("duplicate or oversized resources accepted")
+		}
+	}
+	safe := publicNeedtokenSupport(map[string]interface{}{"contact_url": "javascript:alert(1)", "wecom_qr": "/uploads/../private", "business_email": "bad"})
+	if safe["contact_url"] != "" || safe["wecom_qr"] != "" || safe["business_email"] != "" {
+		t.Fatalf("unsafe legacy support config published: %#v", safe)
 	}
 }

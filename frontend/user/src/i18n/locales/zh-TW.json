@@ -1758,9 +1758,14 @@
       "plans": "API 套餐",
       "models": "模型廣場",
       "docs": "API 文件",
-      "blog": "Blog",
+      "blog": "部落格",
       "login": "登入",
-      "register": "註冊"
+      "register": "註冊",
+      "help": "幫助中心",
+      "tools": "實用工具",
+      "faq": "常見問題",
+      "environment": "檢測工具",
+      "appleIds": "免費 Apple ID"
     },
     "footer": {
       "tagline": "儲值服務、成品訂購與 API 套餐，一站選購，隨時查詢訂單。",
@@ -2298,6 +2303,157 @@
       "card": "信用卡",
       "paypal": "PayPal",
       "checkoutNote": "實際可用方式以結帳頁為準"
+    },
+    "effects": {
+      "soundOn": "按鈕音效：已開啟",
+      "soundOff": "按鈕音效：已關閉"
+    },
+    "environment": {
+      "eyebrow": "瀏覽器與連線",
+      "title": "環境檢測",
+      "subtitle": "檢查瀏覽器設定與本站連線。遇到登入、下單或頁面載入問題時，先從這裡排查。",
+      "privacy": "檢測由您手動開始。語言、時區等資訊只在目前頁面顯示，不上傳；連線測試僅請求本站的健康檢查介面，不需要帳號密碼或 Token。",
+      "checks": "瀏覽器檢查",
+      "runningHint": "瀏覽器檢查已完成，正在測試本站連線…",
+      "checkedAt": "本次檢測：{time}",
+      "idleHint": "點擊「開始檢測」查看目前瀏覽器的結果。",
+      "cancel": "停止",
+      "running": "檢測中",
+      "runAgain": "重新檢測",
+      "run": "開始檢測",
+      "connectionTitle": "本站連線",
+      "requestTime": "本次請求耗時",
+      "httpStatus": "HTTP 狀態：{status}",
+      "connectionScope": "僅測試本站 /health 的一次請求，包含網路和服務回應時間，不代表模型 API 延遲、外部網站可達性或後續請求速度。",
+      "limitsTitle": "這些結果能說明什麼？",
+      "limits": "可用於排查本站存取與瀏覽器功能問題。無法據此判斷 Claude 等平台是否支援您的地區、帳號是否可用、IP 信譽或封號風險；請以相應平台的實際提示為準。",
+      "faq": "查看常見問題",
+      "reportTitle": "分享檢測結果",
+      "reportHint": "報告只包含各項檢測狀態和本站請求結果，省略語言、時區及瀏覽器識別資訊。可複製給客服協助排查。",
+      "copyReport": "複製去識別報告",
+      "viewReport": "查看報告文字",
+      "cancelled": "已停止連線測試，可重新檢測。",
+      "copied": "報告已複製。",
+      "copyFailed": "無法複製，請展開報告文字後手動複製。",
+      "labels": {
+        "secure": "安全連線",
+        "online": "瀏覽器網路狀態",
+        "cookies": "Cookie 讀寫",
+        "storage": "本機儲存",
+        "crypto": "Web Crypto",
+        "wasm": "WebAssembly",
+        "language": "瀏覽器語言",
+        "timezone": "系統時區"
+      },
+      "status": {
+        "ok": "可用",
+        "warning": "需留意",
+        "unknown": "未確認",
+        "idle": "未檢測"
+      },
+      "details": {
+        "notChecked": "尚未檢測。",
+        "secureReady": "目前頁面處於安全上下文，可使用需要 HTTPS 的瀏覽器功能。",
+        "secureLimited": "目前頁面不在安全上下文，部分瀏覽器功能可能受限。",
+        "onlineHint": "瀏覽器回報網路已連線；實際存取結果請看下方本站連線測試。",
+        "offlineHint": "瀏覽器回報目前離線，請先檢查網路連線。",
+        "cookiesReady": "暫存 Cookie 已成功寫入、讀取並刪除；不代表第三方 Cookie 也可用。",
+        "cookiesLimited": "暫存 Cookie 讀寫不可用，登入或付款跳轉可能受瀏覽器設定影響。",
+        "storageReady": "暫存資料已成功寫入、讀取並刪除，不讀取現有儲存內容。",
+        "storageLimited": "本機儲存不可用或已滿，語言偏好、購物車等功能可能受影響。",
+        "cryptoReady": "瀏覽器提供 Web Crypto 介面。",
+        "cryptoLimited": "Web Crypto 介面不可用，部分安全功能可能受限。",
+        "wasmReady": "瀏覽器提供 WebAssembly 介面。",
+        "wasmLimited": "未偵測到 WebAssembly 介面，依賴此能力的工具可能無法運作。",
+        "localOnly": "來自目前瀏覽器，僅在本頁顯示，不據此評判地區或帳號狀態。"
+      },
+      "connection": {
+        "notChecked": "尚未發出連線測試請求。",
+        "reachable": "本站健康檢查回應正常。",
+        "httpError": "本站回傳了非成功狀態，請稍後重試；持續出現時可將報告傳給客服。",
+        "invalidResponse": "收到了回應，但無法確認為本站健康檢查結果。可能是存取限制、跳轉或代理頁面。",
+        "timeout": "5 秒內未完成本站健康檢查，連線狀態未確認。請檢查網路後重試。",
+        "networkError": "無法完成本站請求，可能與網路、瀏覽器限制或服務狀態有關，請重試。"
+      }
+    },
+    "support": {
+      "title": "聯絡 NeedToken.AI",
+      "intro": "訂單諮詢、使用問題與商務合作",
+      "open": "聯絡客服",
+      "close": "關閉客服面板",
+      "tabsLabel": "客服與收藏",
+      "contact": "聯絡客服",
+      "bookmark": "收藏本站",
+      "wecom": "企業微信",
+      "qq": "QQ 客服",
+      "hours": "服務時間：{hours}",
+      "openContact": "前往諮詢",
+      "sendEmail": "傳送諮詢郵件",
+      "emailIntro": "需要協助？請透過郵件聯絡我們。",
+      "orderNote": "諮詢訂單時請附訂單編號；請勿傳送密碼、驗證碼或 APIKey。",
+      "bookmarkTitle": "下次造訪更方便",
+      "bookmarkIntro": "使用瀏覽器的書籤功能儲存本站。",
+      "windows": "Windows 電腦",
+      "mac": "Mac 電腦",
+      "mobile": "手機瀏覽器",
+      "mobileHelp": "開啟分享或選單，選擇加入書籤",
+      "business": "商務合作",
+      "scanTitle": "掃碼聯絡",
+      "scanIntro": "掃碼加入客服，諮詢訂單、售後與商務合作。"
+    },
+    "faq": {
+      "eyebrow": "幫助中心",
+      "title": "常見問題",
+      "subtitle": "儲值、成品交付與 API 使用，按問題尋找答案。",
+      "search": "搜尋問題關鍵字",
+      "searchAction": "搜尋",
+      "categories": "問題分類",
+      "all": "全部問題",
+      "needHelp": "訂單需要幫助？",
+      "contactDescription": "準備好訂單編號，在訂單頁核對付款及交付進度，或透過右側客服入口聯絡我們。",
+      "orderHelp": "查看我的訂單",
+      "questions": "問題與解答",
+      "count": "共 {count} 個問題",
+      "loadError": "暫時無法載入問題",
+      "loadErrorDescription": "請稍後重試，或透過客服入口聯絡我們。",
+      "noResults": "沒有找到相關問題",
+      "noResultsDescription": "試試更短的關鍵字，或切換問題分類。",
+      "empty": "問題整理中",
+      "emptyDescription": "這裡會陸續更新使用說明與常見解答。需要幫助時，可先查看訂單或聯絡客服。",
+      "clear": "清除搜尋",
+      "readArticle": "查看完整說明"
+    },
+    "freeAppleId": {
+      "eyebrow": "實用工具",
+      "title": "免費 Apple ID",
+      "subtitle": "查看可用地區與使用說明，按需開啟分享資源。",
+      "noticeTitle": "使用前請先閱讀資源說明",
+      "notice": "選擇所需地區，開啟資源頁查看帳號與使用說明。資源定期更新，實際可用情況以資源頁為準。",
+      "resources": "分享資源",
+      "count": "{count} 項資源",
+      "help": "常見問題",
+      "empty": "暫未發布分享資源",
+      "emptyDescription": "新資源發布後會在這裡更新，也可以先查看使用指南。",
+      "guides": "查看使用指南",
+      "resourceFallback": "Apple ID 分享資源",
+      "manualRecord": "人工維護",
+      "updated": "更新於 {date}",
+      "openResource": "查看資源與使用說明",
+      "beforeUse": "使用前，確認這三件事",
+      "steps": [
+        {
+          "title": "確認來源與地區",
+          "description": "閱讀發布方的使用說明，確認資源來源、適用地區及允許的用途。"
+        },
+        {
+          "title": "保護個人帳號",
+          "description": "共享帳號僅用於 App Store 下載，iCloud 繼續使用你自己的帳號。"
+        },
+        {
+          "title": "按說明使用與回報",
+          "description": "遇到過期或不可用資源，請停止重試並聯絡客服回報，勿修改共享帳號的安全設定。"
+        }
+      ]
     }
   }
 }

@@ -11,6 +11,7 @@ import (
 
 // PostResp 文章/公告公共响应
 type PostResp struct {
+	CategoryID      *uint                `json:"category_id,omitempty"`
 	ID              uint                 `json:"id"`
 	Slug            string               `json:"slug"`
 	Type            string               `json:"type"`
@@ -56,6 +57,7 @@ func NewRelatedProductCardList(products []contentcontract.RelatedProduct) []Rela
 // NewPostResp 从 Content 文章领域对象构造响应。
 func NewPostResp(p *contentdomain.Post) PostResp {
 	return PostResp{
+		CategoryID:  p.CategoryID,
 		ID:          p.ID,
 		Slug:        p.Slug,
 		Type:        p.Type,

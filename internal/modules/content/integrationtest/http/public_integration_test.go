@@ -230,3 +230,75 @@ func TestPublicContentHandlersPreserveRepositoryErrorMapping(t *testing.T) {
 		t.Fatalf("category repository error should be observable as internal error, got %#v", categories)
 	}
 }
+
+func TestPublicPostCategoryScopeDoesNotLeakUnrelatedOrUnpublishedPosts(t *testing.T) {
+	handler, _, categories, _, db := setupPublicContentHandlerTest(t)
+	router := publicContentTestRouter(handler)
+	ctx := context.Background()
+	root, err := categories.Create(ctx, contentapp.CreatePostCategoryInput{Slug: "faq", NameJSON: jsonmap.JSON{"en-US": "FAQ"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := categories.Create(ctx, contentapp.CreatePostCategoryInput{Slug: "faq-payments", ParentID: &root.ID, NameJSON: jsonmap.JSON{"en-US": "Payments"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := categories.Create(ctx, contentapp.CreatePostCategoryInput{Slug: "guides", NameJSON: jsonmap.JSON{"en-US": "Guides"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabled, err := categories.Create(ctx, contentapp.CreatePostCategoryInput{Slug: "faq-disabled", ParentID: &root.ID, NameJSON: jsonmap.JSON{"en-US": "Disabled"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := categories.SetActive(ctx, disabled.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	for _, post := range []contentdomain.Post{
+		{Slug: "root-answer", Type: constants.PostTypeBlog, CategoryID: &root.ID, IsPublished: true, PublishedAt: &now, TitleJSON: jsonmap.JSON{"en-US": "root"}},
+		{Slug: "payment-answer", Type: constants.PostTypeBlog, CategoryID: &child.ID, IsPublished: true, PublishedAt: &now, TitleJSON: jsonmap.JSON{"en-US": "payment"}},
+		{Slug: "draft-answer", Type: constants.PostTypeBlog, CategoryID: &child.ID, IsPublished: false, TitleJSON: jsonmap.JSON{"en-US": "draft"}},
+		{Slug: "disabled-answer", Type: constants.PostTypeBlog, CategoryID: &disabled.ID, IsPublished: true, PublishedAt: &now, TitleJSON: jsonmap.JSON{"en-US": "disabled"}},
+		{Slug: "other-guide", Type: constants.PostTypeBlog, CategoryID: &other.ID, IsPublished: true, PublishedAt: &now, TitleJSON: jsonmap.JSON{"en-US": "other"}},
+		{Slug: "uncategorized", Type: constants.PostTypeBlog, IsPublished: true, PublishedAt: &now, TitleJSON: jsonmap.JSON{"en-US": "none"}},
+	} {
+		if err := db.Create(&post).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	check := func(query string, wantTotal int64, wantSlug string) {
+		t.Helper()
+		recorder := requestPublicContent(t, router, "/api/v1/public/posts?type=blog&"+query)
+		var result struct {
+			Data []struct {
+				Slug       string `json:"slug"`
+				CategoryID uint   `json:"category_id"`
+			} `json:"data"`
+			Pagination response.Pagination `json:"pagination"`
+		}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		if result.Pagination.Total != wantTotal {
+			t.Fatalf("%s: total = %d, want %d (body=%s)", query, result.Pagination.Total, wantTotal, recorder.Body.String())
+		}
+		if wantSlug != "" && (len(result.Data) != 1 || result.Data[0].Slug != wantSlug || result.Data[0].CategoryID != child.ID) {
+			t.Fatalf("%s: wrong scoped article response: %#v", query, result)
+		}
+		if wantTotal == 0 && len(result.Data) != 0 {
+			t.Fatalf("%s: missing scope returned global posts: %#v", query, result)
+		}
+	}
+	check("category_slug=faq", 2, "")
+	check("category_slug=faq&page_size=1", 2, "")
+	check("category_slug=faq-payments", 1, "payment-answer")
+	check("category_slug=faq&search=payment", 1, "payment-answer")
+	check("category_slug=missing", 0, "")
+	check("category_slug=faq-disabled", 0, "")
+	if _, err := categories.SetActive(ctx, root.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	check("category_slug=faq", 0, "")
+	check("category_slug=faq-payments", 0, "")
+}

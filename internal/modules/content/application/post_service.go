@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"strings"
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/modules/content/contract"
@@ -24,10 +25,11 @@ type CreatePostInput struct {
 
 // PublicPostQuery 描述公开文章列表查询。
 type PublicPostQuery struct {
-	Type     string
-	Search   string
-	Page     int
-	PageSize int
+	CategorySlug string
+	Type         string
+	Search       string
+	Page         int
+	PageSize     int
 }
 
 // AdminPostQuery 描述后台文章列表查询。
@@ -61,7 +63,44 @@ func NewPostService(posts contract.PostStore, relations contract.PostProductRela
 
 // ListPublic 获取公开文章列表。
 func (s *PostService) ListPublic(ctx context.Context, query PublicPostQuery) ([]domain.Post, int64, error) {
+	var categoryIDs []uint
+	if slug := strings.TrimSpace(query.CategorySlug); slug != "" {
+		if s.categories == nil {
+			return []domain.Post{}, 0, nil
+		}
+		categories, err := s.categories.ListActive(ctx)
+		if err != nil {
+			return nil, 0, err
+		}
+		active := make(map[uint]domain.PostCategory, len(categories))
+		for _, category := range categories {
+			active[category.ID] = category
+		}
+		for _, category := range categories {
+			if category.Slug != slug {
+				continue
+			}
+			// A child beneath an inactive or deleted parent is not a public scope.
+			if category.ParentID != nil && *category.ParentID != 0 {
+				if _, ok := active[*category.ParentID]; !ok {
+					return []domain.Post{}, 0, nil
+				}
+			}
+			categoryIDs = append(categoryIDs, category.ID)
+			for _, child := range categories {
+				if child.ParentID != nil && *child.ParentID == category.ID {
+					categoryIDs = append(categoryIDs, child.ID)
+				}
+			}
+			break
+		}
+		// Never fall back to every article when a configured category is absent.
+		if len(categoryIDs) == 0 {
+			return []domain.Post{}, 0, nil
+		}
+	}
 	return s.posts.List(ctx, contract.PostQuery{
+		CategoryIDs:   categoryIDs,
 		Page:          query.Page,
 		PageSize:      query.PageSize,
 		Type:          query.Type,
