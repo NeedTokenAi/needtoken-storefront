@@ -3,6 +3,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useCartStore, type CartItem } from '../stores/cart'
 import { useBuyNowStore } from '../stores/buyNow'
+import { useInvoiceRequestStore } from '../stores/invoiceRequest'
+import { getActiveTemplate } from '../templates/registry'
 import { useAppStore } from '../stores/app'
 import { useUserAuthStore } from '../stores/userAuth'
 import { guestOrderAPI, userOrderAPI, walletAPI, type CaptchaPayload } from '../api'
@@ -50,6 +52,8 @@ export function useCheckout() {
   const buyNowStore = useBuyNowStore()
   const appStore = useAppStore()
   const userAuthStore = useUserAuthStore()
+  const invoiceStore = useInvoiceRequestStore()
+  const invoiceEnabled = computed(() => getActiveTemplate() === 'needtoken')
   const { t } = useI18n()
 
   const { getLocalizedText, siteCurrency, formatPrice } = useLocalized()
@@ -600,6 +604,7 @@ export function useCheckout() {
   })
 
   const submitBlockedReason = computed(() => {
+    if (invoiceEnabled.value && !invoiceStore.ready) return t('needtoken.invoice.blocked')
     if (syncingStock.value) return t('checkout.stockSyncing')
     if (cartItems.value.length === 0) return t('checkout.errors.emptyCart')
     if (!manualFormValidation.value.valid) {
@@ -662,6 +667,7 @@ export function useCheckout() {
     affiliate_visitor_key: getAffiliateVisitorKey() || undefined,
     items: buildItemsPayload(),
     manual_form_data: buildManualFormDataPayload(),
+    ...(invoiceEnabled.value && invoiceStore.request ? { invoice_request: invoiceStore.request } : {}),
   })
 
   const loadOrderPaymentChannels = async () => {
@@ -815,6 +821,11 @@ export function useCheckout() {
         return
       }
 
+      if (invoiceEnabled.value && !invoiceStore.ready) {
+        error.value = t('needtoken.invoice.blocked')
+        return
+      }
+
       const payload = {
         ...buildOrderPayload(),
         channel_id: requiresOnlineChannel.value ? (selectedChannelId.value || undefined) : undefined,
@@ -845,6 +856,7 @@ export function useCheckout() {
       }
 
       clearSourceStore()
+      invoiceStore.clear()
 
       // Redirect to the existing Payment page which handles all payment display
       const query = userAuthStore.isAuthenticated
@@ -866,7 +878,7 @@ export function useCheckout() {
   }
 
   watch(
-    () => [cartItems.value, manualFormFingerprint.value, normalizedCouponCode.value, checkoutMode.value, guestEmail.value, guestPassword.value, userAuthStore.isAuthenticated],
+    () => [cartItems.value, manualFormFingerprint.value, invoiceEnabled.value ? invoiceStore.request : null, normalizedCouponCode.value, checkoutMode.value, guestEmail.value, guestPassword.value, userAuthStore.isAuthenticated],
     () => {
       debouncedLoadPreview()
     },

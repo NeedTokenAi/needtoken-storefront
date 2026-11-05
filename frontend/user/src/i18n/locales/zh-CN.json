@@ -2659,6 +2659,53 @@
       "scanHeading": "扫一扫，联系我们",
       "scanDescription": "订单售后、服务咨询与商务合作，选择方便的方式联系。",
       "scanHint": "扫码添加客服"
+    },
+    "catalogToolbar": {
+      "title": "搜索与价格显示",
+      "searchButton": "搜索商品",
+      "searchActive": "搜索商品，当前关键词：{query}",
+      "currencyButton": "显示币种：{currency}",
+      "close": "关闭搜索与价格设置",
+      "searchLabel": "搜索当前分类"
+    },
+    "invoice": {
+      "title": "发票信息",
+      "request": "需要发票",
+      "edit": "修改",
+      "hint": "电子票据；订单完成后按提示联系客服领取。",
+      "ordinary": "普通发票",
+      "special_vat": "增值税专用发票",
+      "fillTitle": "预填开票信息",
+      "formHint": "保存后随订单提交，供开票人员核对。此步骤不会自动开票。",
+      "type": "发票类型",
+      "titleType": "抬头类型",
+      "personal": "个人",
+      "company": "企业",
+      "personalTitle": "个人姓名 / 抬头",
+      "companyTitle": "企业名称 / 抬头",
+      "taxId": "纳税人识别号",
+      "email": "票据接收邮箱",
+      "extra": "企业补充信息（选填）",
+      "company_address": "注册地址（选填）",
+      "company_phone": "注册电话（选填）",
+      "bank_name": "开户银行（选填）",
+      "bank_account": "银行账号（选填）",
+      "save": "保存信息",
+      "close": "关闭开票信息",
+      "savedTitle": "已保存开票预填信息",
+      "readyTitle": "订单已完成，可联系领取票据",
+      "pendingHint": "订单完成后会显示领取提示。此信息仅作为开票申请，不代表票据已开具。",
+      "collectHint": "请联系店铺客服或发送邮件，提供订单号核对开票信息并领取电子票据。",
+      "mailSubject": "订单 {order} 开票申请",
+      "blocked": "请先保存开票信息或取消发票申请。",
+      "adminHint": "客户预填资料，尚未表示已开票；请核对订单和资料后办理。",
+      "errors": {
+        "invalid": "请选择有效的发票类型和抬头类型。",
+        "titleInvalid": "请填写抬头，最多 120 个字。",
+        "emailInvalid": "请填写有效的票据接收邮箱。",
+        "taxInvalid": "请填写 15–20 位字母或数字组成的纳税人识别号。",
+        "extraInvalid": "请检查选填信息；银行账号须为 8–40 位数字。"
+      }
     }
   }
 }

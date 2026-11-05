@@ -14,19 +14,9 @@
         :placeholder="t('needtoken.models.search')"
         :aria-label="t('needtoken.models.search')"
       />
-      <select v-model="vendor" class="h-10 rounded-md border border-border bg-card px-3 text-[14px] text-foreground" :aria-label="t('needtoken.models.vendor')">
-        <option value="">{{ t('needtoken.models.allVendors') }}</option>
-        <option v-for="v in vendorOptions" :key="v" :value="v">{{ v }}</option>
-      </select>
-      <select v-model="supply" class="h-10 rounded-md border border-border bg-card px-3 text-[14px] text-foreground" :aria-label="t('needtoken.models.supply')">
-        <option value="">{{ t('needtoken.models.allSupply') }}</option>
-        <option v-for="s in supplyOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
-      </select>
-      <select v-model="sort" class="h-10 rounded-md border border-border bg-card px-3 text-[14px] text-foreground" :aria-label="t('needtoken.models.sort')">
-        <option value="default">{{ t('needtoken.models.sortDefault') }}</option>
-        <option value="price_asc">{{ t('needtoken.models.sortPriceAsc') }}</option>
-        <option value="price_desc">{{ t('needtoken.models.sortPriceDesc') }}</option>
-      </select>
+      <NeedtokenSelect v-model="vendor" :options="vendorSelectOptions" :label="t('needtoken.models.vendor')" align="start" />
+      <NeedtokenSelect v-model="supply" :options="supplySelectOptions" :label="t('needtoken.models.supply')" align="start" />
+      <NeedtokenSelect :model-value="sort" :options="sortSelectOptions" :label="t('needtoken.models.sort')" align="start" @update:model-value="selectSort" />
       <span class="ml-auto text-[12px] text-muted-foreground">
         <template v-if="pricing.loadedAt.value">{{ t('needtoken.models.updatedAt', { time: pricing.loadedAt.value.toLocaleString() }) }}</template>
       </span>
@@ -133,6 +123,7 @@ import {
 import { usePricing } from './lib/usePricing'
 import { levelFor, type PoolLevel } from './lib/poolStatus'
 import { usePoolStatus } from './lib/usePoolStatus'
+import NeedtokenSelect from './components/NeedtokenSelect.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -165,6 +156,14 @@ const supplyOptions = computed(() => {
   }
   return [...seen.entries()].map(([value, label]) => ({ value, label }))
 })
+const vendorSelectOptions = computed(() => [{ value: '', label: t('needtoken.models.allVendors') }, ...vendorOptions.value.map(value => ({ value, label: value }))])
+const supplySelectOptions = computed(() => [{ value: '', label: t('needtoken.models.allSupply') }, ...supplyOptions.value])
+const sortSelectOptions = computed(() => [
+  { value: 'default', label: t('needtoken.models.sortDefault') },
+  { value: 'price_asc', label: t('needtoken.models.sortPriceAsc') },
+  { value: 'price_desc', label: t('needtoken.models.sortPriceDesc') },
+])
+const selectSort = (value: string) => { if (value === 'default' || value === 'price_asc' || value === 'price_desc') sort.value = value }
 
 const visible = computed(() =>
   sortOffers(filterOffers(offers.value, { vendor: vendor.value, supply: supply.value, keyword: keyword.value }), sort.value, DEFAULT_MODELS),

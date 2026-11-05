@@ -41,6 +41,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+const invoiceFields = ['title', 'tax_id', 'email', 'company_address', 'company_phone', 'bank_name', 'bank_account'] as const
 
 const detailLoading = ref(false)
 const detailError = ref('')
@@ -772,6 +773,16 @@ watch(
           {{ detailError }}
         </div>
         <div v-else-if="selectedOrder" class="space-y-6">
+          <Card v-if="selectedOrder.invoice_request" class="border-border bg-background">
+            <CardContent class="p-4">
+              <h3 class="text-sm font-semibold">{{ t('invoiceRequest.title') }}</h3>
+              <p class="mt-2 text-xs leading-relaxed text-muted-foreground">{{ t('invoiceRequest.adminHint') }}</p>
+              <dl class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div><dt class="text-xs text-muted-foreground">{{ t('invoiceRequest.type') }}</dt><dd class="mt-1">{{ t(`invoiceRequest.${selectedOrder.invoice_request.type}`) }} · {{ t(`invoiceRequest.${selectedOrder.invoice_request.title_type}`) }}</dd></div>
+                <template v-for="field in invoiceFields" :key="field"><div v-if="selectedOrder.invoice_request[field]" class="min-w-0"><dt class="text-xs text-muted-foreground">{{ t(`invoiceRequest.${field === 'title' ? 'billingTitle' : field}`) }}</dt><dd class="mt-1 whitespace-pre-wrap break-words">{{ selectedOrder.invoice_request[field] }}</dd></div></template>
+              </dl>
+            </CardContent>
+          </Card>
           <div class="grid grid-cols-1 gap-4 text-sm md:grid-cols-2 [&>*]:min-w-0">
             <Card class="min-w-0 rounded-lg border-border bg-background shadow-none">
               <CardContent class="p-3">

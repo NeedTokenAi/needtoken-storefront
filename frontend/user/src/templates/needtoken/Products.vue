@@ -20,15 +20,7 @@
           <button type="button" class="nt-service-catalog__filter" :class="{ 'is-active': scope.selected?.id === scope.root.id }" :aria-pressed="scope.selected?.id === scope.root.id" @click="selectCategory(null)">{{ t('needtoken.catalogServices.all') }}</button>
           <button v-for="category in scope.categories" :key="category.id" type="button" class="nt-service-catalog__filter" :class="{ 'is-active': scope.selected?.id === category.id }" :aria-pressed="scope.selected?.id === category.id" @click="selectCategory(category)">{{ getLocalizedText(category.name) }}</button>
         </nav>
-        <div class="nt-service-catalog__tools">
-          <span v-if="!loading && !categoriesLoading && !loadError" class="nt-service-catalog__count" aria-live="polite">{{ t('needtoken.catalogServices.resultCount', { count: totalProducts }) }}</span>
-          <form class="nt-service-catalog__search" role="search" @submit.prevent="submitSearch">
-            <Search :size="16" aria-hidden="true" />
-            <input v-model="searchQuery" type="search" :placeholder="t('needtoken.catalogServices.search')" :aria-label="t('needtoken.catalogServices.search')" />
-            <button type="submit" :aria-label="t('needtoken.catalogServices.searchSubmit')"><ArrowRight :size="16" aria-hidden="true" /></button>
-          </form>
-          <DisplayCurrencySelector compact />
-        </div>
+        <CatalogueTools v-model="searchQuery" :search-label="t('needtoken.catalogServices.search')" :count="!loading && !categoriesLoading && !loadError ? totalProducts : null" :loading="categoriesLoading || loading" @search="submitSearch" />
       </div>
 
       <div v-if="categoriesLoading || loading" class="nt-service-catalog__grid" role="status" :aria-label="t('needtoken.common.loading')" aria-busy="true">
@@ -66,13 +58,13 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowRight, ArrowUpRight, BookOpen, Building2, FileText, PackageCheck, PackageSearch, Search, ShieldCheck, Undo2 } from 'lucide-vue-next'
+import { ArrowUpRight, BookOpen, Building2, FileText, PackageCheck, PackageSearch, ShieldCheck, Undo2 } from 'lucide-vue-next'
 import ClassicProducts from '../../views/Products.vue'
 import PaginationNav from '../../components/PaginationNav.vue'
 import { useLocalized } from '../../composables/useProduct'
 import { usePageSeo } from '../../composables/usePageSeo'
 import ServiceProductCard from './components/ServiceProductCard.vue'
-import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
+import CatalogueTools from './components/CatalogueTools.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import { useServiceCatalog } from './composables/useServiceCatalog'
 
@@ -107,19 +99,12 @@ h1 { font-size: clamp(27px, 2.5vw, 34px); font-weight: 750; letter-spacing: -.04
 .nt-service-catalog__promises li { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid rgba(255, 224, 126, .45); border-radius: 9px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24); }
 .nt-service-catalog__promises svg { flex: none; color: currentColor; opacity: .85; }
 .nt-service-catalog__rate { position: relative; z-index: 3; }
-.nt-service-catalog__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0 16px; border-top: 1px solid var(--ui-border); }
-.nt-service-catalog__tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex: 0 1 auto; min-width: 0; }
-.nt-service-catalog__count { flex: none; color: var(--ui-text-muted); font-size: 12px; }
-.nt-service-catalog__filters { min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
+.nt-service-catalog__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 16px; border-top: 1px solid var(--ui-border); }
+.nt-service-catalog__filters { min-width: 0; flex: 1; display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
 .nt-service-catalog__filter { min-height: 40px; flex-shrink: 0; border: 1px solid rgba(204, 219, 235, .17); border-radius: 10px; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.018)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 4px 16px rgba(0,0,0,.08); padding: 8px 14px; color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; cursor: pointer; transition: .15s; }
 .nt-service-catalog__filter:hover { color: var(--ui-text-primary); border-color: rgba(204,219,235,.35); }
 .nt-service-catalog__filter.is-active { color: var(--ui-accent); border-color: rgba(45,212,167,.44); background: linear-gradient(135deg, rgba(45,212,167,.15), rgba(45,212,167,.04)); box-shadow: inset 0 1px 0 rgba(153,255,223,.13), 0 0 18px rgba(45,212,167,.035); }
-.nt-service-catalog__filter:focus-visible, .nt-service-catalog__search:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-.nt-service-catalog__search { display: flex; align-items: center; gap: 8px; width: 200px; flex: 0 1 200px; min-width: 140px; min-height: 40px; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 10px; background: rgba(255,255,255,.025); color: var(--ui-text-muted); }
-.nt-service-catalog__search input { min-width: 0; flex: 1; width: 100%; outline: none; background: transparent; font-size: 13px; color: var(--ui-text-primary); }
-.nt-service-catalog__search button { display: grid; width: 24px; height: 28px; place-items: center; }
-.nt-service-catalog__tools :deep(.nt-display-currency--compact) { flex: none; font-size: 12px; gap: 6px; }
-.nt-service-catalog__tools :deep(.nt-display-currency__control) { min-height: 40px; }
+.nt-service-catalog__filter:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
 .nt-service-catalog__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .nt-service-catalog__skeleton { min-height: 406px; border: 1px solid var(--ui-border); border-radius: 24px; padding: 24px; }
 .nt-service-catalog__skeleton > div { width: 80%; height: 20px; margin-bottom: 20px; border-radius: 7px; background: rgba(255,255,255,.045); }
@@ -134,7 +119,6 @@ h1 { font-size: clamp(27px, 2.5vw, 34px); font-weight: 750; letter-spacing: -.04
 .nt-service-catalog__help a:hover { color: var(--ui-accent); }
 @media (max-width: 1023px) { .nt-service-catalog__promises { grid-template-columns: repeat(2, minmax(0, 1fr)); } .nt-service-catalog__rate { grid-column: 1 / -1; } .nt-service-catalog__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .nt-service-catalog__skeleton { min-height: 330px; padding: 18px; border-radius: 20px; } }
-@media (max-width: 1023px) { .nt-service-catalog__toolbar { align-items: stretch; flex-direction: column; gap: 12px; } .nt-service-catalog__tools { justify-content: space-between; flex-wrap: wrap; } .nt-service-catalog__search { flex: 1; } }
-@media (max-width: 640px) { .nt-service-catalog { padding-top: 22px; } .nt-service-catalog__promises li { padding: 7px 9px; gap: 6px; border-radius: 9px; } .nt-service-catalog__promises svg { width: 14px; height: 14px; } .nt-service-catalog__tools { gap: 10px; } .nt-service-catalog__tools > .nt-service-catalog__count { order: 1; } .nt-service-catalog__tools :deep(.nt-display-currency) { order: 2; } .nt-service-catalog__search { flex-basis: 100%; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
+@media (max-width: 640px) { .nt-service-catalog { padding-top: 22px; } .nt-service-catalog__promises li { padding: 7px 9px; gap: 6px; border-radius: 9px; } .nt-service-catalog__promises svg { width: 14px; height: 14px; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
 @media (prefers-reduced-motion: reduce) { .nt-service-catalog__filter { transition: none; } }
 </style>

@@ -296,9 +296,12 @@
             </div>
           </div>
 
+          <InvoiceRequestEditor v-if="invoiceEnabled" :email="guestEmail || userAuthStore.user?.email" :disabled="submitting" />
+
           <Button
             size="lg"
             class="w-full font-semibold"
+            :class="invoiceEnabled ? 'nt-button-purchase' : ''"
             :disabled="!canSubmit"
             @click="handleSubmit"
           >
@@ -323,8 +326,12 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCheckout } from '../composables/useCheckout'
+import { computed } from 'vue'
+import { getActiveTemplate } from '../templates/registry'
+import InvoiceRequestEditor from '../templates/needtoken/components/InvoiceRequestEditor.vue'
 
 const { t } = useI18n()
+const invoiceEnabled = computed(() => getActiveTemplate() === 'needtoken')
 
 const {
   userAuthStore, getLocalizedText, formatPrice, getImageUrl,

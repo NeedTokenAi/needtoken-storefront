@@ -19,7 +19,7 @@
           <legend class="sr-only">{{ t(`needtoken.variants.${axis.id}Label`) }}</legend>
           <span class="nt-service-card__axis-label" aria-hidden="true">{{ t(`needtoken.variants.${axis.id}Label`) }}</span>
           <div class="nt-service-card__options">
-            <label v-for="value in axis.options" :key="value" class="nt-service-card__option" :class="{ 'is-selected': axis.valuesBySku[selectedSkuId] === value }">
+            <label v-for="value in axis.options" :key="value" class="nt-service-card__option" :class="{ 'is-selected': axis.valuesBySku[selectedSkuId] === value }" :aria-disabled="!axisOptionAvailable(axis.id, value)">
               <input type="radio" :name="`service-sku-${product.id}-${axis.id}`" :value="value" :checked="axis.valuesBySku[selectedSkuId] === value" :disabled="!axisOptionAvailable(axis.id, value)" @change="selectAxis(axis.id, value)" />
               <span>{{ axisLabel(axis.id, value) }}</span>
             </label>
@@ -136,12 +136,13 @@ watch(image, () => { imageErrored.value = false })
 .nt-service-card__axis-label { flex-shrink: 0; color: var(--ui-text-muted); font-size: 12px; line-height: 1.4; }
 .nt-service-card__options { display: flex; flex-wrap: wrap; gap: 3px; min-inline-size: 0; max-width: 100%; margin: 0; padding: 3px; border: 1px solid var(--ui-border); border-radius: 12px; background: rgba(255, 255, 255, .035); }
 .nt-service-card__flat-options { margin-top: 11px; width: fit-content; }
-.nt-service-card__option { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; max-width: 100%; padding: 5px 9px; border: 1px solid transparent; border-radius: 8px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.35; text-align: center; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
+.nt-service-card__option { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; max-width: 100%; padding: 5px 9px; border: 1px solid transparent; border-radius: 8px; color: #b5c1cc; font-size: 12px; line-height: 1.35; text-align: center; cursor: pointer; transition: color .15s, background .15s, border-color .15s; }
 .nt-service-card__option > span { min-width: 0; overflow-wrap: anywhere; }
 .nt-service-card__option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.nt-service-card__option:has(input:focus-visible) { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
-.nt-service-card__option:has(input:disabled) { color: var(--ui-text-muted); opacity: .4; cursor: not-allowed; }
-.nt-service-card__option.is-selected { color: var(--ui-text-primary); border-color: rgba(45, 212, 167, .26); background: rgba(45, 212, 167, .12); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); }
+.nt-service-card__option:focus-within { outline: 2px solid #8cf1d1; outline-offset: 2px; }
+.nt-service-card__option[aria-disabled="true"] { color: var(--ui-text-muted); opacity: .4; cursor: not-allowed; }
+.nt-service-card__option:not(.is-selected):not([aria-disabled="true"]):hover { color: #edfff8; border-color: #5caa944d; }
+.nt-service-card__option.is-selected { color: #e4fff4; border-color: #72e4bf; background: linear-gradient(150deg, #3a6b5c, #245443); box-shadow: inset 0 1px 0 #baffdf40, 0 0 0 1px #74efc619, 0 2px 10px #2dd4a712; }
 .nt-service-card__single-option { min-width: 0; max-width: 48%; padding: 5px 8px; border: 1px solid rgba(45, 212, 167, .18); border-radius: 9px; color: var(--ui-accent); background: rgba(45, 212, 167, .06); font-size: 12px; overflow-wrap: anywhere; }
 .nt-service-card__body { min-width: 0; flex: 1; }
 h2 { margin: 0; color: var(--ui-text-primary); font-size: 21px; font-weight: 700; line-height: 1.3; letter-spacing: -.035em; overflow-wrap: anywhere; }
@@ -168,6 +169,7 @@ h2 { margin: 0; color: var(--ui-text-primary); font-size: 21px; font-weight: 700
 .nt-service-card__cta:disabled { color: var(--ui-text-muted); background: rgba(255,255,255,.04); border-color: var(--ui-border); cursor: not-allowed; }
 .nt-service-card__read-more { display: flex; justify-content: center; align-items: center; min-height: 32px; margin-top: 4px; text-align: center; color: var(--ui-text-muted); font-size: 12px; }
 .nt-service-card__read-more:hover { color: var(--ui-text-primary); }
+@media (forced-colors: active) { .nt-service-card__option.is-selected { color: ButtonText; background: ButtonFace; border-color: Highlight; outline: 2px solid Highlight; outline-offset: 1px; } }
 @media (hover: none), (pointer: coarse) { .nt-service-card__option, .nt-service-card__cta, .nt-service-card__read-more { min-height: 44px; } .nt-service-card__option { min-width: 44px; } }
 @media (prefers-reduced-motion: reduce) { .nt-service-card { transition: none; } .nt-service-card:hover { transform: none; } }
 @media (max-width: 640px) { .nt-service-card { padding: 20px; } h2 { font-size: 23px; } .nt-service-card__description { font-size: 13px; min-height: 43px; } .nt-service-card__price { font-size: 34px; } .nt-service-card__option, .nt-service-card__cta, .nt-service-card__read-more { min-height: 44px; } .nt-service-card__option { min-width: 44px; } }
