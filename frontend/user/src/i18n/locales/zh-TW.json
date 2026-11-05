@@ -2659,6 +2659,53 @@
       "scanHeading": "掃一掃，聯絡我們",
       "scanDescription": "訂單售後、服務諮詢與商務合作，選擇方便的方式聯絡。",
       "scanHint": "掃碼新增客服"
+    },
+    "catalogToolbar": {
+      "title": "搜尋與價格顯示",
+      "searchButton": "搜尋商品",
+      "searchActive": "搜尋商品，目前關鍵字：{query}",
+      "currencyButton": "顯示幣別：{currency}",
+      "close": "關閉搜尋與價格設定",
+      "searchLabel": "搜尋目前分類"
+    },
+    "invoice": {
+      "title": "發票資訊",
+      "request": "需要發票",
+      "edit": "修改",
+      "hint": "電子票據；訂單完成後依提示聯絡客服領取。",
+      "ordinary": "普通發票",
+      "special_vat": "增值稅專用發票",
+      "fillTitle": "預填開票資訊",
+      "formHint": "儲存後隨訂單提交，供開票人員核對。此步驟不會自動開票。",
+      "type": "發票類型",
+      "titleType": "抬頭類型",
+      "personal": "個人",
+      "company": "企業",
+      "personalTitle": "個人姓名 / 抬頭",
+      "companyTitle": "企業名稱 / 抬頭",
+      "taxId": "納稅人識別號",
+      "email": "票據接收信箱",
+      "extra": "企業補充資訊（選填）",
+      "company_address": "註冊地址（選填）",
+      "company_phone": "註冊電話（選填）",
+      "bank_name": "開戶銀行（選填）",
+      "bank_account": "銀行帳號（選填）",
+      "save": "儲存資訊",
+      "close": "關閉開票資訊",
+      "savedTitle": "已儲存開票預填資訊",
+      "readyTitle": "訂單已完成，可聯絡領取票據",
+      "pendingHint": "訂單完成後會顯示領取提示。此資訊僅作為開票申請，不代表票據已開具。",
+      "collectHint": "請聯絡店鋪客服或發送郵件，提供訂單號核對開票資訊並領取電子票據。",
+      "mailSubject": "訂單 {order} 開票申請",
+      "blocked": "請先儲存開票資訊或取消發票申請。",
+      "adminHint": "客戶預填資料，不表示已開票；請核對訂單及資料後辦理。",
+      "errors": {
+        "invalid": "請選擇有效的發票及抬頭類型。",
+        "titleInvalid": "請填寫抬頭，最多 120 個字。",
+        "emailInvalid": "請填寫有效的票據接收信箱。",
+        "taxInvalid": "請填寫由 15–20 位字母或數字組成的納稅人識別號。",
+        "extraInvalid": "請檢查選填資訊；銀行帳號須為 8–40 位數字。"
+      }
     }
   }
 }

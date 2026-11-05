@@ -576,7 +576,7 @@ export const GHOST_FIBERS_PRISM = Object.freeze({
   speed: 0.5, scale: 1, rotation: 18 * DEG, rollSpeed: 0.15,
   layers: 3, waves: 1.2, twist: 1.6, threads: 72, volume: 0.7, spread: 1.25,
   density: 1, thickness: 1, flow: 0.4, dotLength: FIBER_STYLES.dots, tips: 0, foldGlow: 1.3,
-  perspective: 0.65, depthOfField: 0.85, focusDepth: 0, particles: 0.5,
+  perspective: 0.65, depthOfField: 0.35, focusDepth: 0, particles: 0.5,
   sparkle: 0.5, glow: 0.8, brightness: 1, vignette: 0.3, grain: 0.06,
   mouseInteraction: true, hover: HOVER_EFFECTS.focus, mouseStrength: 1, pulseOnClick: true,
   intro: true, lightMode: false, paused: false, dpr: 1
@@ -770,6 +770,11 @@ export function createGhostFibers(container, canvas, options = {}) {
     const ratio = canvas.height / Math.max(state.height, 1);
     const intro = s.paused || reduce ? 1 : clamp(state.intro / INTRO_SECONDS, 0, 1);
     const introEase = 1 - (1 - intro) * (1 - intro) * (1 - intro);
+    // Preserve Prism's depth at rest, then bring every ribbon and dust point
+    // into focus on hover. Moving only the focus plane leaves other layers
+    // blurred; reducing the circle of confusion also lowers particle fill cost.
+    const hoverFocus = s.hover === HOVER_EFFECTS.focus ? clamp(state.hover.presence / 0.85, 0, 1) : 0;
+    const depthOfField = s.depthOfField * (1 - hoverFocus);
 
     allocate(scene, canvas.width, canvas.height);
     gl.bindVertexArray(vao);
@@ -802,7 +807,7 @@ export function createGhostFibers(container, canvas, options = {}) {
     gl.uniform1f(u.uFlow, state.flow);
     gl.uniform1f(u.uSize, 1.6 * s.thickness);
     gl.uniform1f(u.uFocus, state.focus);
-    gl.uniform1f(u.uDof, s.depthOfField);
+    gl.uniform1f(u.uDof, depthOfField);
     gl.uniform1f(u.uMaxCoc, blurCap);
     gl.uniform1f(u.uFocal, CAMERA);
     gl.uniform1f(u.uIntro, introEase);
@@ -844,7 +849,7 @@ export function createGhostFibers(container, canvas, options = {}) {
       gl.uniform1f(d.uTime, state.time);
       gl.uniform1f(d.uSize, 2.2 * s.thickness);
       gl.uniform1f(d.uFocus, state.focus);
-      gl.uniform1f(d.uDof, s.depthOfField);
+      gl.uniform1f(d.uDof, depthOfField);
       gl.uniform1f(d.uMaxCoc, 22);
       gl.uniform1f(d.uFocal, CAMERA);
       gl.uniform1f(d.uIntro, introEase);

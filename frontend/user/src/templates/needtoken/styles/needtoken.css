@@ -33,12 +33,63 @@ body.nt-tokens {
   color: var(--ui-text-primary);
 }
 
+/* Match the native cart/order views to the header's 1200px outer container.
+   Only these NeedToken wrappers opt in; classic and vault retain their layout. */
+.nt-scope .nt-native-page > div {
+  min-height: 0;
+  padding-top: 32px;
+  padding-bottom: 48px;
+}
+.nt-scope .nt-native-page > div > .container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+.nt-scope .nt-native-page :where(article, .grid > div, input) {
+  min-width: 0;
+}
+@media (max-width: 639px) {
+  .nt-scope .nt-native-page > div { padding-top: 24px; padding-bottom: 36px; }
+  .nt-scope .nt-native-page > div > .container { padding-inline: 16px; }
+}
+
+/* Primary purchase actions keep a visible face and edge without GPU effects. */
+.nt-scope :is(a, button).nt-button-purchase,
+body.nt-tokens :is(a, button).nt-button-purchase,
+.nt-scope .nt-native-cart a[href="/checkout"] {
+  border: 1px solid #f4ce64;
+  background: #f5c943;
+  background-image: linear-gradient(160deg, #ffe89a 0%, #f7d35a 43%, #edbc32 100%);
+  color: #2c2105;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 #fff6c5, inset 0 -1px 0 #bd8c20, 0 0 0 1px #ffdf802e, 0 5px 18px #e7b73612;
+  text-shadow: none;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.nt-scope :is(a, button).nt-button-purchase:hover,
+body.nt-tokens :is(a, button).nt-button-purchase:hover,
+.nt-scope .nt-native-cart a[href="/checkout"]:hover {
+  background-color: #ffda65;
+  background-image: linear-gradient(160deg, #fff0b5, #ffdc70 48%, #f3c33b);
+  color: #241a03;
+  box-shadow: inset 0 1px 0 #fff9d9, inset 0 -1px 0 #c59222, 0 0 0 1px #ffdf8061, 0 6px 22px #e7b73624;
+}
+.nt-scope :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="true"]),
+body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="true"]) {
+  border-color: #4c525c;
+  background: #252b33;
+  color: #aeb8c5;
+  box-shadow: inset 0 1px 0 #ffffff0a;
+  cursor: not-allowed;
+}
+
 .nt-scope .nt-brand {
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: -0.035em;
 }
 
-/* 分类与规格筛选共用的玻璃按钮；非支持 backdrop-filter 的浏览器仍有可读底色。 */
+/* A painted gradient supplies the glass face even with compositor effects off. */
 .nt-scope .nt-glass-pill {
   display: inline-flex;
   align-items: center;
@@ -48,29 +99,27 @@ body.nt-tokens {
   border: 1px solid rgba(180, 205, 201, 0.16);
   border-radius: 999px;
   padding: 9px 18px;
-  background: rgba(30, 42, 47, 0.54);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 4px 16px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(165deg, #253239, #182329 68%, #162126);
+  box-shadow: inset 0 1px 0 #ffffff21, inset 0 -1px 0 #00000030, 0 0 0 1px #b6e9dc08, 0 4px 16px #0000001a;
   color: var(--ui-text-secondary);
   font-size: 13px;
   font-weight: 600;
-  backdrop-filter: blur(18px) saturate(135%);
-  -webkit-backdrop-filter: blur(18px) saturate(135%);
   cursor: pointer;
   transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .nt-scope .nt-glass-pill:hover {
   border-color: rgba(94, 234, 192, 0.38);
-  background: rgba(53, 77, 73, 0.5);
+  background: linear-gradient(165deg, #324a49, #203735);
   color: var(--ui-text-primary);
 }
 
 .nt-scope .nt-glass-pill[aria-pressed="true"],
 .nt-scope .nt-glass-pill[aria-selected="true"] {
-  border-color: rgba(94, 234, 192, 0.58);
-  background: rgba(45, 212, 167, 0.14);
-  box-shadow: inset 0 1px 0 rgba(190, 255, 234, 0.12), 0 0 20px rgba(45, 212, 167, 0.07);
-  color: #a5f3d6;
+  border-color: #75ebc8;
+  background: linear-gradient(155deg, #3c6a5f, #244c43);
+  box-shadow: inset 0 1px 0 #b5ffe340, 0 0 0 1px #61e6b927, 0 3px 16px #2dd4a718;
+  color: #d8ffef;
 }
 
 .nt-scope :where(a, button, input, select, textarea, summary):focus-visible {
@@ -135,23 +184,40 @@ body.nt-tokens {
   background-size: 40px 40px;
 }
 
-/* A single hover/focus target receives this edge light; ordinary text links stay plain.
-   The delegate only updates that target once per animation frame. */
+/* Baseline surfaces use ordinary gradients/borders on every platform. The
+   moving highlight is an enhancement: no mask, :has or backdrop-filter needed. */
+:where(.nt-scope, body.nt-tokens) .nt-action-surface {
+  background-image: linear-gradient(170deg, #ffffff0e, #ffffff02 48%, #0000000a);
+  box-shadow: inset 0 1px 0 #ffffff1f, inset 0 -1px 0 #00000024, 0 0 0 1px #d9fff308;
+}
 :is(.nt-scope, body.nt-tokens) .nt-specular-position { position: relative; }
-:is(.nt-scope, body.nt-tokens) .nt-specular::after {
+:is(.nt-scope, body.nt-tokens) :is(a, button, label, summary, [role="button"], [role="tab"]).nt-specular {
+  box-shadow: inset 0 1px 0 #e7fff866, inset 0 -1px 0 #00000038, 0 0 0 1px #9cebd840, 0 4px 18px #2dd4a71a;
+}
+:is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after {
   content: '';
   position: absolute;
-  inset: -1px;
-  border: 1px solid transparent;
+  inset: 0;
+  border: 1px solid #ddfff333;
   border-radius: inherit;
-  background: radial-gradient(125px circle at var(--nt-pointer-x, 50%) var(--nt-pointer-y, 0%), rgba(219, 255, 246, .82), rgba(94, 234, 192, .28) 43%, transparent 75%) border-box;
-  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
+  background: radial-gradient(130px circle at var(--nt-pointer-x, 50%) var(--nt-pointer-y, 0%), #e4fff82b, #a3ffe70b 48%, transparent 78%);
+  box-shadow: inset 0 1px 0 #eefff840;
   pointer-events: none;
 }
 :is(.nt-scope, body.nt-tokens) .nt-specular:active { filter: brightness(1.08); }
 @media (prefers-reduced-motion: reduce) {
-  :is(.nt-scope, body.nt-tokens) .nt-specular::after { background: linear-gradient(115deg, transparent, rgba(190, 255, 236, .55), transparent) border-box; }
+  :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after { background: linear-gradient(115deg, transparent, #beffec16, transparent); }
+}
+@media (forced-colors: active) {
+  :is(.nt-scope, body.nt-tokens) .nt-action-surface,
+  .nt-scope .nt-glass-pill,
+  .nt-scope :is(a, button).nt-button-purchase,
+  .nt-scope .nt-native-cart a[href="/checkout"] {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+    box-shadow: none;
+  }
+  :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after { display: none; }
+  .nt-scope .nt-glass-pill:is([aria-pressed="true"], [aria-selected="true"]) { outline: 2px solid Highlight; outline-offset: 2px; }
 }

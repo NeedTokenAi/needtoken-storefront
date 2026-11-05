@@ -43,7 +43,8 @@
     </section>
 
     <button ref="triggerEl" type="button" class="nt-support-trigger" :aria-label="open ? t('needtoken.support.close') : t('needtoken.support.open')" :aria-expanded="open" :aria-controls="panelId" aria-haspopup="dialog" @click="toggle">
-      <X v-if="open" :size="23" /><MessageCircle v-else :size="25" />
+      <X v-if="open" :size="23" />
+      <span v-else class="nt-support-eyes" aria-hidden="true"><span v-for="eye in 2" :key="eye" class="nt-support-eye"><span class="nt-support-pupil" /></span></span>
     </button>
   </div>
 </template>
@@ -64,6 +65,14 @@ const tabs = ['contact', 'bookmark'] as const
 const widgetEl = ref<HTMLElement | null>(null)
 const panelEl = ref<HTMLElement | null>(null)
 const triggerEl = ref<HTMLButtonElement | null>(null)
+let eyeFrame = 0
+let eyeTracking = false
+let eyeVisible = true
+let eyePointerX = 0, eyePointerY = 0
+let lastEyeX = 0, lastEyeY = 0
+let motionQuery: MediaQueryList | undefined
+let pointerQuery: MediaQueryList | undefined
+let eyeObserver: IntersectionObserver | undefined
 const emailHref = computed(() => supportEmailHref(props.support.businessEmail))
 const qrCards = computed(() => [
   { key: 'wecom', label: t('needtoken.support.wecom'), image: props.support.wecomQr },
@@ -99,14 +108,74 @@ function onDocumentPointer(event: PointerEvent) {
 function onDocumentFocus(event: FocusEvent) {
   if (event.target instanceof Node && !widgetEl.value?.contains(event.target)) close()
 }
+function resetEyes() {
+  if (eyeFrame) window.cancelAnimationFrame(eyeFrame)
+  eyeFrame = 0; lastEyeX = 0; lastEyeY = 0
+  triggerEl.value?.style.removeProperty('--nt-eye-x')
+  triggerEl.value?.style.removeProperty('--nt-eye-y')
+}
+function syncEyeTracking() {
+  const enabled = !!triggerEl.value && props.support.enabled && !open.value && eyeVisible && !document.hidden && !motionQuery?.matches && !!pointerQuery?.matches
+  if (enabled === eyeTracking) return
+  eyeTracking = enabled
+  if (enabled) window.addEventListener('pointermove', onEyePointer, { passive: true })
+  else { window.removeEventListener('pointermove', onEyePointer); resetEyes() }
+}
+function updateEyes() {
+  eyeFrame = 0
+  const trigger = triggerEl.value
+  if (!eyeTracking || !trigger) return
+  const bounds = trigger.getBoundingClientRect()
+  if (bounds.bottom <= 0 || bounds.right <= 0 || bounds.top >= window.innerHeight || bounds.left >= window.innerWidth) return
+  const dx = eyePointerX - (bounds.left + bounds.width / 2), dy = eyePointerY - (bounds.top + bounds.height / 2)
+  const distance = Math.hypot(dx, dy)
+  const scale = distance ? Math.min(1, distance / 100) * 2.5 / distance : 0
+  const x = Math.round(dx * scale * 10) / 10, y = Math.round(dy * scale * 10) / 10
+  if (x === lastEyeX && y === lastEyeY) return
+  lastEyeX = x; lastEyeY = y
+  trigger.style.setProperty('--nt-eye-x', `${x}px`)
+  trigger.style.setProperty('--nt-eye-y', `${y}px`)
+}
+function onEyePointer(event: PointerEvent) {
+  if (event.pointerType === 'touch') return
+  eyePointerX = event.clientX; eyePointerY = event.clientY
+  if (!eyeFrame) eyeFrame = window.requestAnimationFrame(updateEyes)
+}
 watch(() => props.support.enabled, enabled => { if (!enabled) close() })
+watch([triggerEl, open], ([trigger], [previousTrigger]) => {
+  if (previousTrigger !== trigger) {
+    if (previousTrigger) eyeObserver?.unobserve(previousTrigger)
+    if (trigger) eyeObserver?.observe(trigger)
+    eyeVisible = !!trigger
+  }
+  syncEyeTracking()
+})
 onMounted(() => {
   document.addEventListener('pointerdown', onDocumentPointer)
   document.addEventListener('focusin', onDocumentFocus)
+  motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  pointerQuery = window.matchMedia('(hover: hover) and (pointer: fine)')
+  motionQuery.addEventListener('change', syncEyeTracking)
+  pointerQuery.addEventListener('change', syncEyeTracking)
+  document.addEventListener('visibilitychange', syncEyeTracking)
+  if (typeof IntersectionObserver !== 'undefined') {
+    eyeObserver = new IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.target === triggerEl.value) eyeVisible = entry.isIntersecting
+      syncEyeTracking()
+    })
+    if (triggerEl.value) eyeObserver.observe(triggerEl.value)
+  }
+  syncEyeTracking()
 })
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocumentPointer)
   document.removeEventListener('focusin', onDocumentFocus)
+  window.removeEventListener('pointermove', onEyePointer)
+  document.removeEventListener('visibilitychange', syncEyeTracking)
+  motionQuery?.removeEventListener('change', syncEyeTracking)
+  pointerQuery?.removeEventListener('change', syncEyeTracking)
+  eyeObserver?.disconnect()
+  resetEyes()
 })
 </script>
 
@@ -114,6 +183,11 @@ onUnmounted(() => {
 .nt-support-widget { position: fixed; right: max(22px, env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 55; }
 .nt-support-trigger { width: 54px; height: 54px; display: grid; place-items: center; margin-left: auto; border: 1px solid rgba(163, 255, 224, .28); border-radius: 50%; background: #2dd4a7; color: #04110d; box-shadow: 0 6px 24px #0005, inset 0 1px 0 #ffffff4d; transition: background-color 160ms, transform 160ms; }
 .nt-support-trigger:hover { background: #5eead4; transform: translateY(-2px); }
+.nt-support-eyes { display: flex; align-items: center; justify-content: center; gap: 4px; pointer-events: none; }
+.nt-support-eye { display: grid; place-items: center; width: 15px; height: 17px; border-radius: 50%; background: #fff; box-shadow: inset 0 -1px 0 #052f2514; transform-origin: center; }
+.nt-support-pupil { display: block; width: 6px; height: 7px; border-radius: 50%; background: #123f34; transform: translate(var(--nt-eye-x, 0), var(--nt-eye-y, 0)); transition: transform 100ms ease-out; }
+.nt-support-trigger:hover .nt-support-eye, .nt-support-trigger:focus-visible .nt-support-eye { animation: nt-support-blink 300ms ease-in-out; }
+@keyframes nt-support-blink { 0%, 100% { transform: scaleY(1); } 42% { transform: scaleY(.22); } 72% { transform: scaleY(1.06); } }
 .nt-support-panel { position: absolute; right: 0; bottom: 68px; width: 364px; max-width: calc(100vw - 32px); max-height: min(640px, calc(100dvh - 120px)); overflow: auto; border: 1px solid rgba(94, 234, 192, .25); border-radius: 20px; background: #0e1218; box-shadow: 0 24px 80px #0009; }
 .nt-support-heading { display: flex; align-items: flex-start; gap: 12px; padding: 22px 20px 18px; border-bottom: 1px solid var(--ui-border); background: linear-gradient(115deg, #2dd4a711, transparent); }
 .nt-support-heading-icon { display: grid; flex-shrink: 0; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: #2dd4a71a; color: var(--ui-accent); }
@@ -145,5 +219,5 @@ onUnmounted(() => {
   .nt-support-trigger { width: 48px; height: 48px; }
   .nt-support-panel { bottom: 62px; max-height: calc(100dvh - 106px); }
 }
-@media (prefers-reduced-motion: reduce) { .nt-support-trigger { transition: none; } .nt-support-trigger:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nt-support-trigger, .nt-support-pupil { transition: none; } .nt-support-trigger:hover { transform: none; } .nt-support-trigger .nt-support-eye { animation: none; } }
 </style>

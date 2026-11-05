@@ -13,12 +13,9 @@
         <nav class="api-plan-tabs" :aria-label="t('needtoken.apiCatalog.audiences')">
           <button v-for="kind in audiences" :key="kind" type="button" :aria-pressed="audience === kind" :class="{ active: audience === kind }" @click="selectAudience(kind)"><component :is="kind === 'personal' ? UserRound : Building2" :size="16" aria-hidden="true" />{{ t(`needtoken.apiCatalog.${kind}`) }}</button>
         </nav>
-        <div class="api-plan-tools">
-          <span v-if="!loading && !categoriesLoading && !loadError && !categoriesError" class="api-plan-count" aria-live="polite">{{ t('needtoken.catalogServices.resultCount', { count: totalProducts }) }}</span>
-          <form class="api-plan-search" role="search" @submit.prevent="submitSearch"><Search :size="16" aria-hidden="true" /><input v-model="searchQuery" type="search" :placeholder="t('needtoken.apiCatalog.search')" :aria-label="t('needtoken.apiCatalog.search')" /><button type="submit" :aria-label="t('needtoken.catalogServices.searchSubmit')"><ArrowRight :size="16" aria-hidden="true" /></button></form>
-          <DisplayCurrencySelector compact />
+        <CatalogueTools v-model="searchQuery" :search-label="t('needtoken.apiCatalog.search')" :count="!loading && !categoriesLoading && !loadError && !categoriesError ? totalProducts : null" :loading="categoriesLoading || loading" @search="submitSearch">
           <a :href="CONSOLE_URL" class="api-plan-console" rel="noopener">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
-        </div>
+        </CatalogueTools>
       </div>
 
       <div class="api-plan-member-note"><LockKeyhole :size="18" aria-hidden="true" /><details><summary><h2>{{ t('needtoken.apiCatalog.memberTitle') }}</h2><span>{{ t('needtoken.apiCatalog.step1Title') }}</span><ChevronDown :size="14" aria-hidden="true" /></summary><p>{{ t('needtoken.apiCatalog.memberDescription') }}</p></details><RouterLink v-if="!userAuth.isAuthenticated" :to="loginTarget">{{ t('needtoken.apiCatalog.login') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink><RouterLink v-else to="/me/orders">{{ t('needtoken.apiCatalog.myOrders') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink></div>
@@ -37,7 +34,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowRight, ArrowUpRight, Building2, ChevronDown, Clock3, FileText, KeyRound, LockKeyhole, PackageSearch, Search, UserRound } from 'lucide-vue-next'
+import { ArrowUpRight, Building2, ChevronDown, Clock3, FileText, KeyRound, LockKeyhole, PackageSearch, UserRound } from 'lucide-vue-next'
 import { usePageSeo } from '../../composables/usePageSeo'
 import { useUserAuthStore } from '../../stores/userAuth'
 import { useAppStore } from '../../stores/app'
@@ -45,7 +42,7 @@ import PaginationNav from '../../components/PaginationNav.vue'
 import { API_BASE_URL, CONSOLE_URL } from './config'
 import CodeBlock from './components/CodeBlock.vue'
 import ServiceProductCard from './components/ServiceProductCard.vue'
-import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
+import CatalogueTools from './components/CatalogueTools.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
 import { normalizeNeedtokenSupport, supportEmailHref } from './lib/supportConfig'
@@ -72,19 +69,12 @@ usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('need
 .api-plans-promises svg { flex: none; opacity: .85; }
 .api-plans-rate { position: relative; z-index: 3; }
 .api-plan-catalog { scroll-margin-top: 85px; }
-.api-plan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0 12px; border-top: 1px solid var(--ui-border); }
-.api-plan-tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
-.api-plan-count { flex: none; color: var(--ui-text-muted); font-size: 12px; }
+.api-plan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 12px; border-top: 1px solid var(--ui-border); }
 .api-plan-console { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 40px; color: var(--ui-accent); font-size: 12px; }
-.api-plan-tools :deep(.nt-display-currency--compact) { flex: none; font-size: 12px; gap: 6px; }
-.api-plan-tools :deep(.nt-display-currency__control) { min-height: 40px; }
-.api-plan-tabs { display: flex; gap: 9px; min-width: 0; }
+.api-plan-tabs { display: flex; flex: 1; gap: 9px; min-width: 0; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
 .api-plan-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: linear-gradient(135deg, #ffffff11, #ffffff04); color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; }
 .api-plan-tabs button.active { color: var(--ui-accent); border-color: #2dd4a770; background: linear-gradient(135deg, #2dd4a725, #2dd4a709); }
-.api-plan-search { display: flex; align-items: center; gap: 8px; min-height: 40px; width: 220px; flex: 0 1 220px; min-width: 160px; max-width: 100%; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 10px; color: var(--ui-text-muted); background: var(--ui-bg-elevated); }
-.api-plan-search input { width: 100%; flex: 1; min-width: 0; background: transparent; color: var(--ui-text-primary); font-size: 13px; outline: none; }
-.api-plan-search:focus-within, .api-plan-tabs button:focus-visible, .api-plan-console:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-.api-plan-search button { display: grid; place-items: center; flex: none; width: 26px; height: 32px; }
+.api-plan-tabs button:focus-visible, .api-plan-console:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
 .api-plan-member-note { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; border: 1px solid #2dd4a733; border-radius: 11px; background: #2dd4a709; }
 .api-plan-member-note > svg { flex: none; color: var(--ui-accent); margin-top: 3px; }
 .api-plan-member-note > details { min-width: 0; flex: 1; }
@@ -118,7 +108,6 @@ usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('need
 .api-plan-connect p { margin-top: 9px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.85; }
 .api-plan-connect > a { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ui-accent); }
 .api-plan-connect > .nt-code { grid-column: 1 / -1; min-width: 0; }
-@media (max-width: 1199px) { .api-plan-toolbar { flex-wrap: wrap; gap: 10px; } .api-plan-tools { flex: 1; flex-wrap: wrap; } .api-plan-count { display: none; } }
-@media (max-width: 1023px) { .api-plans-promises { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plans-rate { grid-column: 1 / -1; } .api-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plan-tools { justify-content: flex-start; } .api-plan-member-note { align-items: flex-start; } }
-@media (max-width: 640px) { .api-plans { padding-top: 22px; } .api-plans-promises li { padding: 7px 9px; gap: 6px; } .api-plan-grid { grid-template-columns: minmax(0, 1fr); } .api-plan-tabs { width: 100%; } .api-plan-tabs button { flex: 1; min-width: 0; white-space: normal; padding-inline: 10px; gap: 6px; } .api-plan-tools { flex-basis: 100%; gap: 10px; } .api-plan-search { flex-basis: 100%; width: 100%; } .api-plan-tools > .api-plan-console { margin-left: auto; } .api-plan-member-note { flex-wrap: wrap; padding: 12px; } .api-plan-member-note > details { flex-basis: calc(100% - 32px); } .api-plan-member-note > a { margin-left: 28px; } .api-plan-how ol { grid-template-columns: 1fr; } .api-plan-how li + li { border-left: 0; border-top: 1px solid var(--ui-border); } .api-plan-connect { grid-template-columns: 1fr; padding: 20px; } .api-plan-connect > a { width: fit-content; } }
+@media (max-width: 1023px) { .api-plans-promises { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plans-rate { grid-column: 1 / -1; } .api-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plan-member-note { align-items: flex-start; } }
+@media (max-width: 640px) { .api-plans { padding-top: 22px; } .api-plans-promises li { padding: 7px 9px; gap: 6px; } .api-plan-grid { grid-template-columns: minmax(0, 1fr); } .api-plan-tabs button { flex: none; padding-inline: 10px; gap: 6px; } .api-plan-member-note { flex-wrap: wrap; padding: 12px; } .api-plan-member-note > details { flex-basis: calc(100% - 32px); } .api-plan-member-note > a { margin-left: 28px; } .api-plan-how ol { grid-template-columns: 1fr; } .api-plan-how li + li { border-left: 0; border-top: 1px solid var(--ui-border); } .api-plan-connect { grid-template-columns: 1fr; padding: 20px; } .api-plan-connect > a { width: fit-content; } }
 </style>

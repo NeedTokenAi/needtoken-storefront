@@ -1,6 +1,6 @@
 import { onMounted, onUnmounted, type Ref } from 'vue'
 
-const ACTION_SELECTOR = 'button, a[href], summary, [role="button"], [role="tab"], input[type="button"], input[type="submit"], input[type="reset"]'
+const ACTION_SELECTOR = 'button, a[href], summary, [role="button"], [role="tab"], input[type="button"], input[type="submit"], input[type="reset"], input[type="radio"], input[type="checkbox"], label.nt-service-card__option'
 
 /** One delegated listener per storefront, rather than a listener/audio file per button. */
 export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
@@ -14,16 +14,38 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
   let pointerX = 0
   let pointerY = 0
   let listenerRoot: Document | null = null
+  let surfaces: MutationObserver | undefined
+  const decorated = new Set<HTMLElement>()
 
   const actionFor = (target: EventTarget | null): HTMLElement | null => {
-    const element = target instanceof Element ? target.closest<HTMLElement>(ACTION_SELECTOR) : null
+    let element = target instanceof Element ? target.closest<HTMLElement>(ACTION_SELECTOR) : null
     if (!element || !(scope.value?.contains(element) || document.body.classList.contains('nt-tokens'))) return null
     if (element.matches(':disabled') || element.closest('[inert], [aria-disabled="true"], [data-nt-effect="off"]')) return null
+    if (element.matches('input[type="radio"], input[type="checkbox"]')) element = element.closest<HTMLElement>('label') || element
+    if (element instanceof HTMLLabelElement && element.control?.matches(':disabled')) return null
     return element
   }
 
+  const isSurface = (control: HTMLElement, style = getComputedStyle(control)) => {
+    if (control.matches('input')) return false
+    const padded = parseFloat(style.paddingTop) > 0 || parseFloat(style.paddingLeft) > 0
+    const framed = parseFloat(style.borderTopWidth) > 0 || style.backgroundColor !== 'rgba(0, 0, 0, 0)'
+    const icon = control.offsetHeight >= 28 && control.offsetWidth >= 28 && parseFloat(style.borderRadius) > 0
+    return padded || framed || icon
+  }
+
+  const decorate = (control: HTMLElement) => {
+    if (!isSurface(control) || decorated.has(control)) return
+    control.classList.add('nt-action-surface')
+    decorated.add(control)
+  }
+  const scan = (root: Element | Document) => {
+    if (root instanceof HTMLElement && root.matches(ACTION_SELECTOR)) decorate(root)
+    root.querySelectorAll<HTMLElement>(ACTION_SELECTOR).forEach(decorate)
+  }
+
   const removeHighlight = () => {
-    activeControl?.classList.remove('nt-specular', 'nt-specular-position')
+    activeControl?.classList.remove('nt-specular', 'nt-specular-overlay', 'nt-specular-position')
     activeControl?.style.removeProperty('--nt-pointer-x')
     activeControl?.style.removeProperty('--nt-pointer-y')
     activeControl = null
@@ -35,12 +57,14 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     if (!control || control.matches('input')) return
     const style = getComputedStyle(control)
     // Plain editorial links keep their text treatment; padded link buttons get the same sheen.
-    if (control.matches('a') && parseFloat(style.paddingTop) === 0 && parseFloat(style.paddingLeft) === 0) return
-    // Do not replace a native widget's existing pseudo element.
-    const existingContent = getComputedStyle(control, '::after').content
-    if (existingContent && !['none', 'normal'].includes(existingContent)) return
+    if (!isSurface(control, style)) return
+    decorate(control)
     activeControl = control
     control.classList.add('nt-specular')
+    // Existing pseudo elements keep their content. The ordinary inset/outer
+    // edge light still works when this optional overlay cannot be added.
+    const existingContent = getComputedStyle(control, '::after').content
+    if (!existingContent || ['none', 'normal'].includes(existingContent)) control.classList.add('nt-specular-overlay')
     if (style.position === 'static') control.classList.add('nt-specular-position')
     control.style.setProperty('--nt-pointer-x', '50%')
     control.style.setProperty('--nt-pointer-y', '0%')
@@ -84,23 +108,23 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
       // Created only inside a trusted click. No autoplay, downloads, microphone access, or audio library.
       const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (!AudioContextClass) return
-      audio ||= new AudioContextClass()
+      if (!audio || audio.state === 'closed') audio = new AudioContextClass({ latencyHint: 'interactive' })
       const context = audio
       const ring = () => {
         if (!mounted || document.hidden || context.state !== 'running') return
         const start = context.currentTime
         const master = context.createGain()
-        master.gain.value = 0.35
+        master.gain.value = 0.5
         master.connect(context.destination)
         let remaining = 2
-        ;[2200, 3360].forEach((frequency, index) => {
+        ;[1800, 2780].forEach((frequency, index) => {
           const oscillator = context.createOscillator()
           const envelope = context.createGain()
           oscillator.type = 'sine'
           oscillator.frequency.setValueAtTime(frequency, start)
           oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.82, start + 0.08)
           envelope.gain.setValueAtTime(0.0001, start)
-          envelope.gain.exponentialRampToValueAtTime(index ? 0.025 : 0.045, start + 0.002)
+          envelope.gain.exponentialRampToValueAtTime(index ? 0.03 : 0.06, start + 0.002)
           envelope.gain.exponentialRampToValueAtTime(0.0001, start + 0.085)
           oscillator.connect(envelope)
           envelope.connect(master)
@@ -113,7 +137,7 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
           oscillator.stop(start + 0.09)
         })
       }
-      if (context.state === 'suspended') void context.resume().then(ring).catch(() => {})
+      if (context.state !== 'running') void context.resume().then(ring).catch(() => {})
       else ring()
     } catch {
       // Restricted browsers and unavailable audio devices retain fully functional buttons.
@@ -135,6 +159,19 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     mounted = true
     // The layout owns body.nt-tokens, including native dialogs teleported to body.
     listenerRoot = document
+    scan(document)
+    surfaces = new MutationObserver(records => {
+      for (const record of records) {
+        record.removedNodes.forEach(node => {
+          if (!(node instanceof Element)) return
+          for (const control of decorated) {
+            if (node === control || node.contains(control)) decorated.delete(control)
+          }
+        })
+        record.addedNodes.forEach(node => { if (node instanceof Element) scan(node) })
+      }
+    })
+    surfaces.observe(document.body, { childList: true, subtree: true })
     listenerRoot?.addEventListener('click', onClick, { capture: true })
     listenerRoot?.addEventListener('pointermove', onPointerMove, { passive: true })
     listenerRoot?.addEventListener('pointerleave', onPointerLeave)
@@ -150,8 +187,11 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     listenerRoot?.removeEventListener('focusin', onFocusIn)
     listenerRoot?.removeEventListener('focusout', onFocusOut)
     document.removeEventListener('visibilitychange', onVisibility)
+    surfaces?.disconnect()
     if (pointerFrame) window.cancelAnimationFrame(pointerFrame)
     removeHighlight()
+    decorated.forEach(control => control.classList.remove('nt-action-surface'))
+    decorated.clear()
     if (audio && audio.state !== 'closed') void audio.close().catch(() => {})
   })
 

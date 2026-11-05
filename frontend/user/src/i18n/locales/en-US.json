@@ -2659,6 +2659,53 @@
       "scanHeading": "Scan to get in touch",
       "scanDescription": "Order support, service questions or business enquiries. Choose the channel that suits you.",
       "scanHint": "Scan to add support"
+    },
+    "catalogToolbar": {
+      "title": "Search and display pricing",
+      "searchButton": "Search products",
+      "searchActive": "Search products, current query: {query}",
+      "currencyButton": "Display currency: {currency}",
+      "close": "Close search and display settings",
+      "searchLabel": "Search this category"
+    },
+    "invoice": {
+      "title": "Invoice details",
+      "request": "Request an invoice",
+      "edit": "Edit",
+      "hint": "Electronic invoice; contact support after your order is complete.",
+      "ordinary": "Ordinary invoice",
+      "special_vat": "Special VAT invoice",
+      "fillTitle": "Prepare invoice details",
+      "formHint": "Details are saved with your order for billing staff to verify. This does not issue an invoice automatically.",
+      "type": "Invoice type",
+      "titleType": "Billing title type",
+      "personal": "Individual",
+      "company": "Company",
+      "personalTitle": "Name / billing title",
+      "companyTitle": "Company / billing title",
+      "taxId": "Tax identification number",
+      "email": "Invoice recipient email",
+      "extra": "Additional company details (optional)",
+      "company_address": "Registered address (optional)",
+      "company_phone": "Registered phone (optional)",
+      "bank_name": "Bank name (optional)",
+      "bank_account": "Bank account (optional)",
+      "save": "Save details",
+      "close": "Close invoice details",
+      "savedTitle": "Invoice request saved",
+      "readyTitle": "Order complete — request your invoice",
+      "pendingHint": "Collection instructions appear after completion. A saved request does not mean an invoice has been issued.",
+      "collectHint": "Contact this store’s support or email your order number to verify billing details and receive the electronic invoice.",
+      "mailSubject": "Invoice request for order {order}",
+      "blocked": "Save the invoice details or cancel the invoice request first.",
+      "adminHint": "Customer-supplied request, not proof of issuance. Verify the order and billing details before issuing.",
+      "errors": {
+        "invalid": "Choose a valid invoice and billing title type.",
+        "titleInvalid": "Enter a billing title of up to 120 characters.",
+        "emailInvalid": "Enter a valid recipient email address.",
+        "taxInvalid": "Enter a tax ID containing 15–20 letters or digits.",
+        "extraInvalid": "Check the optional details; bank accounts must contain 8–40 digits."
+      }
     }
   }
 }

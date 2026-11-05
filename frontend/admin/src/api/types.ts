@@ -161,7 +161,20 @@ export interface AdminFulfillment {
   delivery_data?: Record<string, unknown>
 }
 
+export interface AdminInvoiceRequest {
+  type: 'ordinary' | 'special_vat'
+  title_type: 'personal' | 'company'
+  title: string
+  tax_id?: string
+  email: string
+  company_address?: string
+  company_phone?: string
+  bank_name?: string
+  bank_account?: string
+}
+
 export interface AdminOrder {
+  invoice_request?: AdminInvoiceRequest | null
   id: number
   order_no: string
   parent_id?: number

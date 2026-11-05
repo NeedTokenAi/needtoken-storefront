@@ -2,6 +2,22 @@ import { createI18n } from 'vue-i18n'
 
 const messages = {
   'zh-CN': {
+    invoiceRequest: {
+  "title": "开票预填信息",
+  "ordinary": "普通发票",
+  "special_vat": "增值税专用发票",
+  "type": "发票类型",
+  "personal": "个人",
+  "company": "企业",
+  "email": "票据接收邮箱",
+  "company_address": "注册地址（选填）",
+  "company_phone": "注册电话（选填）",
+  "bank_name": "开户银行（选填）",
+  "bank_account": "银行账号（选填）",
+  "adminHint": "客户预填资料，尚未表示已开票；请核对订单和资料后办理。",
+  "tax_id": "纳税人识别号",
+  "billingTitle": "发票抬头"
+},
     skuDisplay: {
       "title": "规格展示文案",
       "hint": "留空沿用商品介绍。短标签填写「月度」「年度」「100」「200」等；内部来源、渠道标识和官方价格请勿写进规格名。售价继续使用上方填写的 {currency} 金额。",
@@ -4618,6 +4634,22 @@ const messages = {
     },
   },
   'zh-TW': {
+    invoiceRequest: {
+  "title": "開票預填資訊",
+  "ordinary": "普通發票",
+  "special_vat": "增值稅專用發票",
+  "type": "發票類型",
+  "personal": "個人",
+  "company": "企業",
+  "email": "票據接收信箱",
+  "company_address": "註冊地址（選填）",
+  "company_phone": "註冊電話（選填）",
+  "bank_name": "開戶銀行（選填）",
+  "bank_account": "銀行帳號（選填）",
+  "adminHint": "客戶預填資料，不表示已開票；請核對訂單及資料後辦理。",
+  "tax_id": "納稅人識別號",
+  "billingTitle": "發票抬頭"
+},
     skuDisplay: {
       "title": "規格展示文案",
       "hint": "留空沿用商品介紹。短標籤填寫「月度」「年度」「100」「200」等；內部來源、渠道標識與官方價格請勿寫進規格名稱。售價繼續使用上方填寫的 {currency} 金額。",
@@ -9234,6 +9266,22 @@ const messages = {
     },
   },
   'en-US': {
+    invoiceRequest: {
+  "title": "Invoice request",
+  "ordinary": "Ordinary invoice",
+  "special_vat": "Special VAT invoice",
+  "type": "Invoice type",
+  "personal": "Individual",
+  "company": "Company",
+  "email": "Invoice recipient email",
+  "company_address": "Registered address (optional)",
+  "company_phone": "Registered phone (optional)",
+  "bank_name": "Bank name (optional)",
+  "bank_account": "Bank account (optional)",
+  "adminHint": "Customer-supplied request, not proof of issuance. Verify the order and billing details before issuing.",
+  "tax_id": "Tax identification number",
+  "billingTitle": "Billing title"
+},
     skuDisplay: {
       "title": "Variant display copy",
       "hint": "Leave fields blank to use the product copy. Use short switch labels such as Monthly, Annual, 100, or 200; keep internal source identifiers and official prices out of specification names. The selling price remains the {currency} amount entered above.",

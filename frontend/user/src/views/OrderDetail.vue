@@ -53,6 +53,7 @@
       />
 
       <div v-else class="space-y-6">
+        <InvoiceRequestNotice v-if="invoiceEnabled" :order="order" />
         <div class="rounded-2xl border bg-card shadow-sm p-6">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -437,6 +438,9 @@
 <script setup lang="ts">
 import { Copy, Check, Download, Info } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { computed } from 'vue'
+import { getActiveTemplate } from '../templates/registry'
+import InvoiceRequestNotice from '../templates/needtoken/components/InvoiceRequestNotice.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -446,6 +450,7 @@ import SmartImage from '../components/SmartImage.vue'
 import { useOrderDetail } from '../composables/useOrderDetail'
 
 const { t } = useI18n()
+const invoiceEnabled = computed(() => getActiveTemplate() === 'needtoken')
 
 const {
   loading, order, debouncedLoadOrder, cancelOrder,
