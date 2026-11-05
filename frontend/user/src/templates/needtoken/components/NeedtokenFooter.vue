@@ -35,7 +35,7 @@ import { useI18n } from 'vue-i18n'
 import { ArrowUpRight, Clock3, Mail, ScanLine } from 'lucide-vue-next'
 import { useAppStore } from '../../../stores/app'
 import { getImageUrl } from '../../../utils/image'
-import { CONSOLE_URL } from '../config'
+import { API_SERVICES_PATH, CONSOLE_URL } from '../config'
 import { supportEmailHref, type NeedtokenSupport } from '../lib/supportConfig'
 import BrandMark from './BrandMark.vue'
 import FooterShapeWordmark from './FooterShapeWordmark.vue'
@@ -45,7 +45,7 @@ const year = new Date().getFullYear()
 const emailHref = computed(() => supportEmailHref(props.support.businessEmail))
 const qrCards = computed(() => [{ key: 'wecom', label: t('needtoken.support.wecom'), image: props.support.wecomQr }, { key: 'qq', label: t('needtoken.support.qq'), image: props.support.qqQr }].filter(card => !!card.image))
 const columns = computed(() => [
-  { key: 'products', title: t('needtoken.footer.products'), links: [{ path: '/categories/recharge', label: t('needtoken.nav.recharge') }, { path: '/categories/rental', label: t('needtoken.nav.rental') }, { path: '/plans', label: t('needtoken.nav.plans') }, { path: '/models', label: t('needtoken.nav.models') }] },
+  { key: 'products', title: t('needtoken.footer.products'), links: [{ path: '/categories/recharge', label: t('needtoken.nav.recharge') }, { path: '/categories/rental', label: t('needtoken.nav.rental') }, { path: API_SERVICES_PATH, label: t('needtoken.nav.plans') }, { path: '/models', label: t('needtoken.nav.models') }] },
   { key: 'help', title: t('needtoken.nav.help'), links: [{ path: '/blog', label: t('needtoken.nav.blog') }, { path: '/docs', label: t('needtoken.nav.docs') }, { path: '/faq', label: t('needtoken.nav.faq') }] },
   { key: 'support', title: t('needtoken.footer.support'), links: [{ path: '/tools/environment', label: t('needtoken.nav.environment') }, { path: '/free-apple-id', label: t('needtoken.nav.appleIds') }, { path: '/guest/orders', label: t('navbar.guestOrders') }] },
 ])

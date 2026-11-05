@@ -9,6 +9,7 @@ const offers = ref<ModelOffer[]>([])
 const state = ref<LoadState>('idle')
 const loadedAt = ref<Date | null>(null)
 const sourceVersion = ref<string | null>(null)
+const response = ref<PricingResponse | null>(null)
 let inflight: Promise<void> | null = null
 
 const load = async (): Promise<void> => {
@@ -18,6 +19,7 @@ const load = async (): Promise<void> => {
         if (!res.ok) throw new Error(`pricing http ${res.status}`)
         const body = (await res.json()) as PricingResponse
         if (body.success === false) throw new Error('pricing not available')
+        response.value = body
         offers.value = buildOffers(body, {
             defaultModels: DEFAULT_MODELS,
             blockedModels: BLOCKED_MODELS,
@@ -43,8 +45,9 @@ export const usePricing = () => {
         state,
         loadedAt,
         sourceVersion,
+        response,
         isLoading: computed(() => state.value === 'loading' || state.value === 'idle'),
         ensureLoaded,
-        reload: () => { inflight = load().finally(() => { inflight = null }); return inflight },
+        reload: () => { if (!inflight) inflight = load().finally(() => { inflight = null }); return inflight },
     }
 }

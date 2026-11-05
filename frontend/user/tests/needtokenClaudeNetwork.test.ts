@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { CLAUDE_PROBES, classifyWebRtc, claudeNetworkReport, claudeRuleCategoryIds, isPublicIp, lookupExitNetwork, normalizeIp, parseCliReport, probeAnthropic, probeWebRtc, timezoneDiffers } from '../src/templates/needtoken/lib/claudeNetwork.ts'
+import { CLAUDE_PROBES, classifyWebRtc, claudeNetworkReport, claudeRuleCategoryIds, collectClaudeLocalChecks, isPublicIp, lookupExitNetwork, normalizeIp, parseCliReport, probeAnthropic, probeWebRtc, runClaudeNetworkChecks, timezoneDiffers, type NetworkCheckEvent } from '../src/templates/needtoken/lib/claudeNetwork.ts'
 
 const exit = { status: 'ok' as const, detail: 'geoAvailable' as const, source: 'ipapi.co' as const, ip: '8.8.8.8', country: 'United States', countryCode: 'US', timezone: 'America/Los_Angeles', measuredAt: '2026-11-05T00:00:00Z' }
 const cli = {
@@ -102,4 +102,58 @@ test('operator notes require their dedicated published category scope', () => {
   assert.deepEqual(claudeRuleCategoryIds([{ id: 1, slug: 'other' }, { id: 2, slug: 'child', parent_id: 1 }]), [])
   assert.deepEqual(claudeRuleCategoryIds([{ id: 4, slug: 'claude-code-rules', parent_id: 0 }, { id: 5, slug: 'policy', parent_id: 4 }, { id: 8, slug: 'unrelated' }]), [4, 5])
   assert.deepEqual(claudeRuleCategoryIds(null), [])
+})
+
+test('local checks finish synchronously even when every browser getter is restricted', () => {
+  const unavailable = () => { throw new Error('restricted') }
+  const checks = collectClaudeLocalChecks({ secure: unavailable, online: unavailable, cookies: unavailable, storage: unavailable, crypto: unavailable, wasm: unavailable, fetch: unavailable, abort: unavailable, intl: unavailable, language: unavailable, timezone: unavailable, locale: unavailable, clock: unavailable, platform: unavailable, browser: unavailable })
+  assert.equal(checks.length, 15)
+  assert.ok(checks.every(check => check.status === 'unknown'))
+  assert.equal(checks.filter(check => check.group === 'system').length, 6)
+})
+
+test('local clock and browser-reported system are observations without account risk scoring', () => {
+  const checks = collectClaudeLocalChecks({ secure: () => true, online: () => false, language: () => 'zh-CN', timezone: () => 'Asia/Shanghai', clock: () => '2026-11-05T00:00:00Z', platform: () => 'Windows' })
+  assert.equal(checks.find(check => check.id === 'online')?.status, 'warning')
+  assert.equal(checks.find(check => check.id === 'clock')?.status, 'unknown')
+  assert.equal(checks.find(check => check.id === 'platform')?.value, 'Windows')
+  assert.equal(checks.find(check => check.id === 'language')?.status, 'ok')
+})
+
+test('same-origin health completes independently while all third-party probes stall', async () => {
+  const events: NetworkCheckEvent[] = []
+  let finished = false
+  const pending = runClaudeNetworkChecks({ timeoutMs: 8, onResult: event => events.push(event), fetcher: (async url => String(url) === '/health' ? Response.json({ status: 'ok' }) : new Promise(() => {})) as typeof fetch }).then(() => { finished = true })
+  await new Promise(resolve => setTimeout(resolve, 1))
+  assert.equal(events.find(event => event.id === 'storefront')?.result.status, 'ok')
+  assert.equal(finished, false)
+  await pending
+  assert.equal(events.length, 3)
+  assert.equal(events.find(event => event.id === 'exit')?.result.status, 'unknown')
+  assert.equal(events.find(event => event.id === 'anthropic')?.result.status, 'unknown')
+})
+
+test('blocked, synchronously throwing and uncancellable fetches all settle without fake success', async () => {
+  for (const fetcher of [() => { throw new TypeError('blocked') }, () => new Promise(() => {})]) {
+    const events: NetworkCheckEvent[] = []
+    await runClaudeNetworkChecks({ timeoutMs: 3, onResult: event => events.push(event), fetcher: fetcher as typeof fetch })
+    assert.equal(events.length, 3)
+    assert.ok(events.every(event => event.result.status === 'unknown'))
+  }
+})
+
+test('cancelled network batches suppress late events and stop even when fetch ignores abort', async () => {
+  const controller = new AbortController(), events: NetworkCheckEvent[] = []
+  const pending = runClaudeNetworkChecks({ signal: controller.signal, onResult: event => events.push(event), fetcher: (() => new Promise(() => {})) as typeof fetch })
+  controller.abort()
+  await assert.rejects(pending, { name: 'AbortError' })
+  assert.deepEqual(events, [])
+})
+
+test('expanded reports redact local system, clock, locale and exact browser values', () => {
+  const local = collectClaudeLocalChecks({ language: () => 'secret-language', timezone: () => 'secret-timezone', platform: () => 'secret-os', browser: () => 'secret-browser', clock: () => 'secret-clock', locale: () => 'secret-locale' })
+  const report = claudeNetworkReport({ exit: null, anthropic: null, rtc: null, cli: null, measuredAt: '', local, storefront: { status: 'unknown', detail: 'networkError' } })
+  assert.equal(report.includes('secret-'), false)
+  assert.equal(JSON.parse(report).local_checks.length, 15)
+  assert.equal(JSON.parse(report).storefront_connection.status, 'unknown')
 })

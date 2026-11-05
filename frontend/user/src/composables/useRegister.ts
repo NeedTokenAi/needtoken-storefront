@@ -13,7 +13,7 @@ import { useFormValidation, getPasswordStrength } from './useFormValidation'
  * 用户注册页共享逻辑（classic + vault 双模板共用）。
  * 完整保留原 views/auth/Register.vue 的行为，仅抽离为 composable。
  */
-export function useRegister() {
+export function useRegister(options: { requireEmailProof?: boolean; onRegistered?: () => unknown } = {}) {
   const router = useRouter()
   const route = useRoute()
   const userAuthStore = useUserAuthStore()
@@ -214,7 +214,7 @@ export function useRegister() {
     error.value = ''
     const currentEmail = registrationEmail.value
     if (!formValidation.validateAll({ email: currentEmail, password: password.value })) return
-    if (emailVerificationEnabled.value && !code.value) return
+    if ((emailVerificationEnabled.value || options.requireEmailProof) && !code.value) return
     if (inviteCodeMissing()) return
     if (!agreed.value) {
       error.value = t('auth.register.errors.agreementRequired')
@@ -224,11 +224,12 @@ export function useRegister() {
       await userAuthStore.register({
         email: currentEmail,
         password: password.value,
-        code: emailVerificationEnabled.value ? code.value : '',
+        code: emailVerificationEnabled.value || options.requireEmailProof ? code.value : '',
         agreement_accepted: agreed.value,
         invite_code: inviteOnlyEnabled.value ? inviteCode.value.trim() : undefined,
       })
-      router.push('/me/orders')
+      if (options.onRegistered) await options.onRegistered()
+      else router.push('/me/orders')
     } catch (err: any) {
       error.value = err.message || t('auth.register.errors.registerFailed')
     }

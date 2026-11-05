@@ -513,6 +513,13 @@
         "copy": "Copy all",
         "copied": "Copied",
         "acknowledge": "I have saved them"
+      },
+      "twofaOnboarding": {
+        "title": "Protect your account with two-factor authentication",
+        "description": "Select “{action}” below, scan the QR code with an authenticator, then confirm with its six-digit code. Save your recovery codes after enabling. If two-factor authentication is already enabled, you can continue.",
+        "optional": "You can finish this later. Two-factor authentication is enabled only after you confirm the code.",
+        "continue": "Continue where I left off",
+        "bindEmailFirst": "Bind your email below before setting up two-factor authentication."
       }
     },
     "wallet": {
@@ -1765,7 +1772,8 @@
       "tools": "Tools",
       "faq": "FAQ",
       "environment": "Environment check",
-      "appleIds": "Free Apple IDs"
+      "appleIds": "Free Apple IDs",
+      "authEntry": "Sign in / Sign up"
     },
     "footer": {
       "tagline": "Top-ups, ready-made accounts and API plans. Shop in one place and track your orders.",
@@ -2706,6 +2714,188 @@
         "taxInvalid": "Enter a tax ID containing 15–20 letters or digits.",
         "extraInvalid": "Check the optional details; bank accounts must contain 8–40 digits."
       }
+    },
+    "environmentV5": {
+      "subtitle": "Check this browser first, then test this site and the Claude network exit separately. Local results appear immediately, even without a proxy or when external services are blocked.",
+      "localTitle": "Local environment checks",
+      "progressTitle": "Checks completed",
+      "checkFraction": "{count} of {total} checks completed",
+      "localFirst": "Local results first, independent network checks",
+      "localComplete": "Local checks completed",
+      "progressNote": "Progress counts checks with a result. It is not an IP reputation, account eligibility or suspension risk score.",
+      "runningHint": "Local results are available. Network checks run independently and can be stopped at any time.",
+      "cancelledHint": "Network checks stopped. Completed local and connection results are kept.",
+      "idleHint": "No sign-in, proxy or key required. Local checks appear immediately; network checks return independently.",
+      "remaining": "Waiting for {count} network checks…",
+      "pending": "Checking",
+      "stopped": "Stopped",
+      "localIdle": "Start a check to see local results immediately.",
+      "checkDetail": "Details",
+      "healthTitle": "This site",
+      "healthScope": "Verifies one response from this site only. It cannot confirm Anthropic or Claude Code availability.",
+      "disclosure": "Local settings stay on this page. Network checks contact this site, ipapi.co, ipify when needed, and a public Anthropic address; those services receive your connection IP. The local checklist, passwords, API keys and tokens are not uploaded.",
+      "groups": {
+        "connection": "Page and site connection",
+        "features": "Browser features",
+        "system": "System and regional settings"
+      },
+      "groupHints": {
+        "connection": "Compare the browser connection hint with an actual request to this site.",
+        "features": "Checks common browser features, then removes temporary test data. Existing cookies and stored content are not displayed or uploaded.",
+        "system": "Browser-reported settings for troubleshooting only."
+      },
+      "labels": {
+        "fetch": "Network requests",
+        "abort": "Request cancellation",
+        "intl": "Internationalization",
+        "locale": "Date and number locale",
+        "clock": "Device time",
+        "platform": "System hint",
+        "browser": "Browser hint"
+      },
+      "details": {
+        "featureReady": "This browser provides the feature. External service access is tested separately.",
+        "featureLimited": "This browser does not provide the feature. Some page features may be limited; other checks continue.",
+        "featureUnknown": "This browser restricted this observation. The result is unknown; other checks continue.",
+        "clockLocalOnly": "Records the time reported by this device. It has not been compared with a trusted time source and does not confirm clock accuracy.",
+        "browserReported": "A broad hint from the browser identifier. Privacy settings or compatibility mode can change it; it does not identify the system running Claude Code."
+      },
+      "healthTimeout": "This site did not respond within the check deadline. Its status is unknown; local results remain available."
+    },
+    "apiLanding": {
+      "seoTitle": "API services · NeedToken.AI",
+      "eyebrow": "API services",
+      "title": "One API Key.",
+      "titleAccent": "Connect your application.",
+      "intro": "Connect models to your code, automated workflows and team tools. Check model access and pricing, then choose a plan for the usage you need.",
+      "order": "Browse plans",
+      "console": "Open console",
+      "publicBrowse": "Browse the plan catalog without signing in. Purchases require a storefront member account.",
+      "features": {
+        "entry": "One API endpoint",
+        "usage": "Review usage details",
+        "terms": "Quota and validity follow your plan"
+      },
+      "exampleTitle": "Connect the tools you use",
+      "compatible": "OpenAI-compatible API",
+      "quickStart": "Read the integration docs",
+      "choiceEyebrow": "Choose how you use the service",
+      "choiceTitle": "API, recharge or a subscribed account?",
+      "choiceIntro": "Using a platform directly and connecting your own application call for different services.",
+      "choices": {
+        "recharge": {
+          "title": "Renew your existing account",
+          "description": "Renew an account you already use and continue working on the original platform's website or app.",
+          "action": "View recharge services"
+        },
+        "ready": {
+          "title": "Buy a subscribed account",
+          "description": "Collect and check the account as described on its product page. Delivery and permitted use follow your selected option.",
+          "action": "View subscribed accounts"
+        },
+        "api": {
+          "title": "Call models through an API",
+          "description": "Use an API key in code, automated workflows and team tools. Usage follows the selected model's billing rules.",
+          "action": "View API plans"
+        }
+      },
+      "termsIntro": "Check model access, billing units and validity before choosing the access you need.",
+      "accountNote": "Verify and link your existing API account before purchasing. Your balance and usage stay intact. Contact support for the initial link; payment opens after eligibility is checked.",
+      "nextTitle": "Choose a model, then a plan.",
+      "nextDescription": "Browse personal or team options. Available plans are listed in the actual catalog."
+    },
+    "apiCost": {
+      "eyebrow": "API usage estimate",
+      "title": "Work out your monthly API spend.",
+      "intro": "Choose a public model rate and enter your expected usage. Compare the estimate with your recharge or ready-made account budget. Matching budgets do not mean matching features or usage limits.",
+      "priceSource": "Price source",
+      "mode": {
+        "public": "Public model rates",
+        "manual": "Enter your own rates"
+      },
+      "selectModel": "Choose a model and public group",
+      "searchModel": "Search models or groups",
+      "searchHint": "Showing up to 100 options. Search to narrow the list.",
+      "groupFactor": "Public group {group} · ×{factor}, already included in the unit prices below.",
+      "loading": "Loading public rates…",
+      "sourceUnavailable": "Public rates could not be loaded. No live estimate is shown. Retry, or enter rates you have verified.",
+      "sourceStale": "This quote is over five minutes old. Refresh it before calculating.",
+      "noScalarRates": "No fixed text or per-request rates are available for this calculator. Tiered, tool and multimodal prices need their own billing rules.",
+      "manualTitle": "Enter final rates you have verified",
+      "manualHint": "These are your inputs, not live site prices. Enter final USD rates including any group multiplier; do not apply it twice.",
+      "billingUnit": "Billing unit",
+      "tokenUnit": "Per million tokens",
+      "callUnit": "Per request",
+      "manualCall": "Price per request (USD)",
+      "manualInput": "Input price (USD / 1M tokens)",
+      "manualOutput": "Output price (USD / 1M tokens)",
+      "manualCacheRead": "Cache-read price (USD / 1M tokens)",
+      "manualCacheWrite": "Cache-write price (USD / 1M tokens)",
+      "usageTitle": "Your expected monthly usage",
+      "calls": "Requests per month",
+      "inputTokens": "Total input tokens per request",
+      "outputTokens": "Output tokens per request",
+      "inputHint": "Input includes system prompts, conversation history and the current text, not just your latest message. These are budget assumptions, not measured usage.",
+      "cacheTitle": "Have cache usage? Add it here",
+      "cacheHint": "Cache-read and cache-write tokens are subsets of total input. Their sum cannot exceed total input. Leave both at 0 without confirmed usage; an unknown cache rate is never treated as free.",
+      "cacheReadTokens": "Cache-read tokens per request",
+      "cacheWriteTokens": "Cache-write tokens per request",
+      "resultTitle": "Estimated monthly API cost",
+      "resultCurrency": "Result currency",
+      "perMonth": "Based on the usage entered above",
+      "enterManualRates": "Enter unit prices to calculate. Blank does not mean free.",
+      "choosePublicRate": "Choose a model with explicit rates. Unavailable or expired quotes cannot produce a live estimate.",
+      "invalidUsage": "Check usage: requests and tokens must be nonnegative whole numbers, cache cannot exceed total input, and cached usage needs a known cache rate.",
+      "rateCall": "USD / request",
+      "rateInput": "Input · USD / 1M tokens",
+      "rateOutput": "Output · USD / 1M tokens",
+      "rateCacheRead": "Cache read · USD / 1M tokens",
+      "rateCacheWrite": "Cache write · USD / 1M tokens",
+      "volume": "Monthly input: {input} tokens. Monthly output: {output} tokens.",
+      "comparisonTitle": "Compare with your subscription budget",
+      "comparisonAmount": "Your recharge / ready-account monthly cost ({currency})",
+      "comparisonPlaceholder": "Enter an actual price or your budget",
+      "comparison": {
+        "lower": "With these assumptions, the API budget is {amount} lower per month.",
+        "higher": "With these assumptions, the API budget is {amount} higher per month.",
+        "equal": "With these assumptions, the monthly budgets are equal."
+      },
+      "comparisonHint": "You supply this amount; it is not a retrieved official subscription price. API access is not always cheaper. Website subscriptions, ready-made accounts and APIs also have different access and features.",
+      "formulaCall": "Formula: monthly requests × price per request.",
+      "formulaTokens": "Formula: monthly requests × (uncached input × input rate + cache reads × read rate + cache writes × write rate + output × output rate) ÷ 1,000,000.",
+      "scopeNote": "Only fixed public text or per-request rates are estimated. Images, audio/video, extra tools, long-context tiers and special cache durations are excluded. Available groups, recharge discounts, allowances and actual charges follow the console and plan terms.",
+      "fx": "CNY uses the site-published exchange rate: 1 USD = {rate} CNY. Rate updated: {time}. This is not an additional account recharge discount.",
+      "timeUnknown": "not provided",
+      "sourceLink": "View the public pricing source",
+      "loadedAt": "Retrieved: {time}",
+      "manualSource": "Price source: your manual inputs on this page. This estimate does not replace console charges or checkout prices.",
+      "smallAmount": "Less than {price}",
+      "fxMissing": "No USD/CNY exchange rate has been published by this site. Results and comparison inputs therefore use USD."
+    },
+    "emailAuth": {
+      "title": "Sign in or create an account",
+      "subtitle": "One email to continue with your AI services.",
+      "privacyHint": "Verify your email to continue to sign-in or account creation.",
+      "continue": "Continue with email",
+      "sending": "Sending your code…",
+      "passwordShortcut": "Sign in with a password",
+      "codeTitle": "Check your inbox",
+      "codePlaceholder": "Email verification code",
+      "codeHint": "Use the code from the latest email. Never share this code.",
+      "verify": "Verify and continue",
+      "resend": "Send a new code",
+      "change": "Change",
+      "continueHint": "Continue verifying your account.",
+      "passwordTitle": "Welcome back",
+      "registerTitle": "Create your account",
+      "totpTitle": "Two-step verification",
+      "codeInvalid": "This code is invalid or expired. Try again.",
+      "expired": "Email verification expired. Verify your email again to create an account.",
+      "useEmailCode": "Continue with email verification",
+      "newPassword": "Set a sign-in password",
+      "setupTwoFactor": "Set up two-step verification after signing up",
+      "setupTwoFactorHint": "After account creation, scan with an authenticator and confirm a code to enable it.",
+      "securityHint": "Your existing password and two-step verification still protect your account."
     }
   }
 }

@@ -8,11 +8,13 @@ import os from 'node:os'
 
 const host = 'api.anthropic.com'
 const present = (...names) => names.some(name => Boolean(process.env[name]))
+let timezone = ''
+try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '' } catch { /* Keep other checks available. */ }
 const report = {
   schema: 'needtoken.claude-network.v1',
   measured_at: new Date().toISOString(),
   scope: 'curl_inherits_proxy_env',
-  runtime: { node_major: Number(process.versions.node.split('.')[0]), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '' },
+  runtime: { node_major: Number(process.versions.node.split('.')[0]), timezone },
   proxy: {
     http: present('HTTP_PROXY', 'http_proxy'), https: present('HTTPS_PROXY', 'https_proxy'),
     all: present('ALL_PROXY', 'all_proxy'), no_proxy: present('NO_PROXY', 'no_proxy'),
@@ -23,28 +25,39 @@ const report = {
 }
 
 async function checkDns() {
-  const resolver = new Resolver({ timeout: 2500, tries: 1 })
+  let resolver
+  let timer
   try {
+    resolver = new Resolver({ timeout: 2000, tries: 1 })
+    timer = setTimeout(() => resolver.cancel(), 2500)
     const results = await Promise.allSettled([resolver.resolve4(host), resolver.resolve6(host)])
     const count = results.reduce((total, result) => total + (result.status === 'fulfilled' ? result.value.length : 0), 0)
     report.dns = { status: count ? 'ok' : 'error', address_count: count }
-  } finally { resolver.cancel() }
+  } catch { /* DNS restrictions do not prevent the curl result. */ }
+  finally { clearTimeout(timer); resolver?.cancel() }
 }
 
 async function checkCurl() {
   await new Promise(resolve => {
     const writeOut = '{"http_status":%{http_code},"ssl_verify_result":%{ssl_verify_result},"time_total":%{time_total},"peer_ip":"%{remote_ip}"}'
     // -q must be first: local .curlrc cannot silently disable certificate checks.
-    const child = spawn('curl', ['-q', '--proto', '=https', '--head', '--silent', '--show-error', '--connect-timeout', '5', '--max-time', '10', '--output', os.devNull, '--write-out', writeOut, `https://${host}/`], {
+    const child = spawn('curl', ['-q', '--proto', '=https', '--head', '--silent', '--show-error', '--connect-timeout', '4', '--max-time', '7', '--output', os.devNull, '--write-out', writeOut, `https://${host}/`], {
       shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
     })
     let output = ''
-    let unavailable = false
-    const timer = setTimeout(() => child.kill(), 12000)
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      child.kill('SIGKILL')
+      report.curl = { status: 'error', exit_code: 28 }
+      resolve()
+    }, 9000)
     child.stdout.on('data', chunk => { if (output.length < 8192) output += chunk.toString() })
-    child.once('error', () => { unavailable = true; clearTimeout(timer); report.curl = { status: 'unsupported', exit_code: -1 }; resolve() })
+    child.once('error', () => { if (settled) return; settled = true; clearTimeout(timer); report.curl = { status: 'unsupported', exit_code: -1 }; resolve() })
     child.once('close', code => {
-      if (unavailable) return
+      if (settled) return
+      settled = true
       clearTimeout(timer)
       let data = {}
       try { data = JSON.parse(output) } catch { /* Never print curl stderr or an unparsed response. */ }

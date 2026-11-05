@@ -513,6 +513,13 @@
         "copy": "複製全部",
         "copied": "已複製",
         "acknowledge": "我已妥善保存"
+      },
+      "twofaOnboarding": {
+        "title": "設定兩步驗證，保護帳號",
+        "description": "點擊下方「{action}」，用驗證器掃描 QR Code，再輸入 6 位動態碼確認。啟用後請保存復原碼；若已啟用，可直接繼續。",
+        "optional": "可稍後完成。兩步驗證僅在輸入驗證碼確認後生效。",
+        "continue": "繼續原來的操作",
+        "bindEmailFirst": "請先在下方綁定電子郵件，再設定兩步驗證。"
       }
     },
     "wallet": {
@@ -1765,7 +1772,8 @@
       "tools": "實用工具",
       "faq": "常見問題",
       "environment": "檢測工具",
-      "appleIds": "免費 Apple ID"
+      "appleIds": "免費 Apple ID",
+      "authEntry": "登入 / 註冊"
     },
     "footer": {
       "tagline": "儲值服務、成品訂購與 API 套餐，一站選購，隨時查詢訂單。",
@@ -2706,6 +2714,188 @@
         "taxInvalid": "請填寫由 15–20 位字母或數字組成的納稅人識別號。",
         "extraInvalid": "請檢查選填資訊；銀行帳號須為 8–40 位數字。"
       }
+    },
+    "environmentV5": {
+      "subtitle": "先檢查這台瀏覽器，再分別測試本站連線和 Claude 網路出口。沒有代理或外部服務暫時無法連線時，本機結果也會立即顯示。",
+      "localTitle": "本機環境檢查",
+      "progressTitle": "檢查進度",
+      "checkFraction": "已完成 {count} / {total} 項",
+      "localFirst": "本機先完成，連網分項檢查",
+      "localComplete": "本機檢查已完成",
+      "progressNote": "進度表示已取得結果的檢查項數；不代表 IP 純淨度、帳號資格或停權風險。",
+      "runningHint": "本機結果已顯示，連網項目正在分別檢查，您可隨時停止。",
+      "cancelledHint": "已停止連網檢查，已完成的本機和連線結果會保留。",
+      "idleHint": "無需登入、代理或金鑰。點擊後，本機檢查立即顯示；連網項目獨立傳回。",
+      "remaining": "正在等待 {count} 個連網項目…",
+      "pending": "檢查中",
+      "stopped": "已停止",
+      "localIdle": "點擊開始檢測，立即讀取本機檢查結果。",
+      "checkDetail": "查看說明",
+      "healthTitle": "本站連線",
+      "healthScope": "只驗證本站健康檢查的一次回應，不能據此確認 Anthropic 或 Claude Code 可用。",
+      "disclosure": "本機設定只在本頁展示。連網檢查會請求本站、ipapi.co、必要時 ipify，以及 Anthropic 公共位址；第三方正常接收連線 IP。不會上傳本機檢查清單、密碼、APIKey 或 Token。",
+      "groups": {
+        "connection": "網頁與本站連線",
+        "features": "瀏覽器功能",
+        "system": "系統與區域資訊"
+      },
+      "groupHints": {
+        "connection": "先看瀏覽器連線提示，再以本站的實際請求結果核對。",
+        "features": "逐項檢查常用網頁功能；臨時檢測資料會刪除，不展示或上傳既有 Cookie 和儲存內容。",
+        "system": "顯示瀏覽器報告的設定，僅作排查參考。"
+      },
+      "labels": {
+        "fetch": "網路請求能力",
+        "abort": "請求取消能力",
+        "intl": "國際化功能",
+        "locale": "日期與數字區域",
+        "clock": "目前裝置時間",
+        "platform": "系統提示",
+        "browser": "瀏覽器提示"
+      },
+      "details": {
+        "featureReady": "瀏覽器提供這項功能；不代表外部服務可以存取。",
+        "featureLimited": "瀏覽器未提供這項功能，部分網頁體驗可能受限；其他檢查繼續執行。",
+        "featureUnknown": "目前瀏覽器限制了這項讀取，結果未確認；其他檢查不受影響。",
+        "clockLocalOnly": "此處記錄裝置報告的時間，未與可信時間源校準，不能據此判斷系統時鐘準確。",
+        "browserReported": "來自瀏覽器標識的概括提示，可能被隱私設定或相容模式更改；不代表 Claude Code 的執行系統。"
+      },
+      "healthTimeout": "本站連線未在限定時間內完成，狀態未確認；本機檢查結果仍可查看。"
+    },
+    "apiLanding": {
+      "seoTitle": "API 服務 · NeedToken.AI",
+      "eyebrow": "API 服務",
+      "title": "One API Key，",
+      "titleAccent": "接入你的應用。",
+      "intro": "把模型接入程式碼、自動化流程和團隊工具。先瞭解模型與計費，再按實際用量選擇套餐。",
+      "order": "訂購套餐",
+      "console": "開啟控制台",
+      "publicBrowse": "無需登入即可查看套餐目錄；購買時需要本站會員帳號。",
+      "features": {
+        "entry": "統一 API 入口",
+        "usage": "用量明細可查",
+        "terms": "額度與期限以套餐為準"
+      },
+      "exampleTitle": "接入你熟悉的工具",
+      "compatible": "OpenAI 相容介面",
+      "quickStart": "查看接入文件",
+      "choiceEyebrow": "按使用方式選擇",
+      "choiceTitle": "選 API，還是儲值、成品？",
+      "choiceIntro": "在原平台使用，或接進自己的應用，需要選購不同的服務。",
+      "choices": {
+        "recharge": {
+          "title": "為既有帳號儲值",
+          "description": "為你正在使用的帳號續訂，繼續在原平台的網頁或 App 中使用。",
+          "action": "查看儲值服務"
+        },
+        "ready": {
+          "title": "購買已訂閱帳號",
+          "description": "按商品說明領取帳號，登入後驗收。交付內容和使用範圍以所選方案為準。",
+          "action": "查看成品訂購"
+        },
+        "api": {
+          "title": "透過 API 呼叫模型",
+          "description": "用 API Key 把模型接入程式碼、自動化流程和團隊工具，按對應模型的規則計量。",
+          "action": "查看 API 套餐"
+        }
+      },
+      "termsIntro": "選購前核對可用模型、計量方式和有效期限，按所需權益下單。",
+      "accountNote": "購買前請核驗並關聯既有 API 帳號，保留原有餘額與用量。首次關聯請聯絡支援；通過資格校驗後再付款。",
+      "nextTitle": "選好模型，再看套餐。",
+      "nextDescription": "個人開發與團隊應用分別選購；實際可售方案以套餐目錄為準。"
+    },
+    "apiCost": {
+      "eyebrow": "API 用量估算",
+      "title": "按你的用量，算一筆帳。",
+      "intro": "選擇公開模型報價，填入預計用量，再與你的充值或成品月費比較。結果用於預算，不代表兩種服務的功能與使用限制相同。",
+      "priceSource": "價格來源",
+      "mode": {
+        "public": "公開模型報價",
+        "manual": "手動填寫單價"
+      },
+      "selectModel": "選擇模型與公開分組",
+      "searchModel": "搜尋模型或分組",
+      "searchHint": "最多顯示 100 項，請搜尋縮小範圍。",
+      "groupFactor": "公開分組 {group} · 倍率 ×{factor}，已計入下方單價。",
+      "loading": "正在讀取公開價格…",
+      "sourceUnavailable": "暫時無法讀取公開報價，目前不顯示即時費用。你可以重試，或用已確認的單價手動估算。",
+      "sourceStale": "這份報價已超過 5 分鐘，請重新整理後再估算。",
+      "noScalarRates": "目前沒有適合此計算器的固定文字或按次報價。階梯、工具及多模態價格需按各自規則計算。",
+      "manualTitle": "填寫你已確認的最終單價",
+      "manualHint": "手動價格由你提供，並非本站即時報價。請填入含分組倍率的最終 USD 單價，不要重複加倍率。",
+      "billingUnit": "計費單位",
+      "tokenUnit": "按百萬 Token",
+      "callUnit": "按請求次數",
+      "manualCall": "每次請求單價（USD）",
+      "manualInput": "輸入單價（USD / 百萬 Token）",
+      "manualOutput": "輸出單價（USD / 百萬 Token）",
+      "manualCacheRead": "快取讀取單價（USD / 百萬 Token）",
+      "manualCacheWrite": "快取建立單價（USD / 百萬 Token）",
+      "usageTitle": "你的預計月用量",
+      "calls": "每月請求次數",
+      "inputTokens": "每次總輸入 Token",
+      "outputTokens": "每次輸出 Token",
+      "inputHint": "輸入量包含系統提示、歷史對話與本次文字，不只是你新輸入的一句話。這裡填寫的是預算假設，不是已偵測到的真實用量。",
+      "cacheTitle": "有快取用量？展開填寫",
+      "cacheHint": "讀取與建立快取的 Token 都是總輸入的一部分，兩者之和不能超過總輸入。沒有已確認的快取量時保持 0；未知快取單價不會被當作免費。",
+      "cacheReadTokens": "每次快取讀取 Token",
+      "cacheWriteTokens": "每次快取建立 Token",
+      "resultTitle": "預計 API 月費用",
+      "resultCurrency": "結果幣別",
+      "perMonth": "按上方預計用量計算",
+      "enterManualRates": "請填寫單價後再計算；空白不等於免費。",
+      "choosePublicRate": "請選擇有明確報價的模型。報價不可用或過期時，不計算即時費用。",
+      "invalidUsage": "請檢查用量：次數與 Token 須為非負整數，快取量不能超過總輸入；有快取用量時還需明確快取單價。",
+      "rateCall": "USD / 次",
+      "rateInput": "輸入 · USD / 百萬 Token",
+      "rateOutput": "輸出 · USD / 百萬 Token",
+      "rateCacheRead": "快取讀取 · USD / 百萬 Token",
+      "rateCacheWrite": "快取建立 · USD / 百萬 Token",
+      "volume": "每月輸入 {input} Token，輸出 {output} Token。",
+      "comparisonTitle": "與你的訂閱預算比一比",
+      "comparisonAmount": "你填寫的充值 / 成品月費（{currency}）",
+      "comparisonPlaceholder": "填寫實際價格或你的預算",
+      "comparison": {
+        "lower": "按這些假設，API 預算低 {amount} / 月。",
+        "higher": "按這些假設，API 預算高 {amount} / 月。",
+        "equal": "按這些假設，兩項月度預算相同。"
+      },
+      "comparisonHint": "比較金額由你填寫，不是擷取的官方訂閱價格。API 不一定更便宜；網頁訂閱、成品帳號與 API 的權限和體驗也不同。",
+      "formulaCall": "計算方式：每月請求次數 × 每次請求單價。",
+      "formulaTokens": "計算方式：月請求數 ×（未快取輸入 × 輸入單價 + 快取讀取 × 讀取單價 + 快取建立 × 建立單價 + 輸出 × 輸出單價）÷ 1,000,000。",
+      "scopeNote": "僅估算已公開的固定文字或按次單價。圖片、音視訊、額外工具、長上下文階梯及快取特殊時長費用不在此估算中；實際可用分組、充值優惠、額度與扣費以控制台和套餐說明為準。",
+      "fx": "人民幣顯示按本站公布匯率 1 USD = {rate} CNY 換算；匯率更新時間：{time}。這不是額外的帳戶充值折扣。",
+      "timeUnknown": "未提供",
+      "sourceLink": "查看公開報價來源",
+      "loadedAt": "讀取時間：{time}",
+      "manualSource": "價格來源：你在此頁手動填寫。不會取代控制台帳單或訂單結算價。",
+      "smallAmount": "低於 {price}",
+      "fxMissing": "本站尚未公布 USD/CNY 匯率，暫以 USD 顯示。比較金額也請填寫 USD。"
+    },
+    "emailAuth": {
+      "title": "登入或建立帳號",
+      "subtitle": "一個信箱，繼續使用你的 AI 服務。",
+      "privacyHint": "驗證信箱後，為你進入登入或建立帳號。",
+      "continue": "使用信箱繼續",
+      "sending": "正在寄送驗證碼…",
+      "passwordShortcut": "用密碼登入",
+      "codeTitle": "查看你的信箱",
+      "codePlaceholder": "輸入郵件驗證碼",
+      "codeHint": "輸入最新一封郵件中的驗證碼。請勿向他人提供驗證碼。",
+      "verify": "驗證並繼續",
+      "resend": "重新寄送驗證碼",
+      "change": "更換",
+      "continueHint": "繼續完成你的帳號驗證。",
+      "passwordTitle": "歡迎回來",
+      "registerTitle": "建立你的帳號",
+      "totpTitle": "兩步驗證",
+      "codeInvalid": "驗證碼無效或已過期，請重試。",
+      "expired": "信箱驗證已過期，請重新驗證後建立帳號。",
+      "useEmailCode": "使用信箱驗證繼續",
+      "newPassword": "設定登入密碼",
+      "setupTwoFactor": "註冊後設定兩步驗證",
+      "setupTwoFactorHint": "建立帳號後，用驗證器掃碼並輸入驗證碼啟用。",
+      "securityHint": "既有密碼與兩步驗證繼續保護你的帳號。"
     }
   }
 }

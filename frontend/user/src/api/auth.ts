@@ -3,6 +3,7 @@ import type { GoogleCredentialPayload, TelegramAuthPayload, TelegramMiniAppAuthP
 import { GOOGLE_REDIRECT_API_PATHS } from '../utils/googleRedirect'
 
 export const userAuthAPI = {
+    verifyEmailEntry: (data: { email: string; code: string }) => userApi.post('/auth/email/verify', data),
     sendVerifyCode: (data: any) => userApi.post('/auth/send-verify-code', data),
     register: (data: any) => userApi.post('/auth/register', data),
     login: (data: any) => userApi.post('/auth/login', data),
