@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dujiao-next/internal/modules/order/invoice"
+
 	affiliatedomain "github.com/dujiao-next/internal/modules/affiliate/domain"
 	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
@@ -138,6 +140,7 @@ func NewOrderService(opts OrderServiceOptions) *OrderService {
 
 // CreateOrderInput 创建订单输入
 type CreateOrderInput struct {
+	InvoiceRequest      *orderdomain.InvoiceRequest
 	UserID              uint
 	Tenant              resellercontract.TenantContext
 	Items               []CreateOrderItem
@@ -152,6 +155,7 @@ type CreateOrderInput struct {
 
 // CreateGuestOrderInput 游客创建订单输入
 type CreateGuestOrderInput struct {
+	InvoiceRequest      *orderdomain.InvoiceRequest
 	Email               string
 	OrderPassword       string
 	Locale              string
@@ -229,6 +233,7 @@ func (s *OrderService) CreateOrder(input CreateOrderInput) (*orderdomain.Order, 
 		return nil, ErrInvalidOrderItem
 	}
 	return s.createOrder(orderCreateParams{
+		InvoiceRequest:      input.InvoiceRequest,
 		UserID:              input.UserID,
 		Tenant:              input.Tenant,
 		Items:               input.Items,
@@ -254,6 +259,7 @@ func (s *OrderService) CreateGuestOrder(input CreateGuestOrderInput) (*orderdoma
 	}
 	locale := strings.TrimSpace(input.Locale)
 	return s.createOrder(orderCreateParams{
+		InvoiceRequest:      input.InvoiceRequest,
 		UserID:              0,
 		GuestEmail:          email,
 		GuestPassword:       password,
@@ -270,6 +276,7 @@ func (s *OrderService) CreateGuestOrder(input CreateGuestOrderInput) (*orderdoma
 }
 
 type orderCreateParams struct {
+	InvoiceRequest           *orderdomain.InvoiceRequest
 	UserID                   uint
 	GuestEmail               string
 	GuestPassword            string
@@ -292,14 +299,15 @@ type orderCreateParams struct {
 
 // OrderPreview 订单金额预览
 type OrderPreview struct {
-	Currency                string             `json:"currency"`
-	OriginalAmount          money.Amount       `json:"original_amount"`
-	MemberDiscountAmount    money.Amount       `json:"member_discount_amount"`
-	DiscountAmount          money.Amount       `json:"discount_amount"`
-	PromotionDiscountAmount money.Amount       `json:"promotion_discount_amount"`
-	WholesaleDiscountAmount money.Amount       `json:"wholesale_discount_amount"`
-	TotalAmount             money.Amount       `json:"total_amount"`
-	Items                   []OrderPreviewItem `json:"items"`
+	InvoiceRequest          *orderdomain.InvoiceRequest `json:"invoice_request,omitempty"`
+	Currency                string                      `json:"currency"`
+	OriginalAmount          money.Amount                `json:"original_amount"`
+	MemberDiscountAmount    money.Amount                `json:"member_discount_amount"`
+	DiscountAmount          money.Amount                `json:"discount_amount"`
+	PromotionDiscountAmount money.Amount                `json:"promotion_discount_amount"`
+	WholesaleDiscountAmount money.Amount                `json:"wholesale_discount_amount"`
+	TotalAmount             money.Amount                `json:"total_amount"`
+	Items                   []OrderPreviewItem          `json:"items"`
 }
 
 // OrderPreviewItem 订单项金额预览
@@ -342,6 +350,7 @@ func (s *OrderService) PreviewOrder(input CreateOrderInput) (*OrderPreview, erro
 		return nil, ErrInvalidOrderItem
 	}
 	params := orderCreateParams{
+		InvoiceRequest:      input.InvoiceRequest,
 		UserID:              input.UserID,
 		Tenant:              input.Tenant,
 		Items:               input.Items,
@@ -361,6 +370,7 @@ func (s *OrderService) PreviewOrder(input CreateOrderInput) (*OrderPreview, erro
 // PreviewGuestOrder 游客订单金额预览
 func (s *OrderService) PreviewGuestOrder(input CreateGuestOrderInput) (*OrderPreview, error) {
 	params := orderCreateParams{
+		InvoiceRequest:      input.InvoiceRequest,
 		GuestEmail:          input.Email,
 		GuestPassword:       input.OrderPassword,
 		GuestLocale:         input.Locale,
@@ -381,6 +391,10 @@ func (s *OrderService) PreviewGuestOrder(input CreateGuestOrderInput) (*OrderPre
 }
 
 func (s *OrderService) previewOrder(input orderCreateParams) (*OrderPreview, error) {
+	normalizedInvoice, err := invoice.Normalize(input.InvoiceRequest)
+	if err != nil {
+		return nil, err
+	}
 	result, err := s.buildOrderResult(input)
 	if err != nil {
 		return nil, err
@@ -414,6 +428,7 @@ func (s *OrderService) previewOrder(input orderCreateParams) (*OrderPreview, err
 		})
 	}
 	return &OrderPreview{
+		InvoiceRequest:          normalizedInvoice,
 		Currency:                result.Currency,
 		OriginalAmount:          money.FromDecimal(result.OriginalAmount),
 		MemberDiscountAmount:    money.FromDecimal(result.MemberDiscountAmount),
@@ -426,6 +441,10 @@ func (s *OrderService) previewOrder(input orderCreateParams) (*OrderPreview, err
 }
 
 func (s *OrderService) createOrder(input orderCreateParams) (*orderdomain.Order, error) {
+	normalizedInvoice, err := invoice.Normalize(input.InvoiceRequest)
+	if err != nil {
+		return nil, err
+	}
 	if s.queueClient == nil || !s.queueClient.Enabled() {
 		return nil, ErrQueueUnavailable
 	}
@@ -503,6 +522,7 @@ func (s *OrderService) createOrder(input orderCreateParams) (*orderdomain.Order,
 	now := time.Now()
 	expiresAt := now.Add(time.Duration(expireMinutes) * time.Minute)
 	order := &orderdomain.Order{
+		InvoiceRequest:          normalizedInvoice,
 		OrderNo:                 generateOrderNo(),
 		UserID:                  input.UserID,
 		GuestEmail:              input.GuestEmail,
@@ -560,6 +580,7 @@ func (s *OrderService) createOrder(input orderCreateParams) (*orderdomain.Order,
 				childProfit = pricingCtx.Items[idx].ProfitAmount
 			}
 			childOrder := &orderdomain.Order{
+				InvoiceRequest:          normalizedInvoice,
 				OrderNo:                 buildChildOrderNo(order.OrderNo, idx+1),
 				ParentID:                &order.ID,
 				UserID:                  order.UserID,

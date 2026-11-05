@@ -63,29 +63,30 @@ func NewOrderSummaryList(orders []orderdomain.Order) []OrderSummary {
 
 // OrderDetail 订单详情响应（完整字段）
 type OrderDetail struct {
-	OrderNo                  string            `json:"order_no"`
-	GuestEmail               string            `json:"guest_email,omitempty"`
-	GuestLocale              string            `json:"guest_locale,omitempty"`
-	Status                   string            `json:"status"`
-	Currency                 string            `json:"currency"`
-	OriginalAmount           money.Amount      `json:"original_amount"`
-	DiscountAmount           money.Amount      `json:"discount_amount"`
-	MemberDiscountAmount     money.Amount      `json:"member_discount_amount"`
-	PromotionDiscountAmount  money.Amount      `json:"promotion_discount_amount"`
-	WholesaleDiscountAmount  money.Amount      `json:"wholesale_discount_amount"`
-	TotalAmount              money.Amount      `json:"total_amount"`
-	WalletPaidAmount         money.Amount      `json:"wallet_paid_amount"`
-	OnlinePaidAmount         money.Amount      `json:"online_paid_amount"`
-	RefundedAmount           money.Amount      `json:"refunded_amount"`
-	ExpiresAt                *time.Time        `json:"expires_at"`
-	PaidAt                   *time.Time        `json:"paid_at"`
-	CanceledAt               *time.Time        `json:"canceled_at"`
-	CreatedAt                time.Time         `json:"created_at"`
-	AllowedPaymentChannelIDs []uint            `json:"allowed_payment_channel_ids,omitempty"`
-	RefundRecords            []OrderRefundResp `json:"refund_records,omitempty"`
-	Items                    []OrderItemResp   `json:"items,omitempty"`
-	Fulfillment              *FulfillmentResp  `json:"fulfillment,omitempty"`
-	Children                 []OrderDetail     `json:"children,omitempty"`
+	InvoiceRequest           *orderdomain.InvoiceRequest `json:"invoice_request,omitempty"`
+	OrderNo                  string                      `json:"order_no"`
+	GuestEmail               string                      `json:"guest_email,omitempty"`
+	GuestLocale              string                      `json:"guest_locale,omitempty"`
+	Status                   string                      `json:"status"`
+	Currency                 string                      `json:"currency"`
+	OriginalAmount           money.Amount                `json:"original_amount"`
+	DiscountAmount           money.Amount                `json:"discount_amount"`
+	MemberDiscountAmount     money.Amount                `json:"member_discount_amount"`
+	PromotionDiscountAmount  money.Amount                `json:"promotion_discount_amount"`
+	WholesaleDiscountAmount  money.Amount                `json:"wholesale_discount_amount"`
+	TotalAmount              money.Amount                `json:"total_amount"`
+	WalletPaidAmount         money.Amount                `json:"wallet_paid_amount"`
+	OnlinePaidAmount         money.Amount                `json:"online_paid_amount"`
+	RefundedAmount           money.Amount                `json:"refunded_amount"`
+	ExpiresAt                *time.Time                  `json:"expires_at"`
+	PaidAt                   *time.Time                  `json:"paid_at"`
+	CanceledAt               *time.Time                  `json:"canceled_at"`
+	CreatedAt                time.Time                   `json:"created_at"`
+	AllowedPaymentChannelIDs []uint                      `json:"allowed_payment_channel_ids,omitempty"`
+	RefundRecords            []OrderRefundResp           `json:"refund_records,omitempty"`
+	Items                    []OrderItemResp             `json:"items,omitempty"`
+	Fulfillment              *FulfillmentResp            `json:"fulfillment,omitempty"`
+	Children                 []OrderDetail               `json:"children,omitempty"`
 }
 
 // OrderRefundResp 用户侧订单退款记录响应
@@ -101,6 +102,7 @@ type OrderRefundResp struct {
 // 内部自动处理 upstream 类型伪装和成本价清除。
 func NewOrderDetail(o *orderdomain.Order) OrderDetail {
 	d := OrderDetail{
+		InvoiceRequest:          o.InvoiceRequest,
 		OrderNo:                 o.OrderNo,
 		GuestEmail:              o.GuestEmail,
 		GuestLocale:             o.GuestLocale,

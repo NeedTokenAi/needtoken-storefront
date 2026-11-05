@@ -3,6 +3,7 @@ package orderwiring
 import (
 	"errors"
 	"fmt"
+	orderinvoice "github.com/dujiao-next/internal/modules/order/invoice"
 
 	paymentapp "github.com/dujiao-next/internal/modules/payment/application"
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
@@ -334,6 +335,7 @@ func (a orderCreateAdapter) CreateOrder(input ordertransport.CreateOrderInput) (
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
 		ManualFormData:      input.ManualFormData,
+		InvoiceRequest:      input.InvoiceRequest,
 	})
 	return order, mapOrderTransportError(err)
 }
@@ -350,6 +352,7 @@ func (a orderCreateAdapter) CreateGuestOrder(input ordertransport.CreateGuestOrd
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
 		ManualFormData:      input.ManualFormData,
+		InvoiceRequest:      input.InvoiceRequest,
 	})
 	return order, mapOrderTransportError(err)
 }
@@ -406,6 +409,7 @@ func (a orderPreviewAdapter) PreviewOrder(input ordertransport.CreateOrderInput)
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
 		ManualFormData:      input.ManualFormData,
+		InvoiceRequest:      input.InvoiceRequest,
 	})
 	if err != nil {
 		return nil, mapOrderTransportError(err)
@@ -425,6 +429,7 @@ func (a orderPreviewAdapter) PreviewGuestOrder(input ordertransport.CreateGuestO
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
 		ManualFormData:      input.ManualFormData,
+		InvoiceRequest:      input.InvoiceRequest,
 	})
 	if err != nil {
 		return nil, mapOrderTransportError(err)
@@ -470,6 +475,7 @@ func mapOrderPreview(preview *orderapp.OrderPreview) *ordertransport.OrderPrevie
 		})
 	}
 	return &ordertransport.OrderPreview{
+		InvoiceRequest:          preview.InvoiceRequest,
 		Currency:                preview.Currency,
 		OriginalAmount:          preview.OriginalAmount,
 		MemberDiscountAmount:    preview.MemberDiscountAmount,
@@ -492,6 +498,7 @@ func mapOrderTransportError(err error) error {
 		source error
 		target error
 	}{
+		{orderinvoice.ErrInvalid, ordertransport.ErrInvoiceRequestInvalid},
 		{orderrefund.ErrRefundOperationConflict, ordertransport.ErrRefundOperationConflict},
 		{orderapp.ErrOrderNotFound, ordertransport.ErrOrderNotFound},
 		{orderapp.ErrOrderStatusInvalid, ordertransport.ErrOrderStatusInvalid},

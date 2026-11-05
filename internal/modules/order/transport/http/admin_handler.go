@@ -126,11 +126,12 @@ type AdminOrderPaymentItem struct {
 // AdminOrderDetail 管理端订单详情返回
 type AdminOrderDetail struct {
 	orderdomain.Order
-	UserEmail       string                  `json:"user_email,omitempty"`
-	UserDisplayName string                  `json:"user_display_name,omitempty"`
-	CouponCode      string                  `json:"coupon_code,omitempty"`
-	PromotionName   string                  `json:"promotion_name,omitempty"`
-	Payments        []AdminOrderPaymentItem `json:"payments,omitempty"`
+	InvoiceRequest  *orderdomain.InvoiceRequest `json:"invoice_request,omitempty"`
+	UserEmail       string                      `json:"user_email,omitempty"`
+	UserDisplayName string                      `json:"user_display_name,omitempty"`
+	CouponCode      string                      `json:"coupon_code,omitempty"`
+	PromotionName   string                      `json:"promotion_name,omitempty"`
+	Payments        []AdminOrderPaymentItem     `json:"payments,omitempty"`
 }
 
 // AdminListOrders 管理端订单列表
@@ -352,6 +353,7 @@ func (h *AdminHandler) AdminGetOrder(c *gin.Context) {
 	order.TruncateFulfillmentPayload()
 	response.Success(c, AdminOrderDetail{
 		Order:           *order,
+		InvoiceRequest:  order.InvoiceRequest,
 		UserEmail:       email,
 		UserDisplayName: displayName,
 		CouponCode:      couponCode,
