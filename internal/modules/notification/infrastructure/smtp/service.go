@@ -32,6 +32,7 @@ func writeStandardHeaders(buf *bytes.Buffer, from, to, subject, replyTo string) 
 	if normalized := normalizeReplyToHeader(replyTo); normalized != "" {
 		buf.WriteString(fmt.Sprintf("Reply-To: %s\r\n", normalized))
 	}
+	subject = strings.NewReplacer("\r", " ", "\n", " ").Replace(subject)
 	buf.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("UTF-8", subject)))
 	buf.WriteString("MIME-Version: 1.0\r\n")
 }
@@ -69,8 +70,26 @@ func (s *Service) SetConfig(cfg *config.EmailConfig) {
 
 // SendVerifyCode 发送邮箱验证码
 func (s *Service) SendVerifyCode(toEmail, code, purpose, locale string, brand mailbrand.Brand) error {
+	if telegramidentity.IsPlaceholderEmail(toEmail) {
+		return nil
+	}
+	brand.SiteURL = verificationSiteURL(brand.SiteURL)
 	subject, body := buildVerifyCodeContent(code, purpose, locale, brand)
-	return s.sendTextEmail(toEmail, subject, body, brand)
+	expiry := verificationExpiryMinutes(s.cfg, purpose)
+	body += "\n\n" + verificationExpiry(locale, expiry)
+	htmlBody, err := renderVerificationEmail(code, purpose, locale, brand, expiry)
+	if err != nil {
+		return err
+	}
+	from, addr, err := s.prepareSMTPEnvelope(toEmail, brand.FromName)
+	if err != nil {
+		return err
+	}
+	message, err := buildAlternativeEmailMessage(from, toEmail, subject, body, htmlBody, brand.ReplyTo)
+	if err != nil {
+		return err
+	}
+	return s.sendSMTPMessage(addr, toEmail, []byte(message))
 }
 
 // SendOrderStatusEmail 发送订单状态通知
@@ -282,6 +301,9 @@ func buildVerifyCodeContent(code, purpose, locale string, brands ...mailbrand.Br
 		subject := "郵箱驗證碼"
 		purposeText := "郵箱驗證"
 		switch purposeKey {
+		case constants.VerifyPurposeEmailAuth:
+			subject = "繼續登入或註冊"
+			purposeText = "確認郵箱所有權後繼續登入或註冊"
 		case constants.VerifyPurposeRegister:
 			subject = "註冊驗證碼"
 			purposeText = "註冊"
@@ -301,6 +323,9 @@ func buildVerifyCodeContent(code, purpose, locale string, brands ...mailbrand.Br
 		subject := "Email Verification Code"
 		purposeText := "email verification"
 		switch purposeKey {
+		case constants.VerifyPurposeEmailAuth:
+			subject = "Continue sign-in or registration"
+			purposeText = "verifying inbox ownership to continue sign-in or registration"
 		case constants.VerifyPurposeRegister:
 			subject = "Registration Code"
 			purposeText = "registration"
@@ -320,6 +345,9 @@ func buildVerifyCodeContent(code, purpose, locale string, brands ...mailbrand.Br
 		subject := "邮箱验证码"
 		purposeText := "邮箱验证"
 		switch purposeKey {
+		case constants.VerifyPurposeEmailAuth:
+			subject = "继续登录或注册"
+			purposeText = "确认邮箱所有权后继续登录或注册"
 		case constants.VerifyPurposeRegister:
 			subject = "注册验证码"
 			purposeText = "注册"

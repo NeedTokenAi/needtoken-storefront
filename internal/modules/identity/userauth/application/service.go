@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/dujiao-next/internal/telegramidentity"
@@ -226,6 +227,14 @@ func (s *Service) SendVerifyCode(ctx context.Context, email, purpose, locale, in
 	if !isVerifyPurposeSupported(purpose) {
 		return ErrInvalidVerifyPurpose
 	}
+	if purpose == constants.VerifyPurposeEmailAuth {
+		if normalized, err = normalizeUserSuppliedEmail(normalized); err != nil {
+			return err
+		}
+		if address, err := mail.ParseAddress(normalized); err != nil || address.Address != normalized {
+			return ErrInvalidEmail
+		}
+	}
 
 	if purpose == constants.VerifyPurposeRegister {
 		policy, err := s.loadRegistrationPolicy(inviteCode)
@@ -277,6 +286,63 @@ func (s *Service) SendVerifyCode(ctx context.Context, email, purpose, locale, in
 	return s.sendVerifyCode(ctx, normalized, purpose, locale)
 }
 
+// EmailAuthResult discloses only the next credential step, after the inbox
+// owner has consumed a purpose-bound code. It never grants an access session.
+type EmailAuthResult struct {
+	NextStep         string
+	RegistrationCode string
+	ExpiresAt        time.Time
+}
+
+func (s *Service) VerifyEmailAuth(ctx context.Context, email, code string) (*EmailAuthResult, error) {
+	normalized, err := normalizeUserSuppliedEmail(email)
+	if err != nil {
+		return nil, err
+	}
+	if address, err := mail.ParseAddress(normalized); err != nil || address.Address != normalized {
+		return nil, ErrInvalidEmail
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if _, err := s.verifyCode(normalized, constants.VerifyPurposeEmailAuth, code); err != nil {
+		return nil, err
+	}
+	user, err := s.userRepo.GetByEmail(normalized)
+	if err != nil {
+		return nil, err
+	}
+	if user != nil {
+		// A disabled account receives the same password step. Its native password
+		// login still enforces status, verification and second-factor checks.
+		return &EmailAuthResult{NextStep: "password"}, nil
+	}
+	policy, err := s.loadRegistrationPolicy("")
+	if err != nil {
+		return nil, err
+	}
+	if !policy.Enabled {
+		return nil, ErrRegistrationDisabled
+	}
+	if err := settingsapp.CheckRegistrationEmailDomainAllowed(normalized, policy.EmailDomain); err != nil {
+		return nil, err
+	}
+	// Invite/password checks remain in Register before consuming this ticket,
+	// allowing the owner to correct their form without repeating inbox proof.
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return nil, err
+	}
+	ticket := "eauth_" + base64.RawURLEncoding.EncodeToString(secret)
+	now := time.Now()
+	expiresAt := now.Add(time.Duration(constants.EmailAuthMaxExpireMinutes) * time.Minute)
+	record := &emailverificationdomain.Code{Email: normalized, Purpose: constants.VerifyPurposeRegister, Code: ticket, ExpiresAt: expiresAt, SentAt: now, CreatedAt: now}
+	if err := s.codeRepo.Create(record); err != nil {
+		return nil, err
+	}
+	return &EmailAuthResult{NextStep: "register", RegistrationCode: ticket, ExpiresAt: expiresAt}, nil
+}
+
 // Register 用户注册
 func (s *Service) Register(email, password, code, inviteCode string, agreementAccepted bool, emailVerificationEnabled bool) (*userdomain.User, string, time.Time, error) {
 	if !agreementAccepted {
@@ -308,7 +374,7 @@ func (s *Service) Register(email, password, code, inviteCode string, agreementAc
 		return nil, "", time.Time{}, ErrEmailExists
 	}
 
-	if emailVerificationEnabled {
+	if emailVerificationEnabled || strings.TrimSpace(code) != "" {
 		if _, err := s.verifyCode(normalized, constants.VerifyPurposeRegister, code); err != nil {
 			return nil, "", time.Time{}, err
 		}
@@ -521,7 +587,11 @@ func (s *Service) verifyCode(email, purpose, code string) (*emailverificationdom
 	}
 
 	// 先原子占用一次尝试机会再比对：并发猜测请求无法共享同一个"剩余次数"。
-	reserved, err := s.codeRepo.ReserveAttempt(record.ID, resolveMaxAttempts(s.cfg.Email.VerifyCode))
+	maxAttempts := resolveMaxAttempts(s.cfg.Email.VerifyCode)
+	if purpose == constants.VerifyPurposeEmailAuth && maxAttempts > 5 {
+		maxAttempts = 5
+	}
+	reserved, err := s.codeRepo.ReserveAttempt(record.ID, maxAttempts)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +626,11 @@ func (s *Service) sendVerifyCode(ctx context.Context, email, purpose, locale str
 		}
 	}
 
-	code, err := randomNumericCode(resolveCodeLength(s.cfg.Email.VerifyCode))
+	codeLength := resolveCodeLength(s.cfg.Email.VerifyCode)
+	if purpose == constants.VerifyPurposeEmailAuth && codeLength < 6 {
+		codeLength = 6
+	}
+	code, err := randomNumericCode(codeLength)
 	if err != nil {
 		return err
 	}
@@ -568,11 +642,15 @@ func (s *Service) sendVerifyCode(ctx context.Context, email, purpose, locale str
 		}
 	}
 
+	expireMinutes := resolveExpireMinutes(s.cfg.Email.VerifyCode)
+	if purpose == constants.VerifyPurposeEmailAuth && expireMinutes > constants.EmailAuthMaxExpireMinutes {
+		expireMinutes = constants.EmailAuthMaxExpireMinutes
+	}
 	record := &emailverificationdomain.Code{
 		Email:     email,
 		Purpose:   strings.ToLower(purpose),
 		Code:      code,
-		ExpiresAt: now.Add(time.Duration(resolveExpireMinutes(s.cfg.Email.VerifyCode)) * time.Minute),
+		ExpiresAt: now.Add(time.Duration(expireMinutes) * time.Minute),
 		SentAt:    now,
 		CreatedAt: now,
 	}
@@ -620,7 +698,7 @@ func NormalizeEmail(email string) (string, error) {
 
 func isVerifyPurposeSupported(purpose string) bool {
 	switch strings.ToLower(strings.TrimSpace(purpose)) {
-	case constants.VerifyPurposeRegister, constants.VerifyPurposeReset, constants.VerifyPurposeTelegramBind, constants.VerifyPurposeChangeEmailOld, constants.VerifyPurposeChangeEmailNew:
+	case constants.VerifyPurposeRegister, constants.VerifyPurposeEmailAuth, constants.VerifyPurposeReset, constants.VerifyPurposeTelegramBind, constants.VerifyPurposeChangeEmailOld, constants.VerifyPurposeChangeEmailNew:
 		return true
 	default:
 		return false

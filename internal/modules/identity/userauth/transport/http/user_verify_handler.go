@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/i18n"
@@ -35,6 +36,16 @@ type UserVerifySettings interface {
 // UserVerifyAuth 是发送邮箱验证码端口。
 type UserVerifyAuth interface {
 	SendVerifyCode(ctx context.Context, email, purpose, locale, inviteCode string) error
+}
+
+type EmailAuthFlowResult struct {
+	NextStep         string `json:"next_step"`
+	RegistrationCode string `json:"registration_code,omitempty"`
+	ExpiresAt        string `json:"expires_at,omitempty"`
+}
+
+type UserEmailAuthVerifier interface {
+	VerifyEmailAuth(ctx context.Context, email, code string) (*EmailAuthFlowResult, error)
 }
 
 // UserVerifyHandler 处理公开的发送邮箱验证码 HTTP 请求。
@@ -72,14 +83,16 @@ func (h *UserVerifyHandler) SendUserVerifyCode(c *gin.Context) {
 
 	purpose := strings.ToLower(strings.TrimSpace(req.Purpose))
 
-	emailVerificationEnabled, err := h.settings.GetEmailVerificationEnabled(true)
-	if err != nil {
-		ginutil.RespondError(c, response.CodeInternal, "error.send_verify_code_failed", err)
-		return
-	}
-	if !emailVerificationEnabled {
-		ginutil.RespondError(c, response.CodeForbidden, "error.email_verification_disabled", nil)
-		return
+	if purpose != constants.VerifyPurposeEmailAuth {
+		emailVerificationEnabled, err := h.settings.GetEmailVerificationEnabled(true)
+		if err != nil {
+			ginutil.RespondError(c, response.CodeInternal, "error.send_verify_code_failed", err)
+			return
+		}
+		if !emailVerificationEnabled {
+			ginutil.RespondError(c, response.CodeForbidden, "error.email_verification_disabled", nil)
+			return
+		}
 	}
 
 	if purpose == constants.VerifyPurposeRegister {
@@ -96,7 +109,7 @@ func (h *UserVerifyHandler) SendUserVerifyCode(c *gin.Context) {
 
 	captchaScene := ""
 	switch purpose {
-	case constants.VerifyPurposeRegister:
+	case constants.VerifyPurposeRegister, constants.VerifyPurposeEmailAuth:
 		captchaScene = constants.CaptchaSceneRegisterSendCode
 	case constants.VerifyPurposeReset:
 		captchaScene = constants.CaptchaSceneResetSendCode
@@ -138,6 +151,56 @@ func (h *UserVerifyHandler) SendUserVerifyCode(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"sent": true})
+}
+
+// VerifyUserEmailAuth proves inbox ownership before revealing which credential
+// screen to show. Passwords and MFA remain the only existing-account login path.
+func (h *UserVerifyHandler) VerifyUserEmailAuth(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var req struct {
+		Email string `json:"email" binding:"required"`
+		Code  string `json:"code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ginutil.RespondBindError(c, err)
+		return
+	}
+	verifier, ok := h.auth.(UserEmailAuthVerifier)
+	if !ok {
+		ginutil.RespondError(c, response.CodeInternal, "error.email_auth_unavailable", nil)
+		return
+	}
+	result, err := verifier.VerifyEmailAuth(c.Request.Context(), req.Email, req.Code)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidEmail):
+			ginutil.RespondError(c, response.CodeBadRequest, "error.email_invalid", nil)
+		case errors.Is(err, ErrVerifyCodeInvalid):
+			ginutil.RespondError(c, response.CodeBadRequest, "error.verify_code_invalid", nil)
+		case errors.Is(err, ErrVerifyCodeExpired):
+			ginutil.RespondError(c, response.CodeBadRequest, "error.verify_code_expired", nil)
+		case errors.Is(err, ErrVerifyCodeAttemptsExceeded):
+			ginutil.RespondError(c, response.CodeTooManyRequests, "error.verify_code_attempts_exceeded", nil)
+		case errors.Is(err, ErrRegistrationDisabled):
+			ginutil.RespondError(c, response.CodeForbidden, "error.registration_disabled", nil)
+		case errors.Is(err, ErrEmailDomainNotAllowed):
+			ginutil.RespondError(c, response.CodeBadRequest, "error.email_domain_not_allowed", nil)
+		default:
+			ginutil.RespondError(c, response.CodeInternal, "error.email_auth_unavailable", err)
+		}
+		return
+	}
+	if result == nil || (result.NextStep != "password" && result.NextStep != "register") || (result.NextStep == "register" && (result.RegistrationCode == "" || result.ExpiresAt == "")) {
+		ginutil.RespondError(c, response.CodeInternal, "error.email_auth_unavailable", nil)
+		return
+	}
+	if result.NextStep == "register" {
+		if expiry, parseErr := time.Parse(time.RFC3339, result.ExpiresAt); parseErr != nil || !expiry.After(time.Now()) {
+			ginutil.RespondError(c, response.CodeInternal, "error.email_auth_unavailable", nil)
+			return
+		}
+	}
+	response.Success(c, result)
 }
 
 func respondCaptchaError(c *gin.Context, err error) {

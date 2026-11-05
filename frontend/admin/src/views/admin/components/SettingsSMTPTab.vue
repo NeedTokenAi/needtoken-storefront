@@ -40,6 +40,8 @@ const emit = defineEmits<{
 
 const submitting = ref(false)
 const smtpTesting = ref(false)
+const requireCloudflareToken = ref(false)
+const cloudflareHost = 'smtp.mx.cloudflare.net'
 
 const form = reactive({
   enabled: false,
@@ -63,6 +65,7 @@ const form = reactive({
 })
 
 const syncFromProps = () => {
+  requireCloudflareToken.value = false
   form.enabled = props.data.enabled
   form.host = props.data.host
   form.port = props.data.port
@@ -93,6 +96,10 @@ const notifyErrorIfNeeded = (err: unknown, fallback: string) => {
 }
 
 const save = async () => {
+  if (form.host.trim().toLowerCase() === cloudflareHost && requireCloudflareToken.value && !form.password.trim()) {
+    notifyError(t('admin.settings.smtp.cloudflare.tokenRequired'))
+    return
+  }
   submitting.value = true
   try {
     const payload = {
@@ -126,6 +133,18 @@ const save = async () => {
   }
 }
 
+const applyCloudflarePreset = () => {
+  // Keep the sender. A credential from another provider must not be silently
+  // reused against this new SMTP endpoint, including a not-yet-saved secret.
+  requireCloudflareToken.value = props.data.host.trim().toLowerCase() !== cloudflareHost || props.data.username !== 'api_token'
+  if (requireCloudflareToken.value) { form.password = ''; form.has_password = false }
+  form.host = cloudflareHost
+  form.port = 465
+  form.username = 'api_token'
+  form.use_ssl = true
+  form.use_tls = false
+}
+
 const testSMTPSettings = async () => {
   if (!form.test_email || form.test_email.trim() === '') {
     notifyError(t('admin.settings.smtp.testEmailRequired'))
@@ -154,6 +173,15 @@ defineExpose({ save, submitting, smtpTesting })
       </div>
 
       <div class="space-y-6 p-6">
+        <section class="rounded-xl border border-border bg-muted/20 p-4" :aria-label="t('admin.settings.smtp.cloudflare.title')">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="text-sm font-semibold">{{ t('admin.settings.smtp.cloudflare.title') }}</h3>
+            <Button type="button" variant="secondary" size="sm" @click="applyCloudflarePreset">{{ t('admin.settings.smtp.cloudflare.preset') }}</Button>
+          </div>
+          <p class="mt-2 text-xs leading-relaxed text-muted-foreground">{{ t('admin.settings.smtp.cloudflare.description') }}</p>
+          <p class="mt-2 text-xs leading-relaxed text-muted-foreground">{{ t('admin.settings.smtp.cloudflare.tokenHint') }}</p>
+          <a href="https://developers.cloudflare.com/email-service/api/send-emails/smtp/" target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex min-h-8 items-center text-xs text-primary underline">{{ t('admin.settings.smtp.cloudflare.docs') }}</a>
+        </section>
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3">
             <Switch id="smtp-enabled" v-model="form.enabled" />

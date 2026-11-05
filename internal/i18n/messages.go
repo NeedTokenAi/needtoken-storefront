@@ -16,6 +16,7 @@ const (
 
 var messages = map[string]map[string]string{
 	LocaleZH: {
+		"error.email_auth_unavailable":                   "暂时无法继续邮箱验证，请稍后重试，或使用密码登录。",
 		"error.invoice_request_invalid":                  "发票信息有误，请检查发票类型、抬头、税号、接收邮箱及选填信息。",
 		"error.plan_account_link_required":               "请先联系客服，验证并关联您已有的 API 账号后再购买；原有余额与用量会保留。",
 		"error.plan_account_unavailable":                 "已关联的 API 账号当前不可用，请联系客服核查后重试。",
@@ -407,6 +408,7 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "无效的商品状态参数",
 	},
 	LocaleTW: {
+		"error.email_auth_unavailable":                   "暫時無法繼續郵箱驗證，請稍後重試，或使用密碼登入。",
 		"error.invoice_request_invalid":                  "發票資訊有誤，請檢查發票類型、抬頭、稅號、接收郵箱及選填資訊。",
 		"error.plan_account_link_required":               "請先聯絡客服，驗證並關聯您現有的 API 帳號後再購買；原有餘額與用量會保留。",
 		"error.plan_account_unavailable":                 "已關聯的 API 帳號目前無法使用，請聯絡客服核查後重試。",
@@ -798,6 +800,7 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "無效的商品狀態參數",
 	},
 	LocaleEN: {
+		"error.email_auth_unavailable":                   "Email verification is temporarily unavailable. Try again later or sign in with your password.",
 		"error.invoice_request_invalid":                  "Check the invoice type, title, tax ID, recipient email, and any optional details.",
 		"error.plan_account_link_required":               "Contact support to verify and link your existing API account before purchasing. Your balance and usage will be preserved.",
 		"error.plan_account_unavailable":                 "The linked API account is unavailable. Contact support before trying again.",

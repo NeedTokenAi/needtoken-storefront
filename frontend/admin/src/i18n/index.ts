@@ -3254,6 +3254,14 @@ const messages = {
           confirmPasswordPlaceholder: '再次输入新密码',
         },
         smtp: {
+          cloudflare: {
+            title: 'Cloudflare Email Sending',
+            preset: '填入 Cloudflare 连接参数',
+            description: '需先在 Cloudflare 为发件域名开通 Email Sending，并完成域名验证。向任意收件人发送需要 Workers 付费方案；Email Routing 收件转发不能代替它。',
+            tokenHint: '使用 465 端口和 SSL（隐式 TLS），关闭 STARTTLS。用户名为 api_token；将具有 Email Sending: Edit 权限的 API 令牌填入 SMTP 密码。发件地址必须属于已接入域名，保存后再测试。',
+            tokenRequired: '切换到 Cloudflare 时，请填写对应的 API 令牌，不会复用其他邮件服务的密码。',
+            docs: '查看 Cloudflare 官方 SMTP 配置说明',
+          },
           title: 'SMTP 邮件配置',
           subtitle: '配置验证码与订单通知邮件发送能力',
           enabled: '启用邮件发送',
@@ -7886,6 +7894,14 @@ const messages = {
           confirmPasswordPlaceholder: '再次輸入新密碼',
         },
         smtp: {
+          cloudflare: {
+            title: 'Cloudflare Email Sending',
+            preset: '填入 Cloudflare 連線參數',
+            description: '需先在 Cloudflare 為寄件網域開通 Email Sending，並完成網域驗證。向任意收件人寄送需要 Workers 付費方案；Email Routing 收件轉寄不能代替它。',
+            tokenHint: '使用 465 連接埠和 SSL（隱式 TLS），關閉 STARTTLS。使用者名稱為 api_token；將具有 Email Sending: Edit 權限的 API 權杖填入 SMTP 密碼。寄件地址必須屬於已接入網域，儲存後再測試。',
+            tokenRequired: '切換至 Cloudflare 時，請填入對應的 API 權杖，不會沿用其他郵件服務的密碼。',
+            docs: '查看 Cloudflare 官方 SMTP 設定說明',
+          },
           title: 'SMTP 郵件配置',
           subtitle: '配置驗證碼與訂單通知郵件發送能力',
           enabled: '啟用郵件發送',
@@ -12518,6 +12534,14 @@ const messages = {
           confirmPasswordPlaceholder: 'Enter again',
         },
         smtp: {
+          cloudflare: {
+            title: 'Cloudflare Email Sending',
+            preset: 'Fill Cloudflare connection settings',
+            description: 'Enable Email Sending and verify your sender domain in Cloudflare first. Sending to arbitrary recipients requires Workers Paid; inbound Email Routing does not provide this capability.',
+            tokenHint: 'Use port 465 with SSL (implicit TLS), with STARTTLS off. The username is api_token; enter an API token with Email Sending: Edit permission as the SMTP password. Use a sender address on the onboarded domain, save, then test.',
+            tokenRequired: 'Enter the Cloudflare API token when switching providers. An existing provider password will not be reused.',
+            docs: 'Open official Cloudflare SMTP instructions',
+          },
           title: 'SMTP Configuration',
           subtitle: 'Configure email delivery for verification and order notifications',
           enabled: 'Enable email sending',

@@ -26,6 +26,7 @@ func RegisterUserVerifyAuthRoutes(auth gin.IRoutes, handler *UserVerifyHandler, 
 		panic("user verify auth routes: required dependency is nil")
 	}
 	auth.POST("/send-verify-code", rateLimit, handler.SendUserVerifyCode)
+	auth.POST("/email/verify", rateLimit, handler.VerifyUserEmailAuth)
 }
 
 // RegisterUserRegisterAuthRoutes 注册公开的用户注册端点（需附带限流中间件）。
