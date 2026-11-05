@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	categorydomain "github.com/dujiao-next/internal/modules/catalog/category/domain"
 	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
 
@@ -125,7 +126,34 @@ func (r *ProductStore) List(filter productcontract.ListFilter) ([]productdomain.
 		return nil, 0, err
 	}
 
+	if filter.OnlyActive || filter.WithCategory {
+		pointers := make([]*productdomain.Product, len(products))
+		for index := range products {
+			pointers[index] = &products[index]
+		}
+		if err := r.applyCategoryPurchasePolicy(pointers...); err != nil {
+			return nil, 0, err
+		}
+	}
 	return products, total, nil
+}
+
+// Always read through this store's DB/transaction handle, never a global service.
+func (r *ProductStore) applyCategoryPurchasePolicy(products ...*productdomain.Product) error {
+	if len(products) == 0 {
+		return nil
+	}
+	var categories []categorydomain.Category
+	if err := r.db.Unscoped().Select("id", "parent_id", "slug").Find(&categories).Error; err != nil {
+		return err
+	}
+	memberOnly := productdomain.APIPlanCategoryIDs(categories)
+	for _, product := range products {
+		if product != nil {
+			product.MemberOnlyByCategory = memberOnly[product.CategoryID]
+		}
+	}
+	return nil
 }
 
 func applyStockStatusFilter(query *gorm.DB, status string, lowStockThreshold int) *gorm.DB {
@@ -210,6 +238,9 @@ func (r *ProductStore) GetBySlug(slug string, onlyActive bool) (*productdomain.P
 		}
 		return nil, err
 	}
+	if err := r.applyCategoryPurchasePolicy(&product); err != nil {
+		return nil, err
+	}
 	return &product, nil
 }
 
@@ -229,6 +260,9 @@ func (r *ProductStore) GetByID(id string) (*productdomain.Product, error) {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
+		return nil, err
+	}
+	if err := r.applyCategoryPurchasePolicy(&product); err != nil {
 		return nil, err
 	}
 	return &product, nil

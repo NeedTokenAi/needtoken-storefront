@@ -27,6 +27,7 @@ import (
 	userdomain "github.com/dujiao-next/internal/modules/identity/user/domain"
 
 	"github.com/dujiao-next/internal/constants"
+	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	couponcontract "github.com/dujiao-next/internal/modules/coupon/contract"
 	coupongormstore "github.com/dujiao-next/internal/modules/coupon/infrastructure/gormstore"
 	memberlevelapp "github.com/dujiao-next/internal/modules/memberlevel/application"
@@ -711,5 +712,119 @@ func TestBuildOrderResultValidatesManualFormRestoredByUpstreamSync(t *testing.T)
 	}
 	if got := result.Plans[0].Item.ManualFormSubmissionJSON["x_handle"]; got != "fixture_user" {
 		t.Fatalf("expected submission snapshot, got %#v", result.Plans[0].Item.ManualFormSubmissionJSON)
+	}
+}
+
+func TestAPIPlanCategoryRejectsGuestOrderWithLegacyGuestProductFlag(t *testing.T) {
+	fixture := setupWholesaleOrderFixture(t, "api_plan_member_gate", nil, nil, nil)
+	root := categorydomain.Category{Slug: "plans", NameJSON: jsonmap.JSON{"zh-CN": "API"}, IsActive: true}
+	if err := fixture.db.Create(&root).Error; err != nil {
+		t.Fatal(err)
+	}
+	child := categorydomain.Category{Slug: "plans-personal", ParentID: root.ID, NameJSON: jsonmap.JSON{"zh-CN": "个人"}, IsActive: true}
+	if err := fixture.db.Create(&child).Error; err != nil {
+		t.Fatal(err)
+	}
+	deep := categorydomain.Category{Slug: "api-dedicated", ParentID: child.ID, NameJSON: jsonmap.JSON{"zh-CN": "专用"}, IsActive: true}
+	if err := fixture.db.Create(&deep).Error; err != nil {
+		t.Fatal(err)
+	}
+	originalCategory := fixture.product.CategoryID
+	for _, categoryID := range []uint{root.ID, child.ID, deep.ID} {
+		if err := fixture.db.Model(&fixture.product).Updates(map[string]interface{}{"category_id": categoryID, "purchase_type": constants.ProductPurchaseGuest}).Error; err != nil {
+			t.Fatal(err)
+		}
+		input := orderCreateParams{IsGuest: true, GuestEmail: "buyer@example.test", GuestPassword: "test-password", Items: []CreateOrderItem{{ProductID: fixture.product.ID, SKUID: fixture.sku.ID, Quantity: 1}}}
+		if _, err := fixture.svc.buildOrderResult(input); !errors.Is(err, ErrProductPurchaseNotAllowed) {
+			t.Fatalf("API category %d accepted guest request or returned wrong error: %v", categoryID, err)
+		}
+		input.IsGuest = false
+		input.UserID = 1
+		if _, err := fixture.svc.buildOrderResult(input); err == nil || errors.Is(err, ErrProductPurchaseNotAllowed) {
+			t.Fatalf("API member must pass identity gate but cannot buy a plan without a verified entitlement: %v", err)
+		}
+	}
+	if err := fixture.db.Model(&fixture.product).Update("category_id", originalCategory).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.svc.buildOrderResult(orderCreateParams{IsGuest: true, GuestEmail: "buyer@example.test", GuestPassword: "test-password", Items: []CreateOrderItem{{ProductID: fixture.product.ID, SKUID: fixture.sku.ID, Quantity: 1}}}); err != nil {
+		t.Fatalf("ordinary guest product was blocked: %v", err)
+	}
+}
+
+type orderPlanPreflight struct {
+	calls      int
+	userID     uint
+	localSKUID uint
+	raw        string
+	err        error
+}
+
+func (*orderPlanPreflight) EnsureUpstreamStockForOrder(uint, int) error { return nil }
+func (*orderPlanPreflight) Enabled() bool                               { return true }
+func (*orderPlanPreflight) EnqueueTimeoutCancel(uint, time.Duration) error {
+	panic("preflight failure reached queue")
+}
+func (*orderPlanPreflight) EnqueueStatusEmail(uint, string) error {
+	panic("preflight failure reached queue")
+}
+func (p *orderPlanPreflight) PreparePlanCheckout(localSKUID, userID uint, quantity int, raw json.RawMessage, hash string) (mappingcontract.PlanCheckoutRoute, error) {
+	p.calls++
+	p.userID, p.localSKUID, p.raw = userID, localSKUID, string(raw)
+	return mappingcontract.PlanCheckoutRoute{ConnectionID: 77, UpstreamSKUID: 901}, p.err
+}
+
+func TestAPIPlanOrderPreflightFreezesExactTermsAndMemberBeforePersistence(t *testing.T) {
+	fixture := setupWholesaleOrderFixture(t, "api_plan_preflight", nil, nil, nil)
+	fixture.user = userdomain.User{Email: "api-plan-native-member@example.test", PasswordHash: "hash", Status: constants.UserStatusActive}
+	if err := fixture.db.Create(&fixture.user).Error; err != nil {
+		t.Fatal(err)
+	}
+	var contract jsonmap.ExactJSON
+	if err := json.Unmarshal([]byte(`{"kind":"plan","issue_api_key":true,"plan":{"quota":9007199254740993},"future_field":"preserved"}`), &contract); err != nil {
+		t.Fatal(err)
+	}
+	if err := fixture.db.Model(&fixture.sku).Updates(map[string]interface{}{"entitlement_contract_json": contract, "entitlement_contract_hash": strings.Repeat("a", 64)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	// The entitlement remains a plan even if operations moves its category or
+	// leaves the historical purchase flag set to guest.
+	if err := fixture.db.Model(&fixture.product).Update("purchase_type", constants.ProductPurchaseGuest).Error; err != nil {
+		t.Fatal(err)
+	}
+	preflight := &orderPlanPreflight{}
+	fixture.svc.SetProductMappingService(preflight)
+	fixture.svc.queueClient = preflight
+	input := orderCreateParams{UserID: fixture.user.ID, Items: []CreateOrderItem{{ProductID: fixture.product.ID, SKUID: fixture.sku.ID, Quantity: 1}}}
+	result, err := fixture.svc.buildOrderResult(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preflight.calls != 1 || preflight.userID != fixture.user.ID || preflight.localSKUID != fixture.sku.ID || !strings.Contains(preflight.raw, "9007199254740993") || !strings.Contains(preflight.raw, "future_field") {
+		t.Fatalf("wrong native preflight: %#v", preflight)
+	}
+	snapshot := result.Plans[0].Item.SKUSnapshotJSON
+	if snapshot["api_plan"] != true || snapshot["plan_checkout_connection_id"] != "77" || snapshot["plan_checkout_upstream_sku_id"] != "901" || snapshot["plan_checkout_entitlement_raw"] != preflight.raw {
+		t.Fatalf("frozen plan route/terms missing: %#v", snapshot)
+	}
+	// Generic order SQL serialization must retain the exact signed bytes string.
+	value, _ := snapshot.Value()
+	var stored jsonmap.JSON
+	if err := stored.Scan(value); err != nil {
+		t.Fatal(err)
+	}
+	if stored["plan_checkout_entitlement_raw"] != preflight.raw {
+		t.Fatal("order snapshot changed exact signed contract")
+	}
+	preflight.err = mappingcontract.ErrPlanAccountLinkRequired
+	// This fixture has no order store. Rejection must happen before any access
+	// to order persistence/transaction machinery in the real creation path.
+	if _, err := fixture.svc.createOrder(input); !errors.Is(err, mappingcontract.ErrPlanAccountLinkRequired) {
+		t.Fatalf("unlinked member accepted: %v", err)
+	}
+	input.IsGuest, input.GuestEmail, input.GuestPassword, input.UserID = true, "buyer@example.test", "test-password", 0
+	before := preflight.calls
+	if _, err := fixture.svc.buildOrderResult(input); !errors.Is(err, ErrProductPurchaseNotAllowed) || preflight.calls != before {
+		t.Fatalf("guest bypassed moved-category plan: %v", err)
 	}
 }

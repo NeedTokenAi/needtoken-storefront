@@ -3,14 +3,42 @@ package paymenthttp
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/dujiao-next/internal/constants"
+	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
+	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 
 	"github.com/dujiao-next/internal/platform/http/response"
 
 	"github.com/gin-gonic/gin"
 )
+
+type latestPaymentErrorLookup struct{ err error }
+
+func (l latestPaymentErrorLookup) GetLatestPendingByOrder(uint, time.Time) (*paymentdomain.Payment, error) {
+	return nil, l.err
+}
+
+func TestLatestPaymentReturnsLocalizedPlanGuardErrors(t *testing.T) {
+	for _, test := range []struct {
+		err  error
+		want string
+	}{
+		{mappingcontract.ErrPlanChanged, "该 API 套餐已更新，请返回套餐页重新选择规格并下单。"},
+		{mappingcontract.ErrPlanAccountUnavailable, "已关联的 API 账号当前不可用，请联系客服核查后重试。"},
+	} {
+		c, recorder := newResponseTestContext()
+		handler := &LatestHandler{payments: latestPaymentErrorLookup{err: test.err}}
+		handler.respondLatestPayment(c, &orderdomain.Order{ID: 1, Status: constants.OrderStatusPendingPayment})
+		assertErrorResponse(t, recorder, response.CodeBadRequest, test.want)
+	}
+}
 
 func TestRespondPaymentCreateError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -21,6 +49,9 @@ func TestRespondPaymentCreateError(t *testing.T) {
 		code int
 		msg  string
 	}{
+		{name: "verified link required", err: fmt.Errorf("checkout: %w", mappingcontract.ErrPlanAccountLinkRequired), code: response.CodeBadRequest, msg: "请先联系客服，验证并关联您已有的 API 账号后再购买；原有余额与用量会保留。"},
+		{name: "eligibility unavailable", err: mappingcontract.ErrPlanEligibilityUnavailable, code: response.CodeBadRequest, msg: "暂时无法核实 API 套餐开通条件，尚未创建付款。请稍后重试或联系客服。"},
+		{name: "plan changed", err: mappingcontract.ErrPlanChanged, code: response.CodeBadRequest, msg: "该 API 套餐已更新，请返回套餐页重新选择规格并下单。"},
 		{
 			name: "gateway response invalid",
 			err:  ErrPaymentGatewayResponseInvalid,

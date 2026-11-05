@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,4 +90,27 @@ type LocalOrderItem struct {
 	TotalPrice               money.Amount `json:"total_price"`
 	FulfillmentType          string       `json:"fulfillment_type"`
 	ManualFormSubmissionJSON jsonmap.JSON `json:"manual_form_submission"`
+}
+
+// Exact signed entitlement JSON is stored as a string because the historical
+// generic order snapshot decoder uses float64. Preserve legacy paid snapshots
+// while new plan orders use their exact contract and frozen upstream route.
+func FrozenPlanProcurement(snapshot jsonmap.JSON) (jsonmap.JSON, uint, uint, bool, error) {
+	raw, present := snapshot["plan_checkout_entitlement_raw"]
+	if !present {
+		return nil, 0, 0, false, nil
+	}
+	text, ok := raw.(string)
+	var contract jsonmap.ExactJSON
+	if !ok || len(text) == 0 || len(text) > 128*1024 || contract.UnmarshalJSON([]byte(text)) != nil || contract["kind"] != "plan" {
+		return nil, 0, 0, true, fmt.Errorf("invalid frozen plan entitlement")
+	}
+	connectionText, _ := snapshot["plan_checkout_connection_id"].(string)
+	skuText, _ := snapshot["plan_checkout_upstream_sku_id"].(string)
+	connectionID, connectionErr := strconv.ParseUint(connectionText, 10, 64)
+	skuID, skuErr := strconv.ParseUint(skuText, 10, 64)
+	if connectionErr != nil || skuErr != nil || connectionID == 0 || skuID == 0 || uint64(uint(connectionID)) != connectionID || uint64(uint(skuID)) != skuID {
+		return nil, 0, 0, true, fmt.Errorf("invalid frozen plan route")
+	}
+	return jsonmap.JSON(contract), uint(connectionID), uint(skuID), true, nil
 }

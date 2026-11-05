@@ -6,6 +6,7 @@ import (
 	"time"
 
 	paymentapp "github.com/dujiao-next/internal/modules/payment/application"
+	"github.com/dujiao-next/internal/modules/payment/application/plancheckout"
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
@@ -48,9 +49,15 @@ func (a userOrderLookupAdapter) GetOrderByUserForTenant(tenant reseller.TenantCo
 
 type pendingLookupAdapter struct {
 	payments paymentcontract.Store
+	plans    *plancheckout.Guard
 }
 
 func (a pendingLookupAdapter) GetLatestPendingByOrder(orderID uint, now time.Time) (*paymentdomain.Payment, error) {
+	// An older pending payment may contain a usable gateway URL. Recheck the
+	// plan before exposing it, just as when creating or reusing a payment.
+	if _, err := a.plans.Ensure(orderID); err != nil {
+		return nil, mapTransportError(err)
+	}
 	return a.payments.GetLatestPendingByOrder(orderID, now)
 }
 

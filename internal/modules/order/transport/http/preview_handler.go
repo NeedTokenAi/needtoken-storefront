@@ -3,6 +3,7 @@ package orderhttp
 import (
 	"errors"
 	"fmt"
+	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	"strconv"
 
 	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
@@ -332,6 +333,13 @@ var guestOrderCreateExtraErrorRules = []mappedError{
 }
 
 var userOrderCommonErrorRules = []mappedError{
+	{target: mappingcontract.ErrPlanAccountLinkRequired, code: response.CodeBadRequest, key: "error.plan_account_link_required"},
+	{target: mappingcontract.ErrPlanAccountUnavailable, code: response.CodeBadRequest, key: "error.plan_account_unavailable"},
+	{target: mappingcontract.ErrPlanUnavailable, code: response.CodeBadRequest, key: "error.plan_unavailable"},
+	{target: mappingcontract.ErrPlanChanged, code: response.CodeBadRequest, key: "error.plan_changed"},
+	{target: mappingcontract.ErrPlanPurchaseLimitReached, code: response.CodeBadRequest, key: "error.plan_purchase_limit_reached"},
+	{target: mappingcontract.ErrPlanTokenLimitReached, code: response.CodeBadRequest, key: "error.plan_token_limit_reached"},
+	{target: mappingcontract.ErrPlanEligibilityUnavailable, code: response.CodeBadRequest, key: "error.plan_eligibility_unavailable"},
 	{target: ErrProductSKURequired, code: response.CodeBadRequest, key: "error.order_item_invalid"},
 	{target: productcontract.ErrProductSKUInvalid, code: response.CodeBadRequest, key: "error.order_item_invalid"},
 	{target: productdomain.ErrPurchaseQuantityInvalid, code: response.CodeBadRequest, key: "error.order_item_invalid"},

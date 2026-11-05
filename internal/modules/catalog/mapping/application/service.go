@@ -1,11 +1,17 @@
 package application
 
 import (
+	"context"
+	"encoding/hex"
+	"encoding/json"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/dujiao-next/internal/constants"
 	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	mappingdomain "github.com/dujiao-next/internal/modules/catalog/mapping/domain"
+	"github.com/dujiao-next/internal/upstream"
 )
 
 // 文件组织约定:
@@ -130,3 +136,109 @@ func (s *Service) GetSKUMappings(mappingID uint) ([]mappingdomain.SKUMapping, er
 func (s *Service) GetMappedUpstreamIDs(connectionID uint) ([]uint, error) {
 	return s.mappings.ListUpstreamIDsByConnection(connectionID)
 }
+
+// PreparePlanCheckout resolves real SKU mappings before freezing the route. This
+// use case is deliberately separate from the stock check's optional fail-open
+// behavior: an unavailable account or entitlement always blocks a plan checkout.
+func (s *Service) PreparePlanCheckout(localSKUID, userID uint, quantity int, contract json.RawMessage, hash string) (mappingcontract.PlanCheckoutRoute, error) {
+	var route mappingcontract.PlanCheckoutRoute
+	if s == nil || s.skuMappings == nil || s.mappings == nil || s.skus == nil || localSKUID == 0 {
+		return route, mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	skuMapping, err := s.skuMappings.GetByLocalSKUID(localSKUID)
+	if err != nil || skuMapping == nil {
+		return route, mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	mapping, err := s.mappings.GetByID(skuMapping.ProductMappingID)
+	if err != nil || mapping == nil {
+		return route, mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	if !mapping.IsActive || mapping.DeletedAt != nil || mapping.UpstreamStatus != mappingdomain.UpstreamStatusActive || !skuMapping.UpstreamIsActive || skuMapping.DeletedAt != nil {
+		return route, mappingcontract.ErrPlanUnavailable
+	}
+	sku, err := s.skus.GetByID(localSKUID)
+	if err != nil || sku == nil {
+		return route, mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	if !sku.IsActive || sku.ProductID != mapping.LocalProductID || skuMapping.UpstreamSKUID == 0 || mapping.ConnectionID == 0 {
+		return route, mappingcontract.ErrPlanUnavailable
+	}
+	route = mappingcontract.PlanCheckoutRoute{ConnectionID: mapping.ConnectionID, UpstreamSKUID: skuMapping.UpstreamSKUID}
+	if err := s.CheckPlanCheckout(mappingcontract.PlanCheckoutRequest{Route: route, UserID: userID, Quantity: quantity, EntitlementContract: contract, EntitlementContractHash: hash}); err != nil {
+		return mappingcontract.PlanCheckoutRoute{}, err
+	}
+	return route, nil
+}
+
+// CheckPlanCheckout also serves payment retries. It only reads the frozen route
+// and immutable terms supplied by the server-side order snapshot; it never
+// substitutes current SKU terms or resolves a submitted email into an identity.
+func (s *Service) CheckPlanCheckout(request mappingcontract.PlanCheckoutRequest) error {
+	if request.UserID == 0 {
+		return mappingcontract.ErrPlanAccountLinkRequired
+	}
+	if request.Route.ConnectionID == 0 || request.Route.UpstreamSKUID == 0 || request.Quantity != 1 {
+		return mappingcontract.ErrPlanChanged
+	}
+	var shape struct {
+		Kind        string `json:"kind"`
+		IssueAPIKey bool   `json:"issue_api_key"`
+	}
+	if len(request.EntitlementContract) == 0 || len(request.EntitlementContract) > 128*1024 || json.Unmarshal(request.EntitlementContract, &shape) != nil || shape.Kind != "plan" || !shape.IssueAPIKey {
+		return mappingcontract.ErrPlanChanged
+	}
+	if hash, err := hex.DecodeString(request.EntitlementContractHash); err != nil || len(hash) != 32 || strings.ToLower(request.EntitlementContractHash) != request.EntitlementContractHash {
+		return mappingcontract.ErrPlanChanged
+	}
+	if s == nil || s.connections == nil {
+		return mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	connection, err := s.connections.GetByID(request.Route.ConnectionID)
+	if err != nil || connection == nil || connection.Status != constants.ConnectionStatusActive || connection.DeletedAt != nil {
+		return mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	adapter, err := s.connections.GetAdapter(connection)
+	if err != nil {
+		return mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	checker, ok := adapter.(upstream.PlanCheckoutAdapter)
+	if !ok {
+		return mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	result, err := checker.CheckPlanCheckoutEligibility(ctx, upstream.PlanCheckoutEligibilityRequest{
+		SKUID: request.Route.UpstreamSKUID, Quantity: request.Quantity,
+		EntitlementContract: request.EntitlementContract, EntitlementContractHash: request.EntitlementContractHash,
+		CustomerReference: upstream.PlanCheckoutCustomerReference{
+			MerchantCustomerID: "needtoken-storefront:user:" + strconv.FormatUint(uint64(request.UserID), 10),
+			Source:             "needtoken-storefront", Verification: "merchant_session",
+		},
+	})
+	now := time.Now()
+	if err != nil || result == nil || !result.OK || ctx.Err() != nil || result.SKUID != request.Route.UpstreamSKUID || result.EntitlementContractHash != request.EntitlementContractHash || result.CollectedAt.IsZero() || result.CollectedAt.Before(now.Add(-15*time.Second)) || result.CollectedAt.After(now.Add(5*time.Second)) {
+		return mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	if result.Ready && result.ReasonCode == "ready" {
+		return nil
+	}
+	switch result.ReasonCode {
+	case "account_link_required":
+		return mappingcontract.ErrPlanAccountLinkRequired
+	case "account_unavailable":
+		return mappingcontract.ErrPlanAccountUnavailable
+	case "plan_unavailable":
+		return mappingcontract.ErrPlanUnavailable
+	case "plan_changed":
+		return mappingcontract.ErrPlanChanged
+	case "purchase_limit_reached":
+		return mappingcontract.ErrPlanPurchaseLimitReached
+	case "token_limit_reached":
+		return mappingcontract.ErrPlanTokenLimitReached
+	default:
+		return mappingcontract.ErrPlanEligibilityUnavailable
+	}
+}
+
+var _ mappingcontract.PlanCheckoutPreparer = (*Service)(nil)
+var _ mappingcontract.PlanCheckoutChecker = (*Service)(nil)

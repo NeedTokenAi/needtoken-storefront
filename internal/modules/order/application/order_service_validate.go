@@ -1,6 +1,7 @@
 package application
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/mail"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 
 	"github.com/dujiao-next/internal/constants"
+	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
 	"github.com/dujiao-next/internal/modules/catalog/product/manualform"
 	couponapp "github.com/dujiao-next/internal/modules/coupon/application"
@@ -103,16 +105,16 @@ func (s *OrderService) buildOrderResult(input orderCreateParams) (*orderBuildRes
 		if err := productdomain.ValidatePurchaseQuantity(product, item.Quantity); err != nil {
 			return nil, err
 		}
-		purchaseType := strings.TrimSpace(product.PurchaseType)
-		if purchaseType == "" {
-			purchaseType = constants.ProductPurchaseMember
-		}
+		purchaseType := productdomain.EffectivePurchaseType(product)
 		if input.IsGuest && purchaseType == constants.ProductPurchaseMember {
 			return nil, ErrProductPurchaseNotAllowed
 		}
 		sku, err := resolveProductOrderSKU(s.productSKURepo, product, item.SKUID)
 		if err != nil {
 			return nil, err
+		}
+		if isAPIPlanCheckout(product, sku) && (input.IsGuest || input.UserID == 0) {
+			return nil, ErrProductPurchaseNotAllowed
 		}
 
 		productCurrency := currency
@@ -226,6 +228,10 @@ func (s *OrderService) buildOrderResult(input orderCreateParams) (*orderBuildRes
 			manualSchemaSnapshot = normalizedSchema
 			manualSubmission = normalizedSubmission
 		}
+		planCheckout, err := s.prepareAPIPlanCheckout(input, product, sku, item.Quantity)
+		if err != nil {
+			return nil, err
+		}
 
 		var promotionID *uint
 		if promotion != nil {
@@ -276,6 +282,14 @@ func (s *OrderService) buildOrderResult(input orderCreateParams) (*orderBuildRes
 			InstructionsJSON:             product.InstructionsJSON,
 			CreatedAt:                    now,
 			UpdatedAt:                    now,
+		}
+		if planCheckout != nil {
+			orderItem.SKUSnapshotJSON["api_plan"] = true
+			orderItem.SKUSnapshotJSON["plan_checkout_connection_id"] = strconv.FormatUint(uint64(planCheckout.Route.ConnectionID), 10)
+			orderItem.SKUSnapshotJSON["plan_checkout_upstream_sku_id"] = strconv.FormatUint(uint64(planCheckout.Route.UpstreamSKUID), 10)
+			// A JSON string survives the generic order snapshot's SQL decoder
+			// without converting exact signed quota integers into float64.
+			orderItem.SKUSnapshotJSON["plan_checkout_entitlement_raw"] = string(planCheckout.RawContract)
 		}
 		orderItems = append(orderItems, orderItem)
 		plans = append(plans, childOrderPlan{
@@ -564,4 +578,46 @@ func FillOrdersItemsFromChildren(orders []orderdomain.Order) {
 	for i := range orders {
 		FillOrderItemsFromChildren(&orders[i])
 	}
+}
+
+type preparedPlanCheckout struct {
+	Route       mappingcontract.PlanCheckoutRoute
+	RawContract json.RawMessage
+}
+
+func isAPIPlanCheckout(product *productdomain.Product, sku *productdomain.ProductSKU) bool {
+	if product != nil && (product.MemberOnlyByCategory || strings.EqualFold(strings.TrimSpace(product.Category.Slug), "plans")) {
+		return true
+	}
+	return sku != nil && sku.EntitlementContractJSON["kind"] == "plan"
+}
+
+// Called only while building/previewing an order, before createOrder opens its
+// persistence transaction. Neither catalog mapping nor HTTP runs in that tx.
+func (s *OrderService) prepareAPIPlanCheckout(input orderCreateParams, product *productdomain.Product, sku *productdomain.ProductSKU, quantity int) (*preparedPlanCheckout, error) {
+	if !isAPIPlanCheckout(product, sku) {
+		return nil, nil
+	}
+	if input.IsGuest || input.UserID == 0 {
+		return nil, ErrProductPurchaseNotAllowed
+	}
+	if sku == nil || len(sku.EntitlementContractJSON) == 0 {
+		return nil, mappingcontract.ErrPlanChanged
+	}
+	raw, err := json.Marshal(sku.EntitlementContractJSON)
+	if err != nil {
+		return nil, mappingcontract.ErrPlanChanged
+	}
+	preparer, ok := s.productMappingService.(mappingcontract.PlanCheckoutPreparer)
+	if !ok {
+		return nil, mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	route, err := preparer.PreparePlanCheckout(sku.ID, input.UserID, quantity, raw, sku.EntitlementContractHash)
+	if err != nil {
+		return nil, err
+	}
+	if route.ConnectionID == 0 || route.UpstreamSKUID == 0 {
+		return nil, mappingcontract.ErrPlanEligibilityUnavailable
+	}
+	return &preparedPlanCheckout{Route: route, RawContract: raw}, nil
 }

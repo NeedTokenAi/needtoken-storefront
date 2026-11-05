@@ -139,7 +139,7 @@ func (h *LatestHandler) respondLatestPayment(c *gin.Context, order *orderdomain.
 
 	payment, err := h.payments.GetLatestPendingByOrder(order.ID, time.Now())
 	if err != nil {
-		ginutil.RespondError(c, response.CodeInternal, "error.payment_fetch_failed", err)
+		respondWithMappedError(c, err, paymentCreateErrorRules, response.CodeInternal, "error.payment_fetch_failed")
 		return
 	}
 	if payment == nil {

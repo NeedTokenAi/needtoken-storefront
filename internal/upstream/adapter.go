@@ -62,7 +62,7 @@ type UpstreamProduct struct {
 	ReservationPolicyDeclared bool                              `json:"-"`
 	RequiresReservation       bool                              `json:"requires_reservation,omitempty"`
 	ReservationContract       jsonmap.JSON                      `json:"reservation_contract,omitempty"`
-	EntitlementContract       jsonmap.JSON                      `json:"entitlement_contract,omitempty"`
+	EntitlementContract       jsonmap.ExactJSON                 `json:"entitlement_contract,omitempty"`
 	EntitlementContractHash   string                            `json:"entitlement_contract_hash,omitempty"`
 	ID                        uint                              `json:"id"`
 	Slug                      string                            `json:"slug"`
