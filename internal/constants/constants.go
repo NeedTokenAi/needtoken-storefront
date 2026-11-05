@@ -331,6 +331,8 @@ const (
 // 验证码用途常量
 const (
 	VerifyPurposeRegister       = "register"
+	VerifyPurposeEmailAuth      = "email_auth"
+	EmailAuthMaxExpireMinutes   = 10
 	VerifyPurposeReset          = "reset"
 	VerifyPurposeTelegramBind   = "telegram_bind"
 	VerifyPurposeChangeEmailOld = "change_email_old"

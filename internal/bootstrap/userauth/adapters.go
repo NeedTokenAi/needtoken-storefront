@@ -114,6 +114,18 @@ func (a userVerifyTransportAdapter) SendVerifyCode(ctx context.Context, email, p
 	return mapUserAuthTransportError(a.auth.SendVerifyCode(ctx, email, purpose, locale, inviteCode))
 }
 
+func (a userVerifyTransportAdapter) VerifyEmailAuth(ctx context.Context, email, code string) (*userauthtransport.EmailAuthFlowResult, error) {
+	result, err := a.auth.VerifyEmailAuth(ctx, email, code)
+	if err != nil || result == nil {
+		return nil, mapUserAuthTransportError(err)
+	}
+	out := &userauthtransport.EmailAuthFlowResult{NextStep: result.NextStep, RegistrationCode: result.RegistrationCode}
+	if !result.ExpiresAt.IsZero() {
+		out.ExpiresAt = result.ExpiresAt.Format(time.RFC3339)
+	}
+	return out, nil
+}
+
 // userTelegramTransportAdapter 将用户认证服务适配为 Telegram widget/MiniApp transport 端口。
 type userTelegramTransportAdapter struct {
 	auth *userauthapp.Service

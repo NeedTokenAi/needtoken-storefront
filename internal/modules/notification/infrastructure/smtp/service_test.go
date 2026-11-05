@@ -4,6 +4,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
+	"mime"
+	"mime/multipart"
 	"net/mail"
 	"net/smtp"
 	"os"
@@ -12,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/dujiao-next/internal/config"
+	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/i18n"
 	notificationcontract "github.com/dujiao-next/internal/modules/notification/contract"
 	settingsmessaging "github.com/dujiao-next/internal/modules/settings/schema/messaging"
@@ -539,5 +543,94 @@ func TestIsSMTPAlreadyClosedError(t *testing.T) {
 				t.Fatalf("isSMTPAlreadyClosedError() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestVerificationHTMLAndAlternativeMessagePreserveCodeAndConfiguredExpiry(t *testing.T) {
+	for _, locale := range []string{i18n.LocaleZH, i18n.LocaleTW, i18n.LocaleEN} {
+		for _, purpose := range []string{constants.VerifyPurposeEmailAuth, constants.VerifyPurposeRegister, constants.VerifyPurposeReset} {
+			t.Run(locale+"/"+purpose, func(t *testing.T) {
+				brand := mailbrand.Brand{SiteName: "NeedToken.AI", SiteURL: "https://needtoken.ai", ReplyTo: "support@needtoken.ai"}
+				htmlBody, err := renderVerificationEmail("123456", purpose, locale, brand, 7)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, expected := range []string{"NeedToken.AI", "123456", "https://needtoken.ai", verificationExpiry(locale, 7)} {
+					if !strings.Contains(htmlBody, expected) {
+						t.Fatalf("missing %q", expected)
+					}
+				}
+				if strings.Contains(htmlBody, "<img") || strings.Contains(htmlBody, "<script") || strings.Contains(htmlBody, "@font-face") {
+					t.Fatal("authentication mail must not download remote assets or run scripts")
+				}
+				subject, plain := buildVerifyCodeContent("123456", purpose, locale, brand)
+				message, err := buildAlternativeEmailMessage("NeedToken.AI <no-reply@needtoken.ai>", "member@example.test", subject, plain, htmlBody, brand.ReplyTo)
+				if err != nil {
+					t.Fatal(err)
+				}
+				mailMessage, err := mail.ReadMessage(strings.NewReader(message))
+				if err != nil {
+					t.Fatal(err)
+				}
+				mediaType, params, err := mime.ParseMediaType(mailMessage.Header.Get("Content-Type"))
+				if err != nil || mediaType != "multipart/alternative" {
+					t.Fatalf("invalid MIME: %s %v", mediaType, err)
+				}
+				parts := multipart.NewReader(mailMessage.Body, params["boundary"])
+				for index, expected := range []string{plain, htmlBody} {
+					part, err := parts.NextPart()
+					if err != nil {
+						t.Fatal(err)
+					}
+					body, err := io.ReadAll(part)
+					if err != nil || strings.ReplaceAll(string(body), "\r\n", "\n") != strings.ReplaceAll(expected, "\r\n", "\n") {
+						t.Fatalf("MIME part %d changed code or content: %v", index, err)
+					}
+				}
+				if _, err := parts.NextPart(); err != io.EOF {
+					t.Fatal("unexpected MIME parts", err)
+				}
+			})
+		}
+	}
+}
+
+func TestVerificationHTMLCannotInjectMarkupLinksOrHeaders(t *testing.T) {
+	brand := mailbrand.Brand{SiteName: `<img src=x onerror=alert(1)>`, SiteURL: "javascript:alert(1)"}
+	htmlBody, err := renderVerificationEmail(`<script>alert(1)</script>`, constants.VerifyPurposeEmailAuth, i18n.LocaleEN, brand, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(htmlBody, "<img") || strings.Contains(htmlBody, "<script>") || strings.Contains(htmlBody, "javascript:") || strings.Contains(htmlBody, "#ZgotmplZ") {
+		t.Fatal("unsafe data entered authentication email HTML")
+	}
+	if !strings.Contains(htmlBody, "&lt;script&gt;") || !strings.Contains(htmlBody, "Continue sign-in or registration") {
+		t.Fatal("email must escape code and retain a neutral purpose")
+	}
+	if strings.Contains(htmlBody, "NeedToken.AI") || strings.Contains(htmlBody, "Dujiao-Next") {
+		t.Fatal("white-label email must not fall back to the main-site brand")
+	}
+	message, err := buildAlternativeEmailMessage("no-reply@example.test", "member@example.test", "Brand\r\nBcc: attacker@example.test", "code", htmlBody, "support@example.test\r\nBcc: attacker@example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := mail.ReadMessage(strings.NewReader(message))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Header.Get("Bcc") != "" || parsed.Header.Get("Reply-To") != "" {
+		t.Fatal("untrusted branding must not inject email headers")
+	}
+}
+
+func TestVerificationEmailExpiryMatchesPurposeLifetime(t *testing.T) {
+	for _, check := range []struct {
+		purpose          string
+		configured, want int
+	}{{constants.VerifyPurposeEmailAuth, 30, constants.EmailAuthMaxExpireMinutes}, {constants.VerifyPurposeEmailAuth, 7, 7}, {constants.VerifyPurposeRegister, 30, 30}, {constants.VerifyPurposeReset, 30, 30}} {
+		cfg := &config.EmailConfig{VerifyCode: config.VerifyCodeConfig{ExpireMinutes: check.configured}}
+		if got := verificationExpiryMinutes(cfg, check.purpose); got != check.want {
+			t.Fatalf("%s configured %d: displayed expiry %d, want %d", check.purpose, check.configured, got, check.want)
+		}
 	}
 }
