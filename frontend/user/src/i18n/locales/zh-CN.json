@@ -465,6 +465,13 @@
         "copy": "复制全部",
         "copied": "已复制",
         "acknowledge": "我已妥善保存"
+      },
+      "twofaOnboarding": {
+        "title": "设置两步验证，保护账号",
+        "description": "点击下方「{action}」，用身份验证器扫描二维码，再输入 6 位动态码确认。启用后请保存恢复码；如果已经启用，可直接继续。",
+        "optional": "可稍后完成。两步验证仅在输入验证码确认后生效。",
+        "continue": "继续原来的操作",
+        "bindEmailFirst": "请先在下方绑定邮箱，再设置两步验证。"
       }
     },
     "wallet": {
@@ -1765,7 +1772,8 @@
       "tools": "实用工具",
       "faq": "常见问题",
       "environment": "检测工具",
-      "appleIds": "免费苹果 ID"
+      "appleIds": "免费苹果 ID",
+      "authEntry": "登录 / 注册"
     },
     "footer": {
       "tagline": "充值服务、成品订购与 API 套餐，一站选购，订单随时可查。",
@@ -2706,6 +2714,188 @@
         "taxInvalid": "请填写 15–20 位字母或数字组成的纳税人识别号。",
         "extraInvalid": "请检查选填信息；银行账号须为 8–40 位数字。"
       }
+    },
+    "environmentV5": {
+      "subtitle": "先检查这台浏览器，再分别测试本站连接和 Claude 网络出口。没有代理或外部服务暂时不可达时，本地结果也会立即显示。",
+      "localTitle": "本地环境检查",
+      "progressTitle": "检查进度",
+      "checkFraction": "已完成 {count} / {total} 项",
+      "localFirst": "本地先完成，联网分项检查",
+      "localComplete": "本地检查已完成",
+      "progressNote": "进度表示已取得结果的检查项数；不代表 IP 纯净度、账号资格或封号风险。",
+      "runningHint": "本地结果已显示，联网项目正在分别检查，您可随时停止。",
+      "cancelledHint": "已停止联网检查，已完成的本地和连接结果会保留。",
+      "idleHint": "无需登录、代理或密钥。点击后，本地检查立即显示；联网项目独立返回。",
+      "remaining": "正在等待 {count} 个联网项目…",
+      "pending": "检查中",
+      "stopped": "已停止",
+      "localIdle": "点击开始检测，立即读取本地检查结果。",
+      "checkDetail": "查看说明",
+      "healthTitle": "本站连接",
+      "healthScope": "只验证本站健康检查的一次响应，不能据此确认 Anthropic 或 Claude Code 可用。",
+      "disclosure": "本地设置只在本页展示。联网检查会请求本站、ipapi.co、必要时 ipify，以及 Anthropic 公共地址；第三方正常接收连接 IP。不会上传本地检查列表、密码、APIKey 或 Token。",
+      "groups": {
+        "connection": "网页与本站连接",
+        "features": "浏览器功能",
+        "system": "系统与区域信息"
+      },
+      "groupHints": {
+        "connection": "先看浏览器连接提示，再以本站的实际请求结果核对。",
+        "features": "逐项检查常用网页功能；临时检测数据会删除，不展示或上传已有 Cookie 和存储内容。",
+        "system": "显示浏览器报告的设置，仅作排查参考。"
+      },
+      "labels": {
+        "fetch": "网络请求能力",
+        "abort": "请求取消能力",
+        "intl": "国际化功能",
+        "locale": "日期与数字区域",
+        "clock": "当前设备时间",
+        "platform": "系统提示",
+        "browser": "浏览器提示"
+      },
+      "details": {
+        "featureReady": "浏览器提供这项功能；不代表外部服务可以访问。",
+        "featureLimited": "浏览器未提供这项功能，部分网页体验可能受限；其他检查继续运行。",
+        "featureUnknown": "当前浏览器限制了这项读取，结果未确认；其他检查不受影响。",
+        "clockLocalOnly": "此处记录设备报告的时间，未与可信时间源校准，不能据此判断系统时钟准确。",
+        "browserReported": "来自浏览器标识的概括提示，可能被隐私设置或兼容模式更改；不代表 Claude Code 的运行系统。"
+      },
+      "healthTimeout": "本站连接未在限定时间内完成，状态未确认；本地检查结果仍可查看。"
+    },
+    "apiLanding": {
+      "seoTitle": "API 服务 · NeedToken.AI",
+      "eyebrow": "API 服务",
+      "title": "One API Key，",
+      "titleAccent": "接入你的应用。",
+      "intro": "把模型接入代码、自动化流程和团队工具。先了解模型与计费，再按实际用量选择套餐。",
+      "order": "订购套餐",
+      "console": "打开控制台",
+      "publicBrowse": "套餐目录无需登录即可查看；购买时需要本站会员账号。",
+      "features": {
+        "entry": "统一 API 入口",
+        "usage": "用量明细可查",
+        "terms": "额度与期限以套餐为准"
+      },
+      "exampleTitle": "接入你熟悉的工具",
+      "compatible": "OpenAI 兼容接口",
+      "quickStart": "查看接入文档",
+      "choiceEyebrow": "按使用方式选择",
+      "choiceTitle": "选 API，还是充值、成品？",
+      "choiceIntro": "在原平台使用，或接进自己的应用，选购的服务并不相同。",
+      "choices": {
+        "recharge": {
+          "title": "给已有账号充值",
+          "description": "为你正在使用的账号续订，继续在原平台的网页或 App 中使用。",
+          "action": "查看充值服务"
+        },
+        "ready": {
+          "title": "购买已订阅账号",
+          "description": "按商品说明领取账号，登录后验收。交付内容和使用范围以所选方案为准。",
+          "action": "查看成品订购"
+        },
+        "api": {
+          "title": "通过 API 调用模型",
+          "description": "用 API Key 把模型接入代码、自动化流程和团队工具，按对应模型的规则计量。",
+          "action": "查看 API 套餐"
+        }
+      },
+      "termsIntro": "选购前核对可用模型、计量方式和有效期，按所需权益下单。",
+      "accountNote": "购买前请核验并关联已有 API 账号，保留原有余额与用量。首次关联请联系支持；通过资格校验后再付款。",
+      "nextTitle": "选好模型，再看套餐。",
+      "nextDescription": "个人开发与团队应用分别选购；实际可售方案以套餐目录为准。"
+    },
+    "apiCost": {
+      "eyebrow": "API 用量估算",
+      "title": "按你的用量，算一笔账。",
+      "intro": "选择公开模型报价，填入预计用量，再和你的充值或成品月费比较。结果用于预算，不代表两种服务的功能和使用限制相同。",
+      "priceSource": "价格来源",
+      "mode": {
+        "public": "公开模型报价",
+        "manual": "手动填写单价"
+      },
+      "selectModel": "选择模型与公开分组",
+      "searchModel": "搜索模型或分组",
+      "searchHint": "最多显示 100 项，请搜索缩小范围。",
+      "groupFactor": "公开分组 {group} · 倍率 ×{factor}，已计入下方单价。",
+      "loading": "正在读取公开价格…",
+      "sourceUnavailable": "暂时无法读取公开报价，当前不展示实时费用。你可以重试，或用已确认的单价手动估算。",
+      "sourceStale": "这份报价已超过 5 分钟，请刷新后再估算。",
+      "noScalarRates": "当前没有适合此计算器的固定文本或按次报价。阶梯、工具及多模态价格需按各自规则核算。",
+      "manualTitle": "填写你已确认的最终单价",
+      "manualHint": "手动价格由你提供，并非本站实时报价。请填入含分组倍率的最终 USD 单价，不要重复加倍率。",
+      "billingUnit": "计费单位",
+      "tokenUnit": "按百万 Token",
+      "callUnit": "按请求次数",
+      "manualCall": "每次请求单价（USD）",
+      "manualInput": "输入单价（USD / 百万 Token）",
+      "manualOutput": "输出单价（USD / 百万 Token）",
+      "manualCacheRead": "缓存读取单价（USD / 百万 Token）",
+      "manualCacheWrite": "缓存创建单价（USD / 百万 Token）",
+      "usageTitle": "你的预计月用量",
+      "calls": "每月请求次数",
+      "inputTokens": "每次总输入 Token",
+      "outputTokens": "每次输出 Token",
+      "inputHint": "输入量包含系统提示、历史对话和本次文本，不只是你新输入的一句话。这里填写的是预算假设，不是已检测到的真实用量。",
+      "cacheTitle": "有缓存用量？展开填写",
+      "cacheHint": "读取和创建缓存的 Token 都是总输入的一部分，两者之和不能超过总输入。没有已确认的缓存量时保持 0；未知缓存单价不会被当作免费。",
+      "cacheReadTokens": "每次缓存读取 Token",
+      "cacheWriteTokens": "每次缓存创建 Token",
+      "resultTitle": "预计 API 月费用",
+      "resultCurrency": "结果币种",
+      "perMonth": "按上方预计用量计算",
+      "enterManualRates": "请填写单价后再计算；空白不等于免费。",
+      "choosePublicRate": "请选择有明确报价的模型。报价不可用或过期时，不计算实时费用。",
+      "invalidUsage": "请检查用量：次数和 Token 须为非负整数，缓存量不能超过总输入；有缓存用量时还需明确缓存单价。",
+      "rateCall": "USD / 次",
+      "rateInput": "输入 · USD / 百万 Token",
+      "rateOutput": "输出 · USD / 百万 Token",
+      "rateCacheRead": "缓存读取 · USD / 百万 Token",
+      "rateCacheWrite": "缓存创建 · USD / 百万 Token",
+      "volume": "每月输入 {input} Token，输出 {output} Token。",
+      "comparisonTitle": "和你的订阅预算比一比",
+      "comparisonAmount": "你填写的充值 / 成品月费（{currency}）",
+      "comparisonPlaceholder": "填写实际价格或你的预算",
+      "comparison": {
+        "lower": "按这些假设，API 预算低 {amount} / 月。",
+        "higher": "按这些假设，API 预算高 {amount} / 月。",
+        "equal": "按这些假设，两项月度预算相同。"
+      },
+      "comparisonHint": "比较金额由你填写，不是抓取的官方订阅价格。API 不一定更便宜；网页订阅、成品账号与 API 的权限和体验也不同。",
+      "formulaCall": "计算方式：每月请求次数 × 每次请求单价。",
+      "formulaTokens": "计算方式：月请求数 ×（未缓存输入 × 输入单价 + 缓存读取 × 读取单价 + 缓存创建 × 创建单价 + 输出 × 输出单价）÷ 1,000,000。",
+      "scopeNote": "仅估算已公开的固定文本或按次单价。图片、音视频、额外工具、长上下文阶梯及缓存特殊时长费用不在此估算中；实际可用分组、充值优惠、额度和扣费以控制台与套餐说明为准。",
+      "fx": "人民币展示按本站公布汇率 1 USD = {rate} CNY 换算；汇率更新时间：{time}。这不是额外的账户充值折扣。",
+      "timeUnknown": "未提供",
+      "sourceLink": "查看公开报价来源",
+      "loadedAt": "读取时间：{time}",
+      "manualSource": "价格来源：你在此页手动填写。不会替代控制台账单或订单结算价。",
+      "smallAmount": "低于 {price}",
+      "fxMissing": "本站尚未公布 USD/CNY 汇率，暂以 USD 展示。比较金额也请填写 USD。"
+    },
+    "emailAuth": {
+      "title": "登录或创建账号",
+      "subtitle": "一个邮箱，继续使用你的 AI 服务。",
+      "privacyHint": "验证邮箱后，为你进入登录或创建账号。",
+      "continue": "使用邮箱继续",
+      "sending": "正在发送验证码…",
+      "passwordShortcut": "用密码登录",
+      "codeTitle": "查看你的邮箱",
+      "codePlaceholder": "输入邮件验证码",
+      "codeHint": "输入最新一封邮件中的验证码。请勿向他人提供验证码。",
+      "verify": "验证并继续",
+      "resend": "重新发送验证码",
+      "change": "更换",
+      "continueHint": "继续完成你的账号验证。",
+      "passwordTitle": "欢迎回来",
+      "registerTitle": "创建你的账号",
+      "totpTitle": "两步验证",
+      "codeInvalid": "验证码无效或已过期，请重试。",
+      "expired": "邮箱验证已过期，请重新验证后创建账号。",
+      "useEmailCode": "使用邮箱验证继续",
+      "newPassword": "设置登录密码",
+      "setupTwoFactor": "注册后设置两步验证",
+      "setupTwoFactorHint": "创建账号后，用验证器扫码并输入验证码启用。",
+      "securityHint": "已有密码与两步验证继续保护你的账号。"
     }
   }
 }

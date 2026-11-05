@@ -29,7 +29,7 @@ import { useFormValidation } from './useFormValidation'
  * 用户登录页共享逻辑（classic + vault 双模板共用）。
  * 完整保留原 views/auth/Login.vue 的行为，仅抽离为 composable。
  */
-export function useLogin() {
+export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
   const router = useRouter()
   const route = useRoute()
   const userAuthStore = useUserAuthStore()
@@ -145,6 +145,7 @@ export function useLogin() {
   }
 
   const redirectAfterLogin = () => {
+    if (options.onAuthenticated) return options.onAuthenticated()
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/me/orders'
     return router.push(redirect)
   }

@@ -1,14 +1,14 @@
 <template>
   <div ref="scopeEl" class="nt-scope">
-    <header class="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
-      <div class="mx-auto flex h-16 w-full max-w-[1200px] items-center gap-2 px-4 sm:gap-4 sm:px-6">
-        <RouterLink to="/" class="nt-brand flex shrink-0 items-center gap-2 text-[15px] font-bold tracking-tight text-foreground sm:text-[17px]" :title="brandName">
-          <BrandMark v-if="!appStore.isResellerTenant" class="h-7 w-7" />
+    <header class="nt-site-header sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
+      <div class="nt-header-inner mx-auto flex h-16 w-full max-w-[1320px] items-center gap-2 sm:gap-4">
+        <RouterLink to="/" class="nt-brand flex min-w-0 items-center gap-2 text-[15px] font-bold tracking-tight text-foreground sm:shrink-0 sm:text-[17px]" :title="brandName" :aria-label="brandName">
+          <BrandMark v-if="!appStore.isResellerTenant" class="h-7 w-7 shrink-0" />
           <img v-else-if="resellerLogo" :src="resellerLogo" alt="" class="h-7 w-7 rounded-md object-contain" />
-          <span>{{ brandName }}</span>
+          <span class="truncate">{{ brandName }}</span>
         </RouterLink>
 
-        <nav class="ml-4 flex items-center gap-1 max-[1279px]:hidden" :aria-label="t('needtoken.nav.label')">
+        <nav class="nt-desktop-navigation ml-4 flex items-center gap-1 max-[1239px]:hidden" :aria-label="t('needtoken.nav.label')">
           <RouterLink
             v-for="item in menuItems"
             :key="item.key"
@@ -27,7 +27,7 @@
           </div>
         </nav>
 
-        <div class="ml-auto flex items-center gap-2">
+        <div class="ml-auto flex shrink-0 items-center gap-2">
           <RouterLink to="/guest/orders" class="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground max-[419px]:hidden" :aria-label="t('navbar.guestOrders')" :title="t('navbar.guestOrders')">
             <ClipboardList class="h-[18px] w-[18px]" />
           </RouterLink>
@@ -35,7 +35,7 @@
             <ShoppingCart class="h-[18px] w-[18px]" />
             <span v-if="cartCount > 0" class="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{{ cartCount }}</span>
           </RouterLink>
-          <div ref="langEl" class="relative max-[1279px]:hidden" @focusout="onLanguageFocusOut">
+          <div ref="langEl" class="relative max-[1239px]:hidden" @focusout="onLanguageFocusOut">
             <button type="button" class="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-label="t('navbar.selectLanguage')" :aria-expanded="langOpen" aria-controls="nt-language-options" @click="langOpen = !langOpen; openGroup = null">
               <Languages class="h-[18px] w-[18px]" />
             </button>
@@ -44,18 +44,15 @@
             </div>
           </div>
           <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('navbar.personalCenter') }}</RouterLink>
-          <template v-else>
-            <RouterLink :to="loginTarget" class="rounded-md px-3 py-1.5 text-[13px] font-semibold text-foreground hover:bg-secondary max-[640px]:hidden">{{ t('needtoken.nav.login') }}</RouterLink>
-            <RouterLink :to="registerTarget" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.nav.register') }}</RouterLink>
-          </template>
+          <RouterLink v-else :to="loginTarget" class="nt-auth-entry inline-flex min-h-9 items-center whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.nav.authEntry') }}</RouterLink>
 
-          <div ref="moreEl" class="relative hidden max-[1279px]:block" @focusout="onMoreFocusOut">
+          <div ref="moreEl" class="relative hidden max-[1239px]:block" @focusout="onMoreFocusOut">
             <button ref="moreButtonEl" type="button" class="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary" :aria-label="t('navbar.more')" :aria-expanded="moreOpen" aria-controls="nt-mobile-navigation" @click="moreOpen = !moreOpen; openGroup = null">
               <Menu v-if="!moreOpen" class="pointer-events-none h-[18px] w-[18px]" />
               <X v-else class="pointer-events-none h-[18px] w-[18px]" />
             </button>
             <nav v-if="moreOpen" id="nt-mobile-navigation" class="nt-mobile-navigation absolute right-0 top-[calc(100%+8px)] z-[60] flex min-w-[230px] flex-col rounded-xl border border-border bg-card p-2" :aria-label="t('needtoken.nav.label')">
-              <RouterLink v-for="item in menuItems" :key="`m-${item.key}`" :to="item.path" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ item.label }}</RouterLink>
+              <RouterLink v-for="item in menuItems" :key="`m-${item.key}`" :to="item.path" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :class="isActive(item) ? '!text-primary' : ''" :aria-current="isActive(item) ? 'page' : undefined" @click="moreOpen = false">{{ item.label }}</RouterLink>
               <div v-for="group in navGroups" :key="`m-${group.key}`" class="mt-1 border-t border-border pt-1">
                 <button type="button" class="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-expanded="mobileGroup === group.key" :aria-controls="`nt-mobile-${group.key}`" @click="mobileGroup = mobileGroup === group.key ? null : group.key">{{ group.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="mobileGroup === group.key ? 'rotate-180' : ''" /></button>
                 <div v-if="mobileGroup === group.key" :id="`nt-mobile-${group.key}`" class="ml-3 border-l border-border pl-2">
@@ -63,7 +60,7 @@
                 </div>
               </div>
               <RouterLink to="/guest/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ t('navbar.guestOrders') }}</RouterLink>
-              <RouterLink :to="authStore.isAuthenticated ? '/me' : loginTarget" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ authStore.isAuthenticated ? t('navbar.personalCenter') : t('needtoken.nav.login') }}</RouterLink>
+              <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
               <span class="px-3 pb-1 pt-2 text-[11px] uppercase tracking-wider text-muted-foreground">{{ t('navbar.selectLanguage') }}</span>
               <button v-for="lang in languages" :key="`ml-${lang.code}`" type="button" class="rounded px-3 py-2 text-left text-sm hover:bg-secondary" :class="appStore.locale === lang.code ? 'text-primary' : 'text-muted-foreground'" @click="changeLanguage(lang.code); moreOpen = false">{{ lang.name }}</button>
             </nav>
@@ -91,7 +88,8 @@ import { useAppStore } from '../../../stores/app'
 import { useCartStore } from '../../../stores/cart'
 import { useUserAuthStore } from '../../../stores/userAuth'
 import { getImageUrl } from '../../../utils/image'
-import { CATEGORY_SLUGS, NEEDTOKEN_BRAND_NAME, NEEDTOKEN_BRAND_ICON, NEEDTOKEN_TOUCH_ICON } from '../config'
+import { authReturnPath as safeAuthReturnPath } from '../../../utils/authReturnPath'
+import { API_PLANS_PATH, API_SERVICES_PATH, CATEGORY_SLUGS, NEEDTOKEN_BRAND_NAME, NEEDTOKEN_BRAND_ICON, NEEDTOKEN_TOUCH_ICON } from '../config'
 import BrandMark from '../components/BrandMark.vue'
 import NeedtokenFooter from '../components/NeedtokenFooter.vue'
 import GhostFibersBackground from '../components/GhostFibersBackground.vue'
@@ -105,9 +103,8 @@ const route = useRoute()
 const appStore = useAppStore()
 const cartStore = useCartStore()
 const authStore = useUserAuthStore()
-const authReturnPath = computed(() => route.path.startsWith('/auth/') ? '/' : route.fullPath)
+const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
-const registerTarget = computed(() => ({ path: '/auth/register', query: { redirect: authReturnPath.value } }))
 const scopeEl = ref<HTMLElement | null>(null)
 useNeedtokenEffects(scopeEl)
 
@@ -145,7 +142,7 @@ const menuItems = computed<MenuItem[]>(() => [
   { key: 'home', path: '/', label: t('needtoken.nav.home') },
   { key: 'recharge', path: `/categories/${CATEGORY_SLUGS.recharge}`, label: t('needtoken.nav.recharge') },
   { key: 'rental', path: `/categories/${CATEGORY_SLUGS.rental}`, label: t('needtoken.nav.rental') },
-  { key: 'plans', path: '/plans', label: t('needtoken.nav.plans') },
+  { key: 'plans', path: API_SERVICES_PATH, label: t('needtoken.nav.plans') },
   { key: 'models', path: '/models', label: t('needtoken.nav.models') },
 ])
 const navGroups = computed(() => [
@@ -160,7 +157,9 @@ const navGroups = computed(() => [
   ] },
 ])
 
-const isActive = (item: MenuItem) => item.path === '/' ? route.path === '/' : route.path === item.path || route.path.startsWith(`${item.path}/`)
+const isActive = (item: MenuItem) => item.key === 'plans'
+  ? [API_PLANS_PATH, API_SERVICES_PATH].some(path => route.path === path || route.path.startsWith(`${path}/`))
+  : item.path === '/' ? route.path === '/' : route.path === item.path || route.path.startsWith(`${item.path}/`)
 
 function setGroupEl(key: string, el: Element | ComponentPublicInstance | null) {
   if (el instanceof HTMLElement) groupEls.set(key, el)
@@ -252,6 +251,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.nt-site-header { padding-inline: 24px; }
+@media (max-width: 640px) { .nt-site-header { padding-inline: 14px; } }
 .nt-nav-group-button { display: flex; align-items: center; gap: 5px; border-radius: 6px; padding: 8px 10px; white-space: nowrap; font-size: 14px; font-weight: 500; }
 .nt-nav-group-button:hover { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
 .nt-nav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 60; width: 186px; padding: 7px; border: 1px solid var(--ui-border); border-radius: 12px; background: #0e1218; box-shadow: 0 12px 32px #0005; }

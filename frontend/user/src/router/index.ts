@@ -281,6 +281,11 @@ const router = createRouter({
             component: templateView('ModelSquare', () => import('../views/NotFound.vue')),
         },
         {
+            path: '/api-services',
+            name: 'api-services',
+            component: templateView('APILanding', () => import('../views/NotFound.vue')),
+        },
+        {
             path: '/plans',
             name: 'plans',
             component: templateView('Plans', () => import('../views/NotFound.vue')),

@@ -1,40 +1,41 @@
 <template>
-  <div class="nt-claude-network mx-auto w-full max-w-[1200px] px-4 pb-16 pt-11 sm:px-6 sm:pt-14">
+  <div class="nt-claude-network mx-auto w-full max-w-[1200px] px-4 pb-16 pt-10 sm:px-6 sm:pt-12">
     <header class="network-heading">
       <span class="network-eyebrow"><Activity :size="15" aria-hidden="true" />{{ t('needtoken.claudeEnvironment.eyebrow') }}</span>
       <h1>{{ t('needtoken.claudeEnvironment.title') }}</h1>
-      <p>{{ t('needtoken.claudeEnvironment.subtitle') }}</p>
-      <nav class="network-anchors" :aria-label="t('needtoken.claudeEnvironment.sections')">
-        <a href="#network-overview">{{ t('needtoken.claudeEnvironment.overview') }}</a><a href="#network-browser">{{ t('needtoken.claudeEnvironment.browser') }}</a><a href="#network-terminal">{{ t('needtoken.claudeEnvironment.terminal') }}</a><a href="#network-rules">{{ t('needtoken.claudeEnvironment.rules') }}</a>
-      </nav>
+      <p>{{ t('needtoken.environmentV5.subtitle') }}</p>
+      <nav class="network-anchors" :aria-label="t('needtoken.claudeEnvironment.sections')"><a href="#network-local">{{ t('needtoken.environmentV5.localTitle') }}</a><a href="#network-overview">{{ t('needtoken.claudeEnvironment.overview') }}</a><a href="#network-terminal">{{ t('needtoken.claudeEnvironment.terminal') }}</a><a href="#network-rules">{{ t('needtoken.claudeEnvironment.rules') }}</a></nav>
     </header>
 
     <section class="network-start" :aria-busy="running">
       <div class="network-start-top">
-        <div><h2>{{ t('needtoken.claudeEnvironment.startTitle') }}</h2><p role="status" aria-live="polite">{{ running ? t('needtoken.claudeEnvironment.runningHint') : measuredAt ? t('needtoken.claudeEnvironment.checkedAt', { time: dateTime(measuredAt) }) : t('needtoken.claudeEnvironment.idleHint') }}</p></div>
+        <div><h2>{{ t('needtoken.claudeEnvironment.startTitle') }}</h2><p role="status" aria-live="polite">{{ running ? t('needtoken.environmentV5.runningHint') : cancelled ? t('needtoken.environmentV5.cancelledHint') : measuredAt ? t('needtoken.claudeEnvironment.checkedAt', { time: dateTime(measuredAt) }) : t('needtoken.environmentV5.idleHint') }}</p></div>
         <div class="network-actions"><button v-if="running" type="button" class="network-button secondary" @click="cancel"><Square :size="14" />{{ t('needtoken.claudeEnvironment.cancel') }}</button><button type="button" class="network-button primary" :disabled="running" @click="run"><LoaderCircle v-if="running" class="network-spin" :size="17" /><Play v-else :size="16" />{{ t(running ? 'needtoken.claudeEnvironment.running' : measuredAt ? 'needtoken.claudeEnvironment.runAgain' : 'needtoken.claudeEnvironment.run') }}</button></div>
       </div>
+      <div class="network-dashboard">
+        <div class="network-progress" role="progressbar" :aria-label="t('needtoken.environmentV5.progressTitle')" :aria-valuenow="completedCount" :aria-valuemax="totalChecks" :aria-valuetext="t('needtoken.environmentV5.checkFraction', { count: completedCount, total: totalChecks })" aria-valuemin="0"><svg viewBox="0 0 112 112" aria-hidden="true"><circle class="network-progress-track" cx="56" cy="56" r="47" /><circle class="network-progress-value" cx="56" cy="56" r="47" :stroke-dasharray="ringLength" :stroke-dashoffset="ringLength * (1 - completedCount / totalChecks)" /></svg><div><strong>{{ completedCount }}<small>/ {{ totalChecks }}</small></strong><span>{{ t('needtoken.environmentV5.progressTitle') }}</span></div></div>
+        <div class="network-progress-copy"><h3>{{ t(measuredAt ? 'needtoken.environmentV5.localComplete' : 'needtoken.environmentV5.localFirst') }}</h3><p>{{ t('needtoken.environmentV5.progressNote') }}</p><div v-if="measuredAt" class="network-summary" aria-live="polite"><span><Check :size="13" />{{ t('needtoken.claudeEnvironment.confirmedCount', { count: summary.ok }) }}</span><span class="review"><TriangleAlert :size="13" />{{ t('needtoken.claudeEnvironment.reviewCount', { count: summary.warning }) }}</span><span><CircleHelp :size="13" />{{ t('needtoken.claudeEnvironment.unknownCount', { count: summary.unknown }) }}</span></div><p v-if="running" class="network-remaining">{{ t('needtoken.environmentV5.remaining', { count: pending.size }) }}</p></div>
+      </div>
       <label class="network-rtc-choice"><input v-model="includeWebRtc" type="checkbox" :disabled="running" /><span>{{ t('needtoken.claudeEnvironment.rtcChoice') }}<small>{{ t('needtoken.claudeEnvironment.rtcChoiceHint') }}</small></span></label>
-      <p class="network-disclosure"><ShieldCheck :size="16" aria-hidden="true" /><span>{{ t('needtoken.claudeEnvironment.disclosure') }}</span></p>
-      <div v-if="measuredAt" class="network-summary" aria-live="polite"><span><Check :size="13" />{{ t('needtoken.claudeEnvironment.confirmedCount', { count: summary.ok }) }}</span><span class="review"><TriangleAlert :size="13" />{{ t('needtoken.claudeEnvironment.reviewCount', { count: summary.warning }) }}</span><span><CircleHelp :size="13" />{{ t('needtoken.claudeEnvironment.unknownCount', { count: summary.unknown }) }}</span></div>
+      <p class="network-disclosure"><ShieldCheck :size="16" aria-hidden="true" /><span>{{ t('needtoken.environmentV5.disclosure') }} <RouterLink to="/privacy">{{ t('footer.privacy') }}</RouterLink></span></p>
+    </section>
+
+    <section id="network-local" class="network-local-groups" :aria-label="t('needtoken.environmentV5.localTitle')">
+      <article v-for="group in localGroups" :key="group.id" class="network-panel network-local-card" :data-local-group="group.id"><div class="network-panel-heading"><h2><component :is="group.icon" :size="18" aria-hidden="true" />{{ t(`needtoken.environmentV5.groups.${group.id}`) }}</h2><span class="network-group-count">{{ group.checks.length }} / {{ group.total }}</span></div><p class="network-group-intro">{{ t(`needtoken.environmentV5.groupHints.${group.id}`) }}</p><p v-if="!measuredAt" class="network-empty">{{ t('needtoken.environmentV5.localIdle') }}</p><ul v-else class="network-check-list"><li v-for="check in group.checks" :key="check.id" :data-check-id="check.id"><component :is="check.status === 'ok' ? Check : check.status === 'warning' ? TriangleAlert : CircleHelp" :size="15" class="network-check-icon" :class="`is-${check.status}`" aria-hidden="true" /><div><div class="network-check-title"><h3>{{ localLabel(check.id) }}</h3><span class="network-check-state" :class="`is-${check.status}`">{{ statusLabel(check.status) }}</span></div><p v-if="check.value" class="network-check-value">{{ check.value }}</p><details><summary>{{ t('needtoken.environmentV5.checkDetail') }}</summary><p>{{ localDetail(check.detail) }}</p></details></div></li></ul><div v-if="group.id === 'connection'" class="network-health" data-network-check="storefront"><div class="network-check-title"><h3><Server :size="14" aria-hidden="true" />{{ t('needtoken.environmentV5.healthTitle') }}</h3><span class="network-status" :class="`is-${storefront?.status || 'unknown'}`">{{ networkStatus('storefront', storefront?.status) }}</span></div><p>{{ storefront?.detail === 'timeout' ? t('needtoken.environmentV5.healthTimeout') : t(`needtoken.environment.connection.${storefront?.detail || 'notChecked'}`) }}</p><span v-if="storefront?.latencyMs !== undefined" class="network-health-time">{{ storefront.latencyMs }} ms</span><span v-if="storefront?.httpStatus" class="network-health-time">HTTP {{ storefront.httpStatus }}</span><small>{{ t('needtoken.environmentV5.healthScope') }}</small></div></article>
     </section>
 
     <div class="network-layout">
       <div class="network-main">
-        <section id="network-overview" class="network-panel" :aria-label="t('needtoken.claudeEnvironment.overview')">
-          <div class="network-panel-heading"><h2><Globe2 :size="19" />{{ t('needtoken.claudeEnvironment.overview') }}</h2><span class="network-status" :class="`is-${exit?.status || 'idle'}`">{{ statusLabel(exit?.status) }}</span></div>
-          <div class="network-exit-ip"><span>{{ t('needtoken.claudeEnvironment.exitIp') }}</span><strong>{{ exit?.ip || t('needtoken.claudeEnvironment.unmeasured') }}</strong><small v-if="exit?.source">{{ t('needtoken.claudeEnvironment.source', { source: exit.source }) }}</small></div>
+        <section id="network-overview" class="network-panel" :aria-label="t('needtoken.claudeEnvironment.overview')" data-network-check="exit">
+          <div class="network-panel-heading"><h2><Globe2 :size="19" />{{ t('needtoken.claudeEnvironment.overview') }}</h2><span class="network-status" :class="`is-${exit?.status || 'unknown'}`">{{ networkStatus('exit', exit?.status) }}</span></div>
+          <div class="network-exit-ip"><span>{{ t('needtoken.claudeEnvironment.exitIp') }}</span><strong>{{ exit?.ip || (measuredAt && !pending.has('exit') ? unknown : t('needtoken.claudeEnvironment.unmeasured')) }}</strong><small v-if="exit?.source">{{ t('needtoken.claudeEnvironment.source', { source: exit.source }) }}</small></div>
           <dl class="network-facts"><div><dt>{{ t('needtoken.claudeEnvironment.country') }}</dt><dd>{{ exit?.country || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.location') }}</dt><dd>{{ [exit?.region, exit?.city].filter(Boolean).join(' · ') || unknown }}</dd></div><div><dt>ASN</dt><dd>{{ exit?.asn || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.organization') }}</dt><dd>{{ exit?.organization || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.exitTimezone') }}</dt><dd>{{ exit?.timezone || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.reputation') }}</dt><dd>{{ t('needtoken.claudeEnvironment.reputationUnknown') }}</dd></div></dl>
-          <p class="network-note">{{ t(`needtoken.claudeEnvironment.exitDetails.${exit?.detail || 'notChecked'}`) }}</p>
-          <p v-if="exit" class="network-timestamp">{{ t('needtoken.claudeEnvironment.observedAt', { time: dateTime(exit.measuredAt) }) }}</p>
+          <p class="network-note">{{ t(`needtoken.claudeEnvironment.exitDetails.${exit?.detail || 'notChecked'}`) }}</p><p v-if="timeMismatch" class="network-review-note"><Info :size="15" />{{ t('needtoken.claudeEnvironment.timeMismatch') }}</p><p v-if="exit" class="network-timestamp">{{ t('needtoken.claudeEnvironment.observedAt', { time: dateTime(exit.measuredAt) }) }}</p>
         </section>
-
         <section id="network-browser" class="network-browser-grid" :aria-label="t('needtoken.claudeEnvironment.browser')">
-          <article class="network-panel"><div class="network-panel-heading"><h2><Radio :size="19" />{{ t('needtoken.claudeEnvironment.anthropic') }}</h2><span class="network-status" :class="`is-${anthropic?.status || 'idle'}`">{{ statusLabel(anthropic?.status) }}</span></div><p class="network-target" translate="no">api.anthropic.com</p><p class="network-copy">{{ t(`needtoken.claudeEnvironment.connectionDetails.${anthropic?.detail || 'notChecked'}`) }}</p><div v-if="anthropic?.latencyMs !== undefined" class="network-metric">{{ anthropic.latencyMs }}<small>ms</small></div><p v-if="anthropic?.httpStatus" class="network-note">HTTP {{ anthropic.httpStatus }}</p><p class="network-note">{{ t('needtoken.claudeEnvironment.browserScope') }}</p></article>
-          <article class="network-panel"><div class="network-panel-heading"><h2><Waypoints :size="19" />WebRTC</h2><span class="network-status" :class="`is-${rtc?.status || 'idle'}`">{{ statusLabel(rtc?.status) }}</span></div><p class="network-copy">{{ t(`needtoken.claudeEnvironment.rtcDetails.${rtc?.detail || 'notChecked'}`) }}</p><div v-if="rtc?.publicAddresses.length" class="network-addresses"><code v-for="address in rtc.publicAddresses" :key="address">{{ address }}</code></div><p v-if="rtc && rtc.detail !== 'notRequested'" class="network-note">{{ t('needtoken.claudeEnvironment.rtcCounts', { local: rtc.localCount, mdns: rtc.mdnsCount }) }}</p><p class="network-note">{{ t('needtoken.claudeEnvironment.rtcScope') }}</p></article>
-          <article class="network-panel network-local"><div class="network-panel-heading"><h2><Monitor :size="19" />{{ t('needtoken.claudeEnvironment.localEnvironment') }}</h2><span v-if="timeMismatch" class="network-status is-warning">{{ t('needtoken.claudeEnvironment.compareReview') }}</span></div><dl class="network-facts"><div><dt>{{ t('needtoken.claudeEnvironment.browserTimezone') }}</dt><dd>{{ localTimezone || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.browserLanguage') }}</dt><dd>{{ localLanguage || unknown }}</dd></div></dl><p class="network-note">{{ timeMismatch ? t('needtoken.claudeEnvironment.timeMismatch') : t('needtoken.claudeEnvironment.localScope') }}</p></article>
+          <article class="network-panel" data-network-check="anthropic"><div class="network-panel-heading"><h2><Radio :size="19" />{{ t('needtoken.claudeEnvironment.anthropic') }}</h2><span class="network-status" :class="`is-${anthropic?.status || 'unknown'}`">{{ networkStatus('anthropic', anthropic?.status) }}</span></div><p class="network-target" translate="no">api.anthropic.com</p><p class="network-copy">{{ t(`needtoken.claudeEnvironment.connectionDetails.${anthropic?.detail || 'notChecked'}`) }}</p><div v-if="anthropic?.latencyMs !== undefined" class="network-metric">{{ anthropic.latencyMs }}<small>ms</small></div><p v-if="anthropic?.httpStatus" class="network-note">HTTP {{ anthropic.httpStatus }}</p><p class="network-note">{{ t('needtoken.claudeEnvironment.browserScope') }}</p></article>
+          <article class="network-panel" data-network-check="rtc"><div class="network-panel-heading"><h2><Waypoints :size="19" />WebRTC</h2><span class="network-status" :class="`is-${rtc?.status || 'unknown'}`">{{ networkStatus('rtc', rtc?.status) }}</span></div><p class="network-copy">{{ t(`needtoken.claudeEnvironment.rtcDetails.${rtc?.detail || 'notChecked'}`) }}</p><div v-if="rtc?.publicAddresses.length" class="network-addresses"><code v-for="address in rtc.publicAddresses" :key="address">{{ address }}</code></div><p v-if="rtc && rtc.detail !== 'notRequested'" class="network-note">{{ t('needtoken.claudeEnvironment.rtcCounts', { local: rtc.localCount, mdns: rtc.mdnsCount }) }}</p><p class="network-note">{{ t('needtoken.claudeEnvironment.rtcScope') }}</p></article>
         </section>
-
         <section id="network-terminal" class="network-panel" :aria-label="t('needtoken.claudeEnvironment.terminal')">
           <div class="network-panel-heading"><h2><Terminal :size="19" />{{ t('needtoken.claudeEnvironment.terminal') }}</h2><span class="network-status" :class="`is-${cliStatus || 'idle'}`">{{ cli ? statusLabel(cliStatus) : t('needtoken.claudeEnvironment.notImported') }}</span></div>
           <p class="network-copy">{{ t('needtoken.claudeEnvironment.cliIntro') }}</p>
@@ -49,23 +50,22 @@
 
       <aside id="network-rules" class="network-rules" :aria-label="t('needtoken.claudeEnvironment.rules')"><section class="network-panel"><div class="network-panel-heading"><h2><ShieldCheck :size="19" />{{ t('needtoken.claudeEnvironment.rules') }}</h2></div><p class="network-copy">{{ t('needtoken.claudeEnvironment.rulesIntro') }}</p><ul class="network-rule-list"><li v-for="key in ['region','account','consistency','limits']" :key="key"><span><Check :size="13" /></span><p>{{ t(`needtoken.claudeEnvironment.staticRules.${key}`) }}</p></li></ul><a class="network-link" href="https://www.anthropic.com/supported-countries" target="_blank" rel="noopener noreferrer">{{ t('needtoken.claudeEnvironment.officialRegions') }}<ArrowUpRight :size="13" /></a><a class="network-link" href="https://www.anthropic.com/legal/aup" target="_blank" rel="noopener noreferrer">{{ t('needtoken.claudeEnvironment.officialPolicy') }}<ArrowUpRight :size="13" /></a></section>
         <section class="network-panel network-operator"><h2>{{ t('needtoken.claudeEnvironment.operatorUpdates') }}</h2><p v-if="rulesLoading" class="network-note" role="status">{{ t('needtoken.claudeEnvironment.rulesLoading') }}</p><div v-else-if="rulesFailed" class="network-empty"><p>{{ t('needtoken.claudeEnvironment.rulesFailed') }}</p><button type="button" @click="loadRules">{{ t('needtoken.common.retry') }}</button></div><p v-else-if="!rules.length" class="network-note">{{ t('needtoken.claudeEnvironment.rulesEmpty') }}</p><article v-for="rule in rules" v-else :key="rule.id" class="network-rule-article"><h3>{{ localized(rule.title) }}</h3><p>{{ plain(localized(rule.summary)) }}</p><RouterLink :to="`/blog/${encodeURIComponent(rule.slug)}`">{{ t('needtoken.claudeEnvironment.readUpdate') }}<ArrowUpRight :size="12" /></RouterLink></article></section>
-        <p class="network-reference">{{ t('needtoken.claudeEnvironment.reference') }} <a href="https://github.com/LinXiaoTao/FuckClaude" target="_blank" rel="noopener noreferrer">LinXiaoTao/FuckClaude</a></p>
       </aside>
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Activity, ArrowUpRight, Check, CircleHelp, Copy, Download, FileJson, Globe2, Info, LoaderCircle, Monitor, Play, Radio, ShieldCheck, Square, Terminal, TriangleAlert, Upload, Waypoints } from 'lucide-vue-next'
+import { Activity, ArrowUpRight, Check, CircleHelp, Copy, Download, FileJson, Globe2, Info, Cpu, LoaderCircle, Monitor, Play, Radio, Server, ShieldCheck, Square, Terminal, TriangleAlert, Upload, Waypoints } from 'lucide-vue-next'
 import { postAPI } from '../../api'
 import { usePageSeo } from '../../composables/usePageSeo'
 import { useAppStore } from '../../stores/app'
 import { getLocalizedText } from '../../utils/resellerSiteConfig'
 import { serviceDescriptionText } from './lib/serviceCatalog'
-import { classifyWebRtc, claudeNetworkReport, claudeRuleCategoryIds, lookupExitNetwork, parseCliReport, probeAnthropic, probeWebRtc, timezoneDiffers } from './lib/claudeNetwork'
-import type { AnthropicConnection, CliReport, ExitNetwork, NetworkStatus, WebRtcObservation } from './lib/claudeNetwork'
+import { claudeNetworkReport, claudeRuleCategoryIds, collectClaudeLocalChecks, parseCliReport, runClaudeNetworkChecks, timezoneDiffers } from './lib/claudeNetwork'
+import type { ConnectionDiagnostic } from './lib/browserDiagnostics'
+import type { AnthropicConnection, ClaudeLocalCheck, CliReport, ExitNetwork, LocalCheckId, NetworkCheckId, NetworkStatus, WebRtcObservation } from './lib/claudeNetwork'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
@@ -74,39 +74,61 @@ const unknown = computed(() => t('needtoken.claudeEnvironment.unknown'))
 const localized = (value?: Record<string, unknown>) => getLocalizedText(value, appStore.locale)
 const plain = serviceDescriptionText
 const exit = ref<ExitNetwork | null>(null), anthropic = ref<AnthropicConnection | null>(null), rtc = ref<WebRtcObservation | null>(null), cli = ref<CliReport | null>(null)
-const running = ref(false), measuredAt = ref(''), localTimezone = ref(''), localLanguage = ref(''), includeWebRtc = ref(false), copyMessage = ref(''), importMessage = ref('')
+const running = ref(false), measuredAt = ref(''), includeWebRtc = ref(false), copyMessage = ref(''), importMessage = ref(''), cancelled = ref(false)
+const localChecks = ref<ClaudeLocalCheck[]>([]), storefront = ref<ConnectionDiagnostic | null>(null), pending = ref(new Set<NetworkCheckId>()), rtcIncluded = ref(false)
 const rulesLoading = ref(true), rulesFailed = ref(false), rules = ref<Array<{ id: number; slug: string; title: Record<string, unknown>; summary: Record<string, unknown> }>>([])
 let active: AbortController | null = null, generation = 0, importGeneration = 0, rulesGeneration = 0, disposed = false
-const dateTime = (value: string) => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString(locale.value) : unknown.value
+const dateTime = (value: string) => { try { return Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString(locale.value) : unknown.value } catch { return value } }
 const statusLabel = (status?: NetworkStatus) => t(`needtoken.claudeEnvironment.status.${status || 'idle'}`)
-const timeMismatch = computed(() => timezoneDiffers(localTimezone.value, exit.value))
+const networkStatus = (id: NetworkCheckId, status?: NetworkStatus) => pending.value.has(id) ? t('needtoken.environmentV5.pending') : cancelled.value && !status ? t('needtoken.environmentV5.stopped') : statusLabel(status)
+const localValue = (id: LocalCheckId) => localChecks.value.find(check => check.id === id)?.value || ''
+const timeMismatch = computed(() => timezoneDiffers(localValue('timezone'), exit.value))
 const hasCliProxy = computed(() => !!cli.value && (cli.value.proxy.http || cli.value.proxy.https || cli.value.proxy.all))
 const cliStatus = computed<NetworkStatus | undefined>(() => !cli.value ? undefined : cli.value.curl.status === 'unsupported' ? 'unknown' : cli.value.curl.status === 'ok' && ![403, 429].includes(cli.value.curl.http_status || 0) && (cli.value.curl.http_status || 0) < 500 ? 'ok' : 'warning')
+const localGroups = computed(() => [
+  { id: 'connection', icon: ShieldCheck, total: 2, checks: localChecks.value.filter(check => check.group === 'connection') },
+  { id: 'features', icon: Cpu, total: 7, checks: localChecks.value.filter(check => check.group === 'features') },
+  { id: 'system', icon: Monitor, total: 6, checks: localChecks.value.filter(check => check.group === 'system') },
+])
+const oldIds = new Set(['secure', 'online', 'cookies', 'storage', 'crypto', 'wasm', 'language', 'timezone'])
+const oldDetails = new Set(['secureReady', 'secureLimited', 'onlineHint', 'offlineHint', 'cookiesReady', 'cookiesLimited', 'storageReady', 'storageLimited', 'cryptoReady', 'cryptoLimited', 'wasmReady', 'wasmLimited', 'localOnly'])
+const localLabel = (id: LocalCheckId) => t(`${oldIds.has(id) ? 'needtoken.environment' : 'needtoken.environmentV5'}.labels.${id}`)
+const localDetail = (detail: string) => t(`${oldDetails.has(detail) ? 'needtoken.environment' : 'needtoken.environmentV5'}.details.${detail}`)
+const totalChecks = computed(() => 18 + (measuredAt.value ? rtcIncluded.value ? 1 : 0 : includeWebRtc.value ? 1 : 0))
+const networkResults = computed(() => [storefront.value, exit.value, anthropic.value, ...(rtcIncluded.value ? [rtc.value] : [])].filter(Boolean))
+const completedCount = computed(() => localChecks.value.length + networkResults.value.length)
+const ringLength = 2 * Math.PI * 47
 const summary = computed(() => {
-  const rows = [exit.value, anthropic.value, ...(rtc.value?.detail !== 'notRequested' ? [rtc.value] : [])].filter(Boolean)
+  const rows = [...localChecks.value, ...networkResults.value]
   return { ok: rows.filter(row => row?.status === 'ok').length, warning: rows.filter(row => row?.status === 'warning').length, unknown: rows.filter(row => row?.status === 'unknown').length }
 })
-const report = computed(() => claudeNetworkReport({ exit: exit.value, anthropic: anthropic.value, rtc: rtc.value, cli: cli.value, measuredAt: measuredAt.value }))
+const report = computed(() => claudeNetworkReport({ exit: exit.value, anthropic: anthropic.value, rtc: rtc.value, cli: cli.value, measuredAt: measuredAt.value, local: localChecks.value, storefront: storefront.value }))
 
 async function run() {
   if (running.value) return
   const current = ++generation
-  const controller = new AbortController(); active = controller
-  running.value = true; measuredAt.value = ''; exit.value = null; anthropic.value = null; rtc.value = null; copyMessage.value = ''
-  localTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone || ''
-  localLanguage.value = navigator.languages?.join(', ') || navigator.language || ''
-  const exitTask = lookupExitNetwork({ signal: controller.signal }).then(value => { if (!disposed && generation === current) exit.value = value; return value })
-  const connectionTask = probeAnthropic({ signal: controller.signal }).then(value => { if (!disposed && generation === current) anthropic.value = value })
-  const rtcTask = includeWebRtc.value ? probeWebRtc({ signal: controller.signal }) : null
-  const results = await Promise.allSettled([exitTask, connectionTask, rtcTask] as const)
-  if (disposed || generation !== current) return
-  const rtcResult = results[2]
-  const expectedIp = results[0].status === 'fulfilled' ? results[0].value.ip : undefined
-  if (!rtcTask) rtc.value = { status: 'unknown', detail: 'notRequested', publicAddresses: [], localCount: 0, mdnsCount: 0 }
-  else if (rtcResult?.status === 'fulfilled' && rtcResult.value && 'supported' in rtcResult.value) rtc.value = rtcResult.value.supported ? classifyWebRtc(rtcResult.value.addresses, rtcResult.value.mdnsCount, expectedIp) : { status: 'unknown', detail: 'unsupported', publicAddresses: [], localCount: 0, mdnsCount: 0 }
-  measuredAt.value = new Date().toISOString(); running.value = false; active = null
+  const controller = typeof AbortController === 'function' ? new AbortController() : null
+  active = controller; running.value = true; cancelled.value = false; copyMessage.value = ''
+  measuredAt.value = new Date().toISOString(); exit.value = null; anthropic.value = null; storefront.value = null
+  rtcIncluded.value = includeWebRtc.value
+  rtc.value = includeWebRtc.value ? null : { status: 'unknown', detail: 'notRequested', publicAddresses: [], localCount: 0, mdnsCount: 0 }
+  pending.value = new Set<NetworkCheckId>(['storefront', 'exit', 'anthropic', ...(includeWebRtc.value ? ['rtc' as const] : [])])
+  // Publish local results before scheduling any network request.
+  localChecks.value = collectClaudeLocalChecks()
+  try {
+    await runClaudeNetworkChecks({ signal: controller?.signal, includeWebRtc: rtcIncluded.value, onResult: event => {
+      if (disposed || generation !== current) return
+      if (event.id === 'storefront') storefront.value = event.result
+      else if (event.id === 'exit') exit.value = event.result
+      else if (event.id === 'anthropic') anthropic.value = event.result
+      else rtc.value = event.result
+      const remaining = new Set(pending.value); remaining.delete(event.id); pending.value = remaining
+    } })
+  } catch { /* Cancellation and inaccessible browser APIs remain individual unknown results. */ }
+  finally { if (!disposed && generation === current) { running.value = false; pending.value = new Set(); active = null } }
 }
-function cancel() { generation++; active?.abort(); active = null; running.value = false; measuredAt.value = '' }
+function cancel() { generation++; active?.abort(); active = null; running.value = false; cancelled.value = true; pending.value = new Set() }
+
 async function copyReport() { try { await navigator.clipboard.writeText(report.value); copyMessage.value = 'copied' } catch { copyMessage.value = 'copyFailed' } }
 async function importCliReport(event: Event) {
   const input = event.target as HTMLInputElement, file = input.files?.[0], current = ++importGeneration
@@ -141,7 +163,7 @@ onBeforeUnmount(() => { disposed = true; generation++; importGeneration++; rules
 <style scoped>
 .network-heading { max-width: 820px; margin-bottom: 30px; }
 .network-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-accent); font-size: 12px; letter-spacing: .06em; }
-.network-heading h1 { margin: 15px 0; font-size: clamp(29px, 4.2vw, 46px); font-weight: 750; letter-spacing: -.04em; line-height: 1.25; }
+.network-heading h1 { margin: 15px 0; font-size: clamp(28px, 4.2vw, 46px); font-weight: 750; letter-spacing: -.04em; line-height: 1.25; text-wrap: balance; }
 .network-heading > p { color: var(--ui-text-secondary); font-size: 14px; line-height: 1.9; }
 .network-anchors { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; }
 .network-anchors a { padding: 7px 12px; border: 1px solid var(--ui-border); border-radius: 999px; color: var(--ui-text-muted); font-size: 12px; }
@@ -163,6 +185,45 @@ onBeforeUnmount(() => { disposed = true; generation++; importGeneration++; rules
 .network-summary { display: flex; flex-wrap: wrap; gap: 12px 22px; margin-top: 19px; font-size: 11px; }
 .network-summary > span { display: inline-flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); }
 .network-summary .review { color: #e5b969; }
+.network-dashboard { display: flex; align-items: center; gap: 27px; margin-top: 23px; padding-top: 23px; border-top: 1px solid var(--ui-border); }
+.network-progress { position: relative; width: 118px; height: 118px; flex: none; }
+.network-progress svg { width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 5; }
+.network-progress-track { stroke: #2dd4a714; }
+.network-progress-value { stroke: var(--ui-accent); stroke-linecap: round; transition: stroke-dashoffset 220ms ease; }
+.network-progress > div { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; }
+.network-progress strong { font-size: 26px; font-weight: 650; letter-spacing: -.04em; }
+.network-progress strong small { margin-left: 3px; font-size: 13px; color: var(--ui-text-muted); font-weight: 400; }
+.network-progress > div > span { color: var(--ui-text-muted); font-size: 10px; }
+.network-progress-copy { flex: 1; min-width: 0; }
+.network-progress-copy h3 { font-size: 15px; font-weight: 650; }
+.network-progress-copy > p { margin-top: 8px; font-size: 12px; color: var(--ui-text-muted); line-height: 1.85; }
+.network-progress-copy .network-summary { margin-top: 14px; }
+.network-progress-copy > .network-remaining { color: var(--ui-accent); font-size: 11px; }
+.network-disclosure a { color: var(--ui-accent); text-decoration: underline; text-underline-offset: 3px; }
+.network-local-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 18px; margin-bottom: 25px; scroll-margin-top: 88px; }
+.network-local-card { padding: 20px; }
+.network-local-card .network-panel-heading { gap: 8px; margin-bottom: 11px; }
+.network-local-card .network-panel-heading h2 { font-size: 14px; }
+.network-group-count { flex: none; color: var(--ui-text-muted); font-size: 10px; font-family: var(--nt-font-mono); }
+.network-group-intro { color: var(--ui-text-muted); font-size: 11px; line-height: 1.8; margin-bottom: 18px; }
+.network-check-list { display: grid; gap: 14px; }
+.network-check-list > li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.network-check-icon { flex: none; color: var(--ui-text-muted); margin-top: 3px; }
+.network-check-icon.is-ok, .network-check-state.is-ok { color: var(--ui-accent); }
+.network-check-icon.is-warning, .network-check-state.is-warning { color: #e5b969; }
+.network-check-list > li > div { flex: 1; min-width: 0; }
+.network-check-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.network-check-title h3 { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 550; color: var(--ui-text-secondary); min-width: 0; }
+.network-check-state { flex: none; font-size: 10px; color: var(--ui-text-muted); }
+.network-check-value { color: var(--ui-text-secondary); font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; margin-top: 4px; }
+.network-local-card .network-check-list details { margin-top: 2px; }
+.network-local-card .network-check-list summary { display: inline-block; padding: 2px 0; font-size: 10px; color: var(--ui-text-muted); }
+.network-check-list details p { margin-top: 5px; color: var(--ui-text-muted); font-size: 10px; line-height: 1.8; }
+.network-health { border-top: 1px solid var(--ui-border); margin-top: 20px; padding-top: 18px; }
+.network-health .network-check-title { align-items: center; }
+.network-health > p { margin-top: 11px; font-size: 11px; color: var(--ui-text-secondary); line-height: 1.9; }
+.network-health > small { display: block; margin-top: 12px; font-size: 10px; color: var(--ui-text-muted); line-height: 1.8; }
+.network-health-time { display: inline-block; margin-top: 12px; margin-right: 10px; color: var(--ui-accent); font-size: 12px; font-family: var(--nt-font-mono); }
 .network-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 24px; align-items: start; }
 .network-main { display: grid; gap: 22px; min-width: 0; }
 .network-panel { min-width: 0; padding: 23px; border: 1px solid var(--ui-border); border-radius: 18px; background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent); scroll-margin-top: 88px; }
@@ -209,13 +270,12 @@ onBeforeUnmount(() => { disposed = true; generation++; importGeneration++; rules
 .network-rule-article + .network-rule-article { border-top: 1px solid var(--ui-border); padding-top: 16px; margin-top: 16px; }
 .network-rule-article h3 { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 .network-rule-article p { margin-top: 7px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.85; overflow-wrap: anywhere; }
-.network-reference { color: var(--ui-text-muted); font-size: 10px; line-height: 1.85; }
-.network-reference a { color: var(--ui-text-secondary); overflow-wrap: anywhere; }
 .network-empty { color: var(--ui-text-muted); font-size: 11px; line-height: 1.8; }
 .network-empty button { margin-top: 8px; color: var(--ui-accent); }
 .network-spin { animation: network-spin 1s linear infinite; }
 @keyframes network-spin { to { transform: rotate(360deg); } }
-@media (max-width: 1000px) { .network-layout { grid-template-columns: minmax(0, 1fr); } .network-rules { grid-template-columns: repeat(2, minmax(0, 1fr)); } .network-reference { grid-column: 1 / -1; } }
+@media (max-width: 1000px) { .network-layout { grid-template-columns: minmax(0, 1fr); } .network-rules { grid-template-columns: repeat(2, minmax(0, 1fr)); } .network-local-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); } .network-local-card:last-child { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .network-local-groups { grid-template-columns: minmax(0, 1fr); } .network-dashboard { gap: 17px; align-items: flex-start; } .network-progress { width: 93px; height: 93px; } .network-progress strong { font-size: 22px; } .network-progress > div > span { font-size: 9px; } .network-progress-copy h3 { font-size: 13px; } .network-progress-copy > p { font-size: 11px; } .network-summary { gap: 8px 14px; } }
 @media (max-width: 600px) { .network-start, .network-panel { padding: 19px; } .network-browser-grid, .network-rules { grid-template-columns: minmax(0, 1fr); } .network-facts { gap: 15px 12px; } .network-heading > p { font-size: 13px; } .network-panel-heading h2 { font-size: 15px; } .network-start-top { gap: 16px; } .network-actions { width: 100%; } .network-actions > .primary { flex: 1; } }
-@media (prefers-reduced-motion: reduce) { .network-spin { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .network-spin { animation: none; } .network-progress-value { transition: none; } }
 </style>

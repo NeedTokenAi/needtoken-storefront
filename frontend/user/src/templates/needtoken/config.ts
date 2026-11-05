@@ -19,6 +19,10 @@ export const CONSOLE_URL = trimSlash(env.VITE_NEEDTOKEN_CONSOLE_URL || 'https://
 /** 对外唯一 API 入口 */
 export const API_BASE_URL = `${CONSOLE_URL}/v1`
 
+/** API 服务介绍与实际套餐目录分开；/api 是后端保留路径。 */
+export const API_SERVICES_PATH = '/api-services'
+export const API_PLANS_PATH = '/plans'
+
 /** new-api 公开定价接口（模型广场数据源） */
 export const PRICING_URL = trimSlash(env.VITE_NEEDTOKEN_PRICING_URL || `${CONSOLE_URL}/api/pricing`)
 

@@ -90,7 +90,7 @@ export const getActiveTemplate = (): StorefrontTemplate => {
 // vault 模板页面（按需动态加载）。key 形如 './vault/Home.vue'
 const vaultViews = import.meta.glob('./vault/**/*.vue')
 // needtoken 模板页面（needtoken.io 官网）。缺页时回退 classic，结算 / 支付 / 查单沿用独角原页
-const needtokenViews = import.meta.glob('./needtoken/*.vue')
+const needtokenViews = import.meta.glob('./needtoken/**/*.vue')
 
 type ViewLoader = () => Promise<unknown>
 

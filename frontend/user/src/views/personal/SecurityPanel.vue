@@ -1,5 +1,18 @@
 <template>
   <div class="space-y-6">
+    <section v-if="twoFactorOnboarding" class="rounded-2xl border border-primary/30 bg-primary/5 p-6" aria-labelledby="two-factor-onboarding-title">
+      <div class="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
+        <div class="min-w-0 space-y-2">
+          <h2 id="two-factor-onboarding-title" class="flex items-center gap-2 text-base font-bold text-foreground"><ShieldCheck class="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />{{ t('personalCenter.security.twofaOnboarding.title') }}</h2>
+          <p class="max-w-2xl text-sm leading-relaxed text-muted-foreground">{{ canManagePassword ? t('personalCenter.security.twofaOnboarding.description', { action: t('personalCenter.security.twofa.startSetup') }) : t('personalCenter.security.twofaOnboarding.bindEmailFirst') }}</p>
+          <p class="text-xs leading-relaxed text-muted-foreground">{{ t('personalCenter.security.twofaOnboarding.optional') }}</p>
+        </div>
+        <Button as-child variant="outline" class="h-11 shrink-0 font-semibold"><RouterLink :to="twoFactorContinueTarget" data-two-factor-continue>{{ t('personalCenter.security.twofaOnboarding.continue') }}</RouterLink></Button>
+      </div>
+    </section>
+
+    <TwoFactorSection v-if="twoFactorOnboarding && canManagePassword" />
+
     <div class="rounded-2xl border bg-card p-7 shadow-sm">
       <PanelHeading
         :title="t('personalCenter.security.title')"
@@ -92,7 +105,7 @@
       @submit="handleChangePassword"
     />
 
-    <TwoFactorSection v-if="canManagePassword" />
+    <TwoFactorSection v-if="canManagePassword && !twoFactorOnboarding" />
   </div>
 </template>
 
@@ -105,6 +118,8 @@ import { pageAlertVariant, pageAlertToneClass, type PageAlert } from '../../util
 import PanelHeading from '../../components/shared/PanelHeading.vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { authReturnPath } from '../../utils/authReturnPath'
 import { userProfileAPI } from '../../api/user'
 import type { TelegramAuthPayload } from '../../api'
 import { useAppStore } from '../../stores/app'
@@ -135,6 +150,8 @@ const appStore = useAppStore()
 const telegramMiniAppStore = useTelegramMiniAppStore()
 const userProfileStore = useUserProfileStore()
 const userAuthStore = useUserAuthStore()
+const twoFactorOnboarding = computed(() => route.query.setup_2fa === '1')
+const twoFactorContinueTarget = computed(() => authReturnPath(route.query.return_to))
 
 const securityForm = reactive({
   newEmail: '',

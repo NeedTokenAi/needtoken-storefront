@@ -112,7 +112,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowRight, ArrowUpRight, BadgeCheck, Check, ClipboardList, Clock3, KeyRound, PackageCheck, Pause, Play, Plus, ReceiptText, ShieldCheck, Sparkles, Zap } from 'lucide-vue-next'
 import { usePageSeo } from '../../composables/usePageSeo'
-import { CATEGORY_SLUGS } from './config'
+import { API_SERVICES_PATH, CATEGORY_SLUGS } from './config'
 import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import GhostFibersBackground from './components/GhostFibersBackground.vue'
 import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
@@ -127,7 +127,7 @@ usePageSeo({
 const services = [
   { key: 'recharge', icon: Zap, to: `/categories/${CATEGORY_SLUGS.recharge}` },
   { key: 'products', icon: PackageCheck, to: `/categories/${CATEGORY_SLUGS.rental}` },
-  { key: 'api', icon: KeyRound, to: '/plans' },
+  { key: 'api', icon: KeyRound, to: API_SERVICES_PATH },
 ]
 const benefits = [
   { key: 'selfService', icon: Clock3 },

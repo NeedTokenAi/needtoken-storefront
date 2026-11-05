@@ -1,5 +1,7 @@
 /** Original network diagnostics, informed by LinXiaoTao/FuckClaude's separation
  * of local observations and IP reputation. No account eligibility score is inferred. */
+import { probeCookie, probeStorage, probeStorefrontConnection, type ConnectionDiagnostic } from './browserDiagnostics.ts'
+
 export const CLAUDE_PROBES = {
   geo: 'https://ipapi.co/json/',
   ip: 'https://api.ipify.org?format=json',
@@ -44,6 +46,100 @@ export interface CliReport {
   dns: { status: 'ok' | 'error'; address_count: number }
   curl: { status: 'ok' | 'error' | 'unsupported'; exit_code: number; http_status?: number; ssl_verify_result?: number; time_ms?: number; peer_ip?: string }
   scope: 'curl_inherits_proxy_env'
+}
+
+export type LocalCheckGroup = 'connection' | 'features' | 'system'
+export type LocalCheckId = 'secure' | 'online' | 'cookies' | 'storage' | 'crypto' | 'wasm' | 'fetch' | 'abort' | 'intl' | 'language' | 'timezone' | 'locale' | 'clock' | 'platform' | 'browser'
+export interface ClaudeLocalCheck {
+  id: LocalCheckId
+  group: LocalCheckGroup
+  status: NetworkStatus
+  detail: string
+  value?: string
+}
+export type ClaudeLocalEnvironment = Partial<Record<LocalCheckId, () => unknown>>
+export type NetworkCheckId = 'storefront' | 'exit' | 'anthropic' | 'rtc'
+export type NetworkCheckEvent =
+  | { id: 'storefront'; result: ConnectionDiagnostic }
+  | { id: 'exit'; result: ExitNetwork }
+  | { id: 'anthropic'; result: AnthropicConnection }
+  | { id: 'rtc'; result: WebRtcObservation }
+
+/** Each getter is isolated: a restricted browser feature cannot prevent a run. */
+export function collectClaudeLocalChecks(environment?: ClaudeLocalEnvironment): ClaudeLocalCheck[] {
+  const defaults: ClaudeLocalEnvironment = {
+    secure: () => globalThis.isSecureContext,
+    online: () => navigator.onLine,
+    cookies: () => navigator.cookieEnabled && probeCookie(document, globalThis.isSecureContext),
+    storage: () => probeStorage(() => localStorage),
+    crypto: () => !!globalThis.crypto?.subtle,
+    wasm: () => typeof WebAssembly !== 'undefined',
+    fetch: () => typeof fetch === 'function',
+    abort: () => typeof AbortController === 'function',
+    intl: () => typeof Intl.DateTimeFormat === 'function',
+    language: () => (navigator.languages?.length ? navigator.languages : [navigator.language]).slice(0, 5).join(', '),
+    timezone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    locale: () => Intl.DateTimeFormat().resolvedOptions().locale,
+    clock: () => new Date().toISOString(),
+    platform: () => {
+      const agent = navigator.userAgent
+      return /Windows/i.test(agent) ? 'Windows' : /Android/i.test(agent) ? 'Android' : /iPhone|iPad|iPod/i.test(agent) ? 'iOS' : /Macintosh|Mac OS X/i.test(agent) ? 'macOS' : /Linux/i.test(agent) ? 'Linux' : ''
+    },
+    browser: () => {
+      const agent = navigator.userAgent
+      return /Edg\//.test(agent) ? 'Microsoft Edge' : /Firefox\//.test(agent) ? 'Firefox' : /Chrome\//.test(agent) ? 'Chrome / Chromium' : /Safari\//.test(agent) ? 'Safari' : ''
+    },
+  }
+  const readers = environment ?? defaults
+  const read = (id: LocalCheckId) => { try { return readers[id]?.() } catch { return undefined } }
+  const capabilities: { id: LocalCheckId; group: LocalCheckGroup; yes: string; no: string }[] = [
+    { id: 'secure', group: 'connection', yes: 'secureReady', no: 'secureLimited' },
+    { id: 'online', group: 'connection', yes: 'onlineHint', no: 'offlineHint' },
+    { id: 'cookies', group: 'features', yes: 'cookiesReady', no: 'cookiesLimited' },
+    { id: 'storage', group: 'features', yes: 'storageReady', no: 'storageLimited' },
+    { id: 'crypto', group: 'features', yes: 'cryptoReady', no: 'cryptoLimited' },
+    { id: 'wasm', group: 'features', yes: 'wasmReady', no: 'wasmLimited' },
+    { id: 'fetch', group: 'features', yes: 'featureReady', no: 'featureLimited' },
+    { id: 'abort', group: 'features', yes: 'featureReady', no: 'featureLimited' },
+    { id: 'intl', group: 'features', yes: 'featureReady', no: 'featureLimited' },
+  ]
+  const checks: ClaudeLocalCheck[] = capabilities.map(({ id, group, yes, no }) => {
+    const value = read(id)
+    return { id, group, status: typeof value !== 'boolean' ? 'unknown' : value ? 'ok' : 'warning', detail: typeof value !== 'boolean' ? 'featureUnknown' : value ? yes : no }
+  })
+  for (const id of ['language', 'timezone', 'locale', 'clock', 'platform', 'browser'] as const) {
+    const raw = read(id), value = typeof raw === 'string' ? raw.trim().slice(0, 160) : ''
+    checks.push({ id, group: 'system', status: value && id !== 'clock' ? 'ok' : 'unknown', detail: id === 'clock' ? 'clockLocalOnly' : id === 'platform' || id === 'browser' ? 'browserReported' : 'localOnly', ...(value ? { value } : {}) })
+  }
+  return checks
+}
+
+/** Every fixed probe settles independently, including when fetch ignores abort. */
+export async function runClaudeNetworkChecks(options: {
+  onResult: (event: NetworkCheckEvent) => void
+  includeWebRtc?: boolean
+  signal?: AbortSignal
+  fetcher?: typeof fetch
+  timeoutMs?: number
+  rtcFactory?: () => RTCPeerConnection
+}): Promise<void> {
+  if (options.signal?.aborted) throw abortError()
+  const timeoutMs = options.timeoutMs ?? 2500
+  let expectedIp: string | undefined
+  let rtcRaw: { addresses: string[]; mdnsCount: number; supported: boolean } | undefined
+  const notify = (event: NetworkCheckEvent) => { if (!options.signal?.aborted) options.onResult(event) }
+  const publishRtc = () => {
+    if (!rtcRaw) return
+    notify({ id: 'rtc', result: rtcRaw.supported ? classifyWebRtc(rtcRaw.addresses, rtcRaw.mdnsCount, expectedIp) : { status: 'unknown', detail: 'unsupported', publicAddresses: [], localCount: 0, mdnsCount: 0 } })
+  }
+  const tasks = [
+    Promise.resolve().then(() => probeStorefrontConnection({ ...options, timeoutMs })).then(result => notify({ id: 'storefront', result })).catch(() => notify({ id: 'storefront', result: { status: 'unknown', detail: 'networkError' } })),
+    Promise.resolve().then(() => lookupExitNetwork({ ...options, timeoutMs })).then(result => { expectedIp = result.ip; notify({ id: 'exit', result }); publishRtc() }).catch(() => notify({ id: 'exit', result: { status: 'unknown', detail: 'lookupUnavailable', source: '', measuredAt: new Date().toISOString() } })),
+    Promise.resolve().then(() => probeAnthropic({ ...options, timeoutMs })).then(result => notify({ id: 'anthropic', result })).catch(() => notify({ id: 'anthropic', result: { status: 'unknown', detail: 'requestUnconfirmed', measuredAt: new Date().toISOString() } })),
+  ]
+  if (options.includeWebRtc) tasks.push(Promise.resolve().then(() => probeWebRtc({ signal: options.signal, timeoutMs, factory: options.rtcFactory })).then(result => { rtcRaw = result; publishRtc() }).catch(() => notify({ id: 'rtc', result: { status: 'unknown', detail: 'unsupported', publicAddresses: [], localCount: 0, mdnsCount: 0 } })))
+  await Promise.allSettled(tasks)
+  if (options.signal?.aborted) throw abortError()
 }
 
 const abortError = () => new DOMException('Aborted', 'AbortError')
@@ -234,9 +330,11 @@ export function parseCliReport(raw: string): CliReport | null {
   } catch { return null }
 }
 
-export function claudeNetworkReport(data: { exit: ExitNetwork | null; anthropic: AnthropicConnection | null; rtc: WebRtcObservation | null; cli: CliReport | null; measuredAt: string }): string {
+export function claudeNetworkReport(data: { exit: ExitNetwork | null; anthropic: AnthropicConnection | null; rtc: WebRtcObservation | null; cli: CliReport | null; measuredAt: string; local?: ClaudeLocalCheck[]; storefront?: ConnectionDiagnostic | null }): string {
   return JSON.stringify({
     schema: 'needtoken.claude-network.browser.v1', measured_at: data.measuredAt,
+    local_checks: (data.local ?? []).map(({ id, group, status }) => ({ id, group, status })),
+    storefront_connection: data.storefront ?? null,
     exit: data.exit ? { status: data.exit.status, detail: data.exit.detail, source: data.exit.source, measured_at: data.exit.measuredAt } : null,
     anthropic_browser: data.anthropic,
     webrtc: data.rtc ? { status: data.rtc.status, detail: data.rtc.detail, public_address_count: data.rtc.publicAddresses.length, local_count: data.rtc.localCount, mdns_count: data.rtc.mdnsCount } : null,
