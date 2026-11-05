@@ -20,11 +20,15 @@
           <button type="button" class="nt-service-catalog__filter" :class="{ 'is-active': scope.selected?.id === scope.root.id }" :aria-pressed="scope.selected?.id === scope.root.id" @click="selectCategory(null)">{{ t('needtoken.catalogServices.all') }}</button>
           <button v-for="category in scope.categories" :key="category.id" type="button" class="nt-service-catalog__filter" :class="{ 'is-active': scope.selected?.id === category.id }" :aria-pressed="scope.selected?.id === category.id" @click="selectCategory(category)">{{ getLocalizedText(category.name) }}</button>
         </nav>
-        <form class="nt-service-catalog__search" role="search" @submit.prevent="submitSearch">
-          <Search :size="16" aria-hidden="true" />
-          <input v-model="searchQuery" type="search" :placeholder="t('needtoken.catalogServices.search')" :aria-label="t('needtoken.catalogServices.search')" />
-          <button type="submit" :aria-label="t('needtoken.catalogServices.searchSubmit')"><ArrowRight :size="16" aria-hidden="true" /></button>
-        </form>
+        <div class="nt-service-catalog__tools">
+          <span v-if="!loading && !categoriesLoading && !loadError" class="nt-service-catalog__count" aria-live="polite">{{ t('needtoken.catalogServices.resultCount', { count: totalProducts }) }}</span>
+          <form class="nt-service-catalog__search" role="search" @submit.prevent="submitSearch">
+            <Search :size="16" aria-hidden="true" />
+            <input v-model="searchQuery" type="search" :placeholder="t('needtoken.catalogServices.search')" :aria-label="t('needtoken.catalogServices.search')" />
+            <button type="submit" :aria-label="t('needtoken.catalogServices.searchSubmit')"><ArrowRight :size="16" aria-hidden="true" /></button>
+          </form>
+          <DisplayCurrencySelector compact />
+        </div>
       </div>
 
       <div v-if="categoriesLoading || loading" class="nt-service-catalog__grid" role="status" :aria-label="t('needtoken.common.loading')" aria-busy="true">
@@ -42,10 +46,6 @@
         <button v-if="searchQuery" type="button" @click="clearSearch">{{ t('products.clearFilters') }}</button>
       </div>
       <template v-else>
-        <div class="nt-service-catalog__result" aria-live="polite">
-          <span>{{ t(`needtoken.catalogServices.${serviceKind}.section`) }}</span>
-          <div class="nt-service-catalog__result-actions"><span>{{ t('needtoken.catalogServices.resultCount', { count: totalProducts }) }}</span><DisplayCurrencySelector compact /></div>
-        </div>
         <div class="nt-service-catalog__grid">
           <ServiceProductCard v-for="product in products" :key="product.id" :product="product" :kind="serviceKind!" :category-label="categoryLabel(product.category_id)" />
         </div>
@@ -99,26 +99,27 @@ usePageSeo({
 </script>
 
 <style scoped>
-.nt-service-catalog { padding-top: 48px; padding-bottom: 32px; }
-.nt-service-catalog__intro { text-align: center; margin-bottom: 34px; }
-h1 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.055em; line-height: 1.25; text-wrap: balance; }
+.nt-service-catalog { padding-top: 24px; padding-bottom: 32px; }
+.nt-service-catalog__intro { text-align: center; margin-bottom: 16px; }
+h1 { font-size: clamp(27px, 2.5vw, 34px); font-weight: 750; letter-spacing: -.045em; line-height: 1.25; text-wrap: balance; }
 .nt-service-catalog__title-subject { color: var(--ui-accent); }
-.nt-service-catalog__promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 20px; font-size: 12px; }
-.nt-service-catalog__promises li { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; padding: 9px 13px; border: 1px solid rgba(255, 224, 126, .45); border-radius: 11px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24); }
+.nt-service-catalog__promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; font-size: 12px; }
+.nt-service-catalog__promises li { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid rgba(255, 224, 126, .45); border-radius: 9px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24); }
 .nt-service-catalog__promises svg { flex: none; color: currentColor; opacity: .85; }
 .nt-service-catalog__rate { position: relative; z-index: 3; }
-.nt-service-catalog__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; border-top: 1px solid var(--ui-border); }
+.nt-service-catalog__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0 16px; border-top: 1px solid var(--ui-border); }
+.nt-service-catalog__tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex: 0 1 auto; min-width: 0; }
+.nt-service-catalog__count { flex: none; color: var(--ui-text-muted); font-size: 12px; }
 .nt-service-catalog__filters { min-width: 0; display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
-.nt-service-catalog__filter { min-height: 40px; flex-shrink: 0; border: 1px solid rgba(204, 219, 235, .17); border-radius: 12px; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.018)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 4px 16px rgba(0,0,0,.08); backdrop-filter: blur(18px); padding: 8px 17px; color: var(--ui-text-secondary); font-size: 12px; white-space: nowrap; cursor: pointer; transition: .15s; }
+.nt-service-catalog__filter { min-height: 40px; flex-shrink: 0; border: 1px solid rgba(204, 219, 235, .17); border-radius: 10px; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.018)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 4px 16px rgba(0,0,0,.08); padding: 8px 14px; color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; cursor: pointer; transition: .15s; }
 .nt-service-catalog__filter:hover { color: var(--ui-text-primary); border-color: rgba(204,219,235,.35); }
 .nt-service-catalog__filter.is-active { color: var(--ui-accent); border-color: rgba(45,212,167,.44); background: linear-gradient(135deg, rgba(45,212,167,.15), rgba(45,212,167,.04)); box-shadow: inset 0 1px 0 rgba(153,255,223,.13), 0 0 18px rgba(45,212,167,.035); }
 .nt-service-catalog__filter:focus-visible, .nt-service-catalog__search:focus-within { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-.nt-service-catalog__search { display: flex; align-items: center; gap: 8px; width: 220px; flex-shrink: 0; min-height: 40px; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 12px; background: rgba(255,255,255,.025); color: var(--ui-text-muted); }
-.nt-service-catalog__search input { min-width: 0; flex: 1; width: 100%; outline: none; background: transparent; font-size: 12px; color: var(--ui-text-primary); }
+.nt-service-catalog__search { display: flex; align-items: center; gap: 8px; width: 200px; flex: 0 1 200px; min-width: 140px; min-height: 40px; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 10px; background: rgba(255,255,255,.025); color: var(--ui-text-muted); }
+.nt-service-catalog__search input { min-width: 0; flex: 1; width: 100%; outline: none; background: transparent; font-size: 13px; color: var(--ui-text-primary); }
 .nt-service-catalog__search button { display: grid; width: 24px; height: 28px; place-items: center; }
-.nt-service-catalog__result { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 9px 0 18px; color: var(--ui-text-muted); font-size: 11px; }
-.nt-service-catalog__result-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px 16px; min-width: 0; }
-.nt-service-catalog__result > span:first-child { color: var(--ui-text-primary); font-size: 13px; font-weight: 600; }
+.nt-service-catalog__tools :deep(.nt-display-currency--compact) { flex: none; font-size: 12px; gap: 6px; }
+.nt-service-catalog__tools :deep(.nt-display-currency__control) { min-height: 40px; }
 .nt-service-catalog__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .nt-service-catalog__skeleton { min-height: 406px; border: 1px solid var(--ui-border); border-radius: 24px; padding: 24px; }
 .nt-service-catalog__skeleton > div { width: 80%; height: 20px; margin-bottom: 20px; border-radius: 7px; background: rgba(255,255,255,.045); }
@@ -132,15 +133,8 @@ h1 { font-size: clamp(28px, 3.5vw, 42px); font-weight: 750; letter-spacing: -.05
 .nt-service-catalog__help > div, .nt-service-catalog__help a { display: inline-flex; align-items: center; gap: 7px; }
 .nt-service-catalog__help a:hover { color: var(--ui-accent); }
 @media (max-width: 1023px) { .nt-service-catalog__promises { grid-template-columns: repeat(2, minmax(0, 1fr)); } .nt-service-catalog__rate { grid-column: 1 / -1; } .nt-service-catalog__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1024px) {
-  .nt-service-catalog { padding-top: 28px; }
-  .nt-service-catalog__intro { margin-bottom: 24px; }
-  h1 { font-size: 38px; }
-  .nt-service-catalog__promises { margin-top: 18px; }
-  .nt-service-catalog__toolbar { padding-top: 16px; padding-bottom: 16px; }
-  .nt-service-catalog__result { margin-top: 6px; margin-bottom: 12px; }
-  .nt-service-catalog__skeleton { min-height: 280px; padding: 18px; border-radius: 20px; }
-}
-@media (max-width: 640px) { .nt-service-catalog { padding-top: 32px; } .nt-service-catalog__intro { margin-bottom: 27px; } .nt-service-catalog__promises { gap: 8px; margin-top: 18px; font-size: 11px; } .nt-service-catalog__promises li { padding: 8px 10px; gap: 6px; border-radius: 10px; } .nt-service-catalog__promises svg { width: 14px; height: 14px; } .nt-service-catalog__toolbar { align-items: stretch; flex-direction: column; gap: 15px; } .nt-service-catalog__search { width: 100%; } .nt-service-catalog__result-actions { justify-content: flex-start; width: 100%; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } h1 { font-size: 29px; } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
+@media (min-width: 1024px) { .nt-service-catalog__skeleton { min-height: 330px; padding: 18px; border-radius: 20px; } }
+@media (max-width: 1023px) { .nt-service-catalog__toolbar { align-items: stretch; flex-direction: column; gap: 12px; } .nt-service-catalog__tools { justify-content: space-between; flex-wrap: wrap; } .nt-service-catalog__search { flex: 1; } }
+@media (max-width: 640px) { .nt-service-catalog { padding-top: 22px; } .nt-service-catalog__promises li { padding: 7px 9px; gap: 6px; border-radius: 9px; } .nt-service-catalog__promises svg { width: 14px; height: 14px; } .nt-service-catalog__tools { gap: 10px; } .nt-service-catalog__tools > .nt-service-catalog__count { order: 1; } .nt-service-catalog__tools :deep(.nt-display-currency) { order: 2; } .nt-service-catalog__search { flex-basis: 100%; } .nt-service-catalog__grid { grid-template-columns: minmax(0, 1fr); } .nt-service-catalog__help > div { width: 100%; justify-content: center; } }
 @media (prefers-reduced-motion: reduce) { .nt-service-catalog__filter { transition: none; } }
 </style>

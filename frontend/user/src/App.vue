@@ -1,7 +1,7 @@
 <template>
   <div id="app" class="min-h-screen bg-background text-foreground flex flex-col">
-    <!-- 首次访问还不知道站点用哪套模板时先不渲染外壳，等配置返回（见 shellReady） -->
-    <template v-if="shellReady">
+    <NeedtokenStartup v-if="startupPhase !== 'ready'" :branded="startupBranded" :failed="startupPhase === 'error'" :slow="startupSlow" @retry="retryPage" />
+    <template v-else>
       <!-- vault 模板：自带顶栏/页脚的外壳包裹页面（控制台仍走下方分支） -->
       <VaultLayout v-if="isVault && !isResellerConsole">
         <ErrorBoundary>
@@ -15,10 +15,13 @@
 
       <!-- needtoken 模板（needtoken.io 官网）：自带深色外壳 -->
       <NeedtokenLayout v-else-if="isNeedtoken && !isResellerConsole">
+        <div v-if="navigationPending" class="nt-route-progress" role="status" :aria-label="t('needtoken.startup.routeLoading')"><span /><span class="sr-only">{{ t('needtoken.startup.routeLoading') }}</span></div>
+        <div v-if="routeLoadFailed" class="nt-route-error" role="alert"><span>{{ t('needtoken.startup.routeFailed') }}</span><button type="button" @click="retryPage">{{ t('needtoken.startup.retry') }}</button></div>
         <ErrorBoundary>
           <RouterView v-slot="{ Component }">
+            <NeedtokenSkeleton v-if="!Component" />
             <Transition name="page-fade" mode="out-in">
-              <component :is="Component" />
+              <component :is="Component" v-if="Component" />
             </Transition>
           </RouterView>
         </ErrorBoundary>
@@ -42,17 +45,21 @@
       </template>
     </template>
 
-    <Loading :loading="appStore.loading" />
+    <Loading v-if="!isNeedtoken && startupPhase === 'ready'" :loading="appStore.loading" />
     <Toast />
     <ConfirmDialog />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, h, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAppStore } from './stores/app'
-import { getActiveTemplate, hasTemplateHint, rememberTemplate } from './templates/registry'
+import { getActiveTemplate, rememberTemplate } from './templates/registry'
+import { shouldBrandNeedtokenStartup, storefrontStartupPhase } from './utils/storefrontStartup'
+import NeedtokenStartup from './templates/needtoken/components/NeedtokenStartup.vue'
+import NeedtokenSkeleton from './templates/needtoken/components/NeedtokenSkeleton.vue'
 import Navbar from './components/Navbar.vue'
 import Footer from './components/Footer.vue'
 import Loading from './components/Loading.vue'
@@ -64,24 +71,70 @@ import MobileBottomNav from './components/MobileBottomNav.vue'
 
 // vault 外壳按需加载，classic 用户不会拉取其 chunk/样式
 const VaultLayout = defineAsyncComponent(() => import('./templates/vault/layout/VaultLayout.vue'))
-const NeedtokenLayout = defineAsyncComponent(() => import('./templates/needtoken/layout/NeedtokenLayout.vue'))
+const NeedtokenLayout = defineAsyncComponent({
+  loader: () => import('./templates/needtoken/layout/NeedtokenLayout.vue'),
+  loadingComponent: NeedtokenSkeleton,
+  errorComponent: {
+    setup() {
+      const store = useAppStore()
+      return () => h(NeedtokenStartup, { branded: !store.isResellerTenant, failed: true, onRetry: () => window.location.reload() })
+    },
+  },
+  delay: 0,
+  timeout: 20000,
+})
 
 // config 由 router.beforeEach 统一加载，无需在此重复调用
 const appStore = useAppStore()
 const route = useRoute()
+const router = useRouter()
+const { t } = useI18n()
 const isResellerConsole = computed(() => route.meta.resellerConsole === true)
 // getActiveTemplate 读取 appStore.config（响应式），config 加载后会重新计算
 const isVault = computed(() => getActiveTemplate() === 'vault')
 const isNeedtoken = computed(() => getActiveTemplate() === 'needtoken')
 
-// 模板来自异步的站点配置。已有线索（预览覆盖 / 上次访问记住的模板）时立即渲染外壳；
-// 首次访问则等配置返回再渲染，避免先闪一下 classic 外壳。配置加载失败时由首个路由就绪兜底
-// （守卫里的加载无论成败都会结束），不会一直停在空白。
-const shellReady = ref(hasTemplateHint())
-if (!shellReady.value) {
-  watch(() => appStore.config, (config) => { if (config) shellReady.value = true }, { immediate: true })
-  void useRouter().isReady().catch(() => {}).finally(() => { shellReady.value = true })
+const initialRouteReady = ref(false)
+const initialRouteFailed = ref(false)
+const navigationPending = ref(false)
+const routeLoadFailed = ref(false)
+const failedDestination = ref('')
+const startupSlow = ref(false)
+const startupPhase = computed(() => storefrontStartupPhase({ hasConfig: !!appStore.config, routeReady: initialRouteReady.value, routeFailed: initialRouteFailed.value }))
+let verifiedMainHint = false
+try { verifiedMainHint = localStorage.getItem('dj-storefront-boot-main') === '1' } catch { /* Config determines the brand when storage is unavailable. */ }
+const startupBranded = computed(() => appStore.config
+  ? isNeedtoken.value && !appStore.isResellerTenant
+  : shouldBrandNeedtokenStartup(getActiveTemplate(), verifiedMainHint, window.location.hostname))
+const slowTimer = window.setTimeout(() => { if (startupPhase.value === 'pending') startupSlow.value = true }, 8000)
+watch(startupPhase, phase => { if (phase !== 'pending') window.clearTimeout(slowTimer) })
+watch(() => appStore.config, config => {
+  if (!config) return
+  try {
+    if (config.storefront_template === 'needtoken' && !appStore.isResellerTenant) localStorage.setItem('dj-storefront-boot-main', '1')
+    else localStorage.removeItem('dj-storefront-boot-main')
+  } catch { /* Only a non-sensitive brand hint is stored. */ }
+}, { immediate: true })
+void router.isReady().then(() => { initialRouteReady.value = true }).catch(() => { initialRouteFailed.value = true })
+const removeBeforeGuard = router.beforeEach(() => { navigationPending.value = true; routeLoadFailed.value = false })
+const removeAfterGuard = router.afterEach(() => { navigationPending.value = false })
+const removeErrorHandler = router.onError((_error, destination) => {
+  navigationPending.value = false
+  failedDestination.value = destination.fullPath
+  if (!initialRouteReady.value) initialRouteFailed.value = true
+  else routeLoadFailed.value = true
+})
+function retryPage() {
+  const destination = failedDestination.value
+  if (destination.startsWith('/') && !destination.startsWith('//')) window.location.assign(destination)
+  else window.location.reload()
 }
+onUnmounted(() => {
+  window.clearTimeout(slowTimer)
+  removeBeforeGuard()
+  removeAfterGuard()
+  removeErrorHandler()
+})
 watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(value), { immediate: true })
 </script>
 
@@ -95,4 +148,10 @@ watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(va
 .page-fade-leave-to {
   opacity: 0;
 }
+.nt-route-progress { position: fixed; inset: 64px 0 auto; z-index: 45; height: 2px; overflow: hidden; pointer-events: none; background: #2dd4a70c; }
+.nt-route-progress > span:first-child { display: block; width: 35%; height: 100%; background: #2dd4a7; animation: nt-route-travel 1.1s ease-in-out infinite; }
+.nt-route-error { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #e5b96940; color: #e5b969; font-size: 12px; line-height: 1.7; }
+.nt-route-error button { flex-shrink: 0; border-bottom: 1px solid currentColor; cursor: pointer; }
+@keyframes nt-route-travel { from { transform: translateX(-105%); } to { transform: translateX(390%); } }
+@media (prefers-reduced-motion: reduce) { .page-fade-enter-active, .page-fade-leave-active { transition: none; } .nt-route-progress > span:first-child { animation: none; width: 100%; opacity: .6; } }
 </style>

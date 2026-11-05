@@ -87,3 +87,53 @@ export function serviceVariantLabel(sku: ServiceSku, locale: string, fallback: s
   if (code && code.length <= 48 && /[\u3400-\u9fff\s]/.test(code) && !/[_:/\\]/.test(code) && !/[a-f0-9]{16}/i.test(code)) return code
   return fallback
 }
+
+export interface ServiceVariantAxis {
+  id: 'period' | 'tier'
+  options: string[]
+  valuesBySku: Record<number, string>
+}
+
+const axisKeys: Record<ServiceVariantAxis['id'], string[]> = {
+  period: ['period', 'billing_period', 'billingPeriod', 'cycle', '周期', '週期', '订阅周期', '訂閱週期'],
+  tier: ['tier', '档位', '檔位', '等级', '等級', '额度', '額度'],
+}
+
+/** Axes describe actual native SKUs, never groups inferred from product titles.
+ * Ambiguous, partially populated and legacy flat labels keep the flat selector. */
+export function serviceVariantAxes(skus: readonly ServiceSku[], locale: string): ServiceVariantAxis[] {
+  if (skus.length < 2) return []
+  const axes: ServiceVariantAxis[] = []
+  for (const id of ['period', 'tier'] as const) {
+    const valuesBySku: Record<number, string> = {}
+    let populated = 0
+    for (const sku of skus) {
+      const entries = Object.entries(record(sku.spec_values)).filter(([name]) => axisKeys[id].some(alias => key(alias) === key(name)))
+      if (!entries.length) continue
+      // Structured axes are plain native strings; localized flat spec labels
+      // and metadata objects are not an implicit multidimensional catalogue.
+      if (entries.length !== 1 || typeof entries[0]![1] !== 'string') return []
+      const value = (entries[0]![1] as string).trim()
+      if (!value || value.length > 48 || /[\r\n<>]/.test(value) || Object.keys(record(value)).length) return []
+      valuesBySku[sku.id] = text(value, locale)
+      populated++
+    }
+    if (populated && populated !== skus.length) return []
+    if (populated) axes.push({ id, options: [...new Set(skus.map(sku => valuesBySku[sku.id]!))], valuesBySku })
+  }
+  const varying = axes.filter(axis => axis.options.length > 1)
+  if (!varying.length) return []
+  // Two SKUs at the same coordinate could have different prices or fulfillment;
+  // expose both flat options instead of silently selecting an arbitrary one.
+  const coordinates = skus.map(sku => JSON.stringify(varying.map(axis => axis.valuesBySku[sku.id])))
+  return new Set(coordinates).size === skus.length ? varying : []
+}
+
+/** Changing one axis preserves every other selected value. Missing native
+ * combinations stay unavailable instead of changing the buyer's billing term. */
+export function selectServiceVariant(skus: readonly ServiceSku[], axes: readonly ServiceVariantAxis[], currentId: number, axisId: ServiceVariantAxis['id'], value: string): number | null {
+  const axis = axes.find(candidate => candidate.id === axisId)
+  if (!axis || !axis.options.includes(value)) return null
+  const matching = skus.find(sku => axis.valuesBySku[sku.id] === value && axes.every(other => other.id === axisId || other.valuesBySku[sku.id] === other.valuesBySku[currentId]))
+  return matching?.id ?? null
+}

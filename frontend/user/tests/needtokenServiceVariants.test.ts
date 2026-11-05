@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { serviceSkuPresentation, serviceVariantLabel } from '../src/templates/needtoken/lib/serviceVariants.ts'
+import { selectServiceVariant, serviceSkuPresentation, serviceVariantAxes, serviceVariantLabel } from '../src/templates/needtoken/lib/serviceVariants.ts'
 import { serviceAvailability, serviceSkuPrice } from '../src/templates/needtoken/lib/serviceCatalog.ts'
 
 test('legacy import labels prefer the actual option and hide source and reference-price fields', () => {
@@ -43,4 +43,35 @@ test('missing display metadata falls back cleanly and invalid official reference
   }
   assert.deepEqual(serviceSkuPresentation({ id: 1 }, 'en-US'), { label: '', title: '', description: '', features: [], priceSuffix: '', officialPriceUsd: null })
   assert.equal(serviceSkuPresentation({ id: 1, spec_values: { official_usd: '500' }, display_meta: { official_price_usd: '' } }, 'zh-CN').officialPriceUsd, null)
+})
+
+test('native period and tier axes select the exact SKU and its independent price and copy', () => {
+  const skus = ['month', 'year'].flatMap((period, periodIndex) => ['100', '200', '500'].map((tier, tierIndex) => ({
+    id: 10 + periodIndex * 3 + tierIndex, spec_values: { period, tier },
+    is_active: true, stock_status: 'in_stock', price_amount: String(Number(tier) * (period === 'year' ? 10 : 1)),
+    display_meta: { title: `Pro ${tier} ${period}`, description: `${tier} allowance for ${period}` },
+  })))
+  const axes = serviceVariantAxes(skus, 'en-US')
+  assert.deepEqual(axes.map(axis => [axis.id, axis.options]), [['period', ['month', 'year']], ['tier', ['100', '200', '500']]])
+  const annual = selectServiceVariant(skus, axes, 10, 'period', 'year')
+  assert.equal(annual, 13)
+  const selected = selectServiceVariant(skus, axes, annual!, 'tier', '500')
+  assert.equal(selected, 15)
+  const sku = skus.find(candidate => candidate.id === selected)!
+  assert.equal(serviceSkuPrice(sku)?.amount, '5000.00')
+  assert.equal(serviceSkuPresentation(sku, 'en-US').title, 'Pro 500 year')
+  assert.equal(serviceSkuPresentation(sku, 'en-US').description, '500 allowance for year')
+  assert.equal(selectServiceVariant(skus, axes, selected!, 'tier', '999'), null)
+})
+
+test('structured axes preserve real sparse combinations and ambiguous legacy data stays flat', () => {
+  const sparse = [{ id: 1, spec_values: { 周期: 'month', 档位: '100' } }, { id: 2, spec_values: { 周期: 'year', 档位: '100' } }, { id: 3, spec_values: { 周期: 'month', 档位: '500' } }]
+  const axes = serviceVariantAxes(sparse, 'zh-CN')
+  assert.equal(selectServiceVariant(sparse, axes, 2, 'tier', '500'), null)
+  assert.equal(selectServiceVariant(sparse, axes, 2, 'period', 'month'), 1)
+  assert.equal(selectServiceVariant(sparse, axes, 1, 'tier', '500'), 3)
+  assert.deepEqual(serviceVariantAxes([...sparse, { id: 4, spec_values: { 周期: 'month', 档位: '100' } }], 'zh-CN'), [])
+  assert.deepEqual(serviceVariantAxes([{ id: 1, spec_values: { period: 'month' } }, { id: 2, spec_values: { 'zh-CN': '年度' } }], 'zh-CN'), [])
+  assert.deepEqual(serviceVariantAxes([{ id: 1, spec_values: { 'zh-CN': 'Pro 100 月付' } }, { id: 2, spec_values: { 'zh-CN': 'Pro 500 年付' } }], 'zh-CN'), [])
+  assert.deepEqual(serviceVariantAxes([{ id: 1, spec_values: { period: 'month', billing_period: 'year' } }, { id: 2, spec_values: { period: 'year' } }], 'zh-CN'), [])
 })

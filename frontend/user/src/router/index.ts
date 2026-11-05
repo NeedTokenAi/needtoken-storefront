@@ -3,7 +3,7 @@ import { useUserAuthStore } from '../stores/userAuth'
 import { useAppStore } from '../stores/app'
 import { useTelegramMiniAppStore } from '../stores/telegramMiniApp'
 import { captureAffiliateFromRoute } from '../utils/affiliate'
-import { templateView } from '../templates/registry'
+import { getActiveTemplate, templateView } from '../templates/registry'
 import { GOOGLE_REDIRECT_FRONTEND_CALLBACK_PATH } from '../utils/googleRedirect'
 import { waitForListScrollSignal } from '../utils/listScrollSignal'
 
@@ -374,6 +374,14 @@ router.beforeEach(async (to, _from, next) => {
     // Ensure config is loaded before checking template mode
     if (!appStore.config) {
         await appStore.loadConfig()
+    }
+
+    if (getActiveTemplate() === 'needtoken' && to.name === 'category-products') {
+        const kind = ({ plans: '', 'plans-personal': 'personal', 'plans-enterprise': 'enterprise' } as Record<string, string>)[String(to.params.slug)]
+        if (kind !== undefined) {
+            next({ path: '/plans', query: { ...to.query, ...(kind ? { kind } : {}) }, hash: to.hash, replace: true })
+            return
+        }
     }
 
     if (to.meta.requiresUserAuth) {

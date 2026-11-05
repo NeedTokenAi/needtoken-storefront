@@ -1,11 +1,9 @@
-import { onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { onMounted, onUnmounted, type Ref } from 'vue'
 
-const SOUND_PREFERENCE_KEY = 'needtoken-ui-sound'
 const ACTION_SELECTOR = 'button, a[href], summary, [role="button"], [role="tab"], input[type="button"], input[type="submit"], input[type="reset"]'
 
 /** One delegated listener per storefront, rather than a listener/audio file per button. */
 export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
-  const soundEnabled = ref(true)
   let audio: AudioContext | undefined
   let mounted = false
   let lastTap = -Infinity
@@ -78,7 +76,7 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
   }
 
   const playTap = () => {
-    if (!mounted || !soundEnabled.value || document.hidden) return
+    if (!mounted || document.hidden) return
     const now = performance.now()
     if (now - lastTap < 55) return
     lastTap = now
@@ -89,7 +87,7 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
       audio ||= new AudioContextClass()
       const context = audio
       const ring = () => {
-        if (!mounted || !soundEnabled.value || document.hidden || context.state !== 'running') return
+        if (!mounted || document.hidden || context.state !== 'running') return
         const start = context.currentTime
         const master = context.createGain()
         master.gain.value = 0.35
@@ -123,7 +121,7 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
   }
   const onClick = (event: MouseEvent) => {
     const control = actionFor(event.target)
-    if (event.isTrusted && control && !control.hasAttribute('data-nt-sound-toggle')) playTap()
+    if (event.isTrusted && control) playTap()
   }
   const onVisibility = () => {
     if (document.hidden && audio?.state === 'running') void audio.suspend().catch(() => {})
@@ -133,18 +131,8 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
       removeHighlight()
     }
   }
-  const toggleSound = () => {
-    soundEnabled.value = !soundEnabled.value
-    try { localStorage.setItem(SOUND_PREFERENCE_KEY, soundEnabled.value ? 'on' : 'off') } catch { /* Session-only preference is sufficient in private browsing. */ }
-    if (!soundEnabled.value && audio?.state === 'running') void audio.suspend().catch(() => {})
-  }
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === SOUND_PREFERENCE_KEY) soundEnabled.value = event.newValue !== 'off'
-  }
-
   onMounted(() => {
     mounted = true
-    try { soundEnabled.value = localStorage.getItem(SOUND_PREFERENCE_KEY) !== 'off' } catch { /* Keep the session default. */ }
     // The layout owns body.nt-tokens, including native dialogs teleported to body.
     listenerRoot = document
     listenerRoot?.addEventListener('click', onClick, { capture: true })
@@ -153,7 +141,6 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     listenerRoot?.addEventListener('focusin', onFocusIn)
     listenerRoot?.addEventListener('focusout', onFocusOut)
     document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('storage', onStorage)
   })
   onUnmounted(() => {
     mounted = false
@@ -163,11 +150,9 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     listenerRoot?.removeEventListener('focusin', onFocusIn)
     listenerRoot?.removeEventListener('focusout', onFocusOut)
     document.removeEventListener('visibilitychange', onVisibility)
-    window.removeEventListener('storage', onStorage)
     if (pointerFrame) window.cancelAnimationFrame(pointerFrame)
     removeHighlight()
     if (audio && audio.state !== 'closed') void audio.close().catch(() => {})
   })
 
-  return { soundEnabled, toggleSound }
 }

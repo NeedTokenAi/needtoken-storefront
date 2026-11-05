@@ -5,11 +5,65 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title></title>
+  <style>
+    html,body{margin:0}#nt-preboot{--boot-bg:#f5f5f7;--boot-fg:#1d1d1f;--boot-muted:#7d8a99;min-height:100svh;background:var(--boot-bg);color:var(--boot-fg);font-family:ui-sans-serif,system-ui,-apple-system,sans-serif}
+    #nt-preboot .nt-preboot-header{max-width:1152px;height:64px;margin:auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:24px}.nt-preboot-identity,.nt-preboot-nav{display:flex;align-items:center;gap:12px}.nt-preboot-identity{font-size:17px;font-weight:700;letter-spacing:-.035em}.nt-preboot-nav{gap:20px}
+    #nt-preboot i{display:block;border-radius:8px;background:color-mix(in srgb,var(--boot-muted) 12%,transparent)}.nt-preboot-identity>i{width:135px;height:24px}.nt-preboot-nav i{width:60px;height:12px}.nt-preboot-brand{display:none}.nt-preboot-scene{display:flex;min-height:230px;align-items:center;justify-content:center;flex-direction:column;gap:17px;padding:40px 24px 0;box-sizing:border-box;text-align:center}
+    .nt-preboot-logo{width:60px;height:60px}.nt-preboot-logo path{stroke-dasharray:1;animation:nt-preboot-draw 1.9s ease-in-out infinite}.nt-preboot-neutral{height:60px;display:flex;align-items:center;gap:6px}.nt-preboot-neutral i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.25;animation:nt-preboot-pulse 1.3s ease-in-out infinite}.nt-preboot-neutral i:nth-child(2){animation-delay:.15s}.nt-preboot-neutral i:nth-child(3){animation-delay:.3s}
+    .nt-preboot-status,.nt-preboot-failed{margin:0;font-size:13px;letter-spacing:.025em}.nt-preboot-help{max-width:46ch;margin:0;font-size:12px;line-height:1.8;color:var(--boot-muted)}.nt-preboot-copy{display:none}.nt-preboot-copy[lang="zh-CN"]{display:inline}.nt-preboot-failed,.nt-preboot-help,.nt-preboot-retry{display:none}.nt-preboot-retry{padding:9px 16px;border:1px solid #2dd4a740;border-radius:9px;background:#2dd4a70d;color:inherit;font:inherit;font-size:12px;cursor:pointer}.nt-preboot-retry:focus-visible{outline:2px solid #2dd4a7;outline-offset:3px}
+    .nt-preboot-cards{max-width:1200px;box-sizing:border-box;margin:auto;padding:48px 24px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.nt-preboot-cards article{padding:24px;border:1px solid color-mix(in srgb,var(--boot-muted) 16%,transparent);border-radius:22px;min-height:260px;box-sizing:border-box}.nt-preboot-cards i:first-child{width:38px;height:38px;margin-bottom:27px;border-radius:12px}.nt-preboot-cards i:nth-child(2){width:65%;height:23px;margin-bottom:15px}.nt-preboot-cards i:nth-child(3){width:88%;height:42px;margin-bottom:30px}.nt-preboot-cards i:last-child{width:100%;height:40px}
+    html[data-boot-brand="needtoken"] #nt-preboot{--boot-bg:#07090d;--boot-fg:#e8edf3;--boot-muted:#7d8a99;background:radial-gradient(ellipse at 50% 0,#2dd4a70b,transparent 55%),#07090d}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-brand{display:flex}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-neutral,html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-identity>i{display:none}
+    html[data-boot-locale="zh-TW"] .nt-preboot-copy,html[data-boot-locale="en-US"] .nt-preboot-copy{display:none}html[data-boot-locale="zh-TW"] .nt-preboot-copy[lang="zh-TW"],html[data-boot-locale="en-US"] .nt-preboot-copy[lang="en-US"]{display:inline}#nt-preboot[data-slow] .nt-preboot-help,#nt-preboot[data-slow] .nt-preboot-retry,#nt-preboot[data-failed] .nt-preboot-help,#nt-preboot[data-failed] .nt-preboot-retry,#nt-preboot[data-failed] .nt-preboot-failed{display:block}#nt-preboot[data-failed] .nt-preboot-status,#nt-preboot[data-failed] .nt-preboot-cards{display:none}
+    @media(prefers-color-scheme:dark){#nt-preboot{--boot-bg:#0b0f13;--boot-fg:#e8edf3;--boot-muted:#7d8a99}}@media(max-width:640px){#nt-preboot .nt-preboot-header{padding:0 20px}.nt-preboot-nav{gap:10px}.nt-preboot-nav i{width:25px}.nt-preboot-scene{min-height:186px;padding-top:24px;gap:14px}.nt-preboot-logo{width:48px;height:48px}.nt-preboot-cards{padding:32px 20px;grid-template-columns:1fr;gap:12px}.nt-preboot-cards article{min-height:118px;padding:18px}.nt-preboot-cards i:first-child{width:30px;height:30px;margin-bottom:14px}.nt-preboot-cards i:nth-child(3){height:20px;margin-bottom:16px}}
+    @keyframes nt-preboot-draw{0%{stroke-dashoffset:1;opacity:.4}45%,75%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:.55}}@keyframes nt-preboot-pulse{50%{opacity:.75}}@media(prefers-reduced-motion:reduce){.nt-preboot-logo path,.nt-preboot-neutral i{animation:none}}
+  </style>
 </head>
 
 <body>
-  <div id="app"></div>
-  <script type="module" data-cfasync="false" src="/src/main.ts"></script>
+  <div id="app">
+    <div id="nt-preboot" role="status" aria-live="polite" aria-busy="true">
+      <div class="nt-preboot-header" aria-hidden="true"><div class="nt-preboot-identity"><i></i><span class="nt-preboot-brand"><svg width="30" height="30" viewBox="0 0 64 64" fill="none"><rect x="1" y="1" width="62" height="62" rx="18" fill="#10241f" stroke="#2dd4a7" stroke-opacity=".3" stroke-width="2"/><path d="M19 45V19l26 26V19" stroke="#5eeac0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nt-preboot-brand" translate="no">NeedToken.AI</span></div><div class="nt-preboot-nav"><i></i><i></i><i></i></div></div>
+      <div class="nt-preboot-scene">
+        <svg class="nt-preboot-logo nt-preboot-brand" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="1" y="1" width="62" height="62" rx="18" fill="#10241f" stroke="#2dd4a7" stroke-opacity=".3" stroke-width="2"/><path d="M19 45V19l26 26V19" stroke="#5eeac0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/><circle cx="45" cy="19" r="4.5" fill="#cefff0"/></svg>
+        <span class="nt-preboot-neutral" aria-hidden="true"><i></i><i></i><i></i></span>
+        <p class="nt-preboot-status"><span class="nt-preboot-copy" lang="zh-CN">正在准备页面…</span><span class="nt-preboot-copy" lang="zh-TW">正在準備頁面…</span><span class="nt-preboot-copy" lang="en-US">Getting your page ready…</span></p>
+        <p class="nt-preboot-failed"><span class="nt-preboot-copy" lang="zh-CN">页面暂时未能加载</span><span class="nt-preboot-copy" lang="zh-TW">頁面暫時未能載入</span><span class="nt-preboot-copy" lang="en-US">This page could not be loaded</span></p>
+        <p class="nt-preboot-help"><span class="nt-preboot-copy" lang="zh-CN">网络响应较慢，您可以继续等待或重新加载。</span><span class="nt-preboot-copy" lang="zh-TW">網路回應較慢，您可以繼續等待或重新載入。</span><span class="nt-preboot-copy" lang="en-US">The connection is taking longer. You can keep waiting or reload.</span></p>
+        <button type="button" class="nt-preboot-retry"><span class="nt-preboot-copy" lang="zh-CN">重新加载</span><span class="nt-preboot-copy" lang="zh-TW">重新載入</span><span class="nt-preboot-copy" lang="en-US">Reload page</span></button>
+      </div>
+      <div class="nt-preboot-cards" aria-hidden="true"><article><i></i><i></i><i></i><i></i></article><article><i></i><i></i><i></i><i></i></article><article><i></i><i></i><i></i><i></i></article></div>
+    </div>
+  </div>
+  <script data-cfasync="false">
+    (() => {
+      const root = document.getElementById('nt-preboot');
+      const mainHost = location.hostname === 'needtoken.ai' || location.hostname === 'www.needtoken.ai';
+      if (mainHost) document.documentElement.dataset.bootBrand = 'needtoken';
+      try {
+        const param = new URLSearchParams(location.search).get('template');
+        const override = ['classic', 'vault', 'needtoken'].includes(param) ? param : param === 'reset' ? null : localStorage.getItem('dj-storefront-template');
+        const template = override || localStorage.getItem('dj-storefront-template-last');
+        if (!mainHost && template === 'needtoken' && localStorage.getItem('dj-storefront-boot-main') === '1') document.documentElement.dataset.bootBrand = 'needtoken';
+        const lang = localStorage.getItem('locale') || navigator.language || 'zh-CN';
+        document.documentElement.dataset.bootLocale = /^(zh-TW|zh-HK|zh-Hant)/i.test(lang) ? 'zh-TW' : /^en/i.test(lang) ? 'en-US' : 'zh-CN';
+      } catch { /* Unknown tenants retain neutral startup placeholders. */ }
+      const timer = window.setTimeout(() => { if (root?.isConnected) root.dataset.slow = '1'; }, 8000);
+      const retry = () => location.reload();
+      root?.querySelector('.nt-preboot-retry')?.addEventListener('click', retry);
+      const onError = event => {
+        if (event.target instanceof HTMLScriptElement && (event.target.hasAttribute('data-app-entry') || (event.target.type === 'module' && /\/assets\/index[-.][^/]+\.js(?:\?|$)/.test(event.target.src))) && root?.isConnected) {
+          root.dataset.failed = '1'; root.setAttribute('aria-busy', 'false'); root.setAttribute('role', 'alert');
+        }
+      };
+      window.addEventListener('error', onError, true);
+      window.addEventListener('storefront:mounted', () => {
+        clearTimeout(timer); window.removeEventListener('error', onError, true);
+        root?.querySelector('.nt-preboot-retry')?.removeEventListener('click', retry);
+        delete document.documentElement.dataset.bootBrand; delete document.documentElement.dataset.bootLocale;
+      }, { once: true });
+    })();
+  </script>
+  <script type="module" data-cfasync="false" data-app-entry src="/src/main.ts"></script>
 </body>
 
 </html>

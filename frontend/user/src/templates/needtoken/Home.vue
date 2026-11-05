@@ -42,6 +42,7 @@
       </div>
     </section>
 
+    <NeedtokenDeferredRegion :estimated-height="385" :mobile-estimated-height="630">
     <section class="home-container purchase-section" aria-labelledby="purchase-title" @mouseenter="hoverPaused = true" @mouseleave="hoverPaused = false" @focusin="focusPaused = true" @focusout="onFlowFocusOut">
       <div class="section-heading">
         <p class="section-eyebrow">{{ t('needtoken.homeServices.steps.eyebrow') }}</p>
@@ -80,7 +81,9 @@
         </RouterLink>
       </div>
     </section>
+    </NeedtokenDeferredRegion>
 
+    <NeedtokenDeferredRegion :estimated-height="360" :mobile-estimated-height="500">
     <section class="home-container information-section" aria-labelledby="questions-title">
       <div class="questions-intro">
         <p class="section-eyebrow">{{ t('needtoken.homeServices.faq.eyebrow') }}</p>
@@ -100,6 +103,7 @@
         </details>
       </div>
     </section>
+    </NeedtokenDeferredRegion>
   </div>
 </template>
 
@@ -113,6 +117,7 @@ import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import GhostFibersBackground from './components/GhostFibersBackground.vue'
 import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
+import NeedtokenDeferredRegion from './components/NeedtokenDeferredRegion.vue'
 
 const { t } = useI18n()
 usePageSeo({
