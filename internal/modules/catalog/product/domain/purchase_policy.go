@@ -36,6 +36,52 @@ func NormalizePurchaseType(raw string) string {
 	}
 }
 
+// APIPlanCategoryIDs includes every descendant of the reserved API-plan branch.
+// Inactive/soft-deleted ancestors still carry this restriction; hiding a category
+// must not make its previously member-only products available to guest orders.
+func APIPlanCategoryIDs(categories []categorydomain.Category) map[uint]bool {
+	children := make(map[uint][]uint, len(categories))
+	queue := make([]uint, 0)
+	for _, category := range categories {
+		if category.ID == 0 {
+			continue
+		}
+		children[category.ParentID] = append(children[category.ParentID], category.ID)
+		if strings.EqualFold(strings.TrimSpace(category.Slug), "plans") {
+			queue = append(queue, category.ID)
+		}
+	}
+	result := make(map[uint]bool)
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if result[id] {
+			continue
+		}
+		result[id] = true
+		queue = append(queue, children[id]...)
+	}
+	return result
+}
+
+// EffectivePurchaseType is shared by public product views and order validation.
+// API subscriptions always require a merchant member, even if imported with a
+// stale guest purchase_type. Unknown historical values also fail closed.
+func EffectivePurchaseType(product *Product) string {
+	if product == nil || product.MemberOnlyByCategory || strings.EqualFold(strings.TrimSpace(product.Category.Slug), "plans") {
+		return constants.ProductPurchaseMember
+	}
+	for _, sku := range product.SKUs {
+		if sku.EntitlementContractJSON["kind"] == "plan" {
+			return constants.ProductPurchaseMember
+		}
+	}
+	if value := NormalizePurchaseType(product.PurchaseType); value != "" {
+		return value
+	}
+	return constants.ProductPurchaseMember
+}
+
 // NormalizeFulfillmentType 归一化商品交付类型。
 func NormalizeFulfillmentType(raw string) string {
 	value := strings.ToLower(strings.TrimSpace(raw))

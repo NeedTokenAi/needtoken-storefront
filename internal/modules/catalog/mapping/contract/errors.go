@@ -11,3 +11,13 @@ var (
 	ErrUpstreamStockInsufficient = errors.New("upstream stock insufficient")
 	ErrBatchImportInProgress     = errors.New("batch import already running for this connection")
 )
+
+var (
+	ErrPlanAccountLinkRequired    = errors.New("plan API account link required")
+	ErrPlanAccountUnavailable     = errors.New("plan API account unavailable")
+	ErrPlanUnavailable            = errors.New("API plan unavailable")
+	ErrPlanChanged                = errors.New("API plan changed")
+	ErrPlanPurchaseLimitReached   = errors.New("API plan purchase limit reached")
+	ErrPlanTokenLimitReached      = errors.New("API account token limit reached")
+	ErrPlanEligibilityUnavailable = errors.New("API plan eligibility unavailable")
+)

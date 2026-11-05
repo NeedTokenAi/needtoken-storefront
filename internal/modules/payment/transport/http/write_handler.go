@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	"strconv"
 
 	paymentpresenter "github.com/dujiao-next/internal/modules/payment/transport/presenter"
@@ -338,6 +339,13 @@ var paymentProviderGatewayErrorRules = []mappedError{
 
 var paymentCreateErrorRules = concatMappedErrors(
 	[]mappedError{
+		{target: mappingcontract.ErrPlanAccountLinkRequired, code: response.CodeBadRequest, key: "error.plan_account_link_required"},
+		{target: mappingcontract.ErrPlanAccountUnavailable, code: response.CodeBadRequest, key: "error.plan_account_unavailable"},
+		{target: mappingcontract.ErrPlanUnavailable, code: response.CodeBadRequest, key: "error.plan_unavailable"},
+		{target: mappingcontract.ErrPlanChanged, code: response.CodeBadRequest, key: "error.plan_changed"},
+		{target: mappingcontract.ErrPlanPurchaseLimitReached, code: response.CodeBadRequest, key: "error.plan_purchase_limit_reached"},
+		{target: mappingcontract.ErrPlanTokenLimitReached, code: response.CodeBadRequest, key: "error.plan_token_limit_reached"},
+		{target: mappingcontract.ErrPlanEligibilityUnavailable, code: response.CodeBadRequest, key: "error.plan_eligibility_unavailable"},
 		{target: ErrCheckoutPolicyUnknown, code: response.CodeBadRequest, key: "error.checkout_reservation_policy_unknown"},
 		{target: ErrCheckoutReservationUnavailable, code: response.CodeBadRequest, key: "error.checkout_reservation_unavailable"},
 		{target: ErrPaymentInvalid, code: response.CodeBadRequest, key: "error.payment_invalid"},

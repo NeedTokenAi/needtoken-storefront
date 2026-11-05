@@ -25,6 +25,7 @@ type Product struct {
 	Images               jsonslice.Strings   `gorm:"type:json" json:"images"`                                             // 图片数组
 	Tags                 jsonslice.Strings   `gorm:"type:json" json:"tags"`                                               // 标签数组
 	PurchaseType         string              `gorm:"type:varchar(20);not null;default:'member'" json:"purchase_type"`     // 购买身份（guest/member）
+	MemberOnlyByCategory bool                `gorm:"-" json:"-"`                                                          // 分类衍生的会员限制，不持久化且不受商品开关覆盖
 	MinPurchaseQuantity  int                 `gorm:"not null;default:0" json:"min_purchase_quantity"`                     // 单次最小购买数量（0 表示不限制）
 	MaxPurchaseQuantity  int                 `gorm:"not null;default:0" json:"max_purchase_quantity"`                     // 单次最大购买数量（0 表示不限制）
 	StockDisplayMode     string              `gorm:"type:varchar(20);not null;default:'exact'" json:"stock_display_mode"` // 公开库存展示模式（exact/status/range/hidden）

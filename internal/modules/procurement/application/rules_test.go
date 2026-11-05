@@ -1,12 +1,34 @@
 package application
 
 import (
+	"encoding/json"
 	"github.com/dujiao-next/internal/constants"
+	procurementdomain "github.com/dujiao-next/internal/modules/procurement/domain"
 	"testing"
 	"time"
 
 	"github.com/dujiao-next/internal/shared/jsonmap"
 )
+
+func TestFrozenPlanProcurementPreservesExactEntitlementAndRoute(t *testing.T) {
+	raw := `{"kind":"plan","issue_api_key":true,"plan":{"quota":9007199254740993}}`
+	snapshot := jsonmap.JSON{"plan_checkout_entitlement_raw": raw, "plan_checkout_connection_id": "77", "plan_checkout_upstream_sku_id": "901"}
+	contract, connectionID, skuID, present, err := procurementdomain.FrozenPlanProcurement(snapshot)
+	if err != nil || !present || connectionID != 77 || skuID != 901 {
+		t.Fatalf("frozen route invalid: %d %d %t %v", connectionID, skuID, present, err)
+	}
+	encoded, _ := json.Marshal(contract)
+	if string(encoded) != `{"issue_api_key":true,"kind":"plan","plan":{"quota":9007199254740993}}` {
+		t.Fatalf("quota lost precision: %s", encoded)
+	}
+	snapshot["plan_checkout_upstream_sku_id"] = "0"
+	if _, _, _, _, err := procurementdomain.FrozenPlanProcurement(snapshot); err == nil {
+		t.Fatal("malformed frozen route accepted")
+	}
+	if _, _, _, present, err := procurementdomain.FrozenPlanProcurement(jsonmap.JSON{}); err != nil || present {
+		t.Fatal("legacy paid snapshot behavior changed")
+	}
+}
 
 // ── Unit tests for pure functions ──
 

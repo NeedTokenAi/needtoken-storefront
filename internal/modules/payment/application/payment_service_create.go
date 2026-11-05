@@ -56,6 +56,13 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 	if input.OrderID == 0 {
 		return nil, ErrPaymentInvalid
 	}
+	// Account linking and frozen API-plan entitlements must still be valid for
+	// every payment attempt, including an existing link or a full wallet payment.
+	// This read-only upstream check runs before any reservation or DB transaction.
+	planEvidence, err := s.planCheckouts.Ensure(input.OrderID)
+	if err != nil {
+		return nil, err
+	}
 	// Scarce capacity must be durably reserved before entering the transaction
 	// that may debit a wallet or create a payment. No HTTP runs under DB locks.
 	if err := s.Guard.Ensure(input.Context, input.OrderID); err != nil {
@@ -88,7 +95,7 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 		}
 	}
 
-	err := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
+	err = s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
 		preloaded, err := tx.Orders().GetByIDForUpdateWithChildren(input.OrderID)
 		if err != nil {
 			return orderapp.ErrOrderFetchFailed
@@ -105,6 +112,9 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 		}
 		if lockedOrder.ExpiresAt != nil && !lockedOrder.ExpiresAt.After(time.Now()) {
 			return orderapp.ErrOrderStatusInvalid
+		}
+		if err := planEvidence.CheckLocked(&lockedOrder); err != nil {
+			return err
 		}
 		if err := s.Guard.Check(tx, &lockedOrder, time.Now()); err != nil {
 			return err

@@ -76,7 +76,14 @@ func (s *Service) SubmitToUpstream(procurementOrderID uint) error {
 
 	// 查找 SKU 映射
 	upstreamSKUID := frozen.UpstreamSKUID
-	if !frozen.Required {
+	planTerms, planConnectionID, planSKUID, hasPlanTerms, planErr := procurementdomain.FrozenPlanProcurement(item.SKUSnapshot)
+	if planErr != nil || hasPlanTerms && (planConnectionID != procOrder.ConnectionID || localOrder.UserID == 0 || item.Quantity != 1) {
+		s.markProcurementError(procOrder, "frozen API plan contract or route is invalid; automatic procurement stopped")
+		return fmt.Errorf("invalid frozen API plan procurement")
+	}
+	if hasPlanTerms {
+		upstreamSKUID = planSKUID
+	} else if !frozen.Required {
 		var found bool
 		upstreamSKUID, found, err = s.skuMapRepo.FindUpstreamSKUID(item.SKUID)
 		if err != nil {
@@ -111,6 +118,9 @@ func (s *Service) SubmitToUpstream(procurementOrderID uint) error {
 		req.EntitlementContract = jsonmap.JSON(frozen)
 	case jsonmap.JSON:
 		req.EntitlementContract = frozen
+	}
+	if hasPlanTerms {
+		req.EntitlementContract = planTerms
 	}
 	if hash, ok := item.SKUSnapshot["entitlement_contract_hash"].(string); ok {
 		req.EntitlementContractHash = hash

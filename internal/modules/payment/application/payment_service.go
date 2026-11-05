@@ -5,12 +5,14 @@ import (
 
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/logger"
+	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
 	externalidentitycontract "github.com/dujiao-next/internal/modules/identity/externalidentity/contract"
 	usercontract "github.com/dujiao-next/internal/modules/identity/user/contract"
 	notificationcontract "github.com/dujiao-next/internal/modules/notification/contract"
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
+	"github.com/dujiao-next/internal/modules/payment/application/plancheckout"
 	reservationguard "github.com/dujiao-next/internal/modules/payment/application/reservation"
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
@@ -52,6 +54,7 @@ var (
 // PaymentService 支付服务
 type PaymentService struct {
 	*reservationguard.Guard
+	planCheckouts           *plancheckout.Guard
 	orderRepo               ordercontract.Store
 	productRepo             productcontract.Repository
 	productSKURepo          productcontract.SKURepository
@@ -132,12 +135,14 @@ type PaymentServiceOptions struct {
 	PaymentProviderRegistry paymentcontract.GatewayRegistry
 	ResellerAccounting      resellerAccountingTransactions
 	CheckoutReservations    paymentcontract.CheckoutReservationGate
+	PlanEligibility         mappingcontract.PlanCheckoutChecker
 }
 
 // NewPaymentService 创建支付服务
 func NewPaymentService(opts PaymentServiceOptions) *PaymentService {
 	return &PaymentService{
 		Guard:                   reservationguard.New(opts.OrderStore, opts.ProductSKURepo, opts.CheckoutReservations),
+		planCheckouts:           plancheckout.New(opts.OrderStore, opts.ProductRepo, opts.ProductSKURepo, opts.PlanEligibility),
 		orderRepo:               opts.OrderStore,
 		productRepo:             opts.ProductRepo,
 		productSKURepo:          opts.ProductSKURepo,

@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	categoryapp "github.com/dujiao-next/internal/modules/catalog/category/application"
@@ -31,4 +32,29 @@ type CategoryCreator interface {
 type SettingsProvider interface {
 	GetUpstreamSyncConfig(fallbackInterval string) (settingsintegration.UpstreamSyncConfig, error)
 	GetUpstreamSyncInterval(fallbackInterval string) (time.Duration, error)
+}
+
+// PlanCheckoutRoute is resolved from the active merchant SKU mapping, then frozen
+// with the order. Payment rechecks this route rather than a mutable local mapping.
+type PlanCheckoutRoute struct {
+	ConnectionID  uint
+	UpstreamSKUID uint
+}
+
+type PlanCheckoutRequest struct {
+	Route                   PlanCheckoutRoute
+	UserID                  uint
+	Quantity                int
+	EntitlementContract     json.RawMessage
+	EntitlementContractHash string
+}
+
+// PlanCheckoutChecker must run outside a database transaction. It is read-only,
+// requires a merchant member identity and never uses a submitted contact email.
+type PlanCheckoutChecker interface {
+	CheckPlanCheckout(request PlanCheckoutRequest) error
+}
+
+type PlanCheckoutPreparer interface {
+	PreparePlanCheckout(localSKUID, userID uint, quantity int, contract json.RawMessage, hash string) (PlanCheckoutRoute, error)
 }

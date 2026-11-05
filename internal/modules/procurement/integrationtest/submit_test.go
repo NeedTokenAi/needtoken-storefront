@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +19,64 @@ import (
 	siteconnectionapp "github.com/dujiao-next/internal/modules/siteconnection/application"
 	"github.com/dujiao-next/internal/shared/jsonmap"
 )
+
+func TestAPIPlanProcurementUsesFrozenRouteAfterMappingMovedOrDeleted(t *testing.T) {
+	for _, state := range []string{"moved", "deleted"} {
+		t.Run(state, func(t *testing.T) {
+			db := setupProcurementTestDB(t)
+			order := createProcTestOrder(t, db, "API-PLAN-"+state, constants.OrderStatusPaid, constants.FulfillmentTypeUpstream)
+			calls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				decoder := json.NewDecoder(r.Body)
+				decoder.UseNumber()
+				var request map[string]interface{}
+				if err := decoder.Decode(&request); err != nil {
+					t.Error(err)
+				}
+				contract, _ := request["entitlement_contract"].(map[string]interface{})
+				plan, _ := contract["plan"].(map[string]interface{})
+				if request["sku_id"] != json.Number("901") || plan["quota"] != json.Number("9007199254740993") || request["entitlement_contract_hash"] != strings.Repeat("a", 64) {
+					t.Errorf("frozen route or exact quota changed: %#v", request)
+				}
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "order_id": 999, "order_no": "UP-PLAN-999", "status": "accepted", "amount": "50.00", "currency": "CNY"})
+			}))
+			defer server.Close()
+			connections := newTestSiteConnectionService(db, "test-key", t.TempDir())
+			connection, err := connections.Create(siteconnectionapp.CreateInput{Name: "frozen-plan", BaseURL: server.URL, ApiKey: "key", ApiSecret: "secret", Protocol: constants.ConnectionProtocolDujiaoNext})
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot := jsonmap.JSON{"api_plan": true, "requires_reservation": false, "reservation_policy_known": true, "plan_checkout_connection_id": strconv.FormatUint(uint64(connection.ID), 10), "plan_checkout_upstream_sku_id": "901", "plan_checkout_entitlement_raw": `{"kind":"plan","issue_api_key":true,"plan":{"quota":9007199254740993}}`, "entitlement_contract_hash": strings.Repeat("a", 64)}
+			if err := db.Model(&orderdomain.OrderItem{}).Where("order_id = ?", order.ID).Update("sku_snapshot_json", snapshot).Error; err != nil {
+				t.Fatal(err)
+			}
+			if state == "moved" {
+				mapping := &mappingdomain.Mapping{ConnectionID: connection.ID + 100, LocalProductID: 1, UpstreamProductID: 999, IsActive: true}
+				if err := db.Create(mapping).Error; err != nil {
+					t.Fatal(err)
+				}
+				if err := db.Create(&mappingdomain.SKUMapping{ProductMappingID: mapping.ID, LocalSKUID: 1, UpstreamSKUID: 999, UpstreamIsActive: true}).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			service := newTestProcurementService(db, connections)
+			if err := service.CreateForOrder(order.ID); err != nil {
+				t.Fatal(err)
+			}
+			var procurement ProcurementOrder
+			if err := db.Where("local_order_id = ?", order.ID).First(&procurement).Error; err != nil {
+				t.Fatal(err)
+			}
+			if procurement.ConnectionID != connection.ID {
+				t.Fatalf("paid plan followed live connection: %d", procurement.ConnectionID)
+			}
+			if err := service.SubmitToUpstream(procurement.ID); err != nil || calls != 1 {
+				t.Fatalf("frozen plan did not procure: calls=%d err=%v", calls, err)
+			}
+		})
+	}
+}
 
 func TestSubmitScarceOrderRequiresPaidProofAndUsesFrozenSupplierSKU(t *testing.T) {
 	db := setupProcurementTestDB(t)

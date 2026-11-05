@@ -2,6 +2,7 @@ package paymentbootstrap
 
 import (
 	"github.com/dujiao-next/internal/app/container"
+	"github.com/dujiao-next/internal/modules/payment/application/plancheckout"
 	paymenttransport "github.com/dujiao-next/internal/modules/payment/transport/http"
 	paymentcallbacktransport "github.com/dujiao-next/internal/modules/payment/transport/http/callback"
 )
@@ -28,7 +29,7 @@ func New(c *container.Container) Handlers {
 		Latest: paymenttransport.NewLatestHandler(
 			guestOrders,
 			userOrders,
-			pendingLookupAdapter{payments: c.PaymentStore},
+			pendingLookupAdapter{payments: c.PaymentStore, plans: plancheckout.New(c.OrderStore, c.ProductRepo, c.ProductSKURepo, c.ProductMappingService)},
 		),
 		Write: paymenttransport.NewWriteHandler(
 			guestOrders,

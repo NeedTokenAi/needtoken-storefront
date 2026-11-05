@@ -1,6 +1,7 @@
 package gormstore
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -24,6 +25,63 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
+
+func TestProductReadsEnforceAPIPlanMembershipWithoutChangingStoredPurchaseType(t *testing.T) {
+	repo, db := setupProductStoreTest(t)
+	root := categorydomain.Category{Slug: "plans", NameJSON: jsonmap.JSON{"zh-CN": "API"}, IsActive: true}
+	if err := db.Create(&root).Error; err != nil {
+		t.Fatal(err)
+	}
+	child := categorydomain.Category{Slug: "plans-personal", ParentID: root.ID, NameJSON: jsonmap.JSON{"zh-CN": "个人"}, IsActive: true}
+	if err := db.Create(&child).Error; err != nil {
+		t.Fatal(err)
+	}
+	deep := categorydomain.Category{Slug: "api-dedicated", ParentID: child.ID, NameJSON: jsonmap.JSON{"zh-CN": "专用"}, IsActive: true}
+	if err := db.Create(&deep).Error; err != nil {
+		t.Fatal(err)
+	}
+	product := &productdomain.Product{CategoryID: deep.ID, Slug: "api-plan-guest-flag", TitleJSON: jsonmap.JSON{"zh-CN": "API套餐"}, PurchaseType: constants.ProductPurchaseGuest, IsActive: true}
+	if err := repo.Create(product); err != nil {
+		t.Fatal(err)
+	}
+	// A hidden ancestor cannot relax the existing API-plan restriction.
+	if err := db.Model(&root).Updates(map[string]interface{}{"is_active": false, "deleted_at": time.Now()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	for name, read := range map[string]func() (*productdomain.Product, error){
+		"id": func() (*productdomain.Product, error) {
+			return repo.GetByID(strconv.FormatUint(uint64(product.ID), 10))
+		},
+		"slug": func() (*productdomain.Product, error) { return repo.GetBySlug(product.Slug, true) },
+	} {
+		row, err := read()
+		if err != nil || row == nil || productdomain.EffectivePurchaseType(row) != constants.ProductPurchaseMember {
+			t.Fatalf("%s did not apply category membership: row=%#v err=%v", name, row, err)
+		}
+	}
+	rows, _, err := repo.List(productcontract.ListFilter{OnlyActive: true, WithCategory: true})
+	if err != nil || len(rows) != 1 || !rows[0].MemberOnlyByCategory {
+		t.Fatalf("public list did not apply category membership: %#v, %v", rows, err)
+	}
+	var stored productdomain.Product
+	if err := db.First(&stored, product.ID).Error; err != nil || stored.PurchaseType != constants.ProductPurchaseGuest || stored.MemberOnlyByCategory {
+		t.Fatalf("read policy changed persisted configuration: %#v %v", stored, err)
+	}
+	// SQLite single-connection transactions must use their own handle for policy reads.
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		row, err := NewProductStore(tx).GetByID(strconv.FormatUint(uint64(product.ID), 10))
+		if err == nil && (row == nil || !row.MemberOnlyByCategory) {
+			t.Error("transaction policy missing")
+		}
+		return err
+	}); err != nil {
+		t.Fatalf("transaction-bound policy lookup failed: %v", err)
+	}
+}
 
 func setupProductStoreTest(t *testing.T) (*ProductStore, *gorm.DB) {
 	t.Helper()

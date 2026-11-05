@@ -2,6 +2,7 @@ package producthttp
 
 import (
 	"errors"
+	"github.com/dujiao-next/internal/constants"
 	"testing"
 
 	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
@@ -191,7 +192,7 @@ func TestPublicSKUDisplayMetadataDoesNotExposePrivateOrReferenceAsSalePrice(t *t
 	product := &productdomain.Product{ID: 1, PriceAmount: money.FromDecimal(decimal.NewFromInt(879)), SKUs: []productdomain.ProductSKU{{
 		ID: 11, SKUCode: "PRO", IsActive: true, PriceAmount: money.FromDecimal(decimal.NewFromInt(879)),
 		DisplayMetaJSON:         jsonmap.JSON{"label": map[string]interface{}{"zh-CN": "100"}, "official_price_usd": "100", "token": "private"},
-		EntitlementContractJSON: jsonmap.JSON{"private_contract": "private"},
+		EntitlementContractJSON: jsonmap.ExactJSON{"private_contract": "private"},
 	}}}
 	view, err := handler.decoratePublicProduct(product, nil)
 	if err != nil {
@@ -200,5 +201,12 @@ func TestPublicSKUDisplayMetadataDoesNotExposePrivateOrReferenceAsSalePrice(t *t
 	response := view
 	if len(response.SKUs) != 1 || response.SKUs[0].DisplayMeta["official_price_usd"] != "100.00" || response.SKUs[0].DisplayMeta["token"] != nil || !response.SKUs[0].PriceAmount.Decimal.Equal(decimal.NewFromInt(879)) {
 		t.Fatalf("unexpected public SKU: %#v", response.SKUs)
+	}
+}
+
+func TestPublicAPIPlanViewRequiresMembershipEvenWithLegacyGuestFlag(t *testing.T) {
+	view := publicProductView{Product: productdomain.Product{ID: 1, PurchaseType: constants.ProductPurchaseGuest, MemberOnlyByCategory: true}}
+	if got := view.toProductResp().PurchaseType; got != constants.ProductPurchaseMember {
+		t.Fatalf("API plan advertised guest purchase: %s", got)
 	}
 }

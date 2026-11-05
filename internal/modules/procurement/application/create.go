@@ -73,10 +73,19 @@ func (s *Service) createProcurementForSingleOrder(order *procurementdomain.Local
 		return fmt.Errorf("invalid frozen checkout reservation: %w", err)
 	}
 	connectionID := frozen.ConnectionID
+	_, planConnectionID, _, hasPlanTerms, planErr := procurementdomain.FrozenPlanProcurement(item.SKUSnapshot)
+	if planErr != nil {
+		return fmt.Errorf("invalid frozen API plan checkout: %w", planErr)
+	}
 	if frozen.Required {
 		if item.Quantity != 1 {
 			return fmt.Errorf("scarce quantity requires review")
 		}
+	} else if hasPlanTerms {
+		if order.UserID == 0 || item.Quantity != 1 {
+			return fmt.Errorf("API plan requires a member order with quantity 1")
+		}
+		connectionID = planConnectionID
 	} else {
 		var found bool
 		connectionID, found, err = s.mappingRepo.FindConnectionID(item.ProductID)

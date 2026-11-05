@@ -16,6 +16,13 @@ const (
 
 var messages = map[string]map[string]string{
 	LocaleZH: {
+		"error.plan_account_link_required":               "请先联系客服，验证并关联您已有的 API 账号后再购买；原有余额与用量会保留。",
+		"error.plan_account_unavailable":                 "已关联的 API 账号当前不可用，请联系客服核查后重试。",
+		"error.plan_unavailable":                         "该 API 套餐当前不可购买，请选择其他方案或联系客服。",
+		"error.plan_changed":                             "该 API 套餐已更新，请返回套餐页重新选择规格并下单。",
+		"error.plan_purchase_limit_reached":              "已达到此套餐的购买次数限制，请选择其他方案或联系客服。",
+		"error.plan_token_limit_reached":                 "已关联的 API 账号 Key 数量已满，请在 API 控制台删除不再使用的 Key 后重试。",
+		"error.plan_eligibility_unavailable":             "暂时无法核实 API 套餐开通条件，尚未创建付款。请稍后重试或联系客服。",
 		"error.needtoken_support_invalid":                "客服设置无效，请检查邮箱及链接；二维码可使用站内上传地址",
 		"error.needtoken_resources_invalid":              "公开资源设置无效，请检查唯一编号、标题、链接、发布时间及数量（最多 40 条）",
 		"error.needtoken_pricing_invalid":                "币种与汇率设置无效。汇率须为 0 至 1000 之间的正十进制数（最多六位小数）；跨币种默认展示须先配置汇率。",
@@ -399,6 +406,13 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "无效的商品状态参数",
 	},
 	LocaleTW: {
+		"error.plan_account_link_required":               "請先聯絡客服，驗證並關聯您現有的 API 帳號後再購買；原有餘額與用量會保留。",
+		"error.plan_account_unavailable":                 "已關聯的 API 帳號目前無法使用，請聯絡客服核查後重試。",
+		"error.plan_unavailable":                         "此 API 套餐目前無法購買，請選擇其他方案或聯絡客服。",
+		"error.plan_changed":                             "此 API 套餐已更新，請返回套餐頁重新選擇規格並下單。",
+		"error.plan_purchase_limit_reached":              "已達到此套餐的購買次數限制，請選擇其他方案或聯絡客服。",
+		"error.plan_token_limit_reached":                 "已關聯的 API 帳號 Key 數量已滿，請在 API 控制台刪除不再使用的 Key 後重試。",
+		"error.plan_eligibility_unavailable":             "暫時無法核實 API 套餐開通條件，尚未建立付款。請稍後重試或聯絡客服。",
 		"error.needtoken_support_invalid":                "客服設定無效，請檢查信箱及連結；二維碼可使用站內上傳位址",
 		"error.needtoken_resources_invalid":              "公開資源設定無效，請檢查唯一編號、標題、連結、發布時間及數量（最多 40 筆）",
 		"error.needtoken_pricing_invalid":                "幣別與匯率設定無效。匯率須為 0 至 1000 之間的正十進位數（最多六位小數）；跨幣別預設展示須先設定匯率。",
@@ -782,6 +796,13 @@ var messages = map[string]map[string]string{
 		"error.invalid_product_status":              "無效的商品狀態參數",
 	},
 	LocaleEN: {
+		"error.plan_account_link_required":               "Contact support to verify and link your existing API account before purchasing. Your balance and usage will be preserved.",
+		"error.plan_account_unavailable":                 "The linked API account is unavailable. Contact support before trying again.",
+		"error.plan_unavailable":                         "This API plan is unavailable. Choose another plan or contact support.",
+		"error.plan_changed":                             "This API plan has changed. Return to the plans page, select an option and create a new order.",
+		"error.plan_purchase_limit_reached":              "You have reached this plan’s purchase limit. Choose another plan or contact support.",
+		"error.plan_token_limit_reached":                 "The linked API account has reached its key limit. Remove unused keys in the API console and try again.",
+		"error.plan_eligibility_unavailable":             "API activation eligibility could not be verified. Payment has not been created. Try again later or contact support.",
 		"error.needtoken_support_invalid":                "Invalid support settings. Check the email and URLs; QR images may use local upload paths.",
 		"error.needtoken_resources_invalid":              "Invalid public resources. Check unique IDs, titles, URLs, publication times and the 40-entry limit.",
 		"error.needtoken_pricing_invalid":                "Invalid display currency or exchange rate. Use a positive decimal no greater than 1000, with up to six decimal places. Configure a rate before selecting another display currency.",

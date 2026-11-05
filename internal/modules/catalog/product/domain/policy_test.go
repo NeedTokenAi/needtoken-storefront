@@ -7,6 +7,7 @@ import (
 	categorydomain "github.com/dujiao-next/internal/modules/catalog/category/domain"
 
 	"github.com/dujiao-next/internal/constants"
+	"github.com/dujiao-next/internal/shared/jsonmap"
 )
 
 func TestValidatePurchaseQuantityKeepsLimitSemantics(t *testing.T) {
@@ -41,6 +42,30 @@ func TestNormalizePurchaseQuantityLimitDisablesNonPositiveValues(t *testing.T) {
 	}
 	if got := NormalizePurchaseQuantityLimit(3); got != 3 {
 		t.Fatalf("NormalizePurchaseQuantityLimit(3) want 3 got %d", got)
+	}
+}
+
+func TestAPIPlanMembershipPolicyIncludesInactiveAncestorsAndDeepDescendants(t *testing.T) {
+	categories := []categorydomain.Category{
+		{ID: 1, Slug: "plans", IsActive: false},
+		{ID: 2, Slug: "plans-personal", ParentID: 1},
+		{ID: 3, Slug: "api-team", ParentID: 2},
+		{ID: 4, Slug: "recharge"},
+		{ID: 5, Slug: "chatgpt", ParentID: 4},
+		{ID: 6, Slug: "cycle", ParentID: 6},
+	}
+	ids := APIPlanCategoryIDs(categories)
+	if !ids[1] || !ids[2] || !ids[3] || ids[4] || ids[5] || ids[6] {
+		t.Fatalf("unexpected API-plan category policy: %#v", ids)
+	}
+	if got := EffectivePurchaseType(&Product{PurchaseType: constants.ProductPurchaseGuest, MemberOnlyByCategory: true}); got != constants.ProductPurchaseMember {
+		t.Fatalf("category restriction was overridden by guest flag: %s", got)
+	}
+	if got := EffectivePurchaseType(&Product{PurchaseType: constants.ProductPurchaseGuest}); got != constants.ProductPurchaseGuest {
+		t.Fatalf("ordinary guest product changed: %s", got)
+	}
+	if got := EffectivePurchaseType(&Product{PurchaseType: constants.ProductPurchaseGuest, SKUs: []ProductSKU{{EntitlementContractJSON: jsonmap.ExactJSON{"kind": "plan"}}}}); got != constants.ProductPurchaseMember {
+		t.Fatalf("misclassified native API plan remained guest-purchasable: %s", got)
 	}
 }
 

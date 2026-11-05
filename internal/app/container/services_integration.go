@@ -115,6 +115,7 @@ func (c *Container) initIntegrationServices() {
 		PaymentProviderRegistry: c.PaymentProviderRegistry,
 		ResellerAccounting:      c.ResellerAccountingLedger,
 		CheckoutReservations:    checkoutreservation.New(c.PaymentStore, paymentreservations.New(c.SiteConnectionService)),
+		PlanEligibility:         c.ProductMappingService,
 	})
 	c.ProcurementOrderService = procurementapp.NewService(procurementapp.Options{
 		Repository:         c.ProcurementOrderRepo,
