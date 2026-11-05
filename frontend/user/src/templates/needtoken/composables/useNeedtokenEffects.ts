@@ -14,8 +14,6 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
   let pointerX = 0
   let pointerY = 0
   let listenerRoot: Document | null = null
-  let surfaces: MutationObserver | undefined
-  const decorated = new Set<HTMLElement>()
 
   const actionFor = (target: EventTarget | null): HTMLElement | null => {
     let element = target instanceof Element ? target.closest<HTMLElement>(ACTION_SELECTOR) : null
@@ -34,16 +32,6 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     return padded || framed || icon
   }
 
-  const decorate = (control: HTMLElement) => {
-    if (!isSurface(control) || decorated.has(control)) return
-    control.classList.add('nt-action-surface')
-    decorated.add(control)
-  }
-  const scan = (root: Element | Document) => {
-    if (root instanceof HTMLElement && root.matches(ACTION_SELECTOR)) decorate(root)
-    root.querySelectorAll<HTMLElement>(ACTION_SELECTOR).forEach(decorate)
-  }
-
   const removeHighlight = () => {
     activeControl?.classList.remove('nt-specular', 'nt-specular-overlay', 'nt-specular-position')
     activeControl?.style.removeProperty('--nt-pointer-x')
@@ -58,7 +46,6 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     const style = getComputedStyle(control)
     // Plain editorial links keep their text treatment; padded link buttons get the same sheen.
     if (!isSurface(control, style)) return
-    decorate(control)
     activeControl = control
     control.classList.add('nt-specular')
     // Existing pseudo elements keep their content. The ordinary inset/outer
@@ -159,19 +146,6 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     mounted = true
     // The layout owns body.nt-tokens, including native dialogs teleported to body.
     listenerRoot = document
-    scan(document)
-    surfaces = new MutationObserver(records => {
-      for (const record of records) {
-        record.removedNodes.forEach(node => {
-          if (!(node instanceof Element)) return
-          for (const control of decorated) {
-            if (node === control || node.contains(control)) decorated.delete(control)
-          }
-        })
-        record.addedNodes.forEach(node => { if (node instanceof Element) scan(node) })
-      }
-    })
-    surfaces.observe(document.body, { childList: true, subtree: true })
     listenerRoot?.addEventListener('click', onClick, { capture: true })
     listenerRoot?.addEventListener('pointermove', onPointerMove, { passive: true })
     listenerRoot?.addEventListener('pointerleave', onPointerLeave)
@@ -187,11 +161,8 @@ export function useNeedtokenEffects(scope: Ref<HTMLElement | null>) {
     listenerRoot?.removeEventListener('focusin', onFocusIn)
     listenerRoot?.removeEventListener('focusout', onFocusOut)
     document.removeEventListener('visibilitychange', onVisibility)
-    surfaces?.disconnect()
     if (pointerFrame) window.cancelAnimationFrame(pointerFrame)
     removeHighlight()
-    decorated.forEach(control => control.classList.remove('nt-action-surface'))
-    decorated.clear()
     if (audio && audio.state !== 'closed') void audio.close().catch(() => {})
   })
 

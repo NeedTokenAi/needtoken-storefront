@@ -1,4 +1,6 @@
 <template>
+  <!-- html keeps the scrollbar gutter; body locks must not reserve it twice. -->
+  <ConfigProvider :scroll-body="{ padding: 0, margin: 0 }">
   <div id="app" class="min-h-screen bg-background text-foreground flex flex-col">
     <NeedtokenStartup v-if="startupPhase !== 'ready'" :branded="startupBranded" :failed="startupPhase === 'error'" :slow="startupSlow" @retry="retryPage" />
     <template v-else>
@@ -49,12 +51,14 @@
     <Toast />
     <ConfirmDialog />
   </div>
+  </ConfigProvider>
 </template>
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, h, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { ConfigProvider } from 'reka-ui'
 import { useAppStore } from './stores/app'
 import { getActiveTemplate, rememberTemplate } from './templates/registry'
 import { shouldBrandNeedtokenStartup, storefrontStartupPhase } from './utils/storefrontStartup'

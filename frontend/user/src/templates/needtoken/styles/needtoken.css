@@ -184,12 +184,8 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   background-size: 40px 40px;
 }
 
-/* Baseline surfaces use ordinary gradients/borders on every platform. The
-   moving highlight is an enhancement: no mask, :has or backdrop-filter needed. */
-:where(.nt-scope, body.nt-tokens) .nt-action-surface {
-  background-image: linear-gradient(170deg, #ffffff0e, #ffffff02 48%, #0000000a);
-  box-shadow: inset 0 1px 0 #ffffff1f, inset 0 -1px 0 #00000024, 0 0 0 1px #d9fff308;
-}
+/* Only the current hover/focus target receives this light. At rest, every
+   control keeps its component's own background and border. */
 :is(.nt-scope, body.nt-tokens) .nt-specular-position { position: relative; }
 :is(.nt-scope, body.nt-tokens) :is(a, button, label, summary, [role="button"], [role="tab"]).nt-specular {
   box-shadow: inset 0 1px 0 #e7fff866, inset 0 -1px 0 #00000038, 0 0 0 1px #9cebd840, 0 4px 18px #2dd4a71a;
@@ -209,7 +205,6 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after { background: linear-gradient(115deg, transparent, #beffec16, transparent); }
 }
 @media (forced-colors: active) {
-  :is(.nt-scope, body.nt-tokens) .nt-action-surface,
   .nt-scope .nt-glass-pill,
   .nt-scope :is(a, button).nt-button-purchase,
   .nt-scope .nt-native-cart a[href="/checkout"] {
