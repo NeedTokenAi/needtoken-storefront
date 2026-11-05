@@ -1,107 +1,124 @@
 <template>
-  <div class="api-plans mx-auto w-full max-w-[1200px] px-4 pb-12 pt-12 sm:px-6 sm:pt-16">
-    <header class="api-plans-hero" aria-labelledby="api-plans-title">
-      <span class="api-plans-eyebrow"><span aria-hidden="true" />{{ t('needtoken.nav.plans') }}</span>
-      <h1 id="api-plans-title"><span translate="no">{{ t('needtoken.apiServices.keyLabel') }}</span>{{ t('needtoken.apiServices.titleRest') }}</h1>
-      <p class="api-plans-intro">{{ t('needtoken.plans.subtitle') }}</p>
-      <ul class="api-plans-benefits" :aria-label="t('needtoken.apiServices.benefitsLabel')">
-        <li v-for="key in ['models', 'quota', 'usage']" :key="key"><Check :size="14" aria-hidden="true" />{{ t(`needtoken.apiServices.benefits.${key}`) }}</li>
+  <div class="api-plans mx-auto w-full max-w-[1200px] px-4 pb-12 sm:px-6">
+    <header class="api-plans-heading">
+      <h1>{{ t('needtoken.apiCatalog.titlePrefix') }}<span>{{ t('needtoken.nav.plans') }}</span></h1>
+      <ul class="api-plans-promises" :aria-label="t('needtoken.catalogServices.serviceNotes')">
+        <li v-for="(note, index) in notes" :key="note"><component :is="noteIcons[index]" :size="15" aria-hidden="true" />{{ t(`needtoken.apiCatalog.${note}`) }}</li>
+        <li class="api-plans-rate"><StandardExchangeRate placement="below" /></li>
       </ul>
-      <div class="mt-7 flex flex-wrap justify-center gap-3">
-        <RouterLink :to="`/categories/${CATEGORY_SLUGS.plans}`" class="rounded-md bg-primary px-5 py-2.5 text-[14px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.plans.buy') }}</RouterLink>
-        <a :href="CONSOLE_URL" class="rounded-md border border-border px-5 py-2.5 text-[14px] font-semibold text-foreground hover:bg-secondary" rel="noopener">{{ t('needtoken.plans.console') }}</a>
-      </div>
-      <p class="api-plans-quota-note">{{ t('needtoken.apiServices.quotaNote') }}</p>
     </header>
 
-    <section class="mt-10 grid gap-4 md:grid-cols-2" :aria-label="t('needtoken.apiServices.options')">
-      <article v-for="key in ['personal', 'enterprise']" :key="key" class="api-service-option rounded-2xl border border-border bg-card p-6 sm:p-7">
-        <component :is="key === 'personal' ? KeyRound : Building2" class="h-6 w-6 text-primary" aria-hidden="true" />
-        <h2 class="mt-5 text-[21px] font-semibold text-foreground">{{ t(`needtoken.apiServices.${key}.title`) }}</h2>
-        <p class="mt-3 text-[14px] leading-relaxed text-muted-foreground">{{ t(`needtoken.apiServices.${key}.desc`) }}</p>
-        <ul class="mt-5 space-y-2.5 text-[13px] text-muted-foreground">
-          <li v-for="n in 3" :key="n" class="flex items-start gap-2"><Check class="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />{{ t(`needtoken.apiServices.${key}.b${n}`) }}</li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="mt-10 rounded-2xl border border-border bg-card p-6 sm:p-7">
-      <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-[20px] font-semibold text-foreground">{{ t('needtoken.apiServices.connectTitle') }}</h2>
-          <p class="mt-2 text-[14px] text-muted-foreground">{{ t('needtoken.apiServices.connectDesc') }}</p>
-        </div>
-        <RouterLink to="/docs" class="text-[13px] font-semibold text-primary hover:underline">{{ t('needtoken.nav.docs') }} <span aria-hidden="true">↗</span></RouterLink>
-      </div>
-      <CodeBlock :code="API_BASE_URL" title="baseURL" />
-    </section>
-
-    <!-- 套餐由三个要素组成 -->
-    <section class="mt-12">
-      <h2 class="text-[22px] font-semibold text-foreground">{{ t('needtoken.plans.what.title') }}</h2>
-      <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div v-for="(key, idx) in planParts" :key="key" class="rounded-xl border border-border bg-card p-5">
-          <div class="nt-mono text-[13px] text-primary">{{ String(idx + 1).padStart(2, '0') }}</div>
-          <h3 class="mt-2 text-[16px] font-semibold text-foreground">{{ t(`needtoken.plans.what.${key}.title`) }}</h3>
-          <p class="mt-2 text-[14px] text-muted-foreground">{{ t(`needtoken.plans.what.${key}.desc`) }}</p>
+    <section id="api-plan-catalog" class="api-plan-catalog" :aria-label="t('needtoken.apiCatalog.catalogTitle')">
+      <div class="api-plan-toolbar">
+        <nav class="api-plan-tabs" :aria-label="t('needtoken.apiCatalog.audiences')">
+          <button v-for="kind in audiences" :key="kind" type="button" :aria-pressed="audience === kind" :class="{ active: audience === kind }" @click="selectAudience(kind)"><component :is="kind === 'personal' ? UserRound : Building2" :size="16" aria-hidden="true" />{{ t(`needtoken.apiCatalog.${kind}`) }}</button>
+        </nav>
+        <div class="api-plan-tools">
+          <span v-if="!loading && !categoriesLoading && !loadError && !categoriesError" class="api-plan-count" aria-live="polite">{{ t('needtoken.catalogServices.resultCount', { count: totalProducts }) }}</span>
+          <form class="api-plan-search" role="search" @submit.prevent="submitSearch"><Search :size="16" aria-hidden="true" /><input v-model="searchQuery" type="search" :placeholder="t('needtoken.apiCatalog.search')" :aria-label="t('needtoken.apiCatalog.search')" /><button type="submit" :aria-label="t('needtoken.catalogServices.searchSubmit')"><ArrowRight :size="16" aria-hidden="true" /></button></form>
+          <DisplayCurrencySelector compact />
+          <a :href="CONSOLE_URL" class="api-plan-console" rel="noopener">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
         </div>
       </div>
+
+      <div class="api-plan-member-note"><LockKeyhole :size="18" aria-hidden="true" /><details><summary><h2>{{ t('needtoken.apiCatalog.memberTitle') }}</h2><span>{{ t('needtoken.apiCatalog.step1Title') }}</span><ChevronDown :size="14" aria-hidden="true" /></summary><p>{{ t('needtoken.apiCatalog.memberDescription') }}</p></details><RouterLink v-if="!userAuth.isAuthenticated" :to="loginTarget">{{ t('needtoken.apiCatalog.login') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink><RouterLink v-else to="/me/orders">{{ t('needtoken.apiCatalog.myOrders') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink></div>
+
+      <div v-if="categoriesLoading || loading" class="api-plan-grid" role="status" aria-busy="true" :aria-label="t('needtoken.common.loading')"><div v-for="index in 6" :key="index" class="api-plan-skeleton"><div /><div /><div /><div /></div></div>
+      <div v-else-if="categoriesError || loadError" class="api-plan-state" role="alert"><PackageSearch :size="30" aria-hidden="true" /><h3>{{ t('needtoken.catalogServices.loadError') }}</h3><button type="button" @click="categoriesError ? loadCategories() : loadProducts()">{{ t('needtoken.common.retry') }}</button></div>
+      <div v-else-if="!products.length" class="api-plan-state" role="status"><PackageSearch :size="30" aria-hidden="true" /><h3>{{ t(searchQuery ? 'needtoken.catalogServices.emptySearch' : 'needtoken.apiCatalog.empty') }}</h3><p>{{ t('needtoken.apiCatalog.emptyDescription') }}</p><button v-if="searchQuery" type="button" @click="clearSearch">{{ t('products.clearFilters') }}</button><a v-else :href="businessEmailHref">{{ t('needtoken.apiCatalog.businessContact') }}<ArrowUpRight :size="14" aria-hidden="true" /></a></div>
+      <template v-else><div class="api-plan-grid"><ServiceProductCard v-for="product in products" :key="product.id" :product="product" kind="recharge" member-only :category-label="t(`needtoken.apiCatalog.${audience}`)" :cta-label="t(userAuth.isAuthenticated ? 'needtoken.apiCatalog.choose' : 'needtoken.apiCatalog.loginToChoose')" :delivery-text="t('needtoken.apiCatalog.memberDelivery')" :description-fallback="t('needtoken.apiCatalog.productFallback')" /></div><PaginationNav :current-page="page" :total-pages="totalPages" :loading="loading" compact @change-page="changePage" /></template>
     </section>
 
-    <!-- Tokens 计量 -->
-    <section class="mt-12">
-      <h2 class="text-[22px] font-semibold text-foreground">{{ t('needtoken.plans.tokens.title') }}</h2>
-      <ul class="mt-4 space-y-2 text-[14px] text-muted-foreground">
-        <li v-for="n in 4" :key="n" class="flex gap-2"><span class="text-primary">›</span>{{ t(`needtoken.plans.tokens.b${n}`) }}</li>
-      </ul>
-      <RouterLink to="/models" class="mt-4 inline-block text-[14px] font-semibold text-primary hover:underline">{{ t('needtoken.plans.tokens.link') }}</RouterLink>
-    </section>
-
-    <!-- 购买到使用 -->
-    <section class="mt-12">
-      <h2 class="text-[22px] font-semibold text-foreground">{{ t('needtoken.plans.flow.title') }}</h2>
-      <ol class="mt-5 space-y-3">
-        <li v-for="n in 4" :key="n" class="flex gap-4 rounded-xl border border-border bg-card p-4">
-          <span class="nt-mono grid h-7 w-7 flex-none place-items-center rounded-md bg-primary/15 text-[13px] text-primary">{{ n }}</span>
-          <div>
-            <div class="text-[15px] font-medium text-foreground">{{ t(`needtoken.plans.flow.s${n}.title`) }}</div>
-            <div class="mt-1 text-[14px] text-muted-foreground">{{ t(`needtoken.plans.flow.s${n}.desc`) }}</div>
-          </div>
-        </li>
-      </ol>
-      <p class="mt-4 text-[13px] text-muted-foreground">{{ t('needtoken.plans.note') }}</p>
-    </section>
+    <section class="api-plan-how" :aria-label="t('needtoken.apiCatalog.howTitle')"><h2>{{ t('needtoken.apiCatalog.howTitle') }}</h2><ol><li v-for="n in 3" :key="n"><span>0{{ n }}</span><div><h3>{{ t(`needtoken.apiCatalog.step${n}Title`) }}</h3><p>{{ t(`needtoken.apiCatalog.step${n}Description`) }}</p></div></li></ol></section>
+    <section class="api-plan-connect"><div><h2>{{ t('needtoken.apiServices.connectTitle') }}</h2><p>{{ t('needtoken.apiCatalog.connectDescription') }}</p></div><RouterLink to="/docs">{{ t('needtoken.nav.docs') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink><CodeBlock :code="API_BASE_URL" title="baseURL" /></section>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Building2, Check, KeyRound } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, Building2, ChevronDown, Clock3, FileText, KeyRound, LockKeyhole, PackageSearch, Search, UserRound } from 'lucide-vue-next'
 import { usePageSeo } from '../../composables/usePageSeo'
-import { API_BASE_URL, CATEGORY_SLUGS, CONSOLE_URL } from './config'
+import { useUserAuthStore } from '../../stores/userAuth'
+import { useAppStore } from '../../stores/app'
+import PaginationNav from '../../components/PaginationNav.vue'
+import { API_BASE_URL, CONSOLE_URL } from './config'
 import CodeBlock from './components/CodeBlock.vue'
+import ServiceProductCard from './components/ServiceProductCard.vue'
+import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
+import StandardExchangeRate from './components/StandardExchangeRate.vue'
+import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
+import { normalizeNeedtokenSupport, supportEmailHref } from './lib/supportConfig'
 
 const { t } = useI18n()
-
-usePageSeo({
-  title: () => t('needtoken.plans.title'),
-  description: () => t('needtoken.plans.subtitle'),
-})
-
-const planParts = ['group', 'quota', 'validity']
+const userAuth = useUserAuthStore()
+const appStore = useAppStore()
+const { audience, categoriesLoading, categoriesError, products, loading, loadError, totalPages, totalProducts, page, searchQuery, loadCategories, loadProducts, selectAudience, changePage, submitSearch, clearSearch } = useApiPlanCatalog()
+const audiences = ['personal', 'enterprise'] as const
+const notes = ['memberOnly', 'quotaNote', 'usageNote', 'enterpriseNote']
+const noteIcons = [LockKeyhole, Clock3, KeyRound, FileText]
+const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: `/plans?kind=${audience.value}#api-plan-catalog` } }))
+const businessEmailHref = computed(() => supportEmailHref(normalizeNeedtokenSupport(appStore.config?.needtoken_support).businessEmail))
+usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('needtoken.apiCatalog.subtitle'), canonicalPath: () => '/plans' })
 </script>
 
 <style scoped>
-.api-plans-hero { position: relative; isolation: isolate; overflow: hidden; padding: 44px 28px 34px; border: 1px solid var(--ui-border); border-radius: 24px; text-align: center; background: radial-gradient(ellipse at 50% 0, rgba(45, 212, 167, .11), transparent 70%), var(--ui-bg-elevated); }
-.api-plans-hero h1 { margin-top: 22px; font-size: clamp(32px, 4.1vw, 52px); line-height: 1.25; letter-spacing: -.045em; font-weight: 750; text-wrap: balance; }
-.api-plans-hero h1 > span { color: var(--ui-accent); }
-.api-plans-intro { max-width: 660px; margin: 20px auto 0; font-size: 15px; line-height: 1.85; color: var(--ui-text-secondary); text-wrap: pretty; }
-.api-plans-eyebrow { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid var(--ui-border); border-radius: 999px; padding: .4rem .75rem; color: var(--ui-accent); font-size: .75rem; }
-.api-plans-eyebrow span { height: .375rem; width: .375rem; border-radius: 50%; background: currentColor; }
-.api-plans-benefits { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 25px; margin-top: 24px; font-size: 12px; color: var(--ui-text-secondary); }
-.api-plans-benefits li { display: flex; align-items: center; gap: 6px; }
-.api-plans-benefits svg { color: var(--ui-accent); }
-.api-plans-quota-note { margin-top: 17px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.7; }
-.api-service-option { background: linear-gradient(145deg, rgba(45, 212, 167, .035), transparent 65%), var(--ui-bg-elevated); }
-@media (max-width: 640px) { .api-plans-hero { padding: 30px 18px 25px; border-radius: 18px; } .api-plans-intro { font-size: 13px; margin-top: 15px; } .api-plans-benefits { gap: 10px 16px; font-size: 11px; } }
+.api-plans { padding-top: 20px; }
+.api-plans-heading { text-align: center; padding-bottom: 12px; }
+.api-plans-heading h1 { font-size: clamp(27px, 2.5vw, 34px); font-weight: 750; letter-spacing: -.045em; line-height: 1.25; text-wrap: balance; }
+.api-plans-heading h1 span { color: var(--ui-accent); }
+.api-plans-promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; font-size: 12px; }
+.api-plans-promises li { display: flex; min-width: 0; min-height: 34px; justify-content: center; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid #ffe07e73; border-radius: 9px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; }
+.api-plans-promises svg { flex: none; opacity: .85; }
+.api-plans-rate { position: relative; z-index: 3; }
+.api-plan-catalog { scroll-margin-top: 85px; }
+.api-plan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0 12px; border-top: 1px solid var(--ui-border); }
+.api-plan-tools { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.api-plan-count { flex: none; color: var(--ui-text-muted); font-size: 12px; }
+.api-plan-console { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 40px; color: var(--ui-accent); font-size: 12px; }
+.api-plan-tools :deep(.nt-display-currency--compact) { flex: none; font-size: 12px; gap: 6px; }
+.api-plan-tools :deep(.nt-display-currency__control) { min-height: 40px; }
+.api-plan-tabs { display: flex; gap: 9px; min-width: 0; }
+.api-plan-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: linear-gradient(135deg, #ffffff11, #ffffff04); color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; }
+.api-plan-tabs button.active { color: var(--ui-accent); border-color: #2dd4a770; background: linear-gradient(135deg, #2dd4a725, #2dd4a709); }
+.api-plan-search { display: flex; align-items: center; gap: 8px; min-height: 40px; width: 220px; flex: 0 1 220px; min-width: 160px; max-width: 100%; padding: 0 11px; border: 1px solid var(--ui-border); border-radius: 10px; color: var(--ui-text-muted); background: var(--ui-bg-elevated); }
+.api-plan-search input { width: 100%; flex: 1; min-width: 0; background: transparent; color: var(--ui-text-primary); font-size: 13px; outline: none; }
+.api-plan-search:focus-within, .api-plan-tabs button:focus-visible, .api-plan-console:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
+.api-plan-search button { display: grid; place-items: center; flex: none; width: 26px; height: 32px; }
+.api-plan-member-note { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; border: 1px solid #2dd4a733; border-radius: 11px; background: #2dd4a709; }
+.api-plan-member-note > svg { flex: none; color: var(--ui-accent); margin-top: 3px; }
+.api-plan-member-note > details { min-width: 0; flex: 1; }
+.api-plan-member-note summary { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 12px; list-style: none; cursor: pointer; }
+.api-plan-member-note summary::-webkit-details-marker { display: none; }
+.api-plan-member-note summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 4px; border-radius: 3px; }
+.api-plan-member-note summary > span { color: var(--ui-text-secondary); font-size: 12px; }
+.api-plan-member-note summary > svg { flex: none; color: var(--ui-accent); }
+.api-plan-member-note details[open] summary > svg { transform: rotate(180deg); }
+.api-plan-member-note h2 { font-size: 13px; font-weight: 650; }
+.api-plan-member-note p { margin-top: 8px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.api-plan-member-note > a { display: inline-flex; flex: none; align-items: center; gap: 5px; color: var(--ui-accent); font-size: 12px; margin-top: 3px; }
+.api-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 17px; }
+.api-plan-skeleton { min-height: 330px; padding: 18px; border: 1px solid var(--ui-border); border-radius: 20px; }
+.api-plan-skeleton div { height: 25px; width: 70%; margin-bottom: 22px; border-radius: 8px; background: #ffffff09; }
+.api-plan-skeleton div:nth-child(3) { height: 85px; width: 100%; }
+.api-plan-state { display: grid; align-content: center; justify-items: center; gap: 14px; min-height: 310px; padding: 25px; border: 1px solid var(--ui-border); border-radius: 22px; text-align: center; color: var(--ui-text-muted); }
+.api-plan-state h3 { color: var(--ui-text-primary); font-size: 17px; font-weight: 650; }
+.api-plan-state p { font-size: 13px; line-height: 1.8; max-width: 56ch; }
+.api-plan-state button, .api-plan-state a { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--ui-border); border-radius: 9px; font-size: 12px; color: var(--ui-accent); }
+.api-plan-how { margin-top: 44px; }
+.api-plan-how > h2, .api-plan-connect h2 { font-size: 20px; font-weight: 650; }
+.api-plan-how ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 20px; border: 1px solid var(--ui-border); border-radius: 18px; overflow: hidden; background: var(--ui-bg-elevated); }
+.api-plan-how li { display: flex; gap: 15px; min-width: 0; padding: 24px; }
+.api-plan-how li + li { border-left: 1px solid var(--ui-border); }
+.api-plan-how li > span { flex: none; color: var(--ui-accent); font-family: var(--nt-font-mono); font-size: 12px; margin-top: 3px; }
+.api-plan-how h3 { font-size: 13px; font-weight: 650; }
+.api-plan-how p { margin-top: 9px; font-size: 12px; line-height: 1.9; color: var(--ui-text-muted); overflow-wrap: anywhere; }
+.api-plan-connect { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 20px; padding: 26px; margin-top: 38px; border: 1px solid var(--ui-border); border-radius: 18px; background: var(--ui-bg-elevated); }
+.api-plan-connect > div:first-child { min-width: 0; }
+.api-plan-connect p { margin-top: 9px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.85; }
+.api-plan-connect > a { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ui-accent); }
+.api-plan-connect > .nt-code { grid-column: 1 / -1; min-width: 0; }
+@media (max-width: 1199px) { .api-plan-toolbar { flex-wrap: wrap; gap: 10px; } .api-plan-tools { flex: 1; flex-wrap: wrap; } .api-plan-count { display: none; } }
+@media (max-width: 1023px) { .api-plans-promises { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plans-rate { grid-column: 1 / -1; } .api-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plan-tools { justify-content: flex-start; } .api-plan-member-note { align-items: flex-start; } }
+@media (max-width: 640px) { .api-plans { padding-top: 22px; } .api-plans-promises li { padding: 7px 9px; gap: 6px; } .api-plan-grid { grid-template-columns: minmax(0, 1fr); } .api-plan-tabs { width: 100%; } .api-plan-tabs button { flex: 1; min-width: 0; white-space: normal; padding-inline: 10px; gap: 6px; } .api-plan-tools { flex-basis: 100%; gap: 10px; } .api-plan-search { flex-basis: 100%; width: 100%; } .api-plan-tools > .api-plan-console { margin-left: auto; } .api-plan-member-note { flex-wrap: wrap; padding: 12px; } .api-plan-member-note > details { flex-basis: calc(100% - 32px); } .api-plan-member-note > a { margin-left: 28px; } .api-plan-how ol { grid-template-columns: 1fr; } .api-plan-how li + li { border-left: 0; border-top: 1px solid var(--ui-border); } .api-plan-connect { grid-template-columns: 1fr; padding: 20px; } .api-plan-connect > a { width: fit-content; } }
 </style>

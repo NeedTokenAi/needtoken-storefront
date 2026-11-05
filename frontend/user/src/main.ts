@@ -29,14 +29,15 @@ app.use(router)
 app.use(i18n)
 
 // 非默认语言的语言包为懒加载 chunk，挂载前并行加载，避免首屏文案闪现兜底语言
-Promise.all([
+Promise.allSettled([
   useTelegramMiniAppStore(pinia).init(),
   setI18nLocale(detectLocale()),
 ]).then(() => {
   app.mount('#app')
+  window.dispatchEvent(new Event('storefront:mounted'))
 })
 
 void router.isReady().then(() => {
     warmupCommonRoutes()
     warmupLocaleMessages()
-})
+}).catch(() => { /* App renders a retryable initial-route error instead of a stuck overlay. */ })

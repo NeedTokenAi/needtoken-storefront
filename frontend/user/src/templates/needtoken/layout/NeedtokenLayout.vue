@@ -43,9 +43,11 @@
               <button v-for="lang in languages" :key="lang.code" type="button" class="rounded px-3 py-2 text-left text-sm hover:bg-secondary" :class="appStore.locale === lang.code ? 'text-primary' : 'text-muted-foreground'" @click="changeLanguage(lang.code)">{{ lang.name }}</button>
             </div>
           </div>
-          <!-- 注册 / 登录统一进 new-api 控制台（跨域读不到登录态，固定显示） -->
-          <a :href="CONSOLE_LOGIN_URL" class="rounded-md px-3 py-1.5 text-[13px] font-semibold text-foreground hover:bg-secondary max-[640px]:hidden" rel="noopener">{{ t('needtoken.nav.login') }}</a>
-          <a :href="CONSOLE_REGISTER_URL" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90" rel="noopener">{{ t('needtoken.nav.register') }}</a>
+          <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('navbar.personalCenter') }}</RouterLink>
+          <template v-else>
+            <RouterLink :to="loginTarget" class="rounded-md px-3 py-1.5 text-[13px] font-semibold text-foreground hover:bg-secondary max-[640px]:hidden">{{ t('needtoken.nav.login') }}</RouterLink>
+            <RouterLink :to="registerTarget" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.nav.register') }}</RouterLink>
+          </template>
 
           <div ref="moreEl" class="relative hidden max-[1279px]:block" @focusout="onMoreFocusOut">
             <button ref="moreButtonEl" type="button" class="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary" :aria-label="t('navbar.more')" :aria-expanded="moreOpen" aria-controls="nt-mobile-navigation" @click="moreOpen = !moreOpen; openGroup = null">
@@ -61,7 +63,7 @@
                 </div>
               </div>
               <RouterLink to="/guest/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ t('navbar.guestOrders') }}</RouterLink>
-              <a :href="CONSOLE_LOGIN_URL" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" rel="noopener">{{ t('needtoken.nav.login') }}</a>
+              <RouterLink :to="authStore.isAuthenticated ? '/me' : loginTarget" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ authStore.isAuthenticated ? t('navbar.personalCenter') : t('needtoken.nav.login') }}</RouterLink>
               <span class="px-3 pb-1 pt-2 text-[11px] uppercase tracking-wider text-muted-foreground">{{ t('navbar.selectLanguage') }}</span>
               <button v-for="lang in languages" :key="`ml-${lang.code}`" type="button" class="rounded px-3 py-2 text-left text-sm hover:bg-secondary" :class="appStore.locale === lang.code ? 'text-primary' : 'text-muted-foreground'" @click="changeLanguage(lang.code); moreOpen = false">{{ lang.name }}</button>
             </nav>
@@ -75,54 +77,7 @@
       <div class="relative z-[1]"><slot /></div>
     </main>
 
-    <footer class="mt-20 border-t border-border">
-      <div class="mx-auto grid w-full max-w-[1200px] grid-cols-2 gap-x-8 gap-y-9 px-6 py-12 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <div class="col-span-2 md:col-span-1">
-          <div class="nt-brand flex items-center gap-2 text-[15px] font-bold text-foreground">
-            <BrandMark v-if="!appStore.isResellerTenant" class="h-7 w-7" />
-            <span>{{ brandName }}</span>
-          </div>
-          <p class="mt-3 max-w-[32ch] text-[13px] text-muted-foreground">{{ t('needtoken.footer.tagline') }}</p>
-          <div v-if="support.businessEmail" class="mt-5">
-            <span class="text-[11px] text-muted-foreground">{{ t('needtoken.support.business') }}</span>
-            <a :href="emailHref" class="mt-1 flex w-fit items-center gap-2 break-all text-[13px] text-foreground hover:text-primary"><Mail class="h-3.5 w-3.5 shrink-0 text-primary" />{{ support.businessEmail }}</a>
-          </div>
-        </div>
-        <div>
-          <h4 class="mb-3 text-[13px] font-semibold text-foreground">{{ t('needtoken.footer.products') }}</h4>
-          <RouterLink v-for="item in menuItems.slice(1)" :key="`f-${item.key}`" :to="item.path" class="block py-1 text-[13px] text-muted-foreground hover:text-primary">{{ item.label }}</RouterLink>
-        </div>
-        <div>
-          <h4 class="mb-3 text-[13px] font-semibold text-foreground">{{ t('needtoken.nav.help') }}</h4>
-          <RouterLink v-for="item in navGroups[0]?.items" :key="`f-${item.key}`" :to="item.path" class="block py-1 text-[13px] text-muted-foreground hover:text-primary">{{ item.label }}</RouterLink>
-          <a :href="CONSOLE_URL" class="block py-1 text-[13px] text-muted-foreground hover:text-primary" rel="noopener">{{ t('needtoken.footer.console') }}</a>
-        </div>
-        <div>
-          <h4 class="mb-3 text-[13px] font-semibold text-foreground">{{ t('needtoken.footer.support') }}</h4>
-          <RouterLink v-for="item in navGroups[1]?.items" :key="`f-${item.key}`" :to="item.path" class="block py-1 text-[13px] text-muted-foreground hover:text-primary">{{ item.label }}</RouterLink>
-          <RouterLink to="/guest/orders" class="block py-1 text-[13px] text-muted-foreground hover:text-primary">{{ t('navbar.guestOrders') }}</RouterLink>
-          <RouterLink to="/terms" class="block py-1 text-[13px] text-muted-foreground hover:text-primary">{{ t('footer.terms') }}</RouterLink>
-          <RouterLink to="/privacy" class="block py-1 text-[13px] text-muted-foreground hover:text-primary">{{ t('footer.privacy') }}</RouterLink>
-        </div>
-      </div>
-      <div v-if="qrCards.length" class="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-6 border-t border-border px-6 py-7">
-        <div>
-          <h4 class="text-sm font-semibold text-foreground">{{ t('needtoken.support.scanTitle') }}</h4>
-          <p class="mt-2 max-w-[44ch] text-[13px] leading-relaxed text-muted-foreground">{{ t('needtoken.support.scanIntro') }}</p>
-          <p v-if="support.serviceHours" class="mt-2 text-xs text-muted-foreground">{{ t('needtoken.support.hours', { hours: support.serviceHours }) }}</p>
-        </div>
-        <div class="flex flex-wrap gap-5">
-          <figure v-for="card in qrCards" :key="card.key" class="text-center">
-            <div class="w-28 rounded-xl border border-white/15 bg-white p-2"><img :src="getImageUrl(card.image)" :alt="card.label" width="96" height="96" class="aspect-square w-full object-contain" loading="lazy" decoding="async" referrerpolicy="no-referrer" /></div>
-            <figcaption class="mt-2 text-xs text-muted-foreground">{{ card.label }}</figcaption>
-          </figure>
-        </div>
-      </div>
-      <div class="mx-auto flex w-full max-w-[1200px] flex-wrap justify-between gap-3 border-t border-border px-6 py-5 text-[12px] text-muted-foreground">
-        <span>© {{ year }} {{ brandName }}</span>
-        <button type="button" data-nt-sound-toggle :aria-pressed="soundEnabled" class="inline-flex items-center gap-2 rounded px-1 py-1 text-xs hover:text-foreground" @click="toggleSound"><Volume2 v-if="soundEnabled" class="h-3.5 w-3.5" /><VolumeX v-else class="h-3.5 w-3.5" />{{ soundEnabled ? t('needtoken.effects.soundOn') : t('needtoken.effects.soundOff') }}</button>
-      </div>
-    </footer>
+    <NeedtokenFooter :brand-name="brandName" :reseller-logo="resellerLogo" :support="support" />
     <SupportWidget :support="support" :raised="raiseSupport" />
   </div>
 </template>
@@ -131,24 +86,30 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { ArrowUpRight, ChevronDown, ClipboardList, Languages, Mail, Menu, ShoppingCart, Volume2, VolumeX, X } from 'lucide-vue-next'
+import { ArrowUpRight, ChevronDown, ClipboardList, Languages, Menu, ShoppingCart, X } from 'lucide-vue-next'
 import { useAppStore } from '../../../stores/app'
 import { useCartStore } from '../../../stores/cart'
+import { useUserAuthStore } from '../../../stores/userAuth'
 import { getImageUrl } from '../../../utils/image'
-import { CATEGORY_SLUGS, CONSOLE_LOGIN_URL, CONSOLE_REGISTER_URL, CONSOLE_URL, NEEDTOKEN_BRAND_NAME, NEEDTOKEN_BRAND_ICON, NEEDTOKEN_TOUCH_ICON } from '../config'
+import { CATEGORY_SLUGS, NEEDTOKEN_BRAND_NAME, NEEDTOKEN_BRAND_ICON, NEEDTOKEN_TOUCH_ICON } from '../config'
 import BrandMark from '../components/BrandMark.vue'
+import NeedtokenFooter from '../components/NeedtokenFooter.vue'
 import GhostFibersBackground from '../components/GhostFibersBackground.vue'
 import SupportWidget from '../components/SupportWidget.vue'
 import { useNeedtokenEffects } from '../composables/useNeedtokenEffects'
-import { normalizeNeedtokenSupport, supportEmailHref } from '../lib/supportConfig'
+import { normalizeNeedtokenSupport } from '../lib/supportConfig'
 import '../styles/needtoken.css'
 
 const { t } = useI18n()
 const route = useRoute()
 const appStore = useAppStore()
 const cartStore = useCartStore()
+const authStore = useUserAuthStore()
+const authReturnPath = computed(() => route.path.startsWith('/auth/') ? '/' : route.fullPath)
+const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
+const registerTarget = computed(() => ({ path: '/auth/register', query: { redirect: authReturnPath.value } }))
 const scopeEl = ref<HTMLElement | null>(null)
-const { soundEnabled, toggleSound } = useNeedtokenEffects(scopeEl)
+useNeedtokenEffects(scopeEl)
 
 const langOpen = ref(false)
 const moreOpen = ref(false)
@@ -158,7 +119,6 @@ const moreButtonEl = ref<HTMLButtonElement | null>(null)
 const openGroup = ref<string | null>(null)
 const mobileGroup = ref<string | null>(null)
 const groupEls = new Map<string, HTMLElement>()
-const year = new Date().getFullYear()
 
 const brandName = computed(() => appStore.isResellerTenant
   ? String(appStore.config?.brand?.site_name || '').trim() || NEEDTOKEN_BRAND_NAME
@@ -176,11 +136,6 @@ watch(() => appStore.isResellerTenant, (isReseller) => {
   })
 }, { immediate: true })
 const support = computed(() => normalizeNeedtokenSupport(appStore.isResellerTenant ? undefined : appStore.config?.needtoken_support, !appStore.isResellerTenant))
-const emailHref = computed(() => supportEmailHref(support.value.businessEmail))
-const qrCards = computed(() => [
-  { key: 'wecom', label: t('needtoken.support.wecom'), image: support.value.wecomQr },
-  { key: 'qq', label: t('needtoken.support.qq'), image: support.value.qqQr },
-].filter(card => !!card.image))
 const raiseSupport = computed(() => /^\/(?:products\/|checkout(?:\/|$)|pay(?:ment)?(?:\/|$))/.test(route.path))
 const cartCount = computed(() => cartStore.totalItems)
 
