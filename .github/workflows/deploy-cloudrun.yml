@@ -1,0 +1,181 @@
+# 生产部署。只在 main 的 ci（push）成功之后，或维护者从 main 手动指定 SHA 时运行。
+# PR / dev / 手动重跑 ci 不会走到发放 GCP 凭证的 job。
+# 启用前必须先停掉 Cloud Build 触发器 needtoken-storefront-asia-southeast1-NeedTokenAi，
+# 否则会和这里抢着把流量切到 100%。见 docs/ops/deploy.md。
+name: deploy-cloudrun
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: 要部署的完整 40 位 commit SHA（必须在 main 历史上，且已有 push 到 main 的成功 ci）
+        required: true
+        type: string
+      allow_behind_main:
+        description: 部署比当前 main 更旧、但仍在 main 历史上的提交。回滚请优先切回上一修订版本的流量。
+        required: false
+        default: false
+        type: boolean
+
+# 默认不发 OIDC。只有 deploy job 覆盖为 id-token: write。
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Preflight
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+        || (
+          github.event_name == 'workflow_run'
+          && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_branch == 'main'
+          && github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      statuses: read
+    outputs:
+      proceed: ${{ steps.preflight.outputs.proceed }}
+      sha: ${{ steps.preflight.outputs.sha }}
+      allow_behind: ${{ steps.preflight.outputs.allow_behind }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Decide whether this SHA may deploy
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_SHA: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.git_sha || '' }}
+          INPUT_ALLOW_BEHIND: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.allow_behind_main && 'true' || 'false' }}
+          WR_SHA: ${{ github.event.workflow_run.head_sha || '' }}
+          WR_EVENT: ${{ github.event.workflow_run.event || '' }}
+          WR_BRANCH: ${{ github.event.workflow_run.head_branch || '' }}
+          WR_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
+          WR_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name || '' }}
+          WR_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+          MODE: gate
+        run: .github/scripts/deploy-preflight.sh
+
+  deploy:
+    name: Deploy
+    needs: gate
+    if: ${{ needs.gate.result == 'success' && needs.gate.outputs.proceed == 'true' }}
+    concurrency:
+      group: deploy-cloudrun-production
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: write
+      checks: read
+      contents: read
+      id-token: write
+      statuses: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+      IMAGE: ${{ vars.ARTIFACT_REGISTRY_IMAGE }}
+      SHA: ${{ needs.gate.outputs.sha }}
+      DEPLOY_SHA: ${{ needs.gate.outputs.sha }}
+      DEPLOY_ALLOW_BEHIND: ${{ needs.gate.outputs.allow_behind }}
+      INPUT_SHA: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.git_sha || '' }}
+      INPUT_ALLOW_BEHIND: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.allow_behind_main && 'true' || 'false' }}
+      WR_SHA: ${{ github.event.workflow_run.head_sha || '' }}
+      WR_EVENT: ${{ github.event.workflow_run.event || '' }}
+      WR_BRANCH: ${{ github.event.workflow_run.head_branch || '' }}
+      WR_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
+      WR_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name || '' }}
+      WR_RUN_ID: ${{ github.event.workflow_run.id || '' }}
+    steps:
+      - name: Require deploy variables
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION CLOUD_RUN_SERVICE IMAGE SHA; do
+            if [[ -z ${!name:-} ]]; then
+              echo "::error::缺少 Actions Variable 或 SHA: ${name}"
+              missing=1
+            fi
+          done
+          [[ $missing -eq 0 ]]
+          echo "SHA=${SHA}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout exact SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Confirm checkout
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SHA"
+
+      - name: Recheck before credentials
+        id: recheck
+        run: |
+          set -euo pipefail
+          set +e
+          MODE=recheck .github/scripts/deploy-preflight.sh
+          rc=$?
+          set -e
+          if [[ $rc -eq 10 ]]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::main moved; not requesting GCP credentials"
+            exit 0
+          fi
+          [[ $rc -eq 0 ]]
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        if: steps.recheck.outputs.proceed == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        if: steps.recheck.outputs.proceed == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Build and push image by digest
+        if: steps.recheck.outputs.proceed == 'true'
+        run: .github/scripts/deploy-build.sh
+
+      - name: Smoke and shift traffic
+        if: steps.recheck.outputs.proceed == 'true'
+        run: .github/scripts/deploy-apply.sh
+
+      - name: Upload deploy record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-record-${{ github.run_id }}
+          path: |
+            build-record.json
+            deploy-record.json
+            smoke-result.json
+          if-no-files-found: ignore
