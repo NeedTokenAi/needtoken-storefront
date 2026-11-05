@@ -2,9 +2,11 @@
 import { computed, ref, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { AdminProduct, AdminCategory, AdminProductSKU, AdminPaymentChannel, LocalizedText } from '@/api/types'
+import type { AdminProduct, AdminCategory, AdminProductSKU, AdminPaymentChannel, AdminSKUDisplayMeta, LocalizedText } from '@/api/types'
 import MediaPicker from '@/components/admin/MediaPicker.vue'
 import RichEditor from '@/components/RichEditor.vue'
+import SKUDisplayMetaEditor from './SKUDisplayMetaEditor.vue'
+import { changedDefaultSKUDisplayMeta, isValidOfficialUSDPrice, isValidSKUFeatureLines, normalizeSKUDisplayMeta } from '@/utils/skuDisplayMeta'
 // image utils removed - MediaPicker handles image display
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -93,6 +95,7 @@ type SKUFormItem = {
   id: number
   sku_code: string
   spec_values: Record<string, string>
+  display_meta: AdminSKUDisplayMeta
   price_amount: number
   cost_price_amount: number
   manual_stock_total: number
@@ -147,6 +150,7 @@ const createSKUFormItem = (raw?: Partial<AdminProductSKU>): SKUFormItem => ({
       return result
     }, {}),
   },
+  display_meta: normalizeSKUDisplayMeta(raw?.display_meta, raw?.spec_values),
   price_amount: Number(raw?.price_amount || 0),
   cost_price_amount: Number(raw?.cost_price_amount || 0),
   manual_stock_total: toSafeStockTotal(raw?.manual_stock_total),
@@ -155,6 +159,9 @@ const createSKUFormItem = (raw?: Partial<AdminProductSKU>): SKUFormItem => ({
   sort_order: Number(raw?.sort_order || 0),
 })
 
+const singleSKUDisplayMeta = ref(normalizeSKUDisplayMeta(null))
+const originalSingleSKUDisplayMeta = ref(normalizeSKUDisplayMeta(null))
+const originalHadVariantRows = ref(false)
 const form = reactive({
   id: 0,
   title: { 'zh-CN': '', 'zh-TW': '', 'en-US': '' } as LocalizedText,
@@ -447,6 +454,12 @@ const removeSKU = (index: number) => {
   form.skus.splice(index, 1)
 }
 
+const validateDisplayMeta = (meta: AdminSKUDisplayMeta) => {
+  if (!isValidOfficialUSDPrice(meta.official_price_usd)) throw new Error(t('skuDisplay.invalidOfficialPrice'))
+  if (!isValidSKUFeatureLines(meta.feature_lines)) throw new Error(t('skuDisplay.invalidFeatures'))
+  return normalizeSKUDisplayMeta(meta)
+}
+
 const normalizeSKUsForSubmit = () => {
   if (!form.skus.length) {
     return [] as Array<Record<string, unknown>>
@@ -478,6 +491,7 @@ const normalizeSKUsForSubmit = () => {
       id: item.id > 0 ? item.id : undefined,
       sku_code: skuCode,
       spec_values: specValues,
+      display_meta: validateDisplayMeta(item.display_meta),
       price_amount: priceAmount,
       cost_price_amount: Number(item.cost_price_amount) || 0,
       manual_stock_total: stockUnchanged ? undefined : manualStockTotal,
@@ -497,6 +511,9 @@ const isTextLikeField = (fieldType: string) => {
 }
 
 const resetForm = () => {
+  originalHadVariantRows.value = false
+  singleSKUDisplayMeta.value = normalizeSKUDisplayMeta(null)
+  originalSingleSKUDisplayMeta.value = normalizeSKUDisplayMeta(null)
   initialCategoryID.value = null
   originalManualStockTotal.value = null
   Object.assign(form, {
@@ -528,6 +545,11 @@ const resetForm = () => {
 }
 
 const populateForm = (product: AdminProduct) => {
+  const rows = Array.isArray(product.skus) ? product.skus : []
+  const defaultSKU = rows.length === 1 && String(rows[0]?.sku_code || '').trim().toUpperCase() === 'DEFAULT' ? rows[0] : null
+  originalHadVariantRows.value = rows.length > 0 && !defaultSKU
+  singleSKUDisplayMeta.value = normalizeSKUDisplayMeta(defaultSKU?.display_meta, defaultSKU?.spec_values)
+  originalSingleSKUDisplayMeta.value = normalizeSKUDisplayMeta(defaultSKU?.display_meta, defaultSKU?.spec_values)
   initialCategoryID.value = Number(product.category_id || 0) || null
   originalManualStockTotal.value = resolveManualStockMetrics(product).total
   let imagesList: string[] = []
@@ -643,6 +665,9 @@ const handleSubmit = async () => {
       fulfillment_type: form.fulfillment_type,
       manual_stock_total: productStockUnchanged ? undefined : effectiveManualStockTotal,
       skus: normalizedSKUs,
+      default_sku_display_meta: !normalizedSKUs.length
+        ? changedDefaultSKUDisplayMeta(validateDisplayMeta(singleSKUDisplayMeta.value), originalSingleSKUDisplayMeta.value, originalHadVariantRows.value)
+        : undefined,
       payment_channel_ids: form.payment_channel_ids.length > 0 ? form.payment_channel_ids : [],
       is_affiliate_enabled: form.is_affiliate_enabled,
       is_active: form.is_active,
@@ -988,6 +1013,8 @@ watch(
               {{ t('admin.products.form.skuEmpty') }}
             </div>
 
+            <SKUDisplayMetaEditor v-if="!form.skus.length" v-model="singleSKUDisplayMeta" :language="currentLang" :site-currency="siteCurrency" />
+
             <div v-for="(sku, index) in form.skus" :key="`sku-${index}-${sku.id || 0}`" class="rounded-lg border border-border bg-background p-4 space-y-3">
               <div class="flex items-center justify-between">
                 <div class="text-xs font-medium text-muted-foreground">{{ t('admin.products.form.skuItemTitle', { index: index + 1 }) }}</div>
@@ -1032,6 +1059,7 @@ watch(
                   </div>
                 </div>
               </div>
+              <SKUDisplayMetaEditor v-model="sku.display_meta" :language="currentLang" :site-currency="siteCurrency" />
             </div>
           </div>
 

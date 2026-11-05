@@ -2,6 +2,9 @@ package gormstore
 
 import (
 	"fmt"
+	"gorm.io/driver/postgres"
+	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -170,4 +173,90 @@ func TestSKUStoreDeleteByProductHidesRowsAndRejectsStockMutations(t *testing.T) 
 			t.Fatalf("%s must not mutate soft-deleted sku, affected=%d err=%v", operation, affected, err)
 		}
 	}
+}
+
+func testSKUDisplayMetaAdditiveMigration(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	repo := NewSKUStore(db)
+	row := &productdomain.ProductSKU{ProductID: 111, SKUCode: "EXISTING", PriceAmount: money.FromDecimal(decimal.NewFromInt(879)), ManualStockTotal: 12, ManualStockLocked: 2, ManualStockSold: 3, IsActive: true}
+	if err := repo.Create(row); err != nil {
+		t.Fatal(err)
+	}
+	// The isolated fixture models an existing installation without this new column.
+	if err := db.Migrator().DropColumn(&productdomain.ProductSKU{}, "DisplayMetaJSON"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&productdomain.ProductSKU{}); err != nil {
+		t.Fatal(err)
+	}
+	upgraded, err := repo.GetByID(row.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if upgraded.ID != row.ID || !upgraded.PriceAmount.Decimal.Equal(row.PriceAmount.Decimal) || upgraded.ManualStockTotal != 12 || upgraded.ManualStockLocked != 2 || upgraded.ManualStockSold != 3 {
+		t.Fatalf("migration changed existing identity/price/stock: %#v", upgraded)
+	}
+	upgraded.DisplayMetaJSON, err = productdomain.NormalizeSKUDisplayMeta(map[string]interface{}{"official_price_usd": "100", "description": map[string]interface{}{"zh-CN": "日常编程"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Update(upgraded); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&productdomain.ProductSKU{}); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := repo.GetByID(row.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.DisplayMetaJSON["official_price_usd"] != "100.00" || updated.DisplayMetaJSON["description"].(map[string]interface{})["zh-CN"] != "日常编程" {
+		t.Fatalf("metadata roundtrip lost fields: %#v", updated.DisplayMetaJSON)
+	}
+}
+
+func TestSKUDisplayMetaAdditiveMigrationSQLite(t *testing.T) {
+	_, db := setupSKUStoreTest(t)
+	testSKUDisplayMetaAdditiveMigration(t, db)
+}
+
+func TestSKUDisplayMetaAdditiveMigrationPostgres(t *testing.T) {
+	dsn := os.Getenv("NEEDTOKEN_STOREFRONT_TEST_POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("isolated PostgreSQL test DSN is not configured")
+	}
+	admin, err := gorm.Open(postgres.Open(dsn), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := fmt.Sprintf("nt_sku_display_%d", time.Now().UnixNano())
+	if err := admin.Exec("CREATE SCHEMA " + schema).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := admin.Exec("DROP SCHEMA " + schema + " CASCADE").Error; err != nil {
+			t.Error(err)
+		}
+		if sqlDB, err := admin.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := parsed.Query()
+	query.Set("search_path", schema)
+	parsed.RawQuery = query.Encode()
+	db, err := gorm.Open(postgres.Open(parsed.String()), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		t.Cleanup(func() { _ = sqlDB.Close() })
+	}
+	if err := db.AutoMigrate(&productdomain.ProductSKU{}); err != nil {
+		t.Fatal(err)
+	}
+	testSKUDisplayMetaAdditiveMigration(t, db)
 }

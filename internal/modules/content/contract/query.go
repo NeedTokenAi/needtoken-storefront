@@ -10,6 +10,7 @@ const (
 
 // PostQuery 描述文章列表查询。
 type PostQuery struct {
+	CategoryIDs   []uint
 	Page          int
 	PageSize      int
 	Type          string

@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { categoryAPI, productAPI } from '../../../api'
 import type { PublicCategory } from '../../../utils/category'
 import {
+  defaultServiceChild,
   filterServiceProducts,
   resolveServiceScope,
   serviceKindFromSlug,
@@ -34,6 +35,21 @@ export function useServiceCatalog() {
   const page = computed(() => readPage(route.query.page))
   let generation = 0
   let disposed = false
+  // Set when the visitor clicks ALL, so the root URL stays put instead of bouncing to ChatGPT.
+  let explicitRootSlug: string | null = null
+
+  const queryWithoutPage = () => {
+    const query = { ...route.query }
+    delete query.page
+    return query
+  }
+
+  const redirectRootToDefaultChild = async () => {
+    const child = defaultServiceChild(scope.value, explicitRootSlug)
+    if (!child?.slug || child.slug === slug.value) return false
+    await router.replace({ path: `/categories/${child.slug}`, query: queryWithoutPage() }).catch(() => {})
+    return slug.value === child.slug
+  }
 
   const loadProducts = async () => {
     const ticket = ++generation
@@ -80,7 +96,13 @@ export function useServiceCatalog() {
       const response = await categoryAPI.list()
       if (disposed) return
       if (!Array.isArray(response.data.data)) throw new Error('Invalid public category response')
-      categories.value = response.data.data
+      const rows = response.data.data as PublicCategory[]
+      const child = defaultServiceChild(resolveServiceScope(rows, slug.value), explicitRootSlug)
+      if (child?.slug && child.slug !== slug.value) {
+        await router.replace({ path: `/categories/${child.slug}`, query: queryWithoutPage() }).catch(() => {})
+        if (disposed) return
+      }
+      categories.value = rows
       categoriesLoading.value = false
       await loadProducts()
     } catch {
@@ -93,9 +115,8 @@ export function useServiceCatalog() {
   const selectCategory = (category: PublicCategory | null) => {
     if (!scope.value?.root) return
     const target = category || scope.value.root
-    const query = { ...route.query }
-    delete query.page
-    return router.push({ path: `/categories/${target.slug}`, query })
+    explicitRootSlug = target.id === scope.value.root.id ? String(target.slug || '') : null
+    return router.push({ path: `/categories/${target.slug}`, query: queryWithoutPage() })
   }
   const changePage = (nextPage: number) => {
     if (!Number.isSafeInteger(nextPage) || nextPage < 1 || nextPage > totalPages.value) return
@@ -119,7 +140,11 @@ export function useServiceCatalog() {
 
   watch(() => [slug.value, route.query.page, route.query.q], () => {
     searchQuery.value = firstQueryValue(route.query.q)
-    if (!categoriesLoading.value && !categoriesError.value) void loadProducts()
+    if (categoriesLoading.value || categoriesError.value) return
+    void (async () => {
+      if (await redirectRootToDefaultChild()) return
+      if (!disposed) await loadProducts()
+    })()
   })
   onMounted(() => { void loadCategories() })
   onUnmounted(() => { disposed = true; generation += 1 })

@@ -1760,7 +1760,12 @@
       "docs": "API Docs",
       "blog": "Blog",
       "login": "Log in",
-      "register": "Sign up"
+      "register": "Sign up",
+      "help": "Help",
+      "tools": "Tools",
+      "faq": "FAQ",
+      "environment": "Environment check",
+      "appleIds": "Free Apple IDs"
     },
     "footer": {
       "tagline": "Top-ups, ready-made accounts and API plans. Shop in one place and track your orders.",
@@ -1800,13 +1805,13 @@
       "features": {
         "title": "Three product lines, one entry point",
         "recharge": {
-          "title": "Top-up",
-          "b1": "Subscription top-up handled by our team",
+          "title": "Recharge services",
+          "b1": "Subscription recharge services, handled by our team",
           "b2": "Leave an email at checkout, track it on the order page",
           "b3": "After-sales terms are on each product page"
         },
         "rental": {
-          "title": "Rental",
+          "title": "Ready-to-use accounts",
           "b1": "Ready-made accounts for a rental period",
           "b2": "Period, password change and return terms on the product page",
           "b3": "Delivery is shown only on the order page"
@@ -1895,7 +1900,7 @@
           "a": "The model has not been priced by the operator yet; your key is fine. Use a model that shows a price on the Models page, or contact support."
         },
         "aftersale": {
-          "q": "How do top-up and rental after-sales work?",
+          "q": "How do after-sales work for recharge services and ready-to-use accounts?",
           "a": "Each product page states its terms. Please read them before paying."
         }
       }
@@ -1961,9 +1966,9 @@
     },
     "plans": {
       "title": "API Plans",
-      "subtitle": "One key for your everyday models. Choose a personal plan or discuss dedicated supply and higher usage needs for your team.",
-      "buy": "Browse plans",
-      "console": "Open member console",
+      "subtitle": "Top up as needed and choose your Token allowance. Buy plans here; manage your APIKey and usage in the console.",
+      "buy": "Browse API plans",
+      "console": "Open API console",
       "what": {
         "title": "What a plan contains",
         "group": {
@@ -2038,59 +2043,69 @@
       }
     },
     "apiServices": {
-      "title": "One key. Your everyday models.",
+      "title": "One APIKey. Models on demand.",
       "options": "Personal and business API options",
       "personal": {
         "title": "Individuals & developers",
-        "desc": "Choose an API plan for development, writing, and your everyday tools.",
+        "desc": "Choose a plan for writing, development, or your everyday tools.",
         "b1": "Connect models and developer tools",
         "b2": "Choose quota and validity from product terms",
         "b3": "Manage keys and usage in the API console"
       },
       "enterprise": {
         "title": "Business & dedicated supply",
-        "desc": "Discuss a tailored plan based on your team’s models, usage, and concurrency needs.",
+        "desc": "Discuss team usage and dedicated supply based on models, concurrency, and budget.",
         "b1": "Discuss volume plans and tiered discounts",
         "b2": "Assess dedicated account pools and capacity",
         "b3": "Confirm service scope and pricing together"
       },
       "connectTitle": "Connect the tools you already use",
-      "connectDesc": "Create a key in the API console, then enter this base URL in a tool that supports OpenAI-compatible APIs."
+      "connectDesc": "Create a key in the API console, then enter this base URL in a tool that supports OpenAI-compatible APIs.",
+      "keyLabel": "One APIKey",
+      "titleRest": ". Models on demand.",
+      "benefitsLabel": "API plan features",
+      "benefits": {
+        "models": "Multiple models",
+        "quota": "Top up as needed",
+        "usage": "Track your usage"
+      },
+      "quotaNote": "Quota, validity, and request limits follow your purchased plan."
     },
     "homeServices": {
       "seoTitle": "Recharges, ready-made products and API plans",
       "eyebrow": "NeedToken.AI · AI services made simpler",
       "title": "Your AI services,",
       "titleAccent": "all start here.",
-      "subtitle": "Recharge an existing account, choose a ready-made product, or connect your application to model APIs. Find the service that fits your needs.",
+      "subtitle": "Recharge a subscription, get a ready-made account or choose an API plan.",
       "services": {
         "recharge": {
           "tag": "Keep your account",
           "title": "Recharge services",
-          "description": "Choose a recharge or subscription renewal for your existing account, then follow the order instructions.",
+          "description": "Recharge or renew your existing account, with immediate activation.",
           "note": "Review options, specifications and support terms",
           "action": "Recharge now"
         },
         "products": {
           "tag": "Delivered in your order",
           "title": "Ready-made products",
-          "description": "Choose a ready-made package and collect account details or other delivery content from your order page.",
+          "description": "Get a subscribed account and password as soon as payment succeeds.",
           "note": "Check delivery contents and usage terms first",
           "action": "Shop now"
         },
         "api": {
-          "tag": "One key, multiple models",
+          "tag": "One APIKey · Multiple models",
           "title": "API plans",
-          "description": "Choose model access for development, applications and teams, from everyday usage to business needs.",
-          "note": "Choose a plan, connect models and track usage",
+          "description": "Top up as needed and choose the token allowance that fits.",
+          "note": "Model access, allowances and rates follow your plan",
           "action": "Get API access"
         }
       },
       "benefits": {
         "selfService": "24/7 self-service ordering",
         "orderTracking": "Track your order",
-        "afterSales": "Clear support terms",
-        "business": "Invoices and business purchasing"
+        "afterSales": "Warranty & after-sales support",
+        "business": "Invoices & business bank transfers",
+        "channels": "Trusted recharge channels"
       },
       "steps": {
         "eyebrow": "From choosing to using",
@@ -2107,7 +2122,8 @@
         "receive": {
           "title": "Follow your delivery instructions",
           "description": "Submit recharge information, collect your product or follow the setup guide for your API plan."
-        }
+        },
+        "suffix": "in three steps"
       },
       "orders": {
         "title": "Already placed an order? Continue here.",
@@ -2116,24 +2132,76 @@
       },
       "faq": {
         "eyebrow": "Before you buy",
-        "title": "Find the right service for you",
-        "description": "Each service has a different purpose. Check the product description and service terms before ordering.",
+        "title": "A few things to know before ordering",
+        "description": "Recharges, accounts and API plans serve different needs.",
         "notices": "Read service notices",
         "service": {
           "question": "Which service should I choose?",
-          "answer": "Choose recharge services to top up or renew an existing account. Choose ready-made products to receive the items described on a product page. Choose an API plan to call models from tools, applications or development projects."
+          "answer": "Choose a recharge to renew your existing account, a ready-made product for a subscribed account, or an API plan to call models from your tools and apps."
         },
         "recharge": {
           "question": "What information does a recharge need?",
-          "answer": "Requirements vary by product. Read the purchase instructions and submit the requested information through your order. Activation timing depends on actual processing progress."
+          "answer": "Choose a plan and pay, then submit the requested details through your private order page. Follow the order instructions for tokens or credentials and check progress there."
         },
         "delivery": {
           "question": "Where can I check progress and delivery?",
-          "answer": "Use order lookup to find your order. The order page shows recharge progress, product delivery and support information. API keys and usage are managed in the model console."
+          "answer": "Your order page contains recharge progress, account delivery and support updates. Manage APIKeys and usage in the API console."
         },
         "business": {
-          "question": "How do business usage, invoices and bank transfers work?",
-          "answer": "Discuss business usage, dedicated supply, invoices and bank transfers before purchasing. Quotas, discounts, delivery scope and service terms depend on the final agreed plan."
+          "question": "Can I request an invoice or pay by bank transfer?",
+          "answer": "Yes. Confirm the billing name, tax details, invoice items and bank transfer arrangement before ordering. Business usage and dedicated plans can be discussed separately."
+        }
+      },
+      "flowControls": {
+        "label": "Choose a service walkthrough",
+        "pause": "Pause automatic switching",
+        "resume": "Resume automatic switching"
+      },
+      "flows": {
+        "recharge": {
+          "label": "Recharges",
+          "s1": {
+            "title": "Choose a subscription tier",
+            "description": "Select your account type, then check the duration, allowance and supported region."
+          },
+          "s2": {
+            "title": "Place your order and pay",
+            "description": "Check the product and total, then choose an available checkout payment method."
+          },
+          "s3": {
+            "title": "Complete your subscription",
+            "description": "Submit the requested details through your private order page and track the result."
+          }
+        },
+        "products": {
+          "label": "Ready-made accounts",
+          "s1": {
+            "title": "Choose an account tier",
+            "description": "Check the subscription, validity, delivery contents and support terms."
+          },
+          "s2": {
+            "title": "Place your order and pay",
+            "description": "Confirm the option and order total, then check delivery after payment."
+          },
+          "s3": {
+            "title": "Sign in and check the account",
+            "description": "Collect the account and password from your order, then verify its subscription."
+          }
+        },
+        "api": {
+          "label": "API services",
+          "s1": {
+            "title": "Register and create an APIKey",
+            "description": "Sign up in the API console and create your own APIKey."
+          },
+          "s2": {
+            "title": "Top up or choose a plan",
+            "description": "Purchase quota or a plan here, then verify the account association as instructed."
+          },
+          "s3": {
+            "title": "Configure your tool and call",
+            "description": "Enter the API address and APIKey in your tool. Check usage in the console."
+          }
         }
       }
     },
@@ -2145,7 +2213,10 @@
         "section": "Recharge plans",
         "descriptionFallback": "Choose an option and follow the product instructions to recharge.",
         "delivery": "Submit details as instructed",
-        "cta": "Recharge now"
+        "cta": "Recharge now",
+        "titlePrefix": "Choose your ",
+        "titleSubject": "recharge plan",
+        "titleSuffix": ""
       },
       "rental": {
         "label": "Ready-to-use accounts",
@@ -2154,7 +2225,10 @@
         "section": "Account plans",
         "descriptionFallback": "Choose an option and receive the delivery described on the product page.",
         "delivery": "View delivery in your order",
-        "cta": "Buy now"
+        "cta": "Buy now",
+        "titlePrefix": "Choose your ",
+        "titleSubject": "ready-to-use plan",
+        "titleSuffix": ""
       },
       "all": "ALL",
       "serviceNotes": "Service information",
@@ -2219,6 +2293,190 @@
       "siteNoticeScope": "These notices apply to the site. Product benefits and requirements are defined in the product description.",
       "noticeLoadFailed": "Notices could not be loaded. Retry or open all notices to check them.",
       "noSiteNotices": "There are no site notices at present."
+    },
+    "paymentMarks": {
+      "label": "Payment methods",
+      "alipay": "Alipay",
+      "wechat": "WeChat Pay",
+      "unionpay": "UnionPay",
+      "crypto": "Crypto",
+      "card": "Credit card",
+      "paypal": "PayPal",
+      "checkoutNote": "Available methods are shown at checkout"
+    },
+    "effects": {
+      "soundOn": "Button sounds: on",
+      "soundOff": "Button sounds: off"
+    },
+    "environment": {
+      "eyebrow": "Browser & connection",
+      "title": "Environment check",
+      "subtitle": "Check browser settings and your connection to this storefront. A useful first step for sign-in, checkout, or page-loading issues.",
+      "privacy": "Checks start only when you choose. Language and time zone stay on this page and are never uploaded. The connection test requests only this site’s health endpoint. No password or token is needed.",
+      "checks": "Browser checks",
+      "runningHint": "Browser checks complete. Testing this site’s connection…",
+      "checkedAt": "Checked at {time}",
+      "idleHint": "Select “Start checks” to inspect this browser.",
+      "cancel": "Stop",
+      "running": "Checking",
+      "runAgain": "Check again",
+      "run": "Start checks",
+      "connectionTitle": "Storefront connection",
+      "requestTime": "Request duration",
+      "httpStatus": "HTTP status: {status}",
+      "connectionScope": "Tests one request to this site’s /health endpoint, including network and server response time. This does not measure model API latency, access to external services, or the speed of future requests.",
+      "limitsTitle": "What do these results tell you?",
+      "limits": "These checks help troubleshoot storefront access and browser features. They cannot determine regional support for Claude or other platforms, account eligibility, IP reputation, or suspension risk. Refer to the platform’s own messages.",
+      "faq": "Browse FAQs",
+      "reportTitle": "Share your results",
+      "reportHint": "The report contains check statuses and the storefront request result. It omits language, time zone, and browser identifiers. Copy it to help support troubleshoot.",
+      "copyReport": "Copy redacted report",
+      "viewReport": "View report text",
+      "cancelled": "Connection test stopped. You can start again.",
+      "copied": "Report copied.",
+      "copyFailed": "Could not copy. Expand the report and copy the text manually.",
+      "labels": {
+        "secure": "Secure context",
+        "online": "Browser network status",
+        "cookies": "Cookie read/write",
+        "storage": "Local storage",
+        "crypto": "Web Crypto",
+        "wasm": "WebAssembly",
+        "language": "Browser language",
+        "timezone": "System time zone"
+      },
+      "status": {
+        "ok": "Available",
+        "warning": "Review",
+        "unknown": "Unconfirmed",
+        "idle": "Not checked"
+      },
+      "details": {
+        "notChecked": "Not checked yet.",
+        "secureReady": "This page is in a secure context and can use browser features that require HTTPS.",
+        "secureLimited": "This page is not in a secure context. Some browser features may be restricted.",
+        "onlineHint": "The browser reports a network connection. See the connection test below for an actual request result.",
+        "offlineHint": "The browser reports that it is offline. Check your network connection.",
+        "cookiesReady": "A temporary cookie was written, read, and deleted. This does not verify third-party cookies.",
+        "cookiesLimited": "Temporary cookies could not be read or written. Browser settings may affect sign-in or payment redirects.",
+        "storageReady": "Temporary data was written, read, and deleted. Existing stored values were not read.",
+        "storageLimited": "Local storage is unavailable or full. Preferences and shopping cart features may be affected.",
+        "cryptoReady": "The browser provides the Web Crypto interface.",
+        "cryptoLimited": "Web Crypto is unavailable. Some security features may be restricted.",
+        "wasmReady": "The browser provides the WebAssembly interface.",
+        "wasmLimited": "No WebAssembly interface was detected. Tools that require it may not work.",
+        "localOnly": "From this browser, displayed only on this page. Not used to assess region or account status."
+      },
+      "connection": {
+        "notChecked": "No connection test has been sent.",
+        "reachable": "The storefront health check responded successfully.",
+        "httpError": "The site returned an unsuccessful status. Try again later; share the report with support if this persists.",
+        "invalidResponse": "A response arrived, but it could not be verified as this site’s health result. It may be an access restriction, redirect, or proxy page.",
+        "timeout": "The health check did not finish within 5 seconds. Connection status remains unconfirmed. Check your network and try again.",
+        "networkError": "The request could not complete. Network conditions, browser restrictions, or service availability may be involved. Try again."
+      }
+    },
+    "support": {
+      "title": "Contact NeedToken.AI",
+      "intro": "Orders, product help and business enquiries",
+      "open": "Contact support",
+      "close": "Close support panel",
+      "tabsLabel": "Support and bookmarks",
+      "contact": "Contact",
+      "bookmark": "Bookmark",
+      "wecom": "WeCom",
+      "qq": "QQ support",
+      "hours": "Service hours: {hours}",
+      "openContact": "Open contact channel",
+      "sendEmail": "Send an enquiry",
+      "emailIntro": "Need help? Contact us by email.",
+      "orderNote": "Include your order number. Do not send passwords, verification codes or APIKeys.",
+      "bookmarkTitle": "Keep us within reach",
+      "bookmarkIntro": "Save this site with your browser’s bookmark feature.",
+      "windows": "Windows",
+      "mac": "Mac",
+      "mobile": "Mobile browser",
+      "mobileHelp": "Open Share or the menu and add a bookmark",
+      "business": "Business enquiries",
+      "scanTitle": "Scan to get in touch",
+      "scanIntro": "Scan a contact code for orders, after-sales support and business enquiries."
+    },
+    "faq": {
+      "eyebrow": "Help center",
+      "title": "Frequently asked questions",
+      "subtitle": "Find answers about recharges, account delivery, and API access.",
+      "search": "Search questions",
+      "searchAction": "Search",
+      "categories": "Topics",
+      "all": "All questions",
+      "needHelp": "Need help with an order?",
+      "contactDescription": "Have your order number ready. Check payment and delivery progress on the order page, or open support on the right.",
+      "orderHelp": "View my orders",
+      "questions": "Questions and answers",
+      "count": "{count} questions",
+      "loadError": "Questions could not be loaded",
+      "loadErrorDescription": "Try again later, or contact us through the support panel.",
+      "noResults": "No matching questions",
+      "noResultsDescription": "Try a shorter search or choose another topic.",
+      "empty": "Answers are on the way",
+      "emptyDescription": "Guides and answers will appear here as they are published. For now, check your order or contact support.",
+      "clear": "Clear search",
+      "readArticle": "Read the full guide"
+    },
+    "freeAppleId": {
+      "eyebrow": "Utilities",
+      "title": "Free Apple IDs",
+      "subtitle": "Review regions and instructions, then open the resource you need.",
+      "noticeTitle": "Read the resource instructions before use",
+      "notice": "Choose a region and open a resource for account details and instructions. Resources are updated periodically; check the resource page for current availability.",
+      "resources": "Shared resources",
+      "count": "{count} resources",
+      "help": "Frequently asked questions",
+      "empty": "No shared resources published yet",
+      "emptyDescription": "New resources will appear here when published. You can browse the guides in the meantime.",
+      "guides": "Read the guides",
+      "resourceFallback": "Shared Apple ID resource",
+      "manualRecord": "Manually maintained",
+      "updated": "Updated {date}",
+      "openResource": "View resource and instructions",
+      "beforeUse": "Three things to check first",
+      "steps": [
+        {
+          "title": "Check the source and region",
+          "description": "Read the publisher’s instructions and confirm the resource source, supported region, and permitted use."
+        },
+        {
+          "title": "Protect your personal account",
+          "description": "Use a shared account only for App Store downloads. Keep your own account signed in to iCloud."
+        },
+        {
+          "title": "Follow instructions and report issues",
+          "description": "If a resource has expired or no longer works, stop retrying and let support know. Do not change a shared account’s security settings."
+        }
+      ]
+    },
+    "variants": {
+      "optionNumber": "Option {number}",
+      "convertedPrice": "Converted estimate",
+      "settlementPrice": "Charged in: {price}",
+      "officialReference": "Official reference: {price}"
+    },
+    "displayPricing": {
+      "selectorLabel": "Display currency",
+      "currencyNames": {
+        "CNY": "CNY · Chinese yuan",
+        "USD": "USD · US dollar"
+      },
+      "settlementHint": "Orders are charged in {currency}",
+      "rateBadge": "Standard rate · Clear conversion",
+      "rateTitle": "Current display exchange rate",
+      "closeRate": "Close exchange rate details",
+      "rateUpdated": "Updated {time}",
+      "rateSource": "A display conversion rate set by this store.",
+      "ratePending": "Exchange rate not set",
+      "ratePendingHint": "Prices are shown in their original currency, {currency}. Conversion is currently unavailable.",
+      "rateSettlementHint": "Converted prices are for reference. Order totals and payments use {currency}.",
+      "referenceOption": "{name} (estimate)"
     }
   }
 }

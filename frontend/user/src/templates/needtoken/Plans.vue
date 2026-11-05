@@ -1,13 +1,17 @@
 <template>
   <div class="api-plans mx-auto w-full max-w-[1200px] px-4 pb-12 pt-12 sm:px-6 sm:pt-16">
-    <header class="api-plans-hero">
+    <header class="api-plans-hero" aria-labelledby="api-plans-title">
       <span class="api-plans-eyebrow"><span aria-hidden="true" />{{ t('needtoken.nav.plans') }}</span>
-      <h1 class="mt-5 text-[34px] font-bold leading-tight tracking-tight text-foreground sm:text-[48px]">{{ t('needtoken.apiServices.title') }}</h1>
-      <p class="mt-5 max-w-[64ch] text-[15px] leading-relaxed text-muted-foreground sm:text-[17px]">{{ t('needtoken.plans.subtitle') }}</p>
-      <div class="mt-7 flex flex-wrap gap-3">
+      <h1 id="api-plans-title"><span translate="no">{{ t('needtoken.apiServices.keyLabel') }}</span>{{ t('needtoken.apiServices.titleRest') }}</h1>
+      <p class="api-plans-intro">{{ t('needtoken.plans.subtitle') }}</p>
+      <ul class="api-plans-benefits" :aria-label="t('needtoken.apiServices.benefitsLabel')">
+        <li v-for="key in ['models', 'quota', 'usage']" :key="key"><Check :size="14" aria-hidden="true" />{{ t(`needtoken.apiServices.benefits.${key}`) }}</li>
+      </ul>
+      <div class="mt-7 flex flex-wrap justify-center gap-3">
         <RouterLink :to="`/categories/${CATEGORY_SLUGS.plans}`" class="rounded-md bg-primary px-5 py-2.5 text-[14px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.plans.buy') }}</RouterLink>
         <a :href="CONSOLE_URL" class="rounded-md border border-border px-5 py-2.5 text-[14px] font-semibold text-foreground hover:bg-secondary" rel="noopener">{{ t('needtoken.plans.console') }}</a>
       </div>
+      <p class="api-plans-quota-note">{{ t('needtoken.apiServices.quotaNote') }}</p>
     </header>
 
     <section class="mt-10 grid gap-4 md:grid-cols-2" :aria-label="t('needtoken.apiServices.options')">
@@ -88,9 +92,16 @@ const planParts = ['group', 'quota', 'validity']
 </script>
 
 <style scoped>
-.api-plans-hero { position: relative; isolation: isolate; }
-.api-plans-hero::before { position: absolute; z-index: -1; inset: -3rem 0 auto; height: 18rem; content: ''; pointer-events: none; background: radial-gradient(ellipse at 15% 10%, rgba(45, 212, 167, .09), transparent 65%); }
+.api-plans-hero { position: relative; isolation: isolate; overflow: hidden; padding: 44px 28px 34px; border: 1px solid var(--ui-border); border-radius: 24px; text-align: center; background: radial-gradient(ellipse at 50% 0, rgba(45, 212, 167, .11), transparent 70%), var(--ui-bg-elevated); }
+.api-plans-hero h1 { margin-top: 22px; font-size: clamp(32px, 4.1vw, 52px); line-height: 1.25; letter-spacing: -.045em; font-weight: 750; text-wrap: balance; }
+.api-plans-hero h1 > span { color: var(--ui-accent); }
+.api-plans-intro { max-width: 660px; margin: 20px auto 0; font-size: 15px; line-height: 1.85; color: var(--ui-text-secondary); text-wrap: pretty; }
 .api-plans-eyebrow { display: inline-flex; align-items: center; gap: .5rem; border: 1px solid var(--ui-border); border-radius: 999px; padding: .4rem .75rem; color: var(--ui-accent); font-size: .75rem; }
 .api-plans-eyebrow span { height: .375rem; width: .375rem; border-radius: 50%; background: currentColor; }
+.api-plans-benefits { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px 25px; margin-top: 24px; font-size: 12px; color: var(--ui-text-secondary); }
+.api-plans-benefits li { display: flex; align-items: center; gap: 6px; }
+.api-plans-benefits svg { color: var(--ui-accent); }
+.api-plans-quota-note { margin-top: 17px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.7; }
 .api-service-option { background: linear-gradient(145deg, rgba(45, 212, 167, .035), transparent 65%), var(--ui-bg-elevated); }
+@media (max-width: 640px) { .api-plans-hero { padding: 30px 18px 25px; border-radius: 18px; } .api-plans-intro { font-size: 13px; margin-top: 15px; } .api-plans-benefits { gap: 10px 16px; font-size: 11px; } }
 </style>

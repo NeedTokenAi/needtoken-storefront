@@ -100,6 +100,15 @@ func (s *Service) GetConfig(defaults map[string]interface{}) (map[string]interfa
 	for k, v := range value {
 		data[k] = v
 	}
+	if raw, ok := value["needtoken_support"]; ok {
+		data["needtoken_support"] = publicNeedtokenSupport(raw)
+	}
+	if raw, ok := value["needtoken_resources"]; ok {
+		data["needtoken_resources"] = publicNeedtokenResources(raw)
+	}
+	if raw, ok := value["needtoken_pricing"]; ok {
+		data["needtoken_pricing"] = publicNeedtokenPricing(raw, normalizeSiteCurrency(data[constants.SettingFieldSiteCurrency]))
+	}
 	return data, nil
 }
 

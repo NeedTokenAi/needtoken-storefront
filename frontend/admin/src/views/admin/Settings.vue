@@ -15,6 +15,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { notifyError, notifySuccess } from '@/utils/notify'
 import { applySiteIcon } from '@/utils/favicon'
 import { getImageUrl } from '@/utils/image'
+import { mergeSiteSettingPatch } from '@/utils/needtokenSettings'
+import { pricingPatchForSettlementCurrencyChange } from '@/utils/needtokenPricing'
 import { orderEmailSceneKeys } from '@/utils/orderEmailTemplates'
 import MediaPicker from '@/components/admin/MediaPicker.vue'
 import SettingsSMTPTab from './components/SettingsSMTPTab.vue'
@@ -23,6 +25,8 @@ import SettingsOrderEmailTemplateTab from './components/SettingsOrderEmailTempla
 import SettingsNavigationTab from './components/SettingsNavigationTab.vue'
 import SettingsHomeAnnouncementTab from './components/SettingsHomeAnnouncementTab.vue'
 import SettingsUpstreamSyncTab from './components/SettingsUpstreamSyncTab.vue'
+import SettingsNeedtokenTab from './components/SettingsNeedtokenTab.vue'
+import SettingsPricingTab from './components/SettingsPricingTab.vue'
 
 const { t } = useI18n()
 const loading = ref(false)
@@ -32,6 +36,8 @@ const orderEmailTemplateTabRef = ref<InstanceType<typeof SettingsOrderEmailTempl
 const navigationTabRef = ref<InstanceType<typeof SettingsNavigationTab>>()
 const homeAnnouncementTabRef = ref<InstanceType<typeof SettingsHomeAnnouncementTab>>()
 const upstreamSyncTabRef = ref<InstanceType<typeof SettingsUpstreamSyncTab>>()
+const needtokenTabRef = ref<InstanceType<typeof SettingsNeedtokenTab>>()
+const pricingTabRef = ref<InstanceType<typeof SettingsPricingTab>>()
 const siteIconPickerRef = ref<InstanceType<typeof MediaPicker> | null>(null)
 const siteLogoPickerRef = ref<InstanceType<typeof MediaPicker> | null>(null)
 const supportedLanguages = ['zh-CN', 'zh-TW', 'en-US'] as const
@@ -74,6 +80,8 @@ const languages = computed(() => [
 
 const tabs = computed(() => [
   { label: t('admin.settings.tabs.basic'), value: 'basic' },
+  { label: t('needtokenSettings.tab'), value: 'needtoken' },
+  { label: t('needtokenPricing.tab'), value: 'pricing' },
   { label: t('admin.settings.tabs.template'), value: 'template' },
   { label: t('admin.settings.tabs.navigation'), value: 'navigation' },
   { label: t('admin.settings.tabs.about'), value: 'about' },
@@ -609,11 +617,14 @@ const saveRegistrationSettings = async () => {
 }
 
 const saveSiteSettings = async () => {
+  const latest = await adminAPI.getSettings({ key: 'site_config' })
+  const nextCurrency = String(form.currency || 'CNY').trim().toUpperCase()
   const payload = {
     key: 'site_config',
-    value: {
+    value: mergeSiteSettingPatch(latest.data.data, {
+      ...pricingPatchForSettlementCurrencyChange(latest.data.data, nextCurrency),
       brand: form.brand,
-      currency: String(form.currency || 'CNY').trim().toUpperCase(),
+      currency: nextCurrency,
       contact: form.contact,
       seo: form.seo,
       about: form.about,
@@ -622,7 +633,7 @@ const saveSiteSettings = async () => {
       footer_links: form.footer_links,
       storefront_template: form.storefront_template,
       template_mode: form.template_mode,
-    },
+    }),
   }
   await adminAPI.updateSettings(payload)
   applySiteIcon(form.brand.site_icon)
@@ -764,6 +775,14 @@ const saveDashboardSettings = async () => {
 }
 
 const saveSettings = async () => {
+  if (currentTab.value === 'pricing') {
+    await pricingTabRef.value?.save()
+    return
+  }
+  if (currentTab.value === 'needtoken') {
+    await needtokenTabRef.value?.save()
+    return
+  }
   if (currentTab.value === 'smtp') {
     await smtpTabRef.value?.save()
     return
@@ -1430,6 +1449,14 @@ onMounted(() => {
 
       <TabsContent value="navigation" :forceMount="true" v-show="currentTab === 'navigation'" class="mt-0">
         <SettingsNavigationTab ref="navigationTabRef" :current-lang="currentLang" @saved="fetchSettings" />
+      </TabsContent>
+
+      <TabsContent value="needtoken" :forceMount="true" v-show="currentTab === 'needtoken'" class="space-y-6 mt-0">
+        <SettingsNeedtokenTab ref="needtokenTabRef" />
+      </TabsContent>
+
+      <TabsContent value="pricing" :forceMount="true" v-show="currentTab === 'pricing'" class="space-y-6 mt-0">
+        <SettingsPricingTab ref="pricingTabRef" />
       </TabsContent>
 
       <TabsContent value="telegram" :forceMount="true" v-show="currentTab === 'telegram'" class="space-y-6 mt-0">

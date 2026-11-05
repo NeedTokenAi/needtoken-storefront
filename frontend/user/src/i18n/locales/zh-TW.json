@@ -1758,9 +1758,14 @@
       "plans": "API 套餐",
       "models": "模型廣場",
       "docs": "API 文件",
-      "blog": "Blog",
+      "blog": "部落格",
       "login": "登入",
-      "register": "註冊"
+      "register": "註冊",
+      "help": "幫助中心",
+      "tools": "實用工具",
+      "faq": "常見問題",
+      "environment": "檢測工具",
+      "appleIds": "免費 Apple ID"
     },
     "footer": {
       "tagline": "儲值服務、成品訂購與 API 套餐，一站選購，隨時查詢訂單。",
@@ -1800,13 +1805,13 @@
       "features": {
         "title": "三條產品線，一個入口",
         "recharge": {
-          "title": "代充",
-          "b1": "訂閱代充，由商家代為操作",
+          "title": "儲值服務",
+          "b1": "訂閱儲值服務，由商家代為操作",
           "b2": "下單留郵箱，訂單頁檢視進度",
           "b3": "售後口徑以商品頁說明為準"
         },
         "rental": {
-          "title": "租用",
+          "title": "成品訂購",
           "b1": "成品帳號按租期使用",
           "b2": "租期、改密、到期回收見商品頁",
           "b3": "交付內容只在訂單頁檢視"
@@ -1895,7 +1900,7 @@
           "a": "這是管理端還沒給該模型配價，不是你的 key 有問題。請換用模型廣場裡已展示價格的模型，或聯絡客服。"
         },
         "aftersale": {
-          "q": "代充、租用的售後怎麼算？",
+          "q": "儲值服務、成品訂購的售後怎麼算？",
           "a": "以各商品頁寫明的條款為準，請在付款前閱讀。"
         }
       }
@@ -1961,9 +1966,9 @@
     },
     "plans": {
       "title": "API 套餐",
-      "subtitle": "一把 Key 接入常用模型。按需選購個人套餐，或為團隊規劃高用量與專屬供給方案。",
-      "buy": "選購套餐",
-      "console": "開啟會員控制檯",
+      "subtitle": "按需儲值，靈活選配 Token 額度。套餐在本站購買，APIKey 和用量在控制台管理。",
+      "buy": "選購 API 套餐",
+      "console": "開啟 API 控制台",
       "what": {
         "title": "套餐由三部分組成",
         "group": {
@@ -2038,59 +2043,69 @@
       }
     },
     "apiServices": {
-      "title": "一把 Key，連接常用模型。",
+      "title": "One APIKey，多模型隨需呼叫。",
       "options": "個人與企業 API 方案",
       "personal": {
         "title": "個人與開發者",
-        "desc": "為日常開發、寫作與工具呼叫選擇合適的 API 套餐。",
+        "desc": "日常寫作、程式開發或工具呼叫，按用量選購套餐。",
         "b1": "常用模型與開發工具接入",
         "b2": "按商品說明選擇額度與有效期",
         "b3": "在 API 控制台管理 Key 與用量"
       },
       "enterprise": {
         "title": "企業與專屬方案",
-        "desc": "面向團隊和高頻呼叫情境，按模型、用量與並行需求評估專屬方案。",
+        "desc": "團隊用量與專屬供給，按模型、並行與預算確認方案。",
         "b1": "高用量套餐與階梯優惠諮詢",
         "b2": "專屬帳號池與容量方案評估",
         "b3": "服務範圍與報價逐項確認"
       },
       "connectTitle": "相容常用工具，輕鬆接入",
-      "connectDesc": "使用 API 控制台建立的 Key，將以下位址填入支援 OpenAI 相容介面的工具。"
+      "connectDesc": "使用 API 控制台建立的 Key，將以下位址填入支援 OpenAI 相容介面的工具。",
+      "keyLabel": "One APIKey",
+      "titleRest": "，多模型隨需呼叫。",
+      "benefitsLabel": "API 套餐特點",
+      "benefits": {
+        "models": "多模型接入",
+        "quota": "按需補充額度",
+        "usage": "用量可查"
+      },
+      "quotaNote": "實際額度、有效期和呼叫速率以所購套餐為準。"
     },
     "homeServices": {
       "seoTitle": "儲值服務、成品訂購與 API 套餐",
       "eyebrow": "NeedToken.AI · 讓 AI 服務更簡單",
       "title": "你的 AI 服務，",
       "titleAccent": "從這裡開始。",
-      "subtitle": "為常用帳號儲值，選購即用成品，或為應用程式接入模型 API。依你的需求，選擇合適的服務。",
+      "subtitle": "儲值續費、成品帳號與 API 套餐，按需選擇。",
       "services": {
         "recharge": {
           "tag": "原帳號繼續用",
           "title": "儲值服務",
-          "description": "為既有帳號選擇儲值或訂閱續期方案，依訂單指引完成辦理。",
+          "description": "為既有帳號選擇儲值或訂閱續費，立即生效。",
           "note": "方案、規格與售後說明清楚可查",
           "action": "立即儲值"
         },
         "products": {
           "tag": "訂單內交付",
           "title": "成品訂購",
-          "description": "依需求選購成品方案，帳號、密碼等交付內容在訂單頁領取。",
+          "description": "付款成功立即取得已訂閱帳號及密碼。",
           "note": "購買前查看交付內容與使用範圍",
           "action": "立即購買"
         },
         "api": {
-          "tag": "一把 key，多種模型",
+          "tag": "One APIKey · 多模型",
           "title": "API 套餐",
-          "description": "為開發、應用程式與團隊選擇模型呼叫方案，兼顧日常用量與企業需求。",
-          "note": "套餐選購、模型接入與用量管理",
+          "description": "按需儲值，靈活選配 Token 額度。",
+          "note": "多模型呼叫，額度與速率以套餐為準",
           "action": "立即呼叫"
         }
       },
       "benefits": {
-        "selfService": "7×24 自助下單",
+        "selfService": "7×24小時自助下單",
         "orderTracking": "訂單進度可查",
-        "afterSales": "售後保障有據",
-        "business": "發票與企業採購諮詢"
+        "afterSales": "售後保障質保",
+        "business": "可開票與企業轉帳",
+        "channels": "正規儲值管道"
       },
       "steps": {
         "eyebrow": "從選擇到使用",
@@ -2107,7 +2122,8 @@
         "receive": {
           "title": "依訂單指引取得服務",
           "description": "繼續提交儲值資訊、領取成品交付，或查看 API 套餐的使用說明。"
-        }
+        },
+        "suffix": "三步完成"
       },
       "orders": {
         "title": "已有訂單？從這裡繼續",
@@ -2116,24 +2132,76 @@
       },
       "faq": {
         "eyebrow": "購買前了解",
-        "title": "先找到適合你的服務",
-        "description": "三類服務各有用途，購買前請確認商品說明與服務範圍。",
+        "title": "下單前，先了解這些",
+        "description": "儲值、成品與 API 套餐，各有適用情境。",
         "notices": "查看服務公告",
         "service": {
           "question": "儲值服務、成品訂購與 API 套餐怎麼選？",
-          "answer": "已有帳號需要儲值或續期，選擇儲值服務；需要依商品說明領取帳號等成品，選擇成品訂購；需要在工具、應用程式或開發專案中呼叫模型，選擇 API 套餐。"
+          "answer": "已有帳號要續費，選儲值；需要已訂閱帳號，選成品；在工具或應用程式裡呼叫模型，選 API 套餐。"
         },
         "recharge": {
           "question": "儲值需要提交哪些資訊？",
-          "answer": "不同商品所需資訊不同，請先閱讀購買須知，再依訂單指引提交。實際生效時間以處理進度為準。"
+          "answer": "先選套餐並付款，再依訂單專屬頁面提交所需資料。Token 與帳號憑證請只透過訂單指引提交，辦理進度在訂單頁查看。"
         },
         "delivery": {
           "question": "下單後在哪裡查看進度與交付？",
-          "answer": "透過訂單查詢入口查看對應訂單。儲值辦理進度、成品交付內容與售後資訊均以訂單頁面為準；API 套餐的 key 與用量在模型控制台管理。"
+          "answer": "儲值進度、帳號密碼與售後處理都在訂單頁查看。APIKey 與呼叫用量在 API 控制台管理。"
         },
         "business": {
-          "question": "企業大用量、發票與企業採購如何安排？",
-          "answer": "可在購買前溝通企業用量、專屬供給、發票與企業轉帳需求。套餐額度、折扣、交付範圍與服務約定，以最終確認的方案為準。"
+          "question": "能開發票或企業轉帳嗎？",
+          "answer": "可以。下單前請確認抬頭、統一編號、開票內容與企業轉帳安排；企業用量與專屬方案可另行討論。"
+        }
+      },
+      "flowControls": {
+        "label": "選擇服務流程",
+        "pause": "暫停自動切換",
+        "resume": "繼續自動切換"
+      },
+      "flows": {
+        "recharge": {
+          "label": "儲值服務",
+          "s1": {
+            "title": "選擇訂閱級別",
+            "description": "依帳號類型選擇套餐，確認期間、額度與適用地區。"
+          },
+          "s2": {
+            "title": "提交訂單並付款",
+            "description": "核對商品與金額，選擇結帳頁提供的付款方式。"
+          },
+          "s3": {
+            "title": "依訂單指引完成訂閱",
+            "description": "在訂單專屬入口提交所需資料，查看辦理進度與結果。"
+          }
+        },
+        "products": {
+          "label": "成品",
+          "s1": {
+            "title": "選擇成品級別",
+            "description": "查看訂閱等級、使用期限、交付內容與售後說明。"
+          },
+          "s2": {
+            "title": "提交訂單並付款",
+            "description": "確認規格與訂單金額，完成付款後查看交付。"
+          },
+          "s3": {
+            "title": "登入帳號驗收",
+            "description": "在訂單頁領取帳號與密碼，登入檢查訂閱狀態。"
+          }
+        },
+        "api": {
+          "label": "API 服務",
+          "s1": {
+            "title": "註冊並建立 APIKey",
+            "description": "進入 API 控制台註冊，建立自己的 APIKey。"
+          },
+          "s2": {
+            "title": "儲值或選購套餐",
+            "description": "回到本站購買額度或套餐，依商品說明核驗帳號關聯。"
+          },
+          "s3": {
+            "title": "設定後開始呼叫",
+            "description": "在工具中填寫 API 位址與 APIKey，用量可在控制台查看。"
+          }
         }
       }
     },
@@ -2145,7 +2213,10 @@
         "section": "儲值方案",
         "descriptionFallback": "選擇所需規格，依商品指引完成儲值。",
         "delivery": "依指引提交儲值資訊",
-        "cta": "立即儲值"
+        "cta": "立即儲值",
+        "titlePrefix": "選擇適合您的",
+        "titleSubject": "儲值方案",
+        "titleSuffix": ""
       },
       "rental": {
         "label": "成品訂購",
@@ -2154,9 +2225,12 @@
         "section": "成品方案",
         "descriptionFallback": "選擇所需規格，依商品說明取得交付內容。",
         "delivery": "交付內容於訂單內查看",
-        "cta": "立即購買"
+        "cta": "立即購買",
+        "titlePrefix": "選擇適合您的",
+        "titleSubject": "成品方案",
+        "titleSuffix": ""
       },
-      "all": "ALL",
+      "all": "全部",
       "serviceNotes": "服務說明",
       "warrantyNote": "30 天品質保障",
       "refundNote": "儲值未成功，全額退款",
@@ -2219,6 +2293,190 @@
       "siteNoticeScope": "以下為全站公告，具體商品權益與要求以商品說明為準。",
       "noticeLoadFailed": "公告暫時無法載入，請重試或前往全部公告查看。",
       "noSiteNotices": "目前暫無站點公告。"
+    },
+    "paymentMarks": {
+      "label": "付款方式",
+      "alipay": "支付寶",
+      "wechat": "微信支付",
+      "unionpay": "銀聯",
+      "crypto": "加密貨幣",
+      "card": "信用卡",
+      "paypal": "PayPal",
+      "checkoutNote": "實際可用方式以結帳頁為準"
+    },
+    "effects": {
+      "soundOn": "按鈕音效：已開啟",
+      "soundOff": "按鈕音效：已關閉"
+    },
+    "environment": {
+      "eyebrow": "瀏覽器與連線",
+      "title": "環境檢測",
+      "subtitle": "檢查瀏覽器設定與本站連線。遇到登入、下單或頁面載入問題時，先從這裡排查。",
+      "privacy": "檢測由您手動開始。語言、時區等資訊只在目前頁面顯示，不上傳；連線測試僅請求本站的健康檢查介面，不需要帳號密碼或 Token。",
+      "checks": "瀏覽器檢查",
+      "runningHint": "瀏覽器檢查已完成，正在測試本站連線…",
+      "checkedAt": "本次檢測：{time}",
+      "idleHint": "點擊「開始檢測」查看目前瀏覽器的結果。",
+      "cancel": "停止",
+      "running": "檢測中",
+      "runAgain": "重新檢測",
+      "run": "開始檢測",
+      "connectionTitle": "本站連線",
+      "requestTime": "本次請求耗時",
+      "httpStatus": "HTTP 狀態：{status}",
+      "connectionScope": "僅測試本站 /health 的一次請求，包含網路和服務回應時間，不代表模型 API 延遲、外部網站可達性或後續請求速度。",
+      "limitsTitle": "這些結果能說明什麼？",
+      "limits": "可用於排查本站存取與瀏覽器功能問題。無法據此判斷 Claude 等平台是否支援您的地區、帳號是否可用、IP 信譽或封號風險；請以相應平台的實際提示為準。",
+      "faq": "查看常見問題",
+      "reportTitle": "分享檢測結果",
+      "reportHint": "報告只包含各項檢測狀態和本站請求結果，省略語言、時區及瀏覽器識別資訊。可複製給客服協助排查。",
+      "copyReport": "複製去識別報告",
+      "viewReport": "查看報告文字",
+      "cancelled": "已停止連線測試，可重新檢測。",
+      "copied": "報告已複製。",
+      "copyFailed": "無法複製，請展開報告文字後手動複製。",
+      "labels": {
+        "secure": "安全連線",
+        "online": "瀏覽器網路狀態",
+        "cookies": "Cookie 讀寫",
+        "storage": "本機儲存",
+        "crypto": "Web Crypto",
+        "wasm": "WebAssembly",
+        "language": "瀏覽器語言",
+        "timezone": "系統時區"
+      },
+      "status": {
+        "ok": "可用",
+        "warning": "需留意",
+        "unknown": "未確認",
+        "idle": "未檢測"
+      },
+      "details": {
+        "notChecked": "尚未檢測。",
+        "secureReady": "目前頁面處於安全上下文，可使用需要 HTTPS 的瀏覽器功能。",
+        "secureLimited": "目前頁面不在安全上下文，部分瀏覽器功能可能受限。",
+        "onlineHint": "瀏覽器回報網路已連線；實際存取結果請看下方本站連線測試。",
+        "offlineHint": "瀏覽器回報目前離線，請先檢查網路連線。",
+        "cookiesReady": "暫存 Cookie 已成功寫入、讀取並刪除；不代表第三方 Cookie 也可用。",
+        "cookiesLimited": "暫存 Cookie 讀寫不可用，登入或付款跳轉可能受瀏覽器設定影響。",
+        "storageReady": "暫存資料已成功寫入、讀取並刪除，不讀取現有儲存內容。",
+        "storageLimited": "本機儲存不可用或已滿，語言偏好、購物車等功能可能受影響。",
+        "cryptoReady": "瀏覽器提供 Web Crypto 介面。",
+        "cryptoLimited": "Web Crypto 介面不可用，部分安全功能可能受限。",
+        "wasmReady": "瀏覽器提供 WebAssembly 介面。",
+        "wasmLimited": "未偵測到 WebAssembly 介面，依賴此能力的工具可能無法運作。",
+        "localOnly": "來自目前瀏覽器，僅在本頁顯示，不據此評判地區或帳號狀態。"
+      },
+      "connection": {
+        "notChecked": "尚未發出連線測試請求。",
+        "reachable": "本站健康檢查回應正常。",
+        "httpError": "本站回傳了非成功狀態，請稍後重試；持續出現時可將報告傳給客服。",
+        "invalidResponse": "收到了回應，但無法確認為本站健康檢查結果。可能是存取限制、跳轉或代理頁面。",
+        "timeout": "5 秒內未完成本站健康檢查，連線狀態未確認。請檢查網路後重試。",
+        "networkError": "無法完成本站請求，可能與網路、瀏覽器限制或服務狀態有關，請重試。"
+      }
+    },
+    "support": {
+      "title": "聯絡 NeedToken.AI",
+      "intro": "訂單諮詢、使用問題與商務合作",
+      "open": "聯絡客服",
+      "close": "關閉客服面板",
+      "tabsLabel": "客服與收藏",
+      "contact": "聯絡客服",
+      "bookmark": "收藏本站",
+      "wecom": "企業微信",
+      "qq": "QQ 客服",
+      "hours": "服務時間：{hours}",
+      "openContact": "前往諮詢",
+      "sendEmail": "傳送諮詢郵件",
+      "emailIntro": "需要協助？請透過郵件聯絡我們。",
+      "orderNote": "諮詢訂單時請附訂單編號；請勿傳送密碼、驗證碼或 APIKey。",
+      "bookmarkTitle": "下次造訪更方便",
+      "bookmarkIntro": "使用瀏覽器的書籤功能儲存本站。",
+      "windows": "Windows 電腦",
+      "mac": "Mac 電腦",
+      "mobile": "手機瀏覽器",
+      "mobileHelp": "開啟分享或選單，選擇加入書籤",
+      "business": "商務合作",
+      "scanTitle": "掃碼聯絡",
+      "scanIntro": "掃碼加入客服，諮詢訂單、售後與商務合作。"
+    },
+    "faq": {
+      "eyebrow": "幫助中心",
+      "title": "常見問題",
+      "subtitle": "儲值、成品交付與 API 使用，按問題尋找答案。",
+      "search": "搜尋問題關鍵字",
+      "searchAction": "搜尋",
+      "categories": "問題分類",
+      "all": "全部問題",
+      "needHelp": "訂單需要幫助？",
+      "contactDescription": "準備好訂單編號，在訂單頁核對付款及交付進度，或透過右側客服入口聯絡我們。",
+      "orderHelp": "查看我的訂單",
+      "questions": "問題與解答",
+      "count": "共 {count} 個問題",
+      "loadError": "暫時無法載入問題",
+      "loadErrorDescription": "請稍後重試，或透過客服入口聯絡我們。",
+      "noResults": "沒有找到相關問題",
+      "noResultsDescription": "試試更短的關鍵字，或切換問題分類。",
+      "empty": "問題整理中",
+      "emptyDescription": "這裡會陸續更新使用說明與常見解答。需要幫助時，可先查看訂單或聯絡客服。",
+      "clear": "清除搜尋",
+      "readArticle": "查看完整說明"
+    },
+    "freeAppleId": {
+      "eyebrow": "實用工具",
+      "title": "免費 Apple ID",
+      "subtitle": "查看可用地區與使用說明，按需開啟分享資源。",
+      "noticeTitle": "使用前請先閱讀資源說明",
+      "notice": "選擇所需地區，開啟資源頁查看帳號與使用說明。資源定期更新，實際可用情況以資源頁為準。",
+      "resources": "分享資源",
+      "count": "{count} 項資源",
+      "help": "常見問題",
+      "empty": "暫未發布分享資源",
+      "emptyDescription": "新資源發布後會在這裡更新，也可以先查看使用指南。",
+      "guides": "查看使用指南",
+      "resourceFallback": "Apple ID 分享資源",
+      "manualRecord": "人工維護",
+      "updated": "更新於 {date}",
+      "openResource": "查看資源與使用說明",
+      "beforeUse": "使用前，確認這三件事",
+      "steps": [
+        {
+          "title": "確認來源與地區",
+          "description": "閱讀發布方的使用說明，確認資源來源、適用地區及允許的用途。"
+        },
+        {
+          "title": "保護個人帳號",
+          "description": "共享帳號僅用於 App Store 下載，iCloud 繼續使用你自己的帳號。"
+        },
+        {
+          "title": "按說明使用與回報",
+          "description": "遇到過期或不可用資源，請停止重試並聯絡客服回報，勿修改共享帳號的安全設定。"
+        }
+      ]
+    },
+    "variants": {
+      "optionNumber": "方案 {number}",
+      "convertedPrice": "換算參考價",
+      "settlementPrice": "實際結算：{price}",
+      "officialReference": "官方參考價：{price}"
+    },
+    "displayPricing": {
+      "selectorLabel": "顯示幣別",
+      "currencyNames": {
+        "CNY": "CNY · 人民幣",
+        "USD": "USD · 美元"
+      },
+      "settlementHint": "訂單以 {currency} 結算",
+      "rateBadge": "標準匯率 · 換算透明",
+      "rateTitle": "目前顯示匯率",
+      "closeRate": "關閉匯率說明",
+      "rateUpdated": "更新於 {time}",
+      "rateSource": "本站設定的顯示換算匯率。",
+      "ratePending": "匯率待設定",
+      "ratePendingHint": "目前按商品原價幣別 {currency} 顯示，暫不提供換算價。",
+      "rateSettlementHint": "換算用於價格參考，訂單金額與付款均以 {currency} 為準。",
+      "referenceOption": "{name}（換算參考）"
     }
   }
 }
