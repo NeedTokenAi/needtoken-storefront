@@ -14,6 +14,7 @@ import (
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
 	"github.com/dujiao-next/internal/modules/catalog/product/manualform"
 	couponcontract "github.com/dujiao-next/internal/modules/coupon/contract"
+	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 	promotioncontract "github.com/dujiao-next/internal/modules/promotion/contract"
 	resellermodule "github.com/dujiao-next/internal/modules/reseller/contract"
 	"github.com/dujiao-next/internal/platform/http/ginutil"
@@ -26,6 +27,7 @@ import (
 )
 
 var (
+	ErrInvoiceRequestInvalid     = errors.New("invalid invoice request")
 	ErrProductSKURequired        = errors.New("product sku required")
 	ErrInvalidOrderAmount        = errors.New("invalid order amount")
 	ErrGuestEmailRequired        = errors.New("guest email required")
@@ -87,15 +89,17 @@ type OrderItemRequest struct {
 
 // CreateOrderRequest 用户订单预览/创建请求体（preview 使用）。
 type CreateOrderRequest struct {
-	Items               []OrderItemRequest      `json:"items" binding:"required"`
-	CouponCode          string                  `json:"coupon_code"`
-	AffiliateCode       string                  `json:"affiliate_code"`
-	AffiliateVisitorKey string                  `json:"affiliate_visitor_key"`
-	ManualFormData      map[string]jsonmap.JSON `json:"manual_form_data"`
+	InvoiceRequest      *orderdomain.InvoiceRequest `json:"invoice_request"`
+	Items               []OrderItemRequest          `json:"items" binding:"required"`
+	CouponCode          string                      `json:"coupon_code"`
+	AffiliateCode       string                      `json:"affiliate_code"`
+	AffiliateVisitorKey string                      `json:"affiliate_visitor_key"`
+	ManualFormData      map[string]jsonmap.JSON     `json:"manual_form_data"`
 }
 
 // CreateGuestOrderRequest 游客订单预览请求体。
 type CreateGuestOrderRequest struct {
+	InvoiceRequest      *orderdomain.InvoiceRequest       `json:"invoice_request"`
 	Email               string                            `json:"email" binding:"required"`
 	OrderPassword       string                            `json:"order_password" binding:"required"`
 	Items               []OrderItemRequest                `json:"items" binding:"required"`
@@ -116,6 +120,7 @@ type CreateOrderItem struct {
 
 // CreateOrderInput 用户订单预览输入。
 type CreateOrderInput struct {
+	InvoiceRequest      *orderdomain.InvoiceRequest
 	UserID              uint
 	Tenant              resellermodule.TenantContext
 	Items               []CreateOrderItem
@@ -128,6 +133,7 @@ type CreateOrderInput struct {
 
 // CreateGuestOrderInput 游客订单预览输入。
 type CreateGuestOrderInput struct {
+	InvoiceRequest      *orderdomain.InvoiceRequest
 	Email               string
 	OrderPassword       string
 	Locale              string
@@ -142,14 +148,15 @@ type CreateGuestOrderInput struct {
 
 // OrderPreview 订单金额预览。
 type OrderPreview struct {
-	Currency                string             `json:"currency"`
-	OriginalAmount          money.Amount       `json:"original_amount"`
-	MemberDiscountAmount    money.Amount       `json:"member_discount_amount"`
-	DiscountAmount          money.Amount       `json:"discount_amount"`
-	PromotionDiscountAmount money.Amount       `json:"promotion_discount_amount"`
-	WholesaleDiscountAmount money.Amount       `json:"wholesale_discount_amount"`
-	TotalAmount             money.Amount       `json:"total_amount"`
-	Items                   []OrderPreviewItem `json:"items"`
+	InvoiceRequest          *orderdomain.InvoiceRequest `json:"invoice_request,omitempty"`
+	Currency                string                      `json:"currency"`
+	OriginalAmount          money.Amount                `json:"original_amount"`
+	MemberDiscountAmount    money.Amount                `json:"member_discount_amount"`
+	DiscountAmount          money.Amount                `json:"discount_amount"`
+	PromotionDiscountAmount money.Amount                `json:"promotion_discount_amount"`
+	WholesaleDiscountAmount money.Amount                `json:"wholesale_discount_amount"`
+	TotalAmount             money.Amount                `json:"total_amount"`
+	Items                   []OrderPreviewItem          `json:"items"`
 }
 
 // OrderPreviewItem 订单项金额预览。
@@ -211,6 +218,7 @@ func (h *PreviewHandler) PreviewOrder(c *gin.Context) {
 		AffiliateVisitorKey: req.AffiliateVisitorKey,
 		ClientIP:            c.ClientIP(),
 		ManualFormData:      req.ManualFormData,
+		InvoiceRequest:      req.InvoiceRequest,
 	})
 	if err != nil {
 		respondUserOrderPreviewError(c, err)
@@ -238,6 +246,7 @@ func (h *PreviewHandler) PreviewGuestOrder(c *gin.Context) {
 		AffiliateVisitorKey: req.AffiliateVisitorKey,
 		ClientIP:            c.ClientIP(),
 		ManualFormData:      req.ManualFormData,
+		InvoiceRequest:      req.InvoiceRequest,
 	})
 	if err != nil {
 		respondGuestOrderPreviewError(c, err)
@@ -320,6 +329,7 @@ func respondGuestOrderCreateError(c *gin.Context, err error) {
 }
 
 var orderRiskControlErrorRules = []mappedError{
+	{target: ErrInvoiceRequestInvalid, code: response.CodeBadRequest, key: "error.invoice_request_invalid"},
 	{target: ErrRiskIPBlacklisted, code: response.CodeForbidden, key: "error.risk_ip_blacklisted"},
 	{target: ErrRiskClientIPUnavailable, code: response.CodeForbidden, key: "error.risk_client_ip_unavailable"},
 	{target: ErrRiskTooManyPendingOrders, code: response.CodeTooManyRequests, key: "error.risk_too_many_pending_orders"},

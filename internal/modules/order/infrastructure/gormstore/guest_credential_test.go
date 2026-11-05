@@ -27,6 +27,58 @@ func TestOrderStoreRequiresGuestCredentialSecret(t *testing.T) {
 	_ = New(openOrderTenantScopeTestDB(t), "")
 }
 
+func TestInvoiceRequestMigrationPreservesExistingOrders(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var db *gorm.DB
+			if dialect == "postgres" {
+				db = openGuestCredentialPostgresDB(t)
+			} else {
+				db = openOrderTenantScopeTestDB(t)
+			}
+			// Simulate the previous deployed schema, then run the same additive
+			// model migration used by the application registry.
+			if err := db.Migrator().DropColumn(&orderdomain.Order{}, "invoice_request"); err != nil {
+				t.Fatal(err)
+			}
+			if err := db.Table("orders").Create(map[string]any{"order_no": "INVOICE-LEGACY", "user_id": 0, "guest_email": "guest@example.test", "guest_password": "existing-credential", "status": constants.OrderStatusPendingPayment, "currency": "CNY", "total_amount": "42.50"}).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := db.AutoMigrate(&orderdomain.Order{}); err != nil {
+				t.Fatal(err)
+			}
+			var legacy orderdomain.Order
+			if err := db.Where("order_no = ?", "INVOICE-LEGACY").First(&legacy).Error; err != nil {
+				t.Fatal(err)
+			}
+			if legacy.InvoiceRequest != nil || legacy.GuestPassword != "existing-credential" || legacy.Currency != "CNY" || legacy.TotalAmount.StringFixed(2) != "42.50" {
+				t.Fatalf("migration changed old order: %+v", legacy)
+			}
+			var nullCount int64
+			if err := db.Table("orders").Where("id = ? AND invoice_request IS NULL", legacy.ID).Count(&nullCount).Error; err != nil || nullCount != 1 {
+				t.Fatalf("old invoice column must remain NULL: %d, %v", nullCount, err)
+			}
+			legacy.InvoiceRequest = &orderdomain.InvoiceRequest{Type: "ordinary", TitleType: "company", Title: "示例有限公司", TaxID: "91310000ABCDEFGH12", Email: "finance@example.test"}
+			if err := db.Save(&legacy).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := db.Model(&orderdomain.Order{}).Where("id = ?", legacy.ID).Update("status", constants.OrderStatusPaid).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := db.AutoMigrate(&orderdomain.Order{}); err != nil {
+				t.Fatal(err)
+			}
+			var reloaded orderdomain.Order
+			if err := db.First(&reloaded, legacy.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if reloaded.InvoiceRequest == nil || reloaded.InvoiceRequest.TaxID != legacy.InvoiceRequest.TaxID || reloaded.Status != constants.OrderStatusPaid || reloaded.GuestPassword != "existing-credential" || reloaded.TotalAmount.StringFixed(2) != "42.50" {
+				t.Fatalf("invoice request or old data changed after reload: %+v", reloaded)
+			}
+		})
+	}
+}
+
 func TestGuestCredentialIsHashedAtRestAndRawCredentialStillQueries(t *testing.T) {
 	db := openOrderTenantScopeTestDB(t)
 	repo := New(db, "test-guest-credential-secret-with-32-bytes")
