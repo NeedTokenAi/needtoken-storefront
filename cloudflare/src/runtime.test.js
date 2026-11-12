@@ -6,15 +6,20 @@ import { fileURLToPath } from "node:url";
 
 import {
   APP_PORT,
+  ContainerNotReady,
   INSTANCE_TYPE,
   INACTIVITY_TIMEOUT_MS,
   MAX_INSTANCES,
+  NOT_READY_RETRY_AFTER_SECONDS,
+  READY_DEADLINE_MS,
   RESIDENT_CRON,
   RESIDENT_INSTANCE,
   START_COMMAND,
   containerEnv,
   forwardRequest,
   keepResident,
+  notReadyResponse,
+  waitForReady,
 } from "./runtime.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -32,7 +37,11 @@ test("production worker builds the repo Dockerfile and publishes no vars", () =>
   assert.equal(JSON.stringify(wrangler).toLowerCase().includes("staging"), false);
   assert.equal(container.scheduling_policy, "default");
   assert.equal(container.instance_type, "basic");
+  assert.equal(container.class_name, "Storefront");
   assert.equal(container.max_instances, 2);
+  assert.equal(container.rollout_step_percentage, 100);
+  assert.equal(container.rollout_active_grace_period, undefined);
+  assert.equal(wrangler.migrations, undefined);
   assert.equal(container.image, "../Dockerfile");
   assert.equal(container.image_build_context, "..");
   assert.equal(existsSync(join(root, container.image)), true);
@@ -60,6 +69,7 @@ test("start command, port, and instance size stay fixed", () => {
   assert.equal(MAX_INSTANCES, 2);
   assert.equal(RESIDENT_INSTANCE, "instance-0");
   assert.equal(INACTIVITY_TIMEOUT_MS, 6 * 60 * 60 * 1000);
+  assert.equal(READY_DEADLINE_MS, 5 * 60 * 1000);
 });
 
 test("string env and secrets pass through unchanged", () => {
@@ -95,6 +105,43 @@ test("requests are forwarded to the container port", async () => {
   assert.equal(await forwarded.text(), '{"ok":true}');
   assert.equal(forwarded.headers.get("host"), null);
   assert.equal(forwarded.headers.get("content-type"), "application/json");
+});
+
+test("readiness waits through a cold start, then answers 503", async () => {
+  let probes = 0;
+  await waitForReady(
+    async () => {
+      probes += 1;
+      if (probes < 3) throw new Error("down");
+      return new Response("ok");
+    },
+    async () => {},
+    10_000,
+    () => 0,
+  );
+  assert.equal(probes, 3);
+
+  let clock = 0;
+  await assert.rejects(
+    () =>
+      waitForReady(
+        async () => {
+          throw new Error("down");
+        },
+        async (ms) => {
+          clock += ms;
+        },
+        1_000,
+        () => clock,
+      ),
+    (error) => error instanceof ContainerNotReady && /port 8080/.test(error.message),
+  );
+  assert.ok(clock >= 1_000);
+
+  const response = notReadyResponse();
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get("retry-after"), NOT_READY_RETRY_AFTER_SECONDS);
+  assert.equal(await response.text(), "container is starting");
 });
 
 test("the minute cron wakes only instance-0", async () => {
@@ -139,6 +186,9 @@ test("the worker source uses the runtime values and does not restrict hosts", ()
   assert.match(source, /getByName\(RESIDENT_INSTANCE\)/);
   assert.match(source, /async scheduled\(_controller, env\)/);
   assert.match(source, /keepResident\(env\.STOREFRONT\)/);
+  assert.match(source, /error instanceof ContainerNotReady/);
+  assert.match(source, /return notReadyResponse\(\)/);
+  assert.match(source, /waitForReady\(/);
   assert.equal(source.includes("instanceName"), false);
   assert.equal(source.includes("instance-1"), false);
   assert.equal(source.includes("needtoken.ai"), false);

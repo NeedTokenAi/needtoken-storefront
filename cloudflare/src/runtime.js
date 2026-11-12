@@ -22,6 +22,19 @@ export const RESIDENT_CRON = "* * * * *";
 // cannot be applied. This is the platform maximum. The minute cron resets it.
 export const INACTIVITY_TIMEOUT_MS = 6 * 60 * 60 * 1000;
 
+// The published cold start took 2–3 minutes. Wrangler 4 stops the old container
+// before it starts the new one, so this wait has to cover that gap.
+export const READY_DEADLINE_MS = 5 * 60 * 1000;
+export const READY_POLL_MS = 500;
+export const NOT_READY_RETRY_AFTER_SECONDS = "10";
+
+export class ContainerNotReady extends Error {
+  constructor(cause) {
+    super("container did not become ready on port 8080", { cause });
+    this.name = "ContainerNotReady";
+  }
+}
+
 export function containerEnv(env) {
   const out = {};
   if (env == null || typeof env !== "object") {
@@ -34,6 +47,34 @@ export function containerEnv(env) {
   }
   out.PORT = CONTAINER_PORT;
   return out;
+}
+
+export function notReadyResponse() {
+  return new Response("container is starting", {
+    status: 503,
+    headers: {
+      "retry-after": NOT_READY_RETRY_AFTER_SECONDS,
+      "cache-control": "no-store",
+    },
+  });
+}
+
+export async function waitForReady(probe, wait, deadlineMs = READY_DEADLINE_MS, now = Date.now) {
+  const deadline = now() + deadlineMs;
+  let lastError;
+  while (now() <= deadline) {
+    try {
+      const response = await probe();
+      await response.body?.cancel();
+      if (response.ok) return;
+      lastError = new Error(`health check returned ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (now() >= deadline) break;
+    await wait(Math.min(READY_POLL_MS, deadline - now()));
+  }
+  throw new ContainerNotReady(lastError);
 }
 
 export async function keepResident(namespace) {
