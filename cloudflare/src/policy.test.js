@@ -17,7 +17,7 @@ function env(overrides = {}) {
     APP_SECRET_KEY: "app",
     JWT_SECRET: "jwt",
     USER_JWT_SECRET: "user-jwt",
-    DATABASE_DSN: "postgres://store@existing.example/storefront",
+    DATABASE_DSN: "postgres://store@ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech/storefront",
     REDIS_HOST: "production.upstash.example",
     QUEUE_HOST: "production.upstash.example",
     CLOUDFLARE_OBJECT_STORAGE_ENDPOINT: "https://example.r2.cloudflarestorage.com",
@@ -97,11 +97,21 @@ test("the image must equal ctx.container.images.dujiao and a hand-filled record 
   assert.equal(built.ok, true);
   assert.equal(built.record.digest, imageRef);
 
-  const existingDatabase = startPlan(env({
-    DATABASE_DSN: "postgres://store@existing.example/storefront",
+  const pooler = startPlan(env({
+    DATABASE_DSN: "postgres://store@ep-aged-sunset-b33os2qw-pooler.c-4.ap-southeast-1.aws.neon.tech/storefront",
     REDIS_HOST: "production.upstash.example",
   }), "fence-1", imageRef);
-  assert.equal(existingDatabase.ok, true);
+  assert.equal(pooler.ok, true);
+  for (const dsn of [
+    "postgres://store@other.example/storefront",
+    "postgres://store@prod.example/isolated",
+    "postgres://store@ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech.isolated/storefront",
+    "postgres://ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech@other.example/storefront",
+  ]) {
+    const refused = startPlan(env({ DATABASE_DSN: dsn }), "fence-1", imageRef);
+    assert.equal(refused.ok, false, dsn);
+    assert.match(refused.reason, /allowlist/);
+  }
   const wrongBucket = startPlan(env({ CLOUDFLARE_OBJECT_STORAGE_BUCKET: "needtoken-staging-isolated" }), "fence-1", imageRef);
   assert.equal(wrongBucket.ok, false);
   assert.match(wrongBucket.reason, /bucket/);

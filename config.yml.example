@@ -192,8 +192,10 @@ cloudflare:
   # 只能是 isolated。这只表示本进程是隔离候选，不会停掉仍在运行的 Cloud Run。
   isolation: ""
   writer_fence: ""
-  # off 时不启动队列消费者和定时任务。数据库和 Redis 继续用现有实例。
-  # 对象桶只接受 needtoken-staging。
+  # 预发只接受 ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech 及其 -pooler。
+  # 其它数据库主机一律拒绝。关闭本段时不检查主机，也不读取生产 DSN。
+  # Redis 继续用现有 Upstash，不要求另一台主机。对象桶只接受 needtoken-staging。
+  # off 时不启动队列消费者和定时任务。
   background_consumers: "off"
   object_storage:
     endpoint: ""

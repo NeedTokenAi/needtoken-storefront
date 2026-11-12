@@ -68,20 +68,43 @@ func TestEnabledProfileFailsClosedWithoutDurableTarget(t *testing.T) {
 	require.ErrorContains(t, err, "does not stop the existing Cloud Run writer")
 }
 
-func TestIsolatedAllowlistIsTheBucketOnly(t *testing.T) {
+func TestStagingDatabaseHostAllowlistRejectsEveryOtherHost(t *testing.T) {
 	cfg := enabledConfig()
 	cfg.Redis.Host = "production.upstash.example"
 	cfg.Queue.Host = "production.upstash.example"
-	cfg.Database.DSN = "postgres://store@existing.example/storefront?sslmode=require"
 	require.NoError(t, Validate(cfg))
 
 	cfg = enabledConfig()
-	cfg.Database.DSN = "host=existing.example user=store dbname=storefront sslmode=require"
+	cfg.Database.DSN = "postgres://store@" + isolatedDatabasePoolerHost + "/storefront?sslmode=require"
 	require.NoError(t, Validate(cfg))
+
+	cfg = enabledConfig()
+	cfg.Database.DSN = "host=" + isolatedDatabaseHost + " user=store dbname=storefront sslmode=require"
+	require.NoError(t, Validate(cfg))
+
+	disabled := enabledConfig()
+	disabled.Cloudflare.Enabled = false
+	disabled.Database.Driver = "postgres"
+	disabled.Database.DSN = "postgres://store@other.example/storefront?sslmode=require"
+	require.NoError(t, Validate(disabled))
 
 	cfg = enabledConfig()
 	cfg.Redis.Prefix = "staging:"
 	require.NoError(t, Validate(cfg))
+
+	rejectedHosts := []string{
+		"postgres://store@other.example/storefront?sslmode=require",
+		"postgres://store@prod.example/isolated?sslmode=require",
+		"postgres://store@" + isolatedDatabaseHost + ".isolated/storefront?sslmode=require",
+		"postgres://" + isolatedDatabaseHost + "@other.example/storefront?sslmode=require",
+		"host=" + isolatedDatabaseHost + "isolated user=store dbname=storefront sslmode=require",
+		"host=" + isolatedDatabasePoolerHost + ".extra user=store dbname=storefront sslmode=require",
+	}
+	for _, dsn := range rejectedHosts {
+		cfg = enabledConfig()
+		cfg.Database.DSN = dsn
+		require.ErrorContains(t, Validate(cfg), "outside the isolated allowlist", dsn)
+	}
 
 	for _, bucket := range []string{"needtoken-production", "needtoken-staging-isolated", "needtoken-staging.isolated"} {
 		cfg = enabledConfig()
@@ -105,7 +128,7 @@ func TestIsolatedAllowlistIsTheBucketOnly(t *testing.T) {
 func TestEnabledProfileAcceptsPostgresAndObjectStorage(t *testing.T) {
 	require.NoError(t, ValidateStartup(enabledConfig(), ModeAPIWorker))
 	keyword := enabledConfig()
-	keyword.Database.DSN = "host=existing.example user=store dbname=storefront sslmode=require"
+	keyword.Database.DSN = "host=" + isolatedDatabasePoolerHost + " user=store dbname=storefront sslmode=require"
 	require.NoError(t, Validate(keyword))
 }
 
@@ -139,7 +162,7 @@ func enabledConfig() *config.Config {
 		},
 		Database: config.DatabaseConfig{
 			Driver: "postgres",
-			DSN:    "postgres://store@existing.example/storefront?sslmode=require",
+			DSN:    "postgres://store@" + isolatedDatabaseHost + "/storefront?sslmode=require",
 		},
 		Queue: config.QueueConfig{Enabled: true, Host: "redis.example"},
 		Redis: config.RedisConfig{Enabled: true, Host: "redis.example", Prefix: "staging"},

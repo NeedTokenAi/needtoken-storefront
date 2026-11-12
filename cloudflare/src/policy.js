@@ -13,6 +13,10 @@ export const LABELS = Object.freeze({
   stopsOldCloudRunWriter: false,
 });
 
+export const ISOLATED_DATABASE_HOSTS = Object.freeze([
+  "ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech",
+  "ep-aged-sunset-b33os2qw-pooler.c-4.ap-southeast-1.aws.neon.tech",
+]);
 export const ISOLATED_OBJECT_BUCKET = "needtoken-staging";
 
 export const SINGLETON_NAME = "dujiao-storefront";
@@ -82,6 +86,28 @@ function present(value) {
 export function fullRegistryRef(value) {
   const ref = String(value ?? "").trim();
   return /^[a-z0-9][a-z0-9._:-]*(?:\/[a-z0-9][a-z0-9._:-]*)+@sha256:[0-9a-f]{64}$/.test(ref);
+}
+
+export function databaseHost(dsn) {
+  const value = String(dsn ?? "").trim();
+  if (value.includes("://")) {
+    try {
+      return new URL(value).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+  for (const field of value.split(/\s+/)) {
+    const eq = field.indexOf("=");
+    if (eq > 0 && field.slice(0, eq).toLowerCase() === "host") {
+      return field.slice(eq + 1).replace(/^['"]|['"]$/g, "").toLowerCase();
+    }
+  }
+  return "";
+}
+
+function hostAllowed(dsn) {
+  return ISOLATED_DATABASE_HOSTS.includes(databaseHost(dsn));
 }
 
 function redisKeyPrefix(value) {
@@ -163,6 +189,9 @@ export function startPlan(env, fence, imageRef) {
   }
   if (sqliteDSN(source.DATABASE_DSN)) {
     return { ok: false, reason: "sqlite database is refused" };
+  }
+  if (!hostAllowed(source.DATABASE_DSN)) {
+    return { ok: false, reason: "database host is outside the isolated allowlist" };
   }
   if (String(source.CLOUDFLARE_OBJECT_STORAGE_BUCKET ?? "").trim() !== ISOLATED_OBJECT_BUCKET) {
     return { ok: false, reason: "object bucket is outside the isolated allowlist" };
