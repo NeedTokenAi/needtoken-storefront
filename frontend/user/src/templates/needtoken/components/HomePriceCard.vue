@@ -8,17 +8,18 @@
           <PackageCheck v-else :size="16" />
         </span>
         <span class="home-price-name">{{ title }}</span>
+        <span class="home-price-invoice"><ReceiptText :size="13" aria-hidden="true" />{{ t('needtoken.homeLibrary.invoice') }}</span>
       </div>
-      <span class="home-price-invoice">{{ t('needtoken.catalogServices.invoiceNote') }}</span>
-      <p v-if="officialReference" class="home-price-official">{{ t('needtoken.variants.officialReference', { price: officialReference }) }}</p>
+      <p v-if="officialReference" class="home-price-official">{{ t('needtoken.homeLibrary.officialChip', { price: officialChip }) }}</p>
       <p class="home-price-amount">
         <span>{{ priceText }}</span>
-        <small v-if="presentation.priceSuffix && price">{{ presentation.priceSuffix }}</small>
+        <small v-if="presentation.priceSuffix && price">/ {{ presentation.priceSuffix }}</small>
       </p>
       <p v-if="!available" class="home-price-state">{{ availability === 'sold_out' ? t('products.stockStatus.outOfStock') : t('needtoken.catalogServices.availabilityPending') }}</p>
     </div>
-    <div v-if="image && !imageFailed" class="home-price-art" aria-hidden="true">
-      <img :src="image" alt="" @error="imageFailed = true" />
+    <div class="home-price-art" aria-hidden="true">
+      <img v-if="image && !imageFailed" :src="image" alt="" @error="imageFailed = true" />
+      <span v-else class="home-price-art-fallback"><Zap v-if="kind === 'recharge'" :size="22" /><PackageCheck v-else :size="22" /></span>
     </div>
   </component>
 </template>
@@ -26,7 +27,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { PackageCheck, Zap } from 'lucide-vue-next'
+import { PackageCheck, ReceiptText, Zap } from 'lucide-vue-next'
 import { useLocalized } from '../../../composables/useProduct'
 import { useAppStore } from '../../../stores/app'
 import { getFirstImageUrl } from '../../../utils/image'
@@ -56,26 +57,32 @@ const presentation = computed(() => serviceSkuPresentation(sku.value, appStore.l
 const title = computed(() => presentation.value.title || getLocalizedText(props.product.title))
 const priceText = computed(() => price.value ? format(price.value.amount) || t('needtoken.catalogServices.pricePending') : t('needtoken.catalogServices.pricePending'))
 const officialReference = computed(() => presentation.value.officialPriceUsd ? formatServiceMoney(presentation.value.officialPriceUsd, 'USD', appStore.locale) : '')
+const officialChip = computed(() => presentation.value.priceSuffix && officialReference.value ? `${officialReference.value}/${presentation.value.priceSuffix}` : officialReference.value)
 const image = computed(() => getFirstImageUrl(props.product.images))
 const target = computed(() => ({ path: `/products/${props.product.slug}`, query: { sku: String(sku.value?.id || 0) } }))
 </script>
 
 <style scoped>
-.home-price-card { display: flex; align-items: stretch; justify-content: space-between; gap: 12px; min-width: 250px; width: 280px; min-height: 148px; padding: 16px; border: 1px solid rgba(174, 197, 213, .18); border-radius: 18px; background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)); color: var(--ui-text-primary); scroll-snap-align: start; transition: border-color .18s, transform .18s; }
-a.home-price-card:hover { border-color: rgba(45, 212, 167, .5); transform: translateY(-2px); }
+.home-price-card { position: relative; display: flex; align-items: stretch; min-width: 320px; width: 340px; min-height: 168px; padding: 18px 18px 16px; border: 1px solid rgba(255,255,255,.72); border-radius: 22px; background: linear-gradient(180deg, #fbfcfb, #f3f6f4); color: #172027; scroll-snap-align: start; box-shadow: 0 12px 28px rgba(0,0,0,.18); transition: transform .24s ease, box-shadow .24s ease; }
+a.home-price-card:hover { transform: translateY(-6px); box-shadow: 0 20px 36px rgba(0,0,0,.28); }
 .home-price-card.is-unavailable { opacity: .72; }
-.home-price-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
-.home-price-topline { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
-.home-price-mark { display: grid; width: 28px; height: 28px; flex: none; place-items: center; overflow: hidden; border-radius: 8px; background: rgba(45, 212, 167, .1); color: var(--ui-accent); }
+.home-price-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; width: 100%; }
+.home-price-topline { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.home-price-mark { display: grid; width: 28px; height: 28px; flex: none; place-items: center; overflow: hidden; border-radius: 8px; background: #e7f8f2; color: #0f9f78; }
 .home-price-mark img { width: 100%; height: 100%; object-fit: cover; }
-.home-price-name { min-width: 0; font-size: 15px; font-weight: 700; line-height: 1.35; letter-spacing: -.02em; overflow-wrap: anywhere; }
-.home-price-invoice { margin-top: 8px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.06); color: var(--ui-text-muted); font-size: 11px; }
-.home-price-official { margin-top: 10px; color: var(--ui-text-muted); font-size: 12px; }
-.home-price-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin-top: auto; padding-top: 12px; font-size: 26px; font-weight: 750; letter-spacing: -.04em; line-height: 1.1; }
-.home-price-amount small { color: var(--ui-text-muted); font-size: 12px; font-weight: 500; letter-spacing: 0; }
-.home-price-state { margin-top: 6px; color: var(--ui-text-muted); font-size: 11px; }
-.home-price-art { width: 72px; flex: none; display: grid; place-items: center; }
-.home-price-art img { width: 72px; height: 72px; object-fit: cover; border-radius: 12px; }
-a.home-price-card:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-@media (prefers-reduced-motion: reduce) { .home-price-card { transition: none; } a.home-price-card:hover { transform: none; } }
+.home-price-name { min-width: 0; font-size: 16px; font-weight: 750; line-height: 1.3; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.home-price-invoice { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: #6b7785; font-size: 12px; white-space: nowrap; }
+.home-price-official { margin-top: 14px; padding: 3px 10px; border: 1px solid #d5dee6; border-radius: 999px; color: #5d6b78; font-size: 12px; }
+.home-price-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin-top: auto; padding-top: 18px; padding-right: 88px; color: #12181e; font-size: 28px; font-weight: 750; letter-spacing: -.045em; line-height: 1.05; }
+.home-price-amount small { color: #6b7785; font-size: 13px; font-weight: 550; letter-spacing: 0; }
+.home-price-state { margin-top: 6px; color: #6b7785; font-size: 11px; }
+.home-price-art { position: absolute; right: 16px; bottom: 16px; width: 78px; height: 68px; }
+.home-price-art img, .home-price-art-fallback { width: 72px; height: 64px; border-radius: 14px; background: #fff; box-shadow: 0 10px 18px rgba(23, 32, 39, .12); object-fit: cover; transition: transform .28s ease; }
+.home-price-art-fallback { display: grid; place-items: center; color: #8aa398; }
+a.home-price-card:hover .home-price-art img, a.home-price-card:hover .home-price-art-fallback { transform: translate(-4px, -6px) rotate(-8deg); }
+a.home-price-card:focus-visible { outline: 2px solid #2dd4a7; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .home-price-card, .home-price-art img, .home-price-art-fallback { transition: none; }
+  a.home-price-card:hover, a.home-price-card:hover .home-price-art img, a.home-price-card:hover .home-price-art-fallback { transform: none; }
+}
 </style>

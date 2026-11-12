@@ -2907,8 +2907,15 @@
     },
     "homeLibrary": {
       "eyebrow": "产品库",
-      "title": "稳定 高效 合规",
+      "title": "稳定、高效、合规",
       "tabs": "按服务查看商品",
+      "categories": "分类",
+      "invoice": "可开发票",
+      "officialChip": "官方 {price}",
+      "payLabel": "付款方式",
+      "payAlipay": "支付宝",
+      "payUsdt": "USDT",
+      "payChains": "BEP20 · TRC20",
       "loadError": "商品暂时没有加载出来。",
       "empty": "这个分类下还没有可展示的商品。"
     },
@@ -2942,6 +2949,10 @@
     },
     "statusStrip": {
       "label": "公开服务状态",
+      "gpt": "GPT 状态",
+      "codex": "Codex 状态",
+      "codexIntro": "只列出公开摘要里名称包含 Codex 的组件。",
+      "codexEmpty": "公开摘要里没有名称包含 Codex 的组件。",
       "loading": "正在读取公开状态。",
       "unavailable": "这个公开状态源暂时不可用。",
       "currentCount": "{ok} / {total} 项当前为正常",
@@ -2950,7 +2961,8 @@
       "stale": "来源自 {time} 起没有新的更新",
       "sources": {
         "openai": "OpenAI",
-        "claude": "Claude"
+        "claude": "Claude",
+        "codex": "Codex"
       },
       "component": {
         "operational": "正常",

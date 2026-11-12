@@ -14,14 +14,23 @@
               <button type="button" role="tab" :aria-selected="kind === 'rental'" :class="{ active: kind === 'rental' }" @click="setKind('rental')">{{ t('needtoken.nav.rental') }}</button>
               <a href="https://needtoken.ai/api-services">{{ t('needtoken.nav.plans') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
             </div>
-            <div v-if="scope?.root && childCategories.length" class="library-filters" :aria-label="t('needtoken.catalogServices.filterLabel')">
+            <div v-if="scope?.root && childCategories.length" class="library-filters" :aria-label="t('needtoken.homeLibrary.categories')">
+              <span class="library-filter-label">{{ t('needtoken.homeLibrary.categories') }}</span>
               <button type="button" :class="{ active: selectedId === scope.root.id }" :aria-pressed="selectedId === scope.root.id" @click="selectCategory(scope.root.id)">{{ t('needtoken.catalogServices.all') }}</button>
               <button v-for="category in childCategories" :key="category.id" type="button" :class="{ active: selectedId === category.id }" :aria-pressed="selectedId === category.id" @click="selectCategory(category.id)">{{ getLocalizedText(category.name) }}</button>
             </div>
+            <div class="library-currency"><DisplayCurrencySelector compact /></div>
           </div>
           <div class="library-slogan">
-            <h1 id="home-title">{{ t('needtoken.homeLibrary.title') }}</h1>
-            <p translate="no">needtoken.ai</p>
+            <h1 id="home-title">
+              <span v-for="(part, index) in sloganParts" :key="part" class="slogan-word" :style="{ animationDelay: `${index * 140}ms` }">{{ index ? `${sloganSep}${part}` : part }}</span>
+            </h1>
+            <div class="hero-pay" :aria-label="t('needtoken.homeLibrary.payLabel')">
+              <span class="hero-pay-label">{{ t('needtoken.homeLibrary.payLabel') }}</span>
+              <span class="hero-pay-item"><svg viewBox="0 0 24 24" class="pay-mark alipay" aria-hidden="true"><rect width="24" height="24" rx="6" fill="currentColor" /><path d="M7 7h10M12 4.5v5M7.5 10h8.3c-1 4.6-4.3 7.1-8.8 8M9 12.2c2 2.6 5.1 4.4 9.5 5.8" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" /></svg>{{ t('needtoken.homeLibrary.payAlipay') }}</span>
+              <span class="hero-pay-item"><svg viewBox="0 0 24 24" class="pay-mark usdt" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" /><path d="M7.2 7.2h9.6M12 7.2v10.2M8.4 10.2h7.2" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" /></svg>{{ t('needtoken.homeLibrary.payUsdt') }}</span>
+              <span class="hero-pay-item"><svg viewBox="0 0 24 24" class="pay-mark chains" aria-hidden="true"><path d="M7 4.5 12 7.5 17 4.5 12 1.5Z" fill="#f3ba2f" /><path d="M7 19.5 12 22.5 17 19.5 12 16.5Z" fill="#26a17b" /><path d="M4.5 8.2 7 9.8v4.4L4.5 15.8Z" fill="#f3ba2f" /><path d="M19.5 8.2 17 9.8v4.4l2.5 1.6Z" fill="#26a17b" /></svg>{{ t('needtoken.homeLibrary.payChains') }}</span>
+            </div>
           </div>
         </div>
         <div class="price-rail" :aria-busy="loading">
@@ -40,8 +49,6 @@
           </div>
           <div class="hero-benefit hero-benefit--rate"><StandardExchangeRate /></div>
         </div>
-        <PaymentMethodStrip />
-        <div class="hero-currency"><DisplayCurrencySelector compact /></div>
       </div>
     </section>
 
@@ -118,7 +125,6 @@ import { useLocalized } from '../../composables/useProduct'
 import { usePageSeo } from '../../composables/usePageSeo'
 import HomePriceCard from './components/HomePriceCard.vue'
 import { useHomeCatalog } from './composables/useHomeCatalog'
-import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import GhostFibersBackground from './components/GhostFibersBackground.vue'
 import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
@@ -127,6 +133,8 @@ import NeedtokenDeferredRegion from './components/NeedtokenDeferredRegion.vue'
 const { t } = useI18n()
 const { getLocalizedText } = useLocalized()
 const { kind, scope, childCategories, selectedId, products, loading, error, setKind, selectCategory, reload } = useHomeCatalog()
+const sloganParts = computed(() => t('needtoken.homeLibrary.title').split(/[、,]/).map(part => part.trim()).filter(Boolean))
+const sloganSep = computed(() => t('needtoken.homeLibrary.title').includes('、') ? '、' : ', ' )
 usePageSeo({
   title: () => t('needtoken.homeServices.seoTitle'),
   description: () => t('needtoken.homeServices.subtitle'),
@@ -212,12 +220,24 @@ onUnmounted(() => {
 .library-side { min-width: 0; }
 .library-side .hero-eyebrow { justify-content: flex-start; }
 .library-slogan { margin-left: auto; text-align: right; }
-.library-slogan h1 { font-size: clamp(32px, 4vw, 52px); font-weight: 750; line-height: 1.15; letter-spacing: -.045em; }
-.library-slogan p { margin-top: 8px; color: var(--home-secondary); font-size: 15px; letter-spacing: .01em; }
-.library-tabs, .library-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.library-tabs button, .library-tabs a, .library-filters button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 7px 12px; border: 1px solid var(--ui-border); border-radius: 999px; color: var(--home-secondary); font-size: 13px; }
-.library-tabs button.active, .library-filters button.active { color: #07120f; border-color: transparent; background: #2dd4a7; }
-.price-rail { display: flex; gap: 12px; margin-top: 22px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+.library-slogan h1 { color: var(--ui-accent); font-size: clamp(32px, 4vw, 52px); font-weight: 750; line-height: 1.15; letter-spacing: -.045em; }
+.slogan-word { display: inline-block; animation: slogan-rise .55s ease both; }
+.hero-pay { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 14px; margin-top: 14px; }
+.hero-pay-label { color: var(--home-muted); font-size: 12px; }
+.hero-pay-item { display: inline-flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); font-size: 13px; font-weight: 600; }
+.pay-mark { width: 18px; height: 18px; flex: none; }
+.pay-mark.alipay { color: #1677ff; }
+.pay-mark.usdt { color: #26a17b; }
+.library-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-top: 16px; padding: 4px; border: 1px solid var(--ui-border); border-radius: 999px; background: rgba(255,255,255,.03); }
+.library-tabs button, .library-tabs a { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 14px; border: 0; border-radius: 999px; color: var(--home-secondary); font-size: 13px; font-weight: 600; }
+.library-tabs button.active { color: #07120f; background: #2dd4a7; }
+.library-tabs a:hover { color: var(--ui-text-primary); }
+.library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 2px; margin-top: 12px; }
+.library-filter-label { margin-right: 6px; color: var(--home-muted); font-size: 12px; }
+.library-filters button { min-height: 32px; padding: 4px 10px; border: 0; border-radius: 8px; color: var(--home-secondary); font-size: 13px; }
+.library-filters button.active { color: var(--ui-accent); background: rgba(45, 212, 167, .12); }
+.library-currency { margin-top: 12px; }
+.price-rail { display: flex; gap: 12px; margin-top: 22px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 2px 10px; }
 .price-rail-state { display: flex; align-items: center; gap: 10px; min-height: 148px; color: var(--home-muted); font-size: 13px; }
 .price-rail-state button { min-height: 34px; padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-accent); }
 .service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
@@ -240,7 +260,7 @@ onUnmounted(() => {
 .hero-benefit { display: flex; align-items: center; justify-content: center; min-width: 0; gap: 8px; min-height: 46px; padding: 11px 13px; border: 1px solid rgba(255, 226, 126, .6); border-radius: 12px; background: linear-gradient(135deg, #f5cf59, #edb928); color: #242012; font-size: 13px; font-weight: 650; line-height: 1.6; text-align: center; box-shadow: inset 0 1px 0 rgba(255, 249, 222, .4); }
 .hero-benefit > span { min-width: 0; overflow-wrap: anywhere; }
 .hero-benefit svg { flex: none; color: #4d3b09; }
-.hero-currency { display: flex; justify-content: center; margin-top: 12px; }
+@keyframes slogan-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .hero-benefit--rate { position: relative; z-index: 3; }
 .purchase-section { padding-top: 67px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 22px; }
@@ -303,6 +323,7 @@ onUnmounted(() => {
   .library-head { flex-direction: column; align-items: stretch; gap: 18px; }
   .library-slogan { order: -1; width: 100%; text-align: right; }
   .library-slogan h1 { font-size: 32px; }
+  .hero-pay { justify-content: flex-end; }
   .price-rail { margin-top: 16px; }
   .hero-eyebrow { font-size: 11px; }
   .hero-title { margin-top: 12px; font-size: 31px; }
@@ -338,7 +359,7 @@ onUnmounted(() => {
 }
 @media (prefers-reduced-motion: reduce) {
   .service-card, .service-action, .question-toggle { transition: none; }
-  .flow-word, .purchase-steps { animation: none; }
+  .flow-word, .purchase-steps, .slogan-word { animation: none; }
   .service-card:hover { transform: none; }
 }
 </style>
