@@ -2,12 +2,15 @@ import { DurableObject } from "cloudflare:workers";
 
 import {
   APP_PORT,
+  ContainerNotReady,
   INACTIVITY_TIMEOUT_MS,
   RESIDENT_INSTANCE,
   START_COMMAND,
   containerEnv,
   forwardRequest,
   keepResident,
+  notReadyResponse,
+  waitForReady,
 } from "./runtime.js";
 
 export class Storefront extends DurableObject {
@@ -22,10 +25,15 @@ export class Storefront extends DurableObject {
   }
 
   async fetch(request) {
-    this.starting ??= this.startAndWait().finally(() => {
-      this.starting = undefined;
-    });
-    await this.starting;
+    try {
+      this.starting ??= this.startAndWait().finally(() => {
+        this.starting = undefined;
+      });
+      await this.starting;
+    } catch (error) {
+      if (error instanceof ContainerNotReady) return notReadyResponse();
+      throw error;
+    }
     return this.ctx.container.getTcpPort(APP_PORT).fetch(forwardRequest(request));
   }
 
@@ -35,32 +43,23 @@ export class Storefront extends DurableObject {
       throw new Error("container binding is missing");
     }
     if (!container.running) {
-      // Image and instance_type come from wrangler.jsonc. basic is 1/4 vCPU and 1 GiB.
-      container.start({
-        enableInternet: true,
-        entrypoint: START_COMMAND,
-        env: containerEnv(this.env),
-      });
-      await container.setInactivityTimeout(INACTIVITY_TIMEOUT_MS);
-    }
-    const port = container.getTcpPort(APP_PORT);
-    let lastError;
-    for (let attempt = 0; attempt < 100; attempt++) {
       try {
-        const response = await port.fetch("http://container/health", {
-          signal: AbortSignal.timeout(1000),
+        // Image and instance_type come from wrangler.jsonc. basic is 1/4 vCPU and 1 GiB.
+        container.start({
+          enableInternet: true,
+          entrypoint: START_COMMAND,
+          env: containerEnv(this.env),
         });
-        await response.body?.cancel();
-        if (!response.ok) {
-          throw new Error(`health check returned ${response.status}`);
-        }
-        return;
+        await container.setInactivityTimeout(INACTIVITY_TIMEOUT_MS);
       } catch (error) {
-        lastError = error;
-        await scheduler.wait(200);
+        throw new ContainerNotReady(error);
       }
     }
-    throw new Error("container did not become ready on port 8080", { cause: lastError });
+    const port = container.getTcpPort(APP_PORT);
+    await waitForReady(
+      () => port.fetch("http://container/health", { signal: AbortSignal.timeout(1000) }),
+      (ms) => scheduler.wait(ms),
+    );
   }
 }
 
