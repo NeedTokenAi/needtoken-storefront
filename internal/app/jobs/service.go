@@ -21,12 +21,16 @@ type Service struct {
 	scheduler     *asynq.Scheduler
 	consumer      *jobconsumer.Consumer
 	notifyRunning func(bool)
+	idle          bool
 }
 
-// NewService 创建异步队列服务
-func NewService(cfg *config.QueueConfig, consumer *jobconsumer.Consumer) (*Service, error) {
+// NewService 创建异步队列服务。consume 为 false 时不连接队列，也不注册定时任务。
+func NewService(cfg *config.QueueConfig, consumer *jobconsumer.Consumer, consume bool) (*Service, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, errors.New("queue disabled")
+	}
+	if !consume {
+		return &Service{name: "worker", idle: true}, nil
 	}
 	if consumer == nil {
 		return nil, errors.New("consumer is nil")
@@ -136,6 +140,17 @@ func (s *Service) Name() string {
 
 // Start 启动服务
 func (s *Service) Start(ctx context.Context) error {
+	if s != nil && s.idle {
+		if ctx == nil {
+			return errors.New("worker context is nil")
+		}
+		if s.notifyRunning != nil {
+			s.notifyRunning(true)
+			defer s.notifyRunning(false)
+		}
+		<-ctx.Done()
+		return nil
+	}
 	if s == nil || s.server == nil || s.mux == nil {
 		return errors.New("worker not initialized")
 	}

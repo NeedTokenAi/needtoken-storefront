@@ -22,6 +22,13 @@ test("wrangler uses the durable object policy without an instance cap", () => {
   assert.equal(wrangler.exports.DujiaoStorefront.storage, "sqlite");
   assert.equal(JSON.stringify(wrangler).includes("max_instances"), false);
   assert.equal(wrangler.workers_dev, false);
+  const staging = JSON.parse(readFileSync(join(root, "wrangler.staging.jsonc"), "utf8"));
+  assert.equal(staging.name, "needtoken-storefront-staging");
+  assert.equal(staging.workers_dev, false);
+  assert.equal(staging.preview_urls, false);
+  assert.equal(staging.routes, undefined);
+  assert.equal(JSON.stringify(staging).includes("needtoken.com"), false);
+  assert.equal(staging.containers[0].scheduling_policy, "durable_object");
 });
 
 test("secret bindings are names only and match the start allowlist", () => {

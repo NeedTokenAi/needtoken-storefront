@@ -13,6 +13,12 @@ export const LABELS = Object.freeze({
   stopsOldCloudRunWriter: false,
 });
 
+export const ISOLATED_DATABASE_HOSTS = Object.freeze([
+  "ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech",
+  "ep-aged-sunset-b33os2qw-pooler.c-4.ap-southeast-1.aws.neon.tech",
+]);
+export const ISOLATED_OBJECT_BUCKET = "needtoken-staging";
+
 export const SINGLETON_NAME = "dujiao-storefront";
 export const CONTAINER_PORT = 8080;
 export const IMAGE_NAME = "dujiao";
@@ -33,6 +39,10 @@ export const FORCED_ENV = Object.freeze({
 
 export const REQUIRED_BINDINGS = Object.freeze([
   "CLOUDFLARE_IMAGE_DIGEST",
+  "CLOUDFLARE_BUILD_REPOSITORY",
+  "CLOUDFLARE_BUILD_SHA",
+  "CLOUDFLARE_BUILD_RUN_ID",
+  "CLOUDFLARE_BUILD_SOURCE",
   "APP_SECRET_KEY",
   "JWT_SECRET",
   "USER_JWT_SECRET",
@@ -43,6 +53,8 @@ export const REQUIRED_BINDINGS = Object.freeze([
   "CLOUDFLARE_OBJECT_STORAGE_BUCKET",
   "CLOUDFLARE_OBJECT_STORAGE_ACCESS_KEY_ID",
   "CLOUDFLARE_OBJECT_STORAGE_SECRET_ACCESS_KEY",
+  "REDIS_KEY_PREFIX",
+  "CLOUDFLARE_BACKGROUND_CONSUMERS",
 ]);
 
 export const OPTIONAL_BINDINGS = Object.freeze([
@@ -71,9 +83,92 @@ function present(value) {
   return value != null && String(value).trim() !== "";
 }
 
-function realImageDigest(value) {
-  const digest = String(value ?? "").trim();
-  return /^sha256:[0-9a-f]{64}$/.test(digest) && !/^sha256:0{64}$/.test(digest);
+export function fullRegistryRef(value) {
+  const ref = String(value ?? "").trim();
+  return /^[a-z0-9][a-z0-9._:-]*(?:\/[a-z0-9][a-z0-9._:-]*)+@sha256:[0-9a-f]{64}$/.test(ref);
+}
+
+export function databaseHost(dsn) {
+  const value = String(dsn ?? "").trim();
+  if (value.includes("://")) {
+    try {
+      return new URL(value).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+  for (const field of value.split(/\s+/)) {
+    const eq = field.indexOf("=");
+    if (eq > 0 && field.slice(0, eq).toLowerCase() === "host") {
+      return field.slice(eq + 1).replace(/^['"]|['"]$/g, "").toLowerCase();
+    }
+  }
+  return "";
+}
+
+function hostAllowed(dsn) {
+  const host = databaseHost(dsn);
+  return ISOLATED_DATABASE_HOSTS.includes(host);
+}
+
+function redisKeyPrefix(value) {
+  return String(value ?? "").trim().replace(/:$/, "");
+}
+
+// A build record is the workflow's repository, commit, run id, and full
+// registry ref. A bare sha256 or a JSON document is not that record.
+export function buildRecordFromEnv(env) {
+  const source = env ?? {};
+  if (present(source.CLOUDFLARE_BUILD_RECORD_JSON) || typeof source === "string") {
+    return { ok: false, reason: "hand-filled JSON is not a build record" };
+  }
+  if (String(source.CLOUDFLARE_BUILD_SOURCE ?? "").trim() !== "github-actions") {
+    return { ok: false, reason: "hand-filled SHA or JSON is not a build record" };
+  }
+  const repository = String(source.CLOUDFLARE_BUILD_REPOSITORY ?? "").trim();
+  const sha = String(source.CLOUDFLARE_BUILD_SHA ?? "").trim();
+  const runId = String(source.CLOUDFLARE_BUILD_RUN_ID ?? "").trim();
+  const digest = String(source.CLOUDFLARE_IMAGE_DIGEST ?? "").trim();
+  if (!/^[^/\s]+\/[^/\s]+$/.test(repository)) {
+    return { ok: false, reason: "build repository is missing" };
+  }
+  if (!/^[0-9a-f]{40}$/.test(sha)) {
+    return { ok: false, reason: "build sha is missing" };
+  }
+  if (!/^[1-9][0-9]*$/.test(runId)) {
+    return { ok: false, reason: "build run id is missing" };
+  }
+  if (!fullRegistryRef(digest)) {
+    return { ok: false, reason: "digest must be the full registry ref of ctx.container.images.dujiao" };
+  }
+  return { ok: true, record: { repository, sha, runId, digest, source: "github-actions" } };
+}
+
+export function acceptBuildRecord(record) {
+  if (typeof record === "string" || record?.format === "json" || record?.source === "repository-json" || record?.source === "manual") {
+    return { ok: false, reason: "hand-filled JSON is not a build record" };
+  }
+  if (!record || record.builder !== "github-actions") {
+    return { ok: false, reason: "hand-filled SHA or JSON is not a build record" };
+  }
+  return buildRecordFromEnv({
+    CLOUDFLARE_BUILD_SOURCE: "github-actions",
+    CLOUDFLARE_BUILD_REPOSITORY: record.repository,
+    CLOUDFLARE_BUILD_SHA: record.sha,
+    CLOUDFLARE_BUILD_RUN_ID: record.runId,
+    CLOUDFLARE_IMAGE_DIGEST: record.digest,
+  });
+}
+
+export function acceptImage(containerImage, env) {
+  const built = buildRecordFromEnv(env);
+  if (!built.ok) {
+    return built;
+  }
+  if (String(containerImage ?? "").trim() !== built.record.digest) {
+    return { ok: false, reason: "digest must equal ctx.container.images.dujiao" };
+  }
+  return { ok: true, image: built.record.digest };
 }
 
 function sqliteDSN(value) {
@@ -82,19 +177,31 @@ function sqliteDSN(value) {
 }
 
 // startPlan returns the container start options, or a refusal. A refusal must
-// not be passed to start(). The image reference is attached by the Durable
-// Object from ctx.container.images.dujiao.
-export function startPlan(env, fence) {
+// not be passed to start(). imageRef must be ctx.container.images.dujiao.
+export function startPlan(env, fence, imageRef) {
   const source = env ?? {};
   const missing = REQUIRED_BINDINGS.filter((name) => !present(source[name]));
   if (missing.length > 0) {
     return { ok: false, reason: "required binding missing", missing };
   }
-  if (!realImageDigest(source.CLOUDFLARE_IMAGE_DIGEST)) {
-    return { ok: false, reason: "image digest is missing or not tied to a build" };
+  const image = acceptImage(imageRef, source);
+  if (!image.ok) {
+    return image;
   }
   if (sqliteDSN(source.DATABASE_DSN)) {
     return { ok: false, reason: "sqlite database is refused" };
+  }
+  if (!hostAllowed(source.DATABASE_DSN)) {
+    return { ok: false, reason: "database host is outside the isolated allowlist" };
+  }
+  if (String(source.CLOUDFLARE_OBJECT_STORAGE_BUCKET ?? "").trim() !== ISOLATED_OBJECT_BUCKET) {
+    return { ok: false, reason: "object bucket is outside the isolated allowlist" };
+  }
+  if (redisKeyPrefix(source.REDIS_KEY_PREFIX) !== "staging") {
+    return { ok: false, reason: "REDIS_KEY_PREFIX must be staging:" };
+  }
+  if (String(source.CLOUDFLARE_BACKGROUND_CONSUMERS ?? "").trim().toLowerCase() !== "off") {
+    return { ok: false, reason: "background consumers must stay off so this process does not consume production queues or schedules" };
   }
   if (!present(fence)) {
     return { ok: false, reason: "writer fence is missing" };
@@ -114,6 +221,7 @@ export function startPlan(env, fence) {
   return {
     ok: true,
     options: {
+      image: image.image,
       entrypoint: [...ENTRYPOINT],
       enableInternet: true,
       instance: INSTANCE,

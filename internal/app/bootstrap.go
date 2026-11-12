@@ -53,7 +53,7 @@ func BuildRunner(cfg *config.Config, mode string) (*Runner, error) {
 	}
 	if cfg.Queue.Enabled && (mode == ModeAll || mode == ModeWorker) {
 		consumer := jobconsumer.New(dependencies)
-		workerService, err := jobs.NewService(&cfg.Queue, consumer)
+		workerService, err := jobs.NewService(&cfg.Queue, consumer, !cfg.Cloudflare.Enabled)
 		if err != nil {
 			return nil, err
 		}

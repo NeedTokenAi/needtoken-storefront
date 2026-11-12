@@ -209,10 +209,10 @@ func main() {
 		if err := writerPermit.Allow("migrations"); err != nil {
 			failClosed("cloudflare profile 拒绝启动: %v", err)
 		}
-	}
-
-	// 自动迁移数据库表
-	if err := databasemigrations.AutoMigrate(); err != nil {
+		if err := databasemigrations.AutoMigrateUnderLease(writerPermit.Context()); err != nil {
+			failClosed("数据库迁移失败: %v", err)
+		}
+	} else if err := databasemigrations.AutoMigrate(); err != nil {
 		failClosed("数据库迁移失败: %v", err)
 	}
 

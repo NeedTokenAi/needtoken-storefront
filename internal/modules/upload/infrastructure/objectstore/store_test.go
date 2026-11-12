@@ -3,6 +3,7 @@ package objectstore
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dujiao-next/internal/modules/upload/contract"
 	"github.com/stretchr/testify/require"
@@ -137,4 +139,98 @@ func TestPutRejectsBodyOverTheMemoryBoundWithoutCallingStorage(t *testing.T) {
 	err = store.Put(context.Background(), "/uploads/common/2026/07/asset.txt", bytes.NewReader([]byte("123456789")))
 	require.ErrorContains(t, err, "exceeds 8 bytes")
 	require.Zero(t, requests)
+}
+
+func TestPutSignatureMatchesAnIndependentSigV4Check(t *testing.T) {
+	const (
+		access = "AKIDEXAMPLE"
+		secret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+	)
+	var got *http.Request
+	var body []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		got = r.Clone(r.Context())
+		got.Body = io.NopCloser(bytes.NewReader(body))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	store, err := NewWithClient(Config{
+		Endpoint:        server.URL,
+		Bucket:          "unit-bucket",
+		Region:          "auto",
+		AccessKeyID:     access,
+		SecretAccessKey: secret,
+		MaxBytes:        32,
+	}, server.Client())
+	require.NoError(t, err)
+	store.now = func() time.Time { return time.Date(2013, 5, 24, 0, 0, 0, 0, time.UTC) }
+	payload := []byte("hello-upload")
+	require.NoError(t, store.Put(context.Background(), "/uploads/common/2026/07/asset.txt", bytes.NewReader(payload)))
+	require.Equal(t, payload, body)
+	gotSignature, ok := signatureValue(got.Header.Get("Authorization"))
+	require.True(t, ok)
+	require.Equal(t, independentSignature(got, body, secret, "auto"), gotSignature)
+}
+
+func signatureValue(header string) (string, bool) {
+	_, value, ok := strings.Cut(header, "Signature=")
+	return value, ok
+}
+
+func independentSignature(r *http.Request, payload []byte, secret, region string) string {
+	sum := sha256.Sum256(payload)
+	payloadHash := hex.EncodeToString(sum[:])
+	amzDate := r.Header.Get("x-amz-date")
+	dateStamp := amzDate[:8]
+	names := []string{"host", "x-amz-content-sha256", "x-amz-date"}
+	if r.Header.Get("Content-Type") != "" {
+		names = append(names, "content-type")
+	}
+	sortStrings(names)
+	canonicalHeaders := ""
+	for _, name := range names {
+		value := r.Host
+		if name == "content-type" {
+			value = r.Header.Get("Content-Type")
+		} else if name != "host" {
+			value = r.Header.Get(name)
+		}
+		canonicalHeaders += name + ":" + strings.TrimSpace(value) + "\n"
+	}
+	canonical := strings.Join([]string{
+		r.Method,
+		r.URL.EscapedPath(),
+		r.URL.RawQuery,
+		canonicalHeaders,
+		strings.Join(names, ";"),
+		payloadHash,
+	}, "\n")
+	scope := dateStamp + "/" + region + "/s3/aws4_request"
+	canonicalSum := sha256.Sum256([]byte(canonical))
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		scope,
+		hex.EncodeToString(canonicalSum[:]),
+	}, "\n")
+	key := independentHMAC([]byte("AWS4"+secret), dateStamp)
+	key = independentHMAC(key, region)
+	key = independentHMAC(key, "s3")
+	key = independentHMAC(key, "aws4_request")
+	return hex.EncodeToString(independentHMAC(key, stringToSign))
+}
+
+func independentHMAC(key []byte, value string) []byte {
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write([]byte(value))
+	return mac.Sum(nil)
+}
+
+func sortStrings(values []string) {
+	for i := 1; i < len(values); i++ {
+		for j := i; j > 0 && values[j] < values[j-1]; j-- {
+			values[j], values[j-1] = values[j-1], values[j]
+		}
+	}
 }

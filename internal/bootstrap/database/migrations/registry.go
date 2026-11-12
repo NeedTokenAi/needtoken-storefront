@@ -1,6 +1,11 @@
 package migrations
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+
 	"github.com/dujiao-next/internal/constants"
 	affiliatedomain "github.com/dujiao-next/internal/modules/affiliate/domain"
 	apicredentialdomain "github.com/dujiao-next/internal/modules/apicredential/domain"
@@ -42,114 +47,123 @@ import (
 
 // AutoMigrate owns the application-wide schema registry and ordered data migrations.
 func AutoMigrate() error {
+	return runAutoMigrate(context.Background())
+}
+
+func runAutoMigrate(ctx context.Context) error {
 	db := gormdb.DB
-	if err := db.AutoMigrate(
-		&admindomain.Admin{},
-		&userdomain.User{},
-		&externalidentitydomain.Identity{},
-		&invitecodedomain.InviteCode{},
-		&affiliatedomain.Profile{},
-		&affiliatedomain.Click{},
-		&affiliatedomain.Commission{},
-		&affiliatedomain.WithdrawRequest{},
-		&walletdomain.Account{},
-		&walletdomain.Transaction{},
-		&walletdomain.RechargeOrder{},
-		&auditlogdomain.UserLoginLog{},
-		&auditlogdomain.AuthzAuditLog{},
-		&notificationdomain.NotificationLog{},
-		&auditlogdomain.AdminLoginLog{},
-		&emailverificationdomain.Code{},
-		&orderdomain.Order{},
-		&orderdomain.OrderItem{},
-		&orderdomain.OrderRefundRecord{},
-		&orderriskdomain.LockKey{},
-		&cartdomain.Item{},
-		&paymentdomain.PaymentChannel{},
-		&paymentdomain.Payment{},
-		&paymentdomain.PaidFulfillmentEvent{},
-		&paymentdomain.CheckoutReservation{},
-		&cardsecretdomain.Secret{},
-		&cardsecretdomain.Batch{},
-		&giftcarddomain.GiftCard{},
-		&giftcarddomain.GiftCardBatch{},
-		&fulfillmentdomain.Fulfillment{},
-		&coupondomain.Coupon{},
-		&coupondomain.CouponUsage{},
-		&promotiondomain.Promotion{},
-		&categorydomain.Category{},
-		&productdomain.Product{},
-		&productdomain.ProductSKU{},
-		&contentdomain.Post{},
-		&contentdomain.PostProduct{},
-		&contentdomain.PostCategory{},
-		&contentdomain.Banner{},
-		&settingsstore.SettingRecord{},
-		&apicredentialdomain.ApiCredential{},
-		&siteconnectiondomain.Connection{},
-		&mappingdomain.Mapping{},
-		&mappingdomain.SKUMapping{},
-		&procurementdomain.Order{},
-		&downstreamcallbackdomain.OrderRef{},
-		&reconciliationdomain.Job{},
-		&reconciliationdomain.Item{},
-		&channelclientdomain.Client{},
-		&broadcastdomain.Broadcast{},
-		&memberleveldomain.MemberLevel{},
-		&memberleveldomain.MemberLevelPrice{},
-		&contentdomain.Media{},
-	); err != nil {
+	if err := migrationStep(ctx, func() error {
+		return db.AutoMigrate(
+			&admindomain.Admin{},
+			&userdomain.User{},
+			&externalidentitydomain.Identity{},
+			&invitecodedomain.InviteCode{},
+			&affiliatedomain.Profile{},
+			&affiliatedomain.Click{},
+			&affiliatedomain.Commission{},
+			&affiliatedomain.WithdrawRequest{},
+			&walletdomain.Account{},
+			&walletdomain.Transaction{},
+			&walletdomain.RechargeOrder{},
+			&auditlogdomain.UserLoginLog{},
+			&auditlogdomain.AuthzAuditLog{},
+			&notificationdomain.NotificationLog{},
+			&auditlogdomain.AdminLoginLog{},
+			&emailverificationdomain.Code{},
+			&orderdomain.Order{},
+			&orderdomain.OrderItem{},
+			&orderdomain.OrderRefundRecord{},
+			&orderriskdomain.LockKey{},
+			&cartdomain.Item{},
+			&paymentdomain.PaymentChannel{},
+			&paymentdomain.Payment{},
+			&paymentdomain.PaidFulfillmentEvent{},
+			&paymentdomain.CheckoutReservation{},
+			&cardsecretdomain.Secret{},
+			&cardsecretdomain.Batch{},
+			&giftcarddomain.GiftCard{},
+			&giftcarddomain.GiftCardBatch{},
+			&fulfillmentdomain.Fulfillment{},
+			&coupondomain.Coupon{},
+			&coupondomain.CouponUsage{},
+			&promotiondomain.Promotion{},
+			&categorydomain.Category{},
+			&productdomain.Product{},
+			&productdomain.ProductSKU{},
+			&contentdomain.Post{},
+			&contentdomain.PostProduct{},
+			&contentdomain.PostCategory{},
+			&contentdomain.Banner{},
+			&settingsstore.SettingRecord{},
+			&apicredentialdomain.ApiCredential{},
+			&siteconnectiondomain.Connection{},
+			&mappingdomain.Mapping{},
+			&mappingdomain.SKUMapping{},
+			&procurementdomain.Order{},
+			&downstreamcallbackdomain.OrderRef{},
+			&reconciliationdomain.Job{},
+			&reconciliationdomain.Item{},
+			&channelclientdomain.Client{},
+			&broadcastdomain.Broadcast{},
+			&memberleveldomain.MemberLevel{},
+			&memberleveldomain.MemberLevelPrice{},
+			&contentdomain.Media{},
+		)
+	}); err != nil {
 		return err
 	}
 
-	if err := ensureUserOAuthIdentityUserProviderUniqueIndex(); err != nil {
+	if err := migrationStep(ctx, ensureUserOAuthIdentityUserProviderUniqueIndex); err != nil {
 		return err
 	}
-	if err := backfillPendingOrderRiskIPs(db); err != nil {
+	if err := migrationStep(ctx, func() error { return backfillPendingOrderRiskIPs(db) }); err != nil {
 		return err
 	}
-	if err := resellerstore.Migrate(db); err != nil {
+	if err := migrationStep(ctx, func() error { return resellerstore.Migrate(db) }); err != nil {
 		return err
 	}
-	if err := migrateCartSKUUniqueIndex(); err != nil {
+	if err := migrationStep(ctx, migrateCartSKUUniqueIndex); err != nil {
 		return err
 	}
-	if err := ensureProductSKUMigration(); err != nil {
+	if err := migrationStep(ctx, ensureProductSKUMigration); err != nil {
 		return err
 	}
-	if err := ensureManualStockRemainingMigration(); err != nil {
+	if err := migrationStep(ctx, ensureManualStockRemainingMigration); err != nil {
 		return err
 	}
-	if err := ensureCategoryParentMigration(); err != nil {
+	if err := migrationStep(ctx, ensureCategoryParentMigration); err != nil {
 		return err
 	}
-	if err := ensurePaymentProviderBepusdtRenameMigration(); err != nil {
+	if err := migrationStep(ctx, ensurePaymentProviderBepusdtRenameMigration); err != nil {
 		return err
 	}
-	if err := ensurePaymentChannelBepusdtConfigMigration(); err != nil {
+	if err := migrationStep(ctx, ensurePaymentChannelBepusdtConfigMigration); err != nil {
 		return err
 	}
-	if err := ensurePaymentFeePolicyMigration(); err != nil {
+	if err := migrationStep(ctx, ensurePaymentFeePolicyMigration); err != nil {
 		return err
 	}
-	if err := ensureOrderRefundPaymentFeeMigration(); err != nil {
+	if err := migrationStep(ctx, ensureOrderRefundPaymentFeeMigration); err != nil {
 		return err
 	}
-	if err := ensureOrderItemOriginalPriceMigration(); err != nil {
+	if err := migrationStep(ctx, ensureOrderItemOriginalPriceMigration); err != nil {
 		return err
 	}
-	if err := ensureCartForeignKeyConstraints(); err != nil {
+	if err := migrationStep(ctx, ensureCartForeignKeyConstraints); err != nil {
 		return err
 	}
-	if err := ensureProcurementOrderForeignKeyConstraint(); err != nil {
+	if err := migrationStep(ctx, ensureProcurementOrderForeignKeyConstraint); err != nil {
 		return err
 	}
-	if db.Migrator().HasColumn(&productdomain.Product{}, "price_currency") {
-		if err := db.Migrator().DropColumn(&productdomain.Product{}, "price_currency"); err != nil {
-			return err
+	if err := migrationStep(ctx, func() error {
+		if db.Migrator().HasColumn(&productdomain.Product{}, "price_currency") {
+			return db.Migrator().DropColumn(&productdomain.Product{}, "price_currency")
 		}
+		return nil
+	}); err != nil {
+		return err
 	}
-	return nil
+	return migrationLease(ctx)
 }
 
 // backfillPendingOrderRiskIPs 只迁移仍可能占用库存的在途订单，避免启动时扫描全部历史订单。
@@ -178,5 +192,67 @@ func backfillPendingOrderRiskIPs(db *gorm.DB) error {
 			}
 		}
 		return nil
+	})
+}
+
+var migrationDBMu sync.Mutex
+
+func migrationLease(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("writer permit lost during migration: %w", err)
+	}
+	return nil
+}
+
+func migrationStep(ctx context.Context, fn func() error) error {
+	if err := migrationLease(ctx); err != nil {
+		return err
+	}
+	return fn()
+}
+
+func withMigrationDB(db *gorm.DB, fn func() error) error {
+	migrationDBMu.Lock()
+	defer migrationDBMu.Unlock()
+	previous := gormdb.DB
+	gormdb.DB = db
+	defer func() { gormdb.DB = previous }()
+	return fn()
+}
+
+// runUnderLease applies every step in one transaction. A lost permit returns
+// before commit, so the next start can run the same steps again.
+func runUnderLease(ctx context.Context, db *gorm.DB, steps ...func(context.Context, *gorm.DB) error) error {
+	if ctx == nil || ctx.Err() != nil {
+		return errors.New("cloudflare profile: writer permit lost before migrations; this lease does not stop the existing Cloud Run writer")
+	}
+	if db == nil {
+		return errors.New("database is not initialized")
+	}
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tx = tx.WithContext(ctx)
+		for _, step := range steps {
+			if err := migrationLease(ctx); err != nil {
+				return err
+			}
+			if err := step(ctx, tx); err != nil {
+				return err
+			}
+		}
+		return migrationLease(ctx)
+	})
+}
+
+// AutoMigrateUnderLease is the Cloudflare startup path. The writer permit is
+// already held. Losing it rolls this attempt back instead of leaving a
+// half-applied migration.
+func AutoMigrateUnderLease(ctx context.Context) error {
+	return runUnderLease(ctx, gormdb.DB, func(ctx context.Context, tx *gorm.DB) error {
+		return withMigrationDB(tx, func() error {
+			return runAutoMigrate(ctx)
+		})
 	})
 }

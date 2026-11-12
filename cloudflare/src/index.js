@@ -10,7 +10,7 @@ import {
   TRAFFIC_PATH,
   watchdog,
 } from "./lifecycle.js";
-import { CONTAINER_PORT, IMAGE_NAME, INACTIVITY_TIMEOUT_MS, PREVIOUS_IMAGE_NAME, SINGLETON_NAME, startPlan } from "./policy.js";
+import { CONTAINER_PORT, fullRegistryRef, IMAGE_NAME, INACTIVITY_TIMEOUT_MS, PREVIOUS_IMAGE_NAME, SINGLETON_NAME, startPlan } from "./policy.js";
 import { containerRequest, proxyIfReady } from "./proxy.js";
 
 const ALARM_MS = 60 * 1000;
@@ -146,15 +146,20 @@ export class DujiaoStorefront extends DurableObject {
   }
 
   async containerPlan(decision) {
-    const image = decision?.image ?? this.ctx.container?.images?.[IMAGE_NAME];
-    if (!image) {
-      return { ok: false, reason: "container image is missing" };
-    }
-    const plan = startPlan(this.env, await this.currentFence());
+    const current = this.ctx.container?.images?.[IMAGE_NAME];
+    const plan = startPlan(this.env, await this.currentFence(), current);
     if (!plan.ok) {
       return plan;
     }
-    return { ok: true, options: { ...plan.options, image } };
+    let image = plan.options.image;
+    if (decision?.role === "previous") {
+      const previous = this.ctx.container?.images?.[PREVIOUS_IMAGE_NAME];
+      if (!fullRegistryRef(previous) || previous === current) {
+        return { ok: false, reason: "previous image is not a distinct registry ref", rollback: false };
+      }
+      image = previous;
+    }
+    return { ok: true, options: { ...plan.options, image }, rollback: false };
   }
 
   async currentFence() {

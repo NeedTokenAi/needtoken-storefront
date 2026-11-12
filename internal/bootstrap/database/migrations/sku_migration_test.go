@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/dujiao-next/internal/shared/money"
 	"github.com/glebarez/sqlite"
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
 
@@ -632,4 +634,62 @@ func TestAutoMigrateReplacesSupersededProcurementConstraintName(t *testing.T) {
 	if !db.Migrator().HasConstraint(&procurementdomain.Order{}, procurementOrderForeignKeyConstraint) {
 		t.Errorf("procurement index repair removed canonical constraint %s", procurementOrderForeignKeyConstraint)
 	}
+}
+
+func TestLeaseLossRollsBackAndRetryIsReentrant(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TABLE lease_probe (id INTEGER PRIMARY KEY)`).Error)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	err = runUnderLease(ctx, db,
+		func(ctx context.Context, tx *gorm.DB) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := tx.Exec(`INSERT INTO lease_probe (id) VALUES (1)`).Error; err != nil {
+				return err
+			}
+			cancel()
+			return nil
+		},
+		func(ctx context.Context, tx *gorm.DB) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return tx.Exec(`INSERT INTO lease_probe (id) VALUES (2)`).Error
+		},
+	)
+	require.Error(t, err)
+	var count int64
+	require.NoError(t, db.Table("lease_probe").Count(&count).Error)
+	require.Zero(t, count)
+
+	insertOnce := func(ctx context.Context, tx *gorm.DB) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return tx.Exec(`INSERT INTO lease_probe (id) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM lease_probe WHERE id = 1)`).Error
+	}
+	require.NoError(t, runUnderLease(context.Background(), db, insertOnce))
+	require.NoError(t, db.Table("lease_probe").Count(&count).Error)
+	require.Equal(t, int64(1), count)
+	require.NoError(t, runUnderLease(context.Background(), db, insertOnce))
+	require.NoError(t, db.Table("lease_probe").Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+func TestAutoMigrateUnderLeaseStopsBeforeSchemaWhenPermitIsLost(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
+	require.NoError(t, err)
+	previous := gormdb.DB
+	gormdb.DB = db
+	t.Cleanup(func() { gormdb.DB = previous })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = AutoMigrateUnderLease(ctx)
+	require.ErrorContains(t, err, "writer permit lost before migrations")
+	require.ErrorContains(t, err, "does not stop the existing Cloud Run writer")
+	require.False(t, db.Migrator().HasTable("users"))
 }

@@ -79,6 +79,7 @@ redis:
   password: ""
   db: 0
   prefix: "dj"
+  # 预发可另设 REDIS_KEY_PREFIX=staging:。这会覆盖 prefix，分隔符仍由程序补上。
 
 queue:
   enabled: true
@@ -191,6 +192,10 @@ cloudflare:
   # 只能是 isolated。这只表示本进程是隔离候选，不会停掉仍在运行的 Cloud Run。
   isolation: ""
   writer_fence: ""
+  # off 时不启动队列消费者和定时任务。Redis 继续用现有 Upstash，不能改成另一台主机。
+  # 数据库主机只接受 ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech 及其 -pooler。
+  # 对象桶只接受 needtoken-staging。这两项不能靠环境变量加宽。
+  background_consumers: "off"
   object_storage:
     endpoint: ""
     bucket: ""

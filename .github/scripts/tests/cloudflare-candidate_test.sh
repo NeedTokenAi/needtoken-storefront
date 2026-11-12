@@ -29,6 +29,23 @@ if grep -Eq 'uses:[[:space:]]+[^@]+@v[0-9]' "${WORKFLOW}"; then
 fi
 grep -q 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' "${WORKFLOW}" || fail "checkout pin"
 grep -q 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' "${WORKFLOW}" || fail "node pin"
+if grep -Eq 'image_digest:|git_sha:' "${WORKFLOW}"; then
+  fail "candidate dispatch still accepts a hand-filled digest"
+fi
+IMAGE_WORKFLOW="${ROOT}/.github/workflows/cloudflare-image.yml"
+[[ -f ${IMAGE_WORKFLOW} ]] || fail "image workflow missing"
+grep -q 'workflow_dispatch' "${IMAGE_WORKFLOW}" || fail "image workflow must be manual"
+if grep -q 'pull_request:' "${IMAGE_WORKFLOW}"; then
+  fail "image workflow runs on pull request"
+fi
+if grep -Eq 'wrangler deploy|deploy-cloudrun|gcloud ' "${IMAGE_WORKFLOW}"; then
+  fail "image workflow can publish production"
+fi
+grep -q 'containers build' "${IMAGE_WORKFLOW}" || fail "image workflow does not build the container"
+(
+  cd "${ROOT}"
+  node --input-type=module -e 'import {readFileSync} from "node:fs"; const cfg=JSON.parse(readFileSync("cloudflare/wrangler.staging.jsonc","utf8")); if (cfg.name !== "needtoken-storefront-staging" || cfg.routes || cfg.workers_dev !== false || cfg.preview_urls !== false) process.exit(1);'
+) || fail "staging worker config is not isolated from production routes"
 ok "candidate workflow cannot deploy"
 
 set +e
@@ -58,11 +75,14 @@ git -C "${workdir}" checkout -q "${base_branch}"
 git -C "${workdir}" update-ref refs/heads/main "${main_sha}"
 
 record="${workdir}/record"
+full_ref="registry.example/needtoken/storefront-staging@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+zero_ref="registry.example/needtoken/storefront-staging@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+bare_ref="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 set +e
 (
   cd "${workdir}"
   GIT_SHA="${main_sha}" \
-    IMAGE_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
+    IMAGE_DIGEST="${bare_ref}" \
     MAIN_REF="refs/heads/main" \
     bash "${SCRIPT}"
 )
@@ -74,8 +94,12 @@ ok "digest shape alone stays fail-closed"
 (
   cd "${workdir}"
   GIT_SHA="${main_sha}" \
-    IMAGE_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
+    IMAGE_DIGEST="${full_ref}" \
     DOCKERFILE_SHA="${dockerfile_sha}" \
+    BUILD_REPOSITORY="NeedTokenAi/needtoken-storefront" \
+    BUILD_SHA="${main_sha}" \
+    BUILD_RUN_ID="43175381072" \
+    BUILD_SOURCE="github-actions" \
     ISOLATION="isolated" \
     MAIN_REF="refs/heads/main" \
     CANDIDATE_RECORD="${record}" \
@@ -86,14 +110,59 @@ grep -q 'rollback=false' "${record}" || fail "record claimed rollback"
 grep -q 'isolation=isolated' "${record}" || fail "record did not pin isolated bindings"
 grep -q "git_sha=${main_sha}" "${record}" || fail "record did not pin the main sha"
 grep -q "dockerfile_sha=${dockerfile_sha}" "${record}" || fail "record did not pin the dockerfile blob"
-ok "sha, dockerfile blob, and digest bind with deploy=false and rollback=false"
+grep -q "image_digest=${full_ref}" "${record}" || fail "record did not pin the registry ref"
+grep -q 'source=github-actions' "${record}" || fail "record did not pin the build source"
+ok "sha, dockerfile blob, and registry ref bind with deploy=false and rollback=false"
 
 set +e
 (
   cd "${workdir}"
   GIT_SHA="${main_sha}" \
-    IMAGE_DIGEST="sha256:0000000000000000000000000000000000000000000000000000000000000000" \
+    IMAGE_DIGEST="${bare_ref}" \
     DOCKERFILE_SHA="${dockerfile_sha}" \
+    BUILD_REPOSITORY="NeedTokenAi/needtoken-storefront" \
+    BUILD_SHA="${main_sha}" \
+    BUILD_RUN_ID="43175381072" \
+    BUILD_SOURCE="github-actions" \
+    ISOLATION="isolated" \
+    MAIN_REF="refs/heads/main" \
+    bash "${SCRIPT}"
+)
+status=$?
+set -e
+[[ ${status} -eq 1 ]] || fail "bare sha256 exited ${status}"
+ok "bare sha256 is refused"
+
+set +e
+(
+  cd "${workdir}"
+  GIT_SHA="${main_sha}" \
+    IMAGE_DIGEST="${full_ref}" \
+    DOCKERFILE_SHA="${dockerfile_sha}" \
+    BUILD_REPOSITORY="NeedTokenAi/needtoken-storefront" \
+    BUILD_SHA="${main_sha}" \
+    BUILD_RUN_ID="43175381072" \
+    BUILD_SOURCE="github-actions" \
+    BUILD_RECORD_JSON="{}" \
+    ISOLATION="isolated" \
+    MAIN_REF="refs/heads/main" \
+    bash "${SCRIPT}"
+)
+status=$?
+set -e
+[[ ${status} -eq 1 ]] || fail "repository JSON exited ${status}"
+ok "repository JSON is refused"
+
+set +e
+(
+  cd "${workdir}"
+  GIT_SHA="${main_sha}" \
+    IMAGE_DIGEST="${zero_ref}" \
+    DOCKERFILE_SHA="${dockerfile_sha}" \
+    BUILD_REPOSITORY="NeedTokenAi/needtoken-storefront" \
+    BUILD_SHA="${main_sha}" \
+    BUILD_RUN_ID="43175381072" \
+    BUILD_SOURCE="github-actions" \
     ISOLATION="isolated" \
     MAIN_REF="refs/heads/main" \
     bash "${SCRIPT}"
@@ -107,8 +176,12 @@ set +e
 (
   cd "${workdir}"
   GIT_SHA="${main_sha}" \
-    IMAGE_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
+    IMAGE_DIGEST="${full_ref}" \
     DOCKERFILE_SHA="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" \
+    BUILD_REPOSITORY="NeedTokenAi/needtoken-storefront" \
+    BUILD_SHA="${main_sha}" \
+    BUILD_RUN_ID="43175381072" \
+    BUILD_SOURCE="github-actions" \
     ISOLATION="isolated" \
     MAIN_REF="refs/heads/main" \
     bash "${SCRIPT}"
@@ -123,8 +196,12 @@ set +e
   cd "${workdir}"
   git checkout -q feature
   GIT_SHA="${feature_sha}" \
-    IMAGE_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
+    IMAGE_DIGEST="${full_ref}" \
     DOCKERFILE_SHA="${dockerfile_sha}" \
+    BUILD_REPOSITORY="NeedTokenAi/needtoken-storefront" \
+    BUILD_SHA="${feature_sha}" \
+    BUILD_RUN_ID="43175381072" \
+    BUILD_SOURCE="github-actions" \
     ISOLATION="isolated" \
     MAIN_REF="refs/heads/main" \
     bash "${SCRIPT}"
@@ -139,8 +216,12 @@ set +e
   cd "${workdir}"
   git checkout -q "${base_branch}"
   GIT_SHA="${main_sha}" \
-    IMAGE_DIGEST="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
+    IMAGE_DIGEST="${full_ref}" \
     DOCKERFILE_SHA="${dockerfile_sha}" \
+    BUILD_REPOSITORY="NeedTokenAi/needtoken-storefront" \
+    BUILD_SHA="${main_sha}" \
+    BUILD_RUN_ID="43175381072" \
+    BUILD_SOURCE="github-actions" \
     ISOLATION="shared" \
     MAIN_REF="refs/heads/main" \
     bash "${SCRIPT}"

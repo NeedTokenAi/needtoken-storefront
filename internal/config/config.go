@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/dujiao-next/internal/constants"
@@ -207,10 +208,11 @@ type CaptchaTurnstileConfig struct {
 // CloudflareConfig 默认关闭。打开后进程必须使用 Postgres、Asynq，以及可持久化的对象存储。
 // 关闭时现有 Cloud Run 行为不变，上传仍写入本地目录。
 type CloudflareConfig struct {
-	Enabled       bool                `mapstructure:"enabled"`
-	Isolation     string              `mapstructure:"isolation"`
-	WriterFence   string              `mapstructure:"writer_fence"`
-	ObjectStorage ObjectStorageConfig `mapstructure:"object_storage"`
+	Enabled             bool                `mapstructure:"enabled"`
+	Isolation           string              `mapstructure:"isolation"`
+	WriterFence         string              `mapstructure:"writer_fence"`
+	BackgroundConsumers string              `mapstructure:"background_consumers"`
+	ObjectStorage       ObjectStorageConfig `mapstructure:"object_storage"`
 }
 
 // ObjectStorageConfig 是 R2 兼容的对象存储目标。只在 Cloudflare 配置打开时读取。
@@ -451,6 +453,7 @@ func Load() *Config {
 	viper.SetDefault("cloudflare.enabled", false)
 	viper.SetDefault("cloudflare.isolation", "")
 	viper.SetDefault("cloudflare.writer_fence", "")
+	viper.SetDefault("cloudflare.background_consumers", "")
 	viper.SetDefault("cloudflare.object_storage.endpoint", "")
 	viper.SetDefault("cloudflare.object_storage.bucket", "")
 	viper.SetDefault("cloudflare.object_storage.region", "")
@@ -477,6 +480,20 @@ func Load() *Config {
 		logger.Errorw("config_unmarshal_failed", "error", err)
 		panic(fmt.Errorf("配置解析失败: %w", err))
 	}
+	ApplyRedisKeyPrefix(&cfg, os.Getenv("REDIS_KEY_PREFIX"))
 
 	return &cfg
+}
+
+// ApplyRedisKeyPrefix maps REDIS_KEY_PREFIX onto the existing redis.prefix.
+// The app already inserts the separator, so a trailing colon is not stored twice.
+func ApplyRedisKeyPrefix(cfg *Config, keyPrefix string) {
+	if cfg == nil {
+		return
+	}
+	keyPrefix = strings.TrimSpace(keyPrefix)
+	if keyPrefix == "" {
+		return
+	}
+	cfg.Redis.Prefix = strings.TrimSuffix(keyPrefix, ":")
 }

@@ -1,4 +1,5 @@
-# Binds a main SHA to an image digest's Dockerfile blob.
+# Checks the Worker skeleton on pull request.
+# A manual run refuses a hand-filled digest. The image workflow records the registry ref.
 # It does not publish the container and it does not roll traffic back.
 # The existing Cloud Run workflow remains the only production publisher.
 name: cloudflare-candidate
@@ -6,29 +7,6 @@ name: cloudflare-candidate
 on:
   pull_request:
   workflow_dispatch:
-    inputs:
-      git_sha:
-        description: 40 character commit that is already on main
-        required: true
-        type: string
-      image_digest:
-        description: sha256 image digest built from that commit
-        required: true
-        type: string
-      dockerfile_sha:
-        description: git blob SHA of Dockerfile at git_sha
-        required: true
-        type: string
-      isolation:
-        description: must be isolated
-        required: true
-        type: string
-        default: isolated
-      deploy:
-        description: Ignored. A true value makes the bind fail closed.
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -59,14 +37,8 @@ jobs:
       - name: Check the candidate script
         run: bash -n .github/scripts/cloudflare-candidate.sh
 
-      - name: Bind main SHA and digest
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        env:
-          GIT_SHA: ${{ inputs.git_sha }}
-          IMAGE_DIGEST: ${{ inputs.image_digest }}
-          DOCKERFILE_SHA: ${{ inputs.dockerfile_sha }}
-          ISOLATION: ${{ inputs.isolation }}
-          DEPLOY: ${{ inputs.deploy }}
+      - name: Refuse a hand-filled image digest
+        if: github.event_name == 'workflow_dispatch'
         run: |
-          git checkout --detach "$GIT_SHA"
-          bash .github/scripts/cloudflare-candidate.sh
+          printf 'hand-filled SHA or JSON is not a build record\n' >&2
+          exit 1
