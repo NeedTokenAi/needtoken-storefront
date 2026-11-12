@@ -188,6 +188,8 @@ reseller:
 # 缺任一项都会拒绝启动，不会改用 SQLite 或内存存储。不要把生产密钥写进这个文件。
 cloudflare:
   enabled: false
+  # 只能是 isolated。这只表示本进程是隔离候选，不会停掉仍在运行的 Cloud Run。
+  isolation: ""
   writer_fence: ""
   object_storage:
     endpoint: ""

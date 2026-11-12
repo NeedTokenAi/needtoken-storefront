@@ -5,6 +5,7 @@ import { FORCED_ENV, INSTANCE, OPTIONAL_BINDINGS, REQUIRED_BINDINGS, startPlan, 
 
 function env(overrides = {}) {
   return {
+    CLOUDFLARE_IMAGE_DIGEST: `sha256:${"ab".repeat(32)}`,
     APP_SECRET_KEY: "app",
     JWT_SECRET: "jwt",
     USER_JWT_SECRET: "user-jwt",
@@ -32,6 +33,7 @@ test("start plan runs all mode and refuses sqlite or a missing target", () => {
   assert.equal(plan.options.env.DATABASE_DRIVER, "postgres");
   assert.equal(plan.options.env.QUEUE_ENABLED, "true");
   assert.equal(plan.options.env.CLOUDFLARE_ENABLED, "true");
+  assert.equal(plan.options.env.CLOUDFLARE_ISOLATION, "isolated");
   assert.equal(plan.options.env.SERVER_HOST, "0.0.0.0");
   assert.equal(plan.options.env.SERVER_PORT, "8080");
   assert.equal(plan.options.env.CLOUDFLARE_WRITER_FENCE, "fence-1");
@@ -52,6 +54,10 @@ test("start plan runs all mode and refuses sqlite or a missing target", () => {
 
   const noFence = startPlan(env(), "");
   assert.equal(noFence.ok, false);
+
+  const placeholder = startPlan(env({ CLOUDFLARE_IMAGE_DIGEST: `sha256:${"0".repeat(64)}` }), "fence-1");
+  assert.equal(placeholder.ok, false);
+  assert.equal(placeholder.options, undefined);
 });
 
 test("optional bindings are copied and worker-only bindings stay out", () => {

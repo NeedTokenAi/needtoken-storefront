@@ -12,6 +12,10 @@
         "dujiao": {
           "dockerfile": "../Dockerfile",
           "build_context": ".."
+        },
+        "dujiao-previous": {
+          "dockerfile": "../Dockerfile",
+          "build_context": ".."
         }
       }
     }

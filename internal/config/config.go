@@ -208,6 +208,7 @@ type CaptchaTurnstileConfig struct {
 // 关闭时现有 Cloud Run 行为不变，上传仍写入本地目录。
 type CloudflareConfig struct {
 	Enabled       bool                `mapstructure:"enabled"`
+	Isolation     string              `mapstructure:"isolation"`
 	WriterFence   string              `mapstructure:"writer_fence"`
 	ObjectStorage ObjectStorageConfig `mapstructure:"object_storage"`
 }
@@ -448,6 +449,7 @@ func Load() *Config {
 	viper.SetDefault("reseller.self_apply_enabled", true)
 	viper.SetDefault("reseller.settlement_confirm_days", 7)
 	viper.SetDefault("cloudflare.enabled", false)
+	viper.SetDefault("cloudflare.isolation", "")
 	viper.SetDefault("cloudflare.writer_fence", "")
 	viper.SetDefault("cloudflare.object_storage.endpoint", "")
 	viper.SetDefault("cloudflare.object_storage.bucket", "")

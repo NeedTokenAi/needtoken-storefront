@@ -1,4 +1,5 @@
-# Binds a main SHA and image digest. It does not publish the container.
+# Binds a main SHA to an image digest's Dockerfile blob.
+# It does not publish the container and it does not roll traffic back.
 # The existing Cloud Run workflow remains the only production publisher.
 name: cloudflare-candidate
 
@@ -11,9 +12,18 @@ on:
         required: true
         type: string
       image_digest:
-        description: sha256 image digest to bind
+        description: sha256 image digest built from that commit
         required: true
         type: string
+      dockerfile_sha:
+        description: git blob SHA of Dockerfile at git_sha
+        required: true
+        type: string
+      isolation:
+        description: must be isolated
+        required: true
+        type: string
+        default: isolated
       deploy:
         description: Ignored. A true value makes the bind fail closed.
         required: false
@@ -34,12 +44,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
@@ -54,5 +64,9 @@ jobs:
         env:
           GIT_SHA: ${{ inputs.git_sha }}
           IMAGE_DIGEST: ${{ inputs.image_digest }}
+          DOCKERFILE_SHA: ${{ inputs.dockerfile_sha }}
+          ISOLATION: ${{ inputs.isolation }}
           DEPLOY: ${{ inputs.deploy }}
-        run: bash .github/scripts/cloudflare-candidate.sh
+        run: |
+          git checkout --detach "$GIT_SHA"
+          bash .github/scripts/cloudflare-candidate.sh

@@ -27,6 +27,8 @@ type Config struct {
 	AccessKeyID     string
 	SecretAccessKey string
 	Prefix          string
+	// MaxBytes is the hard cap for one Put. Zero uses the upload default, 10 MiB.
+	MaxBytes int64
 }
 
 // Store writes and reads upload objects. It does not use the local disk.
@@ -37,9 +39,12 @@ type Store struct {
 	prefix   string
 	access   string
 	secret   string
+	maxBytes int64
 	client   *http.Client
 	now      func() time.Time
 }
+
+const defaultMaxBytes int64 = 10 << 20
 
 var _ contract.Store = (*Store)(nil)
 
@@ -70,6 +75,10 @@ func NewWithClient(cfg Config, client *http.Client) (*Store, error) {
 		region = "auto"
 	}
 	prefix := strings.Trim(strings.TrimSpace(cfg.Prefix), "/")
+	maxBytes := cfg.MaxBytes
+	if maxBytes <= 0 {
+		maxBytes = defaultMaxBytes
+	}
 	return &Store{
 		endpoint: endpoint,
 		bucket:   bucket,
@@ -77,6 +86,7 @@ func NewWithClient(cfg Config, client *http.Client) (*Store, error) {
 		prefix:   prefix,
 		access:   strings.TrimSpace(cfg.AccessKeyID),
 		secret:   strings.TrimSpace(cfg.SecretAccessKey),
+		maxBytes: maxBytes,
 		client:   client,
 		now:      time.Now,
 	}, nil
@@ -113,9 +123,12 @@ func (s *Store) Put(ctx context.Context, publicPath string, body io.Reader) erro
 	if err != nil {
 		return err
 	}
-	payload, err := io.ReadAll(body)
+	payload, err := io.ReadAll(io.LimitReader(body, s.maxBytes+1))
 	if err != nil {
 		return err
+	}
+	if int64(len(payload)) > s.maxBytes {
+		return fmt.Errorf("cloudflare profile: upload exceeds %d bytes", s.maxBytes)
 	}
 	return s.do(ctx, http.MethodPut, key, payload, contentTypeFor(key))
 }

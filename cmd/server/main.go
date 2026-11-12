@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -121,6 +122,16 @@ func main() {
 		stdLog.Printf("警告: web.admin_path 仍为默认 /admin，建议修改为不易猜测的路径以降低自动化扫描风险")
 	}
 
+	var writerPermit *cloudflare.WriterPermit
+	releaseWriter := func() {
+		if writerPermit != nil {
+			writerPermit.Release()
+		}
+	}
+	failClosed := func(format string, args ...any) {
+		releaseWriter()
+		stdLog.Fatalf(format, args...)
+	}
 	if cfg.Cloudflare.Enabled {
 		mode, found := cloudflare.ModeFromArgs(os.Args[1:])
 		if !found {
@@ -129,12 +140,48 @@ func main() {
 		if err := cloudflare.ValidateStartup(cfg, mode); err != nil {
 			stdLog.Fatalf("cloudflare profile 拒绝启动: %v", err)
 		}
+		if err := cache.InitRedis(&cfg.Redis); err != nil {
+			stdLog.Fatalf("cloudflare profile 拒绝启动: Redis 初始化失败: %v", err)
+		}
+		redisClient := cache.Client()
+		if redisClient == nil {
+			stdLog.Fatalf("cloudflare profile 拒绝启动: Redis 未连接，不会打开数据库")
+		}
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		pingErr := redisClient.Ping(pingCtx).Err()
+		pingCancel()
+		if pingErr != nil {
+			stdLog.Fatalf("cloudflare profile 拒绝启动: Redis 不可用，不会打开数据库: %v", pingErr)
+		}
+		writerPermit, err = cloudflare.OpenWriterPermit(
+			context.Background(),
+			cloudflare.RedisFence{Client: redisClient},
+			cloudflare.FenceKey(cfg.Redis.Prefix),
+			cfg.Cloudflare.WriterFence,
+			cfg.Cloudflare.Isolation,
+		)
+		if err != nil {
+			stdLog.Fatalf("cloudflare profile 拒绝启动: %v", err)
+		}
+		go func() {
+			select {
+			case <-writerPermit.Lost():
+				writerPermit.Cancel()
+			case <-writerPermit.Context().Done():
+			}
+		}()
 	}
 
 	// 自动创建数据目录（fullstack 二进制小白部署免去手动 mkdir）
 	for _, dir := range []string{"db", "uploads", "logs"} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			stdLog.Printf("警告: 创建目录 %s 失败: %v", dir, err)
+		}
+	}
+
+	if writerPermit != nil {
+		if err := writerPermit.Allow("database"); err != nil {
+			failClosed("cloudflare profile 拒绝启动: %v", err)
 		}
 	}
 
@@ -145,21 +192,34 @@ func main() {
 		ConnMaxLifetimeSeconds: cfg.Database.Pool.ConnMaxLifetimeSeconds,
 		ConnMaxIdleTimeSeconds: cfg.Database.Pool.ConnMaxIdleTimeSeconds,
 	}, cfg.Server.Mode); err != nil {
-		stdLog.Fatalf("数据库初始化失败: %v", err)
+		failClosed("数据库初始化失败: %v", err)
 	}
 
 	// 在第一条迁移 SQL 之前先持久化 migration_started。若迁移部分成功后报错，
 	// 后续 CLI 回滚也必须要求 --force，不能把“没有完整启动”误判成“数据库没动过”。
 	// startupGuard 从加载配置前就持有跨进程锁，整个迁移期间 CLI/HTTP 回滚都会被拒绝。
 	if err := startupGuard.MarkMigrationStarted(); err != nil {
+		releaseWriter()
 		stdLog.Printf("记录数据库迁移开始状态失败，已拒绝继续启动: %v", err)
 		printUpdateStateRecoveryHint()
 		os.Exit(1)
 	}
 
+	if writerPermit != nil {
+		if err := writerPermit.Allow("migrations"); err != nil {
+			failClosed("cloudflare profile 拒绝启动: %v", err)
+		}
+	}
+
 	// 自动迁移数据库表
 	if err := databasemigrations.AutoMigrate(); err != nil {
-		stdLog.Fatalf("数据库迁移失败: %v", err)
+		failClosed("数据库迁移失败: %v", err)
+	}
+
+	if writerPermit != nil {
+		if err := writerPermit.Allow("default-admin"); err != nil {
+			failClosed("cloudflare profile 拒绝启动: %v", err)
+		}
 	}
 
 	// 初始化默认管理员账号
@@ -187,13 +247,25 @@ func main() {
 	flag.StringVar(&mode, "mode", app.ModeAll, "启动模式: all (默认), api, worker")
 	flag.Parse()
 
-	if err := app.Run(app.Options{
+	runOpts := app.Options{
 		Config:  cfg,
 		Logger:  logger.S(),
 		Signals: []os.Signal{syscall.SIGINT, syscall.SIGTERM},
 		Mode:    mode,
-	}); err != nil {
-		stdLog.Fatalf("服务运行失败: %v", err)
+	}
+	if writerPermit != nil {
+		if err := writerPermit.Allow("background"); err != nil {
+			failClosed("cloudflare profile 拒绝启动: %v", err)
+		}
+		runOpts.BaseContext = writerPermit.Context()
+		runOpts.ShutdownTimeout = cloudflare.DrainTimeout
+	}
+	if err := app.Run(runOpts); err != nil {
+		failClosed("服务运行失败: %v", err)
+	}
+	if writerPermit != nil {
+		writerPermit.Cancel()
+		writerPermit.Release()
 	}
 
 	// 后台一键升级触发的重启也是走 SIGTERM 优雅关闭，走到这里说明已经收尾干净。

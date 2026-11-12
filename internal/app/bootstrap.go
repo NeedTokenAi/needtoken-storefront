@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"errors"
 	"time"
 
@@ -9,7 +8,6 @@ import (
 	"github.com/dujiao-next/internal/app/httpserver"
 	"github.com/dujiao-next/internal/app/jobs"
 	jobconsumer "github.com/dujiao-next/internal/app/jobs/consumer"
-	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/platform/cloudflare"
 	"github.com/dujiao-next/internal/workflows/paidfulfillment"
@@ -80,6 +78,9 @@ func Run(opts Options) error {
 	if opts.Config == nil {
 		return errors.New("config is nil")
 	}
+	if opts.Config.Cloudflare.Enabled && (opts.BaseContext == nil || opts.BaseContext.Err() != nil) {
+		return errors.New("cloudflare profile: background start requires a live isolated writer permit; this lease does not stop the existing Cloud Run writer")
+	}
 
 	runner, err := BuildRunner(opts.Config, opts.Mode)
 	if err != nil {
@@ -88,34 +89,8 @@ func Run(opts Options) error {
 
 	addr := opts.Config.Server.Host + ":" + opts.Config.Server.Port
 	opts.Logger.Infow("app_start", "addr", addr, "mode", opts.Mode)
-	if opts.Config.Cloudflare.Enabled {
-		if opts.ShutdownTimeout == 10*time.Second {
-			opts.ShutdownTimeout = cloudflare.DrainTimeout
-		}
-		holdCtx, holdCancel := context.WithCancel(context.Background())
-		defer holdCancel()
-		release, lost, err := cloudflare.Hold(
-			holdCtx,
-			cloudflare.RedisFence{Client: cache.Client()},
-			cloudflare.FenceKey(opts.Config.Redis.Prefix),
-			opts.Config.Cloudflare.WriterFence,
-			cloudflare.FenceTTL,
-			cloudflare.FenceRefresh,
-		)
-		if err != nil {
-			return err
-		}
-		defer release()
-		appCtx, appCancel := context.WithCancel(context.Background())
-		defer appCancel()
-		go func() {
-			select {
-			case <-lost:
-				appCancel()
-			case <-holdCtx.Done():
-			}
-		}()
-		opts.BaseContext = appCtx
+	if opts.Config.Cloudflare.Enabled && opts.ShutdownTimeout == 10*time.Second {
+		opts.ShutdownTimeout = cloudflare.DrainTimeout
 	}
 	return RunWithOptions(runner, opts)
 }

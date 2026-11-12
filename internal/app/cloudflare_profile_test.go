@@ -1,16 +1,19 @@
 package app
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dujiao-next/internal/config"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestCloudflareProfileRejectsIncompleteStartupBeforeDatabase(t *testing.T) {
 	cfg := &config.Config{
 		Cloudflare: config.CloudflareConfig{
 			Enabled:     true,
+			Isolation:   "isolated",
 			WriterFence: "1",
 			ObjectStorage: config.ObjectStorageConfig{
 				Endpoint:        "https://example.r2.cloudflarestorage.com",
@@ -37,4 +40,22 @@ func TestCloudflareProfileRejectsIncompleteStartupBeforeDatabase(t *testing.T) {
 	cfg.Cloudflare.ObjectStorage.Bucket = ""
 	_, err = BuildRunner(cfg, "api+worker")
 	require.ErrorContains(t, err, "durable upload target")
+
+	cfg.Cloudflare.ObjectStorage.Bucket = "storefront-uploads"
+	cfg.Cloudflare.Isolation = ""
+	_, err = BuildRunner(cfg, ModeAll)
+	require.ErrorContains(t, err, "does not stop the existing Cloud Run writer")
+}
+
+func TestCloudflareRunRefusesBackgroundWithoutLivePermit(t *testing.T) {
+	cfg := &config.Config{Cloudflare: config.CloudflareConfig{Enabled: true}}
+	logger := zap.NewNop().Sugar()
+	err := Run(Options{Config: cfg, Logger: logger})
+	require.ErrorContains(t, err, "live isolated writer permit")
+	require.ErrorContains(t, err, "does not stop the existing Cloud Run writer")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = Run(Options{Config: cfg, Logger: logger, BaseContext: ctx})
+	require.ErrorContains(t, err, "does not stop the existing Cloud Run writer")
 }

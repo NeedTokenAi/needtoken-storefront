@@ -119,3 +119,22 @@ func TestObjectKeyRejectsEscape(t *testing.T) {
 	_, err = store.Open("/uploads/%2e%2e/secrets")
 	require.Error(t, err)
 }
+
+func TestPutRejectsBodyOverTheMemoryBoundWithoutCallingStorage(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		requests++
+	}))
+	defer server.Close()
+	store, err := NewWithClient(Config{
+		Endpoint:        server.URL,
+		Bucket:          "unit-bucket",
+		AccessKeyID:     "a",
+		SecretAccessKey: "b",
+		MaxBytes:        8,
+	}, server.Client())
+	require.NoError(t, err)
+	err = store.Put(context.Background(), "/uploads/common/2026/07/asset.txt", bytes.NewReader([]byte("123456789")))
+	require.ErrorContains(t, err, "exceeds 8 bytes")
+	require.Zero(t, requests)
+}

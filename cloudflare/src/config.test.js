@@ -17,6 +17,7 @@ test("wrangler uses the durable object policy without an instance cap", () => {
   assert.equal(Object.hasOwn(container, "instance_type"), false);
   assert.equal(Object.hasOwn(container, "image"), false);
   assert.equal(container.images.dujiao.dockerfile, "../Dockerfile");
+  assert.equal(container.images["dujiao-previous"].dockerfile, "../Dockerfile");
   assert.equal(wrangler.durable_objects.bindings[0].name, "STOREFRONT");
   assert.equal(wrangler.exports.DujiaoStorefront.storage, "sqlite");
   assert.equal(JSON.stringify(wrangler).includes("max_instances"), false);
@@ -61,8 +62,12 @@ test("the worker source stays a singleton and does not choose the deprecated pol
   const source = readFileSync(join(root, "src/index.js"), "utf8");
   assert.match(source, /from "cloudflare:workers"/);
   assert.match(source, /getByName\(SINGLETON_NAME\)/);
+  assert.match(source, /schedulerWait/);
+  assert.match(source, /containerRequest/);
+  assert.equal(source.includes("setTimeout"), false);
   assert.equal(source.includes("max_instances"), false);
   assert.equal(source.includes("scheduling_policy"), false);
   assert.equal(source.includes("basic"), false);
   assert.match(source, /setInactivityTimeout\(INACTIVITY_TIMEOUT_MS\)/);
+  assert.match(source, /rollback is false/);
 });

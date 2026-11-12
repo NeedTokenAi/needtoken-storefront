@@ -60,6 +60,12 @@ func TestEnabledProfileFailsClosedWithoutDurableTarget(t *testing.T) {
 	cfg = enabledConfig()
 	cfg.Cloudflare.ObjectStorage.AccessKeyID = ""
 	require.ErrorIs(t, Validate(cfg), ErrDurableTargetMissing)
+
+	cfg = enabledConfig()
+	cfg.Cloudflare.Isolation = ""
+	err = Validate(cfg)
+	require.ErrorIs(t, err, ErrIsolationRequired)
+	require.ErrorContains(t, err, "does not stop the existing Cloud Run writer")
 }
 
 func TestEnabledProfileAcceptsPostgresAndObjectStorage(t *testing.T) {
@@ -87,6 +93,7 @@ func enabledConfig() *config.Config {
 	return &config.Config{
 		Cloudflare: config.CloudflareConfig{
 			Enabled:     true,
+			Isolation:   IsolationIsolated,
 			WriterFence: "1",
 			ObjectStorage: config.ObjectStorageConfig{
 				Endpoint:        "https://example.r2.cloudflarestorage.com",

@@ -72,6 +72,9 @@ func Validate(cfg *config.Config) error {
 	if strings.TrimSpace(cfg.Cloudflare.WriterFence) == "" {
 		return errors.New("cloudflare profile: writer fence is missing")
 	}
+	if strings.TrimSpace(cfg.Cloudflare.Isolation) != IsolationIsolated {
+		return ErrIsolationRequired
+	}
 	if err := validateObjectStorage(cfg.Cloudflare.ObjectStorage); err != nil {
 		return err
 	}

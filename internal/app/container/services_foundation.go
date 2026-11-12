@@ -129,6 +129,7 @@ func (c *Container) initIdentityAndCatalogServices() {
 			AccessKeyID:     c.Config.Cloudflare.ObjectStorage.AccessKeyID,
 			SecretAccessKey: c.Config.Cloudflare.ObjectStorage.SecretAccessKey,
 			Prefix:          c.Config.Cloudflare.ObjectStorage.Prefix,
+			MaxBytes:        c.Config.Upload.MaxSize,
 		})
 		if err != nil {
 			panic(err)

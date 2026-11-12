@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os/signal"
 	"time"
 
@@ -50,6 +51,9 @@ func RunWithOptions(runner *Runner, opts Options) error {
 func (r *Runner) Run(ctx context.Context, stopTimeout time.Duration, logger *zap.SugaredLogger) error {
 	if r == nil || len(r.services) == 0 {
 		return errors.New("no services to run")
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("background start refused: %w", err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
