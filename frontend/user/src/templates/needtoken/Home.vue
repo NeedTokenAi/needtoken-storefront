@@ -3,31 +3,34 @@
     <section class="home-hero" aria-labelledby="home-title">
       <GhostFibersBackground variant="hero" />
       <div class="home-container hero-content">
-        <div class="hero-eyebrow">
-          <Sparkles :size="13" aria-hidden="true" />
-          {{ t('needtoken.homeServices.eyebrow') }}
+        <div class="library-head">
+          <div class="library-side">
+            <div class="hero-eyebrow">
+              <Sparkles :size="13" aria-hidden="true" />
+              {{ t('needtoken.homeLibrary.eyebrow') }}
+            </div>
+            <div class="library-tabs" role="tablist" :aria-label="t('needtoken.homeLibrary.tabs')">
+              <button type="button" role="tab" :aria-selected="kind === 'recharge'" :class="{ active: kind === 'recharge' }" @click="setKind('recharge')">{{ t('needtoken.nav.recharge') }}</button>
+              <button type="button" role="tab" :aria-selected="kind === 'rental'" :class="{ active: kind === 'rental' }" @click="setKind('rental')">{{ t('needtoken.nav.rental') }}</button>
+              <a href="https://needtoken.ai/api-services">{{ t('needtoken.nav.plans') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
+            </div>
+            <div v-if="scope?.root && childCategories.length" class="library-filters" :aria-label="t('needtoken.catalogServices.filterLabel')">
+              <button type="button" :class="{ active: selectedId === scope.root.id }" :aria-pressed="selectedId === scope.root.id" @click="selectCategory(scope.root.id)">{{ t('needtoken.catalogServices.all') }}</button>
+              <button v-for="category in childCategories" :key="category.id" type="button" :class="{ active: selectedId === category.id }" :aria-pressed="selectedId === category.id" @click="selectCategory(category.id)">{{ getLocalizedText(category.name) }}</button>
+            </div>
+          </div>
+          <div class="library-slogan">
+            <h1 id="home-title">{{ t('needtoken.homeLibrary.title') }}</h1>
+            <p translate="no">needtoken.ai</p>
+          </div>
         </div>
-        <h1 id="home-title" class="hero-title">
-          {{ t('needtoken.homeServices.title') }}
-          <span>{{ t('needtoken.homeServices.titleAccent') }}</span>
-        </h1>
-        <div class="service-grid">
-          <article v-for="service in services" :key="service.key" class="service-card" :class="`service--${service.key}`">
-            <div class="service-topline">
-              <span class="service-icon"><component :is="service.icon" :size="23" :stroke-width="1.6" aria-hidden="true" /></span>
-              <span class="service-tag" :translate="service.key === 'api' ? 'no' : undefined">{{ t(`needtoken.homeServices.services.${service.key}.tag`) }}</span>
-            </div>
-            <h2>{{ t(`needtoken.homeServices.services.${service.key}.title`) }}</h2>
-            <p class="service-description">{{ t(`needtoken.homeServices.services.${service.key}.description`) }}</p>
-            <div class="service-footnote">
-              <Check :size="14" aria-hidden="true" />
-              {{ t(`needtoken.homeServices.services.${service.key}.note`) }}
-            </div>
-            <RouterLink :to="service.to" class="service-action">
-              <span>{{ t(`needtoken.homeServices.services.${service.key}.action`) }}</span>
-              <ArrowUpRight :size="18" aria-hidden="true" />
-            </RouterLink>
-          </article>
+        <div class="price-rail" :aria-busy="loading">
+          <p v-if="loading" class="price-rail-state" role="status">{{ t('needtoken.common.loading') }}</p>
+          <p v-else-if="error" class="price-rail-state" role="alert">{{ t('needtoken.homeLibrary.loadError') }} <button type="button" @click="reload">{{ t('needtoken.common.retry') }}</button></p>
+          <p v-else-if="!products.length" class="price-rail-state" role="status">{{ t('needtoken.homeLibrary.empty') }}</p>
+          <template v-else>
+            <HomePriceCard v-for="product in products" :key="product.id" :product="product" :kind="kind" />
+          </template>
         </div>
 
         <div class="hero-benefits">
@@ -110,9 +113,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowRight, ArrowUpRight, BadgeCheck, Check, ClipboardList, Clock3, KeyRound, PackageCheck, Pause, Play, Plus, ReceiptText, ShieldCheck, Sparkles, Zap } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, BadgeCheck, ClipboardList, Clock3, Pause, Play, Plus, ReceiptText, ShieldCheck, Sparkles } from 'lucide-vue-next'
+import { useLocalized } from '../../composables/useProduct'
 import { usePageSeo } from '../../composables/usePageSeo'
-import { API_SERVICES_PATH, CATEGORY_SLUGS } from './config'
+import HomePriceCard from './components/HomePriceCard.vue'
+import { useHomeCatalog } from './composables/useHomeCatalog'
 import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import GhostFibersBackground from './components/GhostFibersBackground.vue'
 import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
@@ -120,15 +125,12 @@ import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import NeedtokenDeferredRegion from './components/NeedtokenDeferredRegion.vue'
 
 const { t } = useI18n()
+const { getLocalizedText } = useLocalized()
+const { kind, scope, childCategories, selectedId, products, loading, error, setKind, selectCategory, reload } = useHomeCatalog()
 usePageSeo({
   title: () => t('needtoken.homeServices.seoTitle'),
   description: () => t('needtoken.homeServices.subtitle'),
 })
-const services = [
-  { key: 'recharge', icon: Zap, to: `/categories/${CATEGORY_SLUGS.recharge}` },
-  { key: 'products', icon: PackageCheck, to: `/categories/${CATEGORY_SLUGS.rental}` },
-  { key: 'api', icon: KeyRound, to: API_SERVICES_PATH },
-]
 const benefits = [
   { key: 'selfService', icon: Clock3 },
   { key: 'channels', icon: ShieldCheck },
@@ -206,8 +208,18 @@ onUnmounted(() => {
 .hero-content { position: relative; z-index: 1; padding-block: 38px 26px; }
 .hero-eyebrow { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--home-secondary); }
 .hero-eyebrow svg { color: var(--ui-accent); }
-.hero-title { margin: 17px 0 0; text-align: center; font-size: clamp(35px, 4.1vw, 56px); font-weight: 750; line-height: 1.17; letter-spacing: -0.045em; text-wrap: balance; }
-.hero-title span { color: var(--ui-accent); }
+.library-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
+.library-side { min-width: 0; }
+.library-side .hero-eyebrow { justify-content: flex-start; }
+.library-slogan { margin-left: auto; text-align: right; }
+.library-slogan h1 { font-size: clamp(32px, 4vw, 52px); font-weight: 750; line-height: 1.15; letter-spacing: -.045em; }
+.library-slogan p { margin-top: 8px; color: var(--home-secondary); font-size: 15px; letter-spacing: .01em; }
+.library-tabs, .library-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.library-tabs button, .library-tabs a, .library-filters button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 7px 12px; border: 1px solid var(--ui-border); border-radius: 999px; color: var(--home-secondary); font-size: 13px; }
+.library-tabs button.active, .library-filters button.active { color: #07120f; border-color: transparent; background: #2dd4a7; }
+.price-rail { display: flex; gap: 12px; margin-top: 22px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
+.price-rail-state { display: flex; align-items: center; gap: 10px; min-height: 148px; color: var(--home-muted); font-size: 13px; }
+.price-rail-state button { min-height: 34px; padding: 6px 10px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-accent); }
 .service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
 .service-card { --service-color: #2dd4a7; --service-rgb: 45, 212, 167; display: flex; flex-direction: column; position: relative; overflow: hidden; padding: 25px; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 20px; background: linear-gradient(145deg, rgba(var(--service-rgb), 0.065), rgba(14, 18, 24, 0.9) 56%); backdrop-filter: blur(18px); transition: border-color 180ms ease, transform 180ms ease; }
 .service-card:hover { border-color: rgba(var(--service-rgb), 0.48); transform: translateY(-3px); }
@@ -288,6 +300,10 @@ onUnmounted(() => {
 @media (max-width: 640px) {
   .home-container { padding-inline: 20px; }
   .hero-content { padding-block: 24px 22px; }
+  .library-head { flex-direction: column; align-items: stretch; gap: 18px; }
+  .library-slogan { order: -1; width: 100%; text-align: right; }
+  .library-slogan h1 { font-size: 32px; }
+  .price-rail { margin-top: 16px; }
   .hero-eyebrow { font-size: 11px; }
   .hero-title { margin-top: 12px; font-size: 31px; }
   .hero-title span { display: block; }

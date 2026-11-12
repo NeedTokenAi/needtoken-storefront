@@ -307,6 +307,16 @@ const router = createRouter({
             component: templateView('EnvironmentTools', () => import('../views/NotFound.vue')),
         },
         {
+            path: '/tools/radar',
+            name: 'reset-radar',
+            component: templateView('Radar', () => import('../views/NotFound.vue')),
+        },
+        {
+            path: '/tools/codex-account',
+            name: 'codex-account-check',
+            component: templateView('CodexAccountCheck', () => import('../views/NotFound.vue')),
+        },
+        {
             path: '/free-apple-id',
             alias: '/download',
             name: 'free-apple-id',

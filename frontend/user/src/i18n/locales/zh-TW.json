@@ -1770,6 +1770,14 @@
       "register": "註冊",
       "help": "幫助中心",
       "tools": "實用工具",
+      "personal": "個人產品",
+      "gateway": "Need網關",
+      "workstation": "Need 工位",
+      "comingSoon": "待開放",
+      "radar": "重置雷達",
+      "accountCheck": "帳號檢測",
+      "claudeCheck": "Claude code 網路環境檢測",
+      "codexCheck": "Codex 帳號檢測",
       "faq": "常見問題",
       "environment": "檢測工具",
       "appleIds": "免費 Apple ID",
@@ -2896,6 +2904,85 @@
       "setupTwoFactor": "註冊後設定兩步驗證",
       "setupTwoFactorHint": "建立帳號後，用驗證器掃碼並輸入驗證碼啟用。",
       "securityHint": "既有密碼與兩步驗證繼續保護你的帳號。"
+    },
+    "homeLibrary": {
+      "eyebrow": "產品庫",
+      "title": "穩定 高效 合規",
+      "tabs": "按服務查看商品",
+      "loadError": "商品暫時沒有載入出來。",
+      "empty": "這個分類下還沒有可展示的商品。"
+    },
+    "apiUse": {
+      "title": "工具裡使用",
+      "intro": "API 套餐交付的是控制台裡的 Key。下面只列出本站已經寫明配置的用法：線上網關、OpenCode、curl，以及 OpenAI Python SDK。",
+      "buy": "查看套餐目錄",
+      "console": "打開 API 控制台",
+      "toolsTitle": "工具裡使用",
+      "compatible": "其他程式工具只要接受 OpenAI 相容的 baseURL 和 Bearer Key，就可以用同一組地址和 Key。未在本站文件寫明的客戶端不在這裡列出。",
+      "calculatorTitle": "API 用量計算",
+      "calculatorIntro": "按現有套餐的計費單位估算用量。結果只用於預算，不改變下單價格。",
+      "tools": {
+        "console": {
+          "title": "線上網關",
+          "body": "在 API 控制台建立 Key，並查看額度與用量。請求發到下面的 baseURL。"
+        },
+        "opencode": {
+          "title": "OpenCode",
+          "body": "把設定放到專案根目錄的 opencode.json，或全域的 ~/.config/opencode/opencode.json。Key 用環境變數引用，不要寫進檔案。"
+        },
+        "curl": {
+          "title": "curl",
+          "body": "用環境變數裡的 Key 呼叫聊天補全介面。先在同一終端 export NEEDTOKEN_API_KEY。"
+        },
+        "python": {
+          "title": "Python OpenAI SDK",
+          "body": "官方 openai 套件把 base_url 指到本站，api_key 讀取同一環境變數。"
+        }
+      }
+    },
+    "statusStrip": {
+      "label": "公開服務狀態",
+      "loading": "正在讀取公開狀態。",
+      "unavailable": "這個公開狀態來源暫時不可用。",
+      "currentCount": "{ok} / {total} 項目前為正常",
+      "noHistory": "公開摘要沒有歷史可用率，這裡不估算百分比。",
+      "updated": "來源更新於 {time}",
+      "stale": "來源自 {time} 起沒有新的更新",
+      "sources": { "openai": "OpenAI", "claude": "Claude" },
+      "component": {
+        "operational": "正常",
+        "degraded_performance": "效能下降",
+        "partial_outage": "部分中斷",
+        "major_outage": "嚴重中斷",
+        "under_maintenance": "維護中",
+        "unknown": "狀態未知"
+      }
+    },
+    "radar": {
+      "eyebrow": "實用工具",
+      "title": "重置雷達",
+      "intro": "這塊看板只陳列 OpenAI 公開狀態裡名稱含 Codex 的元件，以及同時提到 Codex，或同時提到 reset 與 quota 的事件。沒有這類公開紀錄就保持空白。",
+      "board": "公開紀錄",
+      "unavailable": "公開狀態暫時讀不到，看板沒有可展示的紀錄。",
+      "empty": "目前公開事件和元件裡沒有 Codex 或額度重置紀錄。",
+      "note": "這裡不推測重置時間，也不把無關故障寫成重置公告。",
+      "incidentsUnavailable": "元件狀態已經讀到。事件列表這次沒有讀到，所以沒有事件行。",
+      "item": "項目",
+      "kind": "類型",
+      "state": "來源狀態",
+      "kinds": { "component": "元件", "incident": "事件" }
+    },
+    "codexCheck": {
+      "eyebrow": "帳號檢測",
+      "title": "Codex 帳號檢測",
+      "intro": "這類檢測需要拿帳號憑證向服務商查詢訂閱、開通和升級條件。",
+      "board": "檢測項",
+      "unavailableTitle": "檢測暫不可用",
+      "unavailableBody": "本站沒有這項檢測所需的憑證介面，也不會收集 Session、密碼或權杖。下面各項都沒有檢測結果。",
+      "item": "項目",
+      "result": "結果",
+      "notChecked": "未檢測",
+      "rows": { "subscription": "訂閱狀態", "open": "能否開通", "upgrade": "能否升級" }
     }
   }
 }
