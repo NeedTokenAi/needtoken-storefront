@@ -48,6 +48,9 @@ jobs:
       - name: Run image record checks
         run: bash .github/scripts/tests/cloudflare-image-record_test.sh
 
+      - name: Run container wrapper checks
+        run: node --test cloudflare/src/runtime.test.js
+
       - name: Check release archive includes installer
         run: |
           python3 - <<'PY'

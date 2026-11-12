@@ -1,5 +1,6 @@
-# Builds and pushes the staging container image, then outputs the registry digest.
+# Builds and pushes the production container image, then records the sha256 digest.
 # workflow_dispatch only. It does not publish a Worker and it does not select a route.
+# The Worker config does not build this image. It only receives the digest later.
 name: cloudflare-image
 
 on:
@@ -7,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: cloudflare-image-${{ github.ref }}
@@ -14,7 +16,7 @@ concurrency:
 
 jobs:
   push-image:
-    name: Push staging image
+    name: Push production image
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -31,17 +33,28 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build and push the staging image
+      - name: Build and push the production image
         id: build
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          tag="needtoken-storefront-staging:${GITHUB_SHA}"
+          tag="needtoken-storefront:${GITHUB_SHA}"
+          case ${tag} in
+            *:latest|*:main|*:staging|*-staging:*)
+              printf 'mutable or staging tag is refused\n' >&2
+              exit 1
+              ;;
+          esac
           npx --yes wrangler@4 containers build -p -t "${tag}" .
-          uri="registry.cloudflare.com/${CLOUDFLARE_ACCOUNT_ID}/needtoken-storefront-staging:${GITHUB_SHA}"
-          digest=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${uri}" | awk '/^registry\.cloudflare\.com\// { print; exit }')
+          raw=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${tag}")
+          digest=$(printf '%s\n' "${raw}" | sed -n 's/.*@\(sha256:[0-9a-f]\{64\}\)$/\1/p' | head -n 1)
+          unset raw
+          if [[ ! ${digest} =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            printf 'pushed image did not yield a sha256 digest\n' >&2
+            exit 1
+          fi
           printf 'digest=%s\n' "${digest}" >> "${GITHUB_OUTPUT}"
 
       - name: Record the build
@@ -51,5 +64,12 @@ jobs:
           BUILD_SHA: ${{ github.sha }}
           BUILD_RUN_ID: ${{ github.run_id }}
           BUILD_SOURCE: github-actions
-          IMAGE_REF: ${{ steps.build.outputs.digest }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
         run: bash .github/scripts/cloudflare-image-record.sh
+
+      - name: Upload the build record
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-build-record
+          path: build-record.txt
+          if-no-files-found: error

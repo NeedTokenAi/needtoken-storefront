@@ -26,7 +26,21 @@ grep -q 'containers build' "${WORKFLOW}" || fail "image workflow does not build 
 if grep -Eq 'image_digest:|git_sha:' "${WORKFLOW}"; then
   fail "image workflow accepts a hand-filled digest"
 fi
-ok "image workflow records a build and does not deploy"
+grep -q 'tag="needtoken-storefront:${GITHUB_SHA}"' "${WORKFLOW}" || fail "tag must be the production image and source SHA"
+if grep -q 'storefront-staging' "${WORKFLOW}"; then
+  fail "image workflow uses a staging image name"
+fi
+grep -q 'containers build -p -t "${tag}"' "${WORKFLOW}" || fail "push must use the immutable tag"
+grep -q 'CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}' "${WORKFLOW}" || fail "account id must stay a secret"
+if grep -q 'vars:' "${WORKFLOW}"; then
+  fail "account id was turned into a variable"
+fi
+grep -q 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' "${WORKFLOW}" || fail "build record is not uploaded"
+grep -q 'name: image-build-record' "${WORKFLOW}" || fail "artifact name missing"
+grep -q 'build-record.txt' "${WORKFLOW}" || fail "build record path missing"
+grep -q 'contents: read' "${WORKFLOW}" || fail "contents permission"
+grep -q 'actions: write' "${WORKFLOW}" || fail "artifact upload permission"
+ok "image workflow records a production digest and does not deploy"
 
 set +e
 DEPLOY=true bash "${SCRIPT}" >/tmp/cloudflare-image-record-deploy.out 2>/tmp/cloudflare-image-record-deploy.err
@@ -36,23 +50,28 @@ set -e
 ok "deploy request exits 2"
 
 sha=$(git -C "${ROOT}" rev-parse HEAD)
-digest="registry.example/needtoken/storefront-staging@sha256:$(printf 'b%.0s' {1..64})"
+digest="sha256:$(printf 'b%.0s' {1..64})"
+summary=$(mktemp)
+record=$(mktemp)
 out=$(
   cd "${ROOT}"
   BUILD_REPOSITORY=NeedTokenAi/needtoken-storefront \
     BUILD_SHA="${sha}" \
     BUILD_RUN_ID=43175381072 \
     BUILD_SOURCE=github-actions \
-    IMAGE_REF="${digest}" \
+    IMAGE_DIGEST="${digest}" \
+    GITHUB_STEP_SUMMARY="${summary}" \
+    BUILD_RECORD_PATH="${record}" \
     bash "${SCRIPT}"
 )
-grep -q "repository=NeedTokenAi/needtoken-storefront" <<<"${out}" || fail "repository was not recorded"
-grep -q "sha=${sha}" <<<"${out}" || fail "sha was not recorded"
-grep -q "run_id=43175381072" <<<"${out}" || fail "run id was not recorded"
-grep -q "digest=${digest}" <<<"${out}" || fail "digest was not recorded"
-grep -q "source=github-actions" <<<"${out}" || fail "source was not recorded"
-grep -q "deploy=false" <<<"${out}" || fail "deploy was not refused"
-ok "record keeps repository, sha, run id, and digest"
+expected=$(printf 'repository=NeedTokenAi/needtoken-storefront\ndigest=%s\nsha=%s\nrun_id=43175381072\n' "${digest}" "${sha}")
+[[ ${out} == "${expected}" ]] || fail "stdout is not the four-field record"
+[[ $(<"${summary}") == "${expected}" ]] || fail "job summary is not the four-field record"
+[[ $(<"${record}") == "${expected}" ]] || fail "artifact is not the four-field record"
+if grep -Eq 'registry\.cloudflare\.com|account' "${summary}" "${record}"; then
+  fail "record contains an account id"
+fi
+ok "record keeps repository, sha256 digest, source SHA, and run id"
 
 set +e
 (
@@ -60,10 +79,10 @@ set +e
   BUILD_REPOSITORY=NeedTokenAi/needtoken-storefront \
     BUILD_SHA="${sha}" \
     BUILD_RUN_ID=43175381072 \
-    IMAGE_REF="sha256:${digest##*sha256:}" \
-    bash "${SCRIPT}" >/tmp/cloudflare-image-record-bare.out 2>/tmp/cloudflare-image-record-bare.err
+    IMAGE_DIGEST="registry.example/needtoken/needtoken-storefront@${digest}" \
+    bash "${SCRIPT}" >/tmp/cloudflare-image-record-ref.out 2>/tmp/cloudflare-image-record-ref.err
 )
 status=$?
 set -e
-[[ ${status} -eq 1 ]] || fail "bare sha256 exited ${status}"
-ok "bare sha256 is refused"
+[[ ${status} -eq 1 ]] || fail "registry address exited ${status}"
+ok "registry address is refused"

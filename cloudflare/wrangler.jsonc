@@ -1,0 +1,33 @@
+{
+  "name": "needtoken-storefront",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-12",
+  "workers_dev": true,
+  "preview_urls": false,
+  "containers": [
+    {
+      "class_name": "Storefront",
+      "scheduling_policy": "durable_object",
+      "max_instances": 2,
+      "images": {
+        "app": {
+          "image": "${CLOUDFLARE_IMAGE_DIGEST}"
+        }
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "STOREFRONT",
+        "class_name": "Storefront"
+      }
+    ]
+  },
+  "exports": {
+    "Storefront": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}
