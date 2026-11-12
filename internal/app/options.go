@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -23,6 +24,7 @@ type Options struct {
 	Signals         []os.Signal
 	ShutdownTimeout time.Duration
 	Mode            string
+	BaseContext     context.Context
 }
 
 // normalizeOptions 补齐默认参数

@@ -37,10 +37,16 @@ jobs:
         run: |
           bash -n scripts/dujiao-next-manager.sh
           bash -n scripts/tests/dujiao-next-manager_test.sh
-          shellcheck -x -S warning scripts/dujiao-next-manager.sh scripts/tests/dujiao-next-manager_test.sh
+          bash -n .github/scripts/cloudflare-candidate.sh
+          bash -n .github/scripts/tests/cloudflare-candidate_test.sh
+          shellcheck -x -S warning scripts/dujiao-next-manager.sh scripts/tests/dujiao-next-manager_test.sh \
+            .github/scripts/cloudflare-candidate.sh .github/scripts/tests/cloudflare-candidate_test.sh
 
       - name: Run installer tests
         run: sudo bash scripts/tests/dujiao-next-manager_test.sh
+
+      - name: Run Cloudflare candidate checks
+        run: bash .github/scripts/tests/cloudflare-candidate_test.sh
 
       - name: Check release archive includes installer
         run: |
@@ -156,6 +162,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24.11.1'
+
+      - name: Test the Cloudflare Worker skeleton
+        run: node --test cloudflare/src/*.test.js
 
       # 用子 shell cd 而非 `pnpm --dir`：后者不会读取子目录的 packageManager 字段，
       # 在启用 corepack 的环境下会用错 pnpm 版本

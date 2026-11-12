@@ -15,11 +15,12 @@ import (
 
 // Service 异步队列服务
 type Service struct {
-	name      string
-	server    *asynq.Server
-	mux       *asynq.ServeMux
-	scheduler *asynq.Scheduler
-	consumer  *jobconsumer.Consumer
+	name          string
+	server        *asynq.Server
+	mux           *asynq.ServeMux
+	scheduler     *asynq.Scheduler
+	consumer      *jobconsumer.Consumer
+	notifyRunning func(bool)
 }
 
 // NewService 创建异步队列服务
@@ -117,6 +118,14 @@ func registerPeriodicTasks(scheduler *asynq.Scheduler, consumer *jobconsumer.Con
 	}
 }
 
+// NotifyRunning 在 dispatcher 开始和停止时回调。仅 Cloudflare profile 使用。
+func (s *Service) NotifyRunning(fn func(bool)) {
+	if s == nil {
+		return
+	}
+	s.notifyRunning = fn
+}
+
 // Name 服务名称
 func (s *Service) Name() string {
 	if s == nil || s.name == "" {
@@ -134,6 +143,10 @@ func (s *Service) Start(ctx context.Context) error {
 		if err := s.scheduler.Start(); err != nil {
 			logger.Warnw("scheduler_start_failed", "error", err)
 		}
+	}
+	if s.notifyRunning != nil {
+		s.notifyRunning(true)
+		defer s.notifyRunning(false)
 	}
 	return s.server.Run(s.mux)
 }

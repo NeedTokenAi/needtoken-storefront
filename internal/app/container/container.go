@@ -77,8 +77,10 @@ import (
 	broadcastapp "github.com/dujiao-next/internal/modules/telegram/broadcast/application"
 	broadcastcontract "github.com/dujiao-next/internal/modules/telegram/broadcast/contract"
 	uploadapp "github.com/dujiao-next/internal/modules/upload/application"
+	uploadobject "github.com/dujiao-next/internal/modules/upload/infrastructure/objectstore"
 	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletgormstore "github.com/dujiao-next/internal/modules/wallet/infrastructure/gormstore"
+	"github.com/dujiao-next/internal/platform/cloudflare"
 	"github.com/dujiao-next/internal/queue"
 	"github.com/dujiao-next/internal/shared/mailbrand"
 )
@@ -143,6 +145,8 @@ type Container struct {
 	EmailBrandResolver            mailbrand.Resolver
 	CaptchaService                *captchaapp.Service
 	UploadService                 *uploadapp.Service
+	UploadObjects                 *uploadobject.Store
+	CloudflareRuntime             *cloudflare.Runtime
 	ProductReadService            *productapplication.Service
 	ProductAdminService           *productadmin.AdminService
 	ProductWriteService           *productwrite.WriteService

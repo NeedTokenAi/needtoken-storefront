@@ -183,6 +183,20 @@ reseller:
   # 退款扣减会与同一订单的未到账利润一起在确认时生效，确认期内退款不会误冻结账户。
   settlement_confirm_days: 7
 
+# Cloudflare 容器配置。默认关闭，Cloud Run 继续使用本地 uploads 目录和现有启动方式。
+# 打开后必须提供 Postgres DSN、已启用的 Redis/Asynq，以及 R2 兼容对象存储。
+# 缺任一项都会拒绝启动，不会改用 SQLite 或内存存储。不要把生产密钥写进这个文件。
+cloudflare:
+  enabled: false
+  writer_fence: ""
+  object_storage:
+    endpoint: ""
+    bucket: ""
+    region: auto
+    access_key_id: ""
+    secret_access_key: ""
+    prefix: ""
+
 # Web 路由配置（仅在 fullstack 二进制模式下生效；普通 Docker 镜像部署忽略此段）
 web:
   # 后台访问路径前缀

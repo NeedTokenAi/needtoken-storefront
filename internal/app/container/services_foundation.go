@@ -28,7 +28,9 @@ import (
 	settingsmessaging "github.com/dujiao-next/internal/modules/settings/schema/messaging"
 	settingssecurity "github.com/dujiao-next/internal/modules/settings/schema/security"
 	uploadapp "github.com/dujiao-next/internal/modules/upload/application"
+	uploadcontract "github.com/dujiao-next/internal/modules/upload/contract"
 	uploadlocal "github.com/dujiao-next/internal/modules/upload/infrastructure/localstore"
+	uploadobject "github.com/dujiao-next/internal/modules/upload/infrastructure/objectstore"
 	"github.com/dujiao-next/internal/platform/database/gormdb"
 )
 
@@ -118,13 +120,29 @@ func (c *Container) initIdentityAndCatalogServices() {
 	c.UserAuthService.SetEmailBrandResolver(c.EmailBrandResolver)
 	c.InviteCodeService = invitecodeapp.NewService(invitecodestore.New(gormdb.DB))
 	c.UserAuthService.SetInviteCodeChecker(c.InviteCodeService)
+	var uploadStore uploadcontract.Store = uploadlocal.New("uploads")
+	if c.Config.Cloudflare.Enabled {
+		objectStore, err := uploadobject.New(uploadobject.Config{
+			Endpoint:        c.Config.Cloudflare.ObjectStorage.Endpoint,
+			Bucket:          c.Config.Cloudflare.ObjectStorage.Bucket,
+			Region:          c.Config.Cloudflare.ObjectStorage.Region,
+			AccessKeyID:     c.Config.Cloudflare.ObjectStorage.AccessKeyID,
+			SecretAccessKey: c.Config.Cloudflare.ObjectStorage.SecretAccessKey,
+			Prefix:          c.Config.Cloudflare.ObjectStorage.Prefix,
+		})
+		if err != nil {
+			panic(err)
+		}
+		c.UploadObjects = objectStore
+		uploadStore = objectStore
+	}
 	c.UploadService = uploadapp.NewService(uploadapp.Policy{
 		MaxSize:           c.Config.Upload.MaxSize,
 		AllowedTypes:      c.Config.Upload.AllowedTypes,
 		AllowedExtensions: c.Config.Upload.AllowedExtensions,
 		MaxWidth:          c.Config.Upload.MaxWidth,
 		MaxHeight:         c.Config.Upload.MaxHeight,
-	}, uploadlocal.New("uploads"))
+	}, uploadStore)
 	c.AffiliateService = affiliateapp.NewService(c.AffiliateRepo, c.UserStore, c.OrderStore, c.ProductRepo, c.SettingService)
 	productServices := catalogproductbootstrap.New(catalogproductbootstrap.Dependencies{
 		Products:          c.ProductRepo,

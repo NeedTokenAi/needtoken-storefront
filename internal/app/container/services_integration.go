@@ -8,6 +8,7 @@ import (
 	auditlogapp "github.com/dujiao-next/internal/modules/auditlog/application"
 	channelclientapp "github.com/dujiao-next/internal/modules/channelclient/application"
 	contentapp "github.com/dujiao-next/internal/modules/content/application"
+	contentcontract "github.com/dujiao-next/internal/modules/content/contract"
 	localfilestore "github.com/dujiao-next/internal/modules/content/infrastructure/filestore/local"
 	contentgormstore "github.com/dujiao-next/internal/modules/content/infrastructure/gormstore"
 	dashboardapp "github.com/dujiao-next/internal/modules/dashboard/application"
@@ -38,8 +39,17 @@ import (
 	broadcastapp "github.com/dujiao-next/internal/modules/telegram/broadcast/application"
 	notifyapp "github.com/dujiao-next/internal/modules/telegram/notify/application"
 	notifybotapi "github.com/dujiao-next/internal/modules/telegram/notify/infrastructure/botapi"
+	uploadobject "github.com/dujiao-next/internal/modules/upload/infrastructure/objectstore"
+	"github.com/dujiao-next/internal/platform/cloudflare"
 	"github.com/dujiao-next/internal/platform/database/gormdb"
+	"github.com/dujiao-next/internal/upstream"
 	"github.com/dujiao-next/internal/workflows/checkoutreservation"
+)
+
+var (
+	_ contentcontract.FileStore = (*uploadobject.Store)(nil)
+	_ notifybotapi.UploadOpener = (*uploadobject.Store)(nil)
+	_ upstream.ImagePutter      = (*uploadobject.Store)(nil)
 )
 
 // initIntegrationServices 装配通知、站点对接、支付、采购、渠道与 Telegram 集成。
@@ -49,7 +59,13 @@ func (c *Container) initIntegrationServices() {
 	c.AdminLoginLogService = auditlogapp.NewAdminLoginService(c.AdminLoginLogRepo)
 	c.NotificationLogService = notificationapp.NewLogService(c.NotificationLogRepo)
 	c.DashboardService = dashboardapp.NewService(c.DashboardRepo, c.SettingService)
-	telegramNotifyService := notifyapp.NewService(c.SettingService, c.Config.TelegramAuth, notifybotapi.New())
+	telegramBot := notifybotapi.New()
+	if c.Config.Cloudflare.Enabled {
+		if err := telegramBot.RequireDurableUploads(c.UploadObjects); err != nil {
+			panic(err)
+		}
+	}
+	telegramNotifyService := notifyapp.NewService(c.SettingService, c.Config.TelegramAuth, telegramBot)
 	c.NotificationService = notificationapp.NewService(
 		c.SettingService,
 		c.EmailSender,
@@ -60,10 +76,23 @@ func (c *Container) initIntegrationServices() {
 		notificationfeishu.New(),
 	)
 	c.ApiCredentialService = apicredentialapp.NewService(c.ApiCredentialRepo)
-	c.SiteConnectionService = siteconnectionapp.NewService(c.SiteConnectionRepo, c.Config.App.SecretKey, "uploads")
+	siteConnections := siteconnectionapp.NewService(c.SiteConnectionRepo, c.Config.App.SecretKey, "uploads")
+	if c.Config.Cloudflare.Enabled {
+		if err := siteConnections.RequireDurableImages(c.UploadObjects); err != nil {
+			panic(err)
+		}
+	}
+	c.SiteConnectionService = siteConnections
+	mediaFiles := contentcontract.FileStore(localfilestore.New())
+	if c.Config.Cloudflare.Enabled {
+		if c.UploadObjects == nil {
+			panic(cloudflare.ErrDurableTargetMissing)
+		}
+		mediaFiles = c.UploadObjects
+	}
 	mediaCore := contentapp.NewMediaService(
 		contentgormstore.NewMediaStore(gormdb.DB),
-		localfilestore.New(),
+		mediaFiles,
 		contentapp.WarningLoggerFunc(logger.Warnw),
 	)
 	c.ContentMediaService = mediaCore

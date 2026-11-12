@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -27,6 +28,8 @@ type Service struct {
 	encryptKey      []byte
 	uploadsDir      string
 	markupReapplier MarkupReapplier
+	imageSink       upstream.ImagePutter
+	durableImages   bool
 }
 
 // NewService 创建连接服务。
@@ -41,6 +44,16 @@ func NewService(connRepo siteconnectioncontract.Repository, appSecretKey, upload
 // SetMarkupReapplier 注入定价重算器（容器装配时调用）。
 func (s *Service) SetMarkupReapplier(r MarkupReapplier) {
 	s.markupReapplier = r
+}
+
+// RequireDurableImages 让上游图片写入对象存储。目标为空时失败关闭。
+func (s *Service) RequireDurableImages(sink upstream.ImagePutter) error {
+	if s == nil || sink == nil {
+		return errors.New("cloudflare profile: durable upload target is missing")
+	}
+	s.imageSink = sink
+	s.durableImages = true
+	return nil
 }
 
 // Create 创建连接
@@ -229,12 +242,12 @@ func (s *Service) Ping(id uint) (*PingResult, error) {
 		return nil, err
 	}
 
-	adapter, err := upstream.NewAdapter(&siteconnectiondomain.Connection{
+	adapter, err := s.openAdapter(&siteconnectiondomain.Connection{
 		BaseURL:   conn.BaseURL,
 		ApiKey:    conn.ApiKey,
 		ApiSecret: decrypted,
 		Protocol:  conn.Protocol,
-	}, s.uploadsDir)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -277,12 +290,27 @@ func (s *Service) GetAdapter(conn *siteconnectiondomain.Connection) (upstream.Ad
 		return nil, err
 	}
 
-	return upstream.NewAdapter(&siteconnectiondomain.Connection{
+	return s.openAdapter(&siteconnectiondomain.Connection{
 		BaseURL:   conn.BaseURL,
 		ApiKey:    conn.ApiKey,
 		ApiSecret: decrypted,
 		Protocol:  conn.Protocol,
-	}, s.uploadsDir)
+	})
+}
+
+func (s *Service) openAdapter(conn *siteconnectiondomain.Connection) (upstream.Adapter, error) {
+	adapter, err := upstream.NewAdapter(conn, s.uploadsDir)
+	if err != nil || !s.durableImages {
+		return adapter, err
+	}
+	durable, ok := adapter.(*upstream.DujiaoNextAdapter)
+	if !ok || s.imageSink == nil {
+		return nil, errors.New("cloudflare profile: durable upload target is missing")
+	}
+	if err := durable.RequireDurableImages(s.imageSink); err != nil {
+		return nil, err
+	}
+	return adapter, nil
 }
 
 func (s *Service) decryptSecret(conn *siteconnectiondomain.Connection) (string, error) {

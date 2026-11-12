@@ -1,0 +1,58 @@
+# Binds a main SHA and image digest. It does not publish the container.
+# The existing Cloud Run workflow remains the only production publisher.
+name: cloudflare-candidate
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: 40 character commit that is already on main
+        required: true
+        type: string
+      image_digest:
+        description: sha256 image digest to bind
+        required: true
+        type: string
+      deploy:
+        description: Ignored. A true value makes the bind fail closed.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test the Worker skeleton
+        run: node --test cloudflare/src/*.test.js
+
+      - name: Check the candidate script
+        run: bash -n .github/scripts/cloudflare-candidate.sh
+
+      - name: Bind main SHA and digest
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        env:
+          GIT_SHA: ${{ inputs.git_sha }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          DEPLOY: ${{ inputs.deploy }}
+        run: bash .github/scripts/cloudflare-candidate.sh

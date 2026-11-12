@@ -32,7 +32,10 @@ func RunWithOptions(runner *Runner, opts Options) error {
 		return errors.New("runner is nil")
 	}
 	opts = normalizeOptions(opts)
-	ctx := context.Background()
+	ctx := opts.BaseContext
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if len(opts.Signals) > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = signal.NotifyContext(ctx, opts.Signals...)

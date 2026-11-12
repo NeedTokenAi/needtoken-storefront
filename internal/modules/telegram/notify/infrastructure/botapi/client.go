@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -23,9 +24,16 @@ type telegramSendMessageResponse struct {
 	Description string `json:"description"`
 }
 
+// UploadOpener reads an upload without using the container disk.
+type UploadOpener interface {
+	Open(name string) (io.ReadCloser, error)
+}
+
 // Client 通过 Telegram Bot API 发送消息。
 type Client struct {
-	httpClient *http.Client
+	httpClient     *http.Client
+	uploads        UploadOpener
+	durableUploads bool
 }
 
 var _ notifycontract.Sender = (*Client)(nil)
@@ -41,6 +49,16 @@ func NewWithHTTPClient(client *http.Client) *Client {
 		panic("telegram bot api: http client is nil")
 	}
 	return &Client{httpClient: client}
+}
+
+// RequireDurableUploads 在 Cloudflare profile 打开时从对象存储读取附件。
+func (s *Client) RequireDurableUploads(opener UploadOpener) error {
+	if s == nil || opener == nil {
+		return errors.New("cloudflare profile: durable upload target is missing")
+	}
+	s.uploads = opener
+	s.durableUploads = true
+	return nil
 }
 
 // SendWithBotToken 使用显式 bot token 发送 Telegram 消息。
@@ -94,7 +112,16 @@ func (s *Client) SendWithBotToken(ctx context.Context, botToken string, options 
 }
 
 func (s *Client) sendMultipartMedia(ctx context.Context, botToken, method, fieldName, filePath string, options notifycontract.SendOptions) error {
-	file, err := os.Open(filePath)
+	var file io.ReadCloser
+	var err error
+	if s != nil && s.durableUploads {
+		if s.uploads == nil {
+			return fmt.Errorf("%w: durable upload target is missing", notifycontract.ErrNotifySendFailed)
+		}
+		file, err = s.uploads.Open(filePath)
+	} else {
+		file, err = os.Open(filePath)
+	}
 	if err != nil {
 		return fmt.Errorf("%w: open attachment failed: %v", notifycontract.ErrNotifySendFailed, err)
 	}

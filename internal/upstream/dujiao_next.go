@@ -48,11 +48,18 @@ func extractUpstreamErrorCode(err error) string {
 
 // DujiaoNextAdapter Dujiao-Next 协议适配器
 type DujiaoNextAdapter struct {
-	baseURL    string
-	apiKey     string
-	apiSecret  string
-	uploadsDir string
-	client     *http.Client
+	baseURL       string
+	apiKey        string
+	apiSecret     string
+	uploadsDir    string
+	client        *http.Client
+	imageSink     ImagePutter
+	durableImages bool
+}
+
+// ImagePutter stores an upstream image outside the container disk.
+type ImagePutter interface {
+	Put(ctx context.Context, publicPath string, body io.Reader) error
 }
 
 // NewDujiaoNextAdapter 创建 Dujiao-Next 适配器
@@ -66,6 +73,16 @@ func NewDujiaoNextAdapter(conn *siteconnectiondomain.Connection, uploadsDir stri
 			Timeout: 30 * time.Second,
 		},
 	}
+}
+
+// RequireDurableImages makes image downloads fail closed unless sink is set.
+func (a *DujiaoNextAdapter) RequireDurableImages(sink ImagePutter) error {
+	if a == nil || sink == nil {
+		return errors.New("cloudflare profile: durable upload target is missing")
+	}
+	a.imageSink = sink
+	a.durableImages = true
+	return nil
 }
 
 // Ping 连接测试
@@ -234,6 +251,23 @@ func (a *DujiaoNextAdapter) DownloadImage(ctx context.Context, imageURL string) 
 	}
 
 	filename := uuid.New().String() + ext
+	if a.durableImages {
+		if a.imageSink == nil {
+			return "", errors.New("cloudflare profile: durable upload target is missing")
+		}
+		payload, err := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamImageBytes+1))
+		if err != nil {
+			return "", fmt.Errorf("read image: %w", err)
+		}
+		if len(payload) > maxUpstreamImageBytes {
+			return "", fmt.Errorf("image exceeds %d bytes", maxUpstreamImageBytes)
+		}
+		publicPath := "/uploads/upstream/" + filename
+		if err := a.imageSink.Put(ctx, publicPath, bytes.NewReader(payload)); err != nil {
+			return "", err
+		}
+		return publicPath, nil
+	}
 	dir := filepath.Join(a.uploadsDir, "upstream")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("create uploads dir: %w", err)

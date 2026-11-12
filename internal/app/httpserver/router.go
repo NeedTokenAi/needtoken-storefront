@@ -250,14 +250,24 @@ func SetupRouter(cfg *config.Config, c *container.Container) *gin.Engine {
 	// 静态文件服务（上传的图片）必须放在前面。
 	// 所有上传文件一律禁止脚本：即使上传校验被绕过（如 telegram 场景不限扩展名、上游图片），
 	// 直接打开 /uploads/x.html 也不会在站点源下执行脚本；<img src> 引用不受影响。
-	// SVG 额外强制下载。
-	r.Group("/uploads", func(c *gin.Context) {
+	// SVG 额外强制下载。Cloudflare profile 关闭时仍从本地目录读取。
+	uploads := r.Group("/uploads", func(c *gin.Context) {
 		c.Header("Content-Security-Policy", "sandbox; script-src 'none'")
 		c.Header("X-Content-Type-Options", "nosniff")
 		if strings.EqualFold(path.Ext(c.Request.URL.Path), ".svg") {
 			c.Header("Content-Disposition", "attachment")
 		}
-	}).Static("/", "./uploads")
+	})
+	if c.UploadObjects == nil {
+		uploads.Static("/", "./uploads")
+	} else {
+		objects := c.UploadObjects
+		serve := func(ctx *gin.Context) {
+			objects.ServePublic(ctx.Writer, ctx.Request, uploadPublicPath(ctx.Param("filepath")))
+		}
+		uploads.GET("/*filepath", serve)
+		uploads.HEAD("/*filepath", serve)
+	}
 
 	// SEO 资源（动态生成）。
 	sitemaptransport.RegisterRoutes(r, sitemaptransport.NewHandler(c.SitemapService, sitemapbrand.New(c.SettingService)))
@@ -278,6 +288,12 @@ func SetupRouter(cfg *config.Config, c *container.Container) *gin.Engine {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	if c.CloudflareRuntime != nil {
+		runtime := c.CloudflareRuntime
+		r.GET("/health/worker", func(ctx *gin.Context) {
+			runtime.ServeHealth(ctx.Writer)
+		})
+	}
 
 	// 嵌入式前端资源（仅在 -tags fullstack 构建时生效）
 	if web.Enabled() {
@@ -295,6 +311,16 @@ func SetupRouter(cfg *config.Config, c *container.Container) *gin.Engine {
 	}
 
 	return r
+}
+
+func uploadPublicPath(param string) string {
+	if param == "" {
+		return ""
+	}
+	if !strings.HasPrefix(param, "/") {
+		param = "/" + param
+	}
+	return "/uploads" + param
 }
 
 func configureTrustedProxies(engine *gin.Engine, trustedProxies []string) error {

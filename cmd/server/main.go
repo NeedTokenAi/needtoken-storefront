@@ -19,6 +19,7 @@ import (
 	"github.com/dujiao-next/internal/logger"
 	adminapplication "github.com/dujiao-next/internal/modules/identity/admin/application"
 	adminstore "github.com/dujiao-next/internal/modules/identity/admin/infrastructure/gormstore"
+	"github.com/dujiao-next/internal/platform/cloudflare"
 	"github.com/dujiao-next/internal/platform/database/gormdb"
 	"github.com/dujiao-next/internal/selfupdate"
 	"github.com/dujiao-next/internal/shared/passwordpolicy"
@@ -118,6 +119,16 @@ func main() {
 	// fullstack 模式下若仍使用默认 admin 路径，提示安全风险
 	if web.Enabled() && cfg.Server.Mode == "release" && cfg.Web.AdminPath == "/admin" {
 		stdLog.Printf("警告: web.admin_path 仍为默认 /admin，建议修改为不易猜测的路径以降低自动化扫描风险")
+	}
+
+	if cfg.Cloudflare.Enabled {
+		mode, found := cloudflare.ModeFromArgs(os.Args[1:])
+		if !found {
+			mode = app.ModeAll
+		}
+		if err := cloudflare.ValidateStartup(cfg, mode); err != nil {
+			stdLog.Fatalf("cloudflare profile 拒绝启动: %v", err)
+		}
 	}
 
 	// 自动创建数据目录（fullstack 二进制小白部署免去手动 mkdir）

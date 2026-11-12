@@ -2,8 +2,10 @@ package upstream
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -31,4 +33,44 @@ func TestDownloadImageRestrictsHostAndSize(t *testing.T) {
 	if _, err := adapter.DownloadImage(context.Background(), "/huge.png"); err == nil {
 		t.Fatal("oversized image must be rejected")
 	}
+}
+
+func TestDownloadImageUsesDurableSink(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("png"))
+	}))
+	defer server.Close()
+	dir := t.TempDir()
+	adapter := NewDujiaoNextAdapter(&siteconnectiondomain.Connection{BaseURL: server.URL}, dir)
+	if err := adapter.RequireDurableImages(nil); err == nil {
+		t.Fatal("missing durable target must fail closed")
+	}
+	sink := &memoryImageSink{}
+	if err := adapter.RequireDurableImages(sink); err != nil {
+		t.Fatal(err)
+	}
+	local, err := adapter.DownloadImage(context.Background(), "/uploads/a.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(local, "/uploads/upstream/") || string(sink.body) != "png" {
+		t.Fatalf("durable image = %s body %q", local, sink.body)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("durable download wrote local files: %v", entries)
+	}
+}
+
+type memoryImageSink struct {
+	body []byte
+}
+
+func (s *memoryImageSink) Put(_ context.Context, _ string, body io.Reader) error {
+	payload, err := io.ReadAll(body)
+	s.body = payload
+	return err
 }

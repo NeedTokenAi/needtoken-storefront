@@ -33,6 +33,7 @@ type Config struct {
 	Captcha      CaptchaConfig      `mapstructure:"captcha"`
 	Web          WebConfig          `mapstructure:"web"`
 	Reseller     ResellerConfig     `mapstructure:"reseller"`
+	Cloudflare   CloudflareConfig   `mapstructure:"cloudflare"`
 }
 
 // AppConfig 应用级配置
@@ -201,6 +202,24 @@ type CaptchaTurnstileConfig struct {
 	SecretKey string `mapstructure:"secret_key"`
 	VerifyURL string `mapstructure:"verify_url"`
 	TimeoutMS int    `mapstructure:"timeout_ms"`
+}
+
+// CloudflareConfig 默认关闭。打开后进程必须使用 Postgres、Asynq，以及可持久化的对象存储。
+// 关闭时现有 Cloud Run 行为不变，上传仍写入本地目录。
+type CloudflareConfig struct {
+	Enabled       bool                `mapstructure:"enabled"`
+	WriterFence   string              `mapstructure:"writer_fence"`
+	ObjectStorage ObjectStorageConfig `mapstructure:"object_storage"`
+}
+
+// ObjectStorageConfig 是 R2 兼容的对象存储目标。只在 Cloudflare 配置打开时读取。
+type ObjectStorageConfig struct {
+	Endpoint        string `mapstructure:"endpoint"`
+	Bucket          string `mapstructure:"bucket"`
+	Region          string `mapstructure:"region"`
+	AccessKeyID     string `mapstructure:"access_key_id"`
+	SecretAccessKey string `mapstructure:"secret_access_key"`
+	Prefix          string `mapstructure:"prefix"`
 }
 
 // UploadConfig 文件上传配置
@@ -428,6 +447,14 @@ func Load() *Config {
 	viper.SetDefault("reseller.subdomain_base", "")
 	viper.SetDefault("reseller.self_apply_enabled", true)
 	viper.SetDefault("reseller.settlement_confirm_days", 7)
+	viper.SetDefault("cloudflare.enabled", false)
+	viper.SetDefault("cloudflare.writer_fence", "")
+	viper.SetDefault("cloudflare.object_storage.endpoint", "")
+	viper.SetDefault("cloudflare.object_storage.bucket", "")
+	viper.SetDefault("cloudflare.object_storage.region", "")
+	viper.SetDefault("cloudflare.object_storage.access_key_id", "")
+	viper.SetDefault("cloudflare.object_storage.secret_access_key", "")
+	viper.SetDefault("cloudflare.object_storage.prefix", "")
 
 	// 环境变量支持
 	viper.AutomaticEnv()                                   // 自动读取环境变量

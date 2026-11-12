@@ -245,3 +245,39 @@ func TestTelegramNotifyServiceSendWithBotTokenSendsRemotePhoto(t *testing.T) {
 		t.Fatalf("send with remote photo failed: %v", err)
 	}
 }
+
+type memoryUploadOpener struct {
+	body []byte
+	name string
+}
+
+func (o *memoryUploadOpener) Open(name string) (io.ReadCloser, error) {
+	o.name = name
+	return io.NopCloser(strings.NewReader(string(o.body))), nil
+}
+
+func TestDurableTelegramAttachmentDoesNotOpenDisk(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	client := NewWithHTTPClient(&http.Client{Transport: rewriteTelegramTransport{baseURL: server.URL}})
+	if err := client.RequireDurableUploads(nil); err == nil {
+		t.Fatal("missing durable upload target must fail closed")
+	}
+	opener := &memoryUploadOpener{body: []byte("from-object")}
+	if err := client.RequireDurableUploads(opener); err != nil {
+		t.Fatal(err)
+	}
+	err := client.SendWithBotToken(context.Background(), "bot-token", notifycontract.SendOptions{
+		ChatID:        "10001",
+		Message:       "hello",
+		AttachmentURL: "/uploads/telegram/2026/03/missing.txt",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opener.name != "uploads/telegram/2026/03/missing.txt" {
+		t.Fatalf("opened %s", opener.name)
+	}
+}

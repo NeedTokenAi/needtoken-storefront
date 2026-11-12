@@ -1,0 +1,5 @@
+{
+  "name": "needtoken-storefront-cloudflare",
+  "private": true,
+  "type": "module"
+}
