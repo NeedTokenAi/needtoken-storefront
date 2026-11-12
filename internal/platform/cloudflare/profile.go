@@ -15,12 +15,10 @@ const (
 	ModeWorker    = "worker"
 	ModeAPIWorker = "api+worker"
 
-	// The isolated database and bucket are the resources NeedOps already created.
-	// Redis stays on the existing Upstash. A wider host list is not accepted.
-	isolatedDatabaseHost       = "ep-aged-sunset-b33os2qw.c-4.ap-southeast-1.aws.neon.tech"
-	isolatedDatabasePoolerHost = "ep-aged-sunset-b33os2qw-pooler.c-4.ap-southeast-1.aws.neon.tech"
-	isolatedObjectBucket       = "needtoken-staging"
-	isolatedRedisKeyPrefix     = "staging"
+	// This phase keeps the existing Postgres and Upstash. Only the R2 bucket is a
+	// separate isolated resource.
+	isolatedObjectBucket   = "needtoken-staging"
+	isolatedRedisKeyPrefix = "staging"
 )
 
 // ErrDurableTargetMissing means the Cloudflare profile is on and no durable
@@ -88,9 +86,6 @@ func Validate(cfg *config.Config) error {
 	if bucket := strings.TrimSpace(cfg.Cloudflare.ObjectStorage.Bucket); bucket != isolatedObjectBucket {
 		return fmt.Errorf("cloudflare profile: object bucket %q is outside the isolated allowlist", bucket)
 	}
-	if err := validateDatabaseHost(cfg.Database.DSN); err != nil {
-		return err
-	}
 	if normalizeRedisKeyPrefix(cfg.Redis.Prefix) != isolatedRedisKeyPrefix {
 		return errors.New("cloudflare profile: REDIS_KEY_PREFIX must be staging: so this process does not use production keys")
 	}
@@ -102,40 +97,6 @@ func Validate(cfg *config.Config) error {
 
 func normalizeRedisKeyPrefix(prefix string) string {
 	return strings.TrimSuffix(strings.TrimSpace(prefix), ":")
-}
-
-func validateDatabaseHost(dsn string) error {
-	host, err := databaseHost(dsn)
-	if err != nil {
-		return err
-	}
-	if host == isolatedDatabaseHost || host == isolatedDatabasePoolerHost {
-		return nil
-	}
-	return fmt.Errorf("cloudflare profile: database host %q is outside the isolated allowlist", host)
-}
-
-func databaseHost(dsn string) (string, error) {
-	dsn = strings.TrimSpace(dsn)
-	if strings.Contains(dsn, "://") {
-		parsed, err := url.Parse(dsn)
-		if err != nil || parsed == nil || parsed.Hostname() == "" {
-			return "", errors.New("cloudflare profile: database host is missing")
-		}
-		return strings.ToLower(parsed.Hostname()), nil
-	}
-	for field := range strings.FieldsSeq(dsn) {
-		key, value, ok := strings.Cut(field, "=")
-		if !ok || !strings.EqualFold(strings.TrimSpace(key), "host") {
-			continue
-		}
-		host := strings.ToLower(strings.Trim(strings.TrimSpace(value), `"'`))
-		if host == "" {
-			return "", errors.New("cloudflare profile: database host is missing")
-		}
-		return host, nil
-	}
-	return "", errors.New("cloudflare profile: database host is missing")
 }
 
 func validateObjectStorage(cfg config.ObjectStorageConfig) error {
