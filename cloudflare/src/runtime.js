@@ -6,15 +6,10 @@ export const CONTAINER_PORT = "8080";
 // argv, not a shell string. Joined, this is /app/dujiao-next -mode=api.
 export const START_COMMAND = ["/app/dujiao-next", "-mode=api"];
 
-// durable_object cannot express max_instances. These two names are the cap.
-export const MAX_INSTANCES = 2;
+// Predefined basic is 1/4 vCPU and 1 GiB. Wrangler instance_type carries it.
+export const INSTANCE_TYPE = "basic";
 
-// No named type is 1 vCPU and 512 MiB. diskMb is the durable_object minimum.
-export const INSTANCE = {
-  vcpu: 1,
-  memoryMib: 512,
-  diskMb: 2000,
-};
+export const MAX_INSTANCES = 2;
 
 // Platform maximum. A shorter timeout would stop the process between requests.
 export const INACTIVITY_TIMEOUT_MS = 6 * 60 * 60 * 1000;

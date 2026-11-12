@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   APP_PORT,
-  INSTANCE,
+  INSTANCE_TYPE,
   MAX_INSTANCES,
   START_COMMAND,
   containerEnv,
@@ -25,16 +25,16 @@ test("production worker serves workers.dev and does not build an image", () => {
   assert.equal(wrangler.routes, undefined);
   assert.equal(JSON.stringify(wrangler).includes("needtoken.ai"), false);
   assert.equal(JSON.stringify(wrangler).toLowerCase().includes("staging"), false);
-  assert.equal(Object.hasOwn(container, "max_instances"), false);
-  assert.equal(container.scheduling_policy, "durable_object");
+  assert.equal(container.scheduling_policy, "default");
+  assert.equal(container.instance_type, "basic");
+  assert.equal(container.max_instances, 2);
   assert.equal(
-    container.images.app.image,
+    container.image,
     "registry.cloudflare.com/account-id/needtoken-storefront@sha256:0000000000000000000000000000000000000000000000000000000000000000",
   );
-  assert.equal(container.images.app.image.includes("registry.cloudflare.com/"), true);
-  assert.match(container.images.app.image, /@sha256:[0-9a-f]{64}$/);
-  assert.equal(Object.hasOwn(container.images.app, "dockerfile"), false);
-  assert.equal(Object.hasOwn(container.images.app, "build_context"), false);
+  assert.match(container.image, /@sha256:[0-9a-f]{64}$/);
+  assert.equal(Object.hasOwn(container, "images"), false);
+  assert.equal(Object.hasOwn(container, "dockerfile"), false);
   assert.equal(JSON.stringify(wrangler).includes("Dockerfile"), false);
   assert.equal(wrangler.vars, undefined);
   assert.equal(JSON.stringify(wrangler).includes("REDIS_PREFIX"), false);
@@ -45,9 +45,7 @@ test("start command, port, and instance size stay fixed", () => {
   assert.equal(APP_PORT, 8080);
   assert.deepEqual(START_COMMAND, ["/app/dujiao-next", "-mode=api"]);
   assert.equal(START_COMMAND.join(" "), "/app/dujiao-next -mode=api");
-  assert.equal(INSTANCE.vcpu, 1);
-  assert.equal(INSTANCE.memoryMib, 512);
-  assert.equal(INSTANCE.diskMb, 2000);
+  assert.equal(INSTANCE_TYPE, "basic");
   assert.equal(MAX_INSTANCES, 2);
   assert.equal(instanceName(() => 0), "instance-0");
   assert.equal(instanceName(() => 0.999), "instance-1");
@@ -91,8 +89,8 @@ test("requests are forwarded to the container port", async () => {
 
 test("the worker source uses the runtime values and does not restrict hosts", () => {
   const source = readFileSync(join(root, "src/index.js"), "utf8");
-  assert.match(source, /image: container\.images\.app/);
-  assert.match(source, /instance: INSTANCE/);
+  assert.equal(source.includes("container.images"), false);
+  assert.equal(source.includes("memoryMib"), false);
   assert.match(source, /entrypoint: START_COMMAND/);
   assert.match(source, /env: containerEnv\(this\.env\)/);
   assert.match(source, /getTcpPort\(APP_PORT\)/);

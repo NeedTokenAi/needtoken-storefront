@@ -3,7 +3,6 @@ import { DurableObject } from "cloudflare:workers";
 import {
   APP_PORT,
   INACTIVITY_TIMEOUT_MS,
-  INSTANCE,
   START_COMMAND,
   containerEnv,
   forwardRequest,
@@ -35,9 +34,8 @@ export class Storefront extends DurableObject {
       throw new Error("container binding is missing");
     }
     if (!container.running) {
+      // Image and instance_type come from wrangler.jsonc. basic is 1/4 vCPU and 1 GiB.
       container.start({
-        image: container.images.app,
-        instance: INSTANCE,
         enableInternet: true,
         entrypoint: START_COMMAND,
         env: containerEnv(this.env),
