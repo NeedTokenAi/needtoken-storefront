@@ -4,6 +4,13 @@
   "compatibility_date": "2026-11-12",
   "workers_dev": false,
   "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true
+    },
+    "head_sampling_rate": 1
+  },
   "triggers": {
     "crons": ["* * * * *"]
   },
@@ -11,9 +18,13 @@
     {
       "class_name": "Storefront",
       "scheduling_policy": "default",
-      "image": "registry.cloudflare.com/account-id/needtoken-storefront@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "image": "../Dockerfile",
+      "image_build_context": "..",
       "instance_type": "basic",
-      "max_instances": 2
+      "max_instances": 2,
+      "constraints": {
+        "regions": ["APAC"]
+      }
     }
   ],
   "durable_objects": {

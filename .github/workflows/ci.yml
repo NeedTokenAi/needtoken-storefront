@@ -8,7 +8,6 @@ on:
   pull_request:
   # 上游同步若没有 SYNC_GITHUB_TOKEN，会用 workflow_dispatch 触发本工作流，
   # 让 sync/upstream/* 上的提交跑检查。默认 GITHUB_TOKEN 开的 PR 不会触发 pull_request。
-  # deploy-cloudrun 只认 push 到 main 的成功 ci，这里手动运行不会部署生产。
   workflow_dispatch:
 
 permissions:

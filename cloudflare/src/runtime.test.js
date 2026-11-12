@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -19,7 +19,7 @@ import {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test("production worker has no public dev route and does not build an image", () => {
+test("production worker builds the repo Dockerfile and publishes no vars", () => {
   const wrangler = JSON.parse(readFileSync(join(root, "wrangler.jsonc"), "utf8"));
   const container = wrangler.containers[0];
   assert.equal(wrangler.name, "needtoken-storefront");
@@ -33,15 +33,21 @@ test("production worker has no public dev route and does not build an image", ()
   assert.equal(container.scheduling_policy, "default");
   assert.equal(container.instance_type, "basic");
   assert.equal(container.max_instances, 2);
-  assert.equal(
-    container.image,
-    "registry.cloudflare.com/account-id/needtoken-storefront@sha256:0000000000000000000000000000000000000000000000000000000000000000",
-  );
-  assert.match(container.image, /@sha256:[0-9a-f]{64}$/);
+  assert.equal(container.image, "../Dockerfile");
+  assert.equal(container.image_build_context, "..");
+  assert.equal(existsSync(join(root, container.image)), true);
+  assert.equal(container.image.includes("registry.cloudflare.com"), false);
+  assert.equal(container.image.includes("sha256:"), false);
+  assert.deepEqual(container.constraints.regions, ["APAC"]);
+  assert.deepEqual(wrangler.observability, {
+    enabled: true,
+    logs: { enabled: true },
+    head_sampling_rate: 1,
+  });
   assert.equal(Object.hasOwn(container, "images"), false);
   assert.equal(Object.hasOwn(container, "dockerfile"), false);
-  assert.equal(JSON.stringify(wrangler).includes("Dockerfile"), false);
   assert.equal(wrangler.vars, undefined);
+  assert.equal(JSON.stringify(wrangler).includes("sha256:"), false);
   assert.equal(JSON.stringify(wrangler).includes("REDIS_PREFIX"), false);
   assert.equal(JSON.stringify(wrangler).includes("OPS_WRITES_ENABLED"), false);
 });

@@ -14,33 +14,13 @@ ok() {
   printf 'ok - %s\n' "$1"
 }
 
-[[ -f ${WORKFLOW} ]] || fail "image workflow missing"
-grep -q 'workflow_dispatch' "${WORKFLOW}" || fail "image workflow must be manual"
-if grep -q 'pull_request:' "${WORKFLOW}"; then
-  fail "image workflow runs on pull request"
+if [[ -e ${WORKFLOW} ]]; then
+  fail "image workflow must stay deleted; Workers Builds publishes the Dockerfile"
 fi
-if grep -Eq 'wrangler deploy|deploy-cloudrun|gcloud ' "${WORKFLOW}"; then
-  fail "image workflow can publish production"
+if [[ -e ${ROOT}/.github/workflows/deploy-cloudrun.yml ]]; then
+  fail "cloud run workflow must stay deleted"
 fi
-grep -q 'containers build' "${WORKFLOW}" || fail "image workflow does not build the container"
-if grep -Eq 'image_digest:|git_sha:' "${WORKFLOW}"; then
-  fail "image workflow accepts a hand-filled digest"
-fi
-grep -q 'tag="needtoken-storefront:${GITHUB_SHA}"' "${WORKFLOW}" || fail "tag must be the production image and source SHA"
-if grep -q 'storefront-staging' "${WORKFLOW}"; then
-  fail "image workflow uses a staging image name"
-fi
-grep -q 'containers build -p -t "${tag}"' "${WORKFLOW}" || fail "push must use the immutable tag"
-grep -q 'CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}' "${WORKFLOW}" || fail "account id must stay a secret"
-if grep -q 'vars:' "${WORKFLOW}"; then
-  fail "account id was turned into a variable"
-fi
-grep -q 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' "${WORKFLOW}" || fail "build record is not uploaded"
-grep -q 'name: image-build-record' "${WORKFLOW}" || fail "artifact name missing"
-grep -q 'build-record.txt' "${WORKFLOW}" || fail "build record path missing"
-grep -q 'contents: read' "${WORKFLOW}" || fail "contents permission"
-grep -q 'actions: write' "${WORKFLOW}" || fail "artifact upload permission"
-ok "image workflow records a production digest and does not deploy"
+ok "image and cloud run workflows are not a second publisher"
 
 set +e
 DEPLOY=true bash "${SCRIPT}" >/tmp/cloudflare-image-record-deploy.out 2>/tmp/cloudflare-image-record-deploy.err
