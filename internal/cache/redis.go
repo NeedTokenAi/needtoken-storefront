@@ -188,6 +188,11 @@ func SetNX(ctx context.Context, key string, value interface{}, ttl time.Duration
 	return true, nil
 }
 
+// Key applies the configured Redis prefix. REDIS_KEY_PREFIX is stored there.
+func Key(key string) string {
+	return buildKey(key)
+}
+
 func buildKey(key string) string {
 	trimmed := strings.TrimSpace(key)
 	if trimmed == "" {

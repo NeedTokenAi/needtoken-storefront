@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,10 @@ import (
 	"github.com/hibiken/asynq"
 )
 
+// ErrEnqueueRefused is returned when background consumers are off.
+// The call does not write a queue key.
+var ErrEnqueueRefused = errors.New("queue enqueue refused while background consumers are off")
+
 const (
 	// DefaultQueue 默认队列名称
 	DefaultQueue = constants.QueueDefault
@@ -20,20 +25,77 @@ const (
 type Client struct {
 	client       *asynq.Client
 	enabled      bool
+	allowEnqueue bool
 	defaultQueue string
 }
 
-// NewClient 创建队列客户端
-func NewClient(cfg *config.QueueConfig) (*Client, error) {
-	if cfg == nil || !cfg.Enabled {
-		return &Client{enabled: false, defaultQueue: DefaultQueue}, nil
+type clientSettings struct {
+	keyPrefix    string
+	allowEnqueue bool
+	conn         asynq.RedisConnOpt
+}
+
+// Option configures a queue client.
+type Option func(*clientSettings)
+
+// WithKeyPrefix namespaces queue names with REDIS_KEY_PREFIX.
+// The production prefix dj keeps the existing asynq queue name.
+func WithKeyPrefix(prefix string) Option {
+	return func(settings *clientSettings) {
+		settings.keyPrefix = prefix
 	}
-	opt := buildRedisOpt(cfg)
-	client := asynq.NewClient(opt)
+}
+
+// WithEnqueueAllowed reports whether Enqueue may write Redis.
+// CLOUDFLARE_BACKGROUND_CONSUMERS=off passes false.
+func WithEnqueueAllowed(allowed bool) Option {
+	return func(settings *clientSettings) {
+		settings.allowEnqueue = allowed
+	}
+}
+
+func withRedisConn(conn asynq.RedisConnOpt) Option {
+	return func(settings *clientSettings) {
+		settings.conn = conn
+	}
+}
+
+// QueueName returns the asynq queue name for a redis key prefix.
+// An empty prefix and the production prefix dj stay on the existing queue.
+func QueueName(keyPrefix, name string) string {
+	prefix := strings.Trim(strings.TrimSpace(keyPrefix), ":")
+	if prefix == "" || prefix == constants.RedisPrefixDefault {
+		return name
+	}
+	return prefix + ":" + name
+}
+
+// asynqQueueKeyPrefix is the Redis key prefix asynq derives from a queue name.
+func asynqQueueKeyPrefix(queue string) string {
+	return "asynq:{" + queue + "}:"
+}
+
+// NewClient 创建队列客户端
+func NewClient(cfg *config.QueueConfig, opts ...Option) (*Client, error) {
+	settings := clientSettings{allowEnqueue: true}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&settings)
+		}
+	}
+	queueName := QueueName(settings.keyPrefix, DefaultQueue)
+	if cfg == nil || !cfg.Enabled {
+		return &Client{enabled: false, allowEnqueue: settings.allowEnqueue, defaultQueue: queueName}, nil
+	}
+	conn := settings.conn
+	if conn == nil {
+		conn = buildRedisOpt(cfg)
+	}
 	return &Client{
-		client:       client,
+		client:       asynq.NewClient(conn),
 		enabled:      true,
-		defaultQueue: DefaultQueue,
+		allowEnqueue: settings.allowEnqueue,
+		defaultQueue: queueName,
 	}, nil
 }
 
@@ -61,13 +123,7 @@ func (c *Client) EnqueueOrderStatusEmail(payload OrderStatusEmailPayload, opts .
 	}
 	// 限制重试次数与保留期，避免 SMTP 长时间不可用时邮件任务堆积成雪崩；
 	// 调用方可通过 opts 覆盖。
-	options := append([]asynq.Option{
-		asynq.Queue(c.defaultQueue),
-		asynq.MaxRetry(3),
-		asynq.Retention(24 * time.Hour),
-	}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, append([]asynq.Option{asynq.MaxRetry(3), asynq.Retention(24 * time.Hour)}, opts...)...)
 }
 
 // EnqueueOrderAutoFulfill 推送自动交付任务
@@ -79,9 +135,7 @@ func (c *Client) EnqueueOrderAutoFulfill(payload OrderAutoFulfillPayload, opts .
 	if err != nil {
 		return err
 	}
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, opts...)
 }
 
 // EnqueueAffiliateOrderPaid 推送佣金创建重试任务
@@ -93,9 +147,7 @@ func (c *Client) EnqueueAffiliateOrderPaid(payload AffiliateOrderPaidPayload, op
 	if err != nil {
 		return err
 	}
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, opts...)
 }
 
 // EnqueueOrderTimeoutCancel 推送订单超时取消任务
@@ -110,9 +162,7 @@ func (c *Client) EnqueueOrderTimeoutCancel(payload OrderTimeoutCancelPayload, de
 	if err != nil {
 		return err
 	}
-	options := []asynq.Option{asynq.Queue(c.defaultQueue), asynq.ProcessIn(delay)}
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, asynq.ProcessIn(delay))
 }
 
 // EnqueueWalletRechargeExpire 推送钱包充值超时过期任务
@@ -127,9 +177,7 @@ func (c *Client) EnqueueWalletRechargeExpire(payload WalletRechargeExpirePayload
 	if err != nil {
 		return err
 	}
-	options := []asynq.Option{asynq.Queue(c.defaultQueue), asynq.ProcessIn(delay)}
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, asynq.ProcessIn(delay))
 }
 
 // EnqueueNotificationDispatch 推送通知中心分发任务
@@ -141,9 +189,7 @@ func (c *Client) EnqueueNotificationDispatch(payload NotificationDispatchPayload
 	if err != nil {
 		return err
 	}
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, opts...)
 }
 
 // EnqueueProcurementSubmit 推送采购提交任务
@@ -156,9 +202,7 @@ func (c *Client) EnqueueProcurementSubmit(payload ProcurementSubmitPayload, opts
 		return err
 	}
 	// 采购单服务自行管理重试逻辑，asynq 仅处理瞬态错误（DB/Redis 不可达等）
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue), asynq.MaxRetry(3)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, append([]asynq.Option{asynq.MaxRetry(3)}, opts...)...)
 }
 
 // EnqueueProcurementPollStatus 推送采购状态轮询任务
@@ -173,9 +217,7 @@ func (c *Client) EnqueueProcurementPollStatus(payload ProcurementPollStatusPaylo
 	if err != nil {
 		return err
 	}
-	options := []asynq.Option{asynq.Queue(c.defaultQueue), asynq.ProcessIn(delay)}
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, asynq.ProcessIn(delay))
 }
 
 // EnqueueDownstreamCallback 推送下游回调通知任务
@@ -187,9 +229,7 @@ func (c *Client) EnqueueDownstreamCallback(payload DownstreamCallbackPayload, op
 	if err != nil {
 		return err
 	}
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, opts...)
 }
 
 // EnqueueReconciliationRun 入队对账执行任务
@@ -201,9 +241,7 @@ func (c *Client) EnqueueReconciliationRun(payload ReconciliationRunPayload, opts
 	if err != nil {
 		return err
 	}
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, opts...)
 }
 
 // EnqueueBotNotify 入队 Bot 交付通知任务
@@ -215,9 +253,7 @@ func (c *Client) EnqueueBotNotify(payload BotNotifyPayload, opts ...asynq.Option
 	if err != nil {
 		return err
 	}
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue), asynq.MaxRetry(5)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
-	return err
+	return c.enqueue(task, append([]asynq.Option{asynq.MaxRetry(5)}, opts...)...)
 }
 
 // EnqueueTelegramBroadcast 入队 Telegram 群发任务。
@@ -229,21 +265,36 @@ func (c *Client) EnqueueTelegramBroadcast(payload TelegramBroadcastPayload, opts
 	if err != nil {
 		return err
 	}
-	options := append([]asynq.Option{asynq.Queue(c.defaultQueue), asynq.MaxRetry(3)}, opts...)
-	_, err = c.client.Enqueue(task, options...)
+	return c.enqueue(task, append([]asynq.Option{asynq.MaxRetry(3)}, opts...)...)
+}
+
+func (c *Client) enqueue(task *asynq.Task, opts ...asynq.Option) error {
+	if c == nil || !c.enabled {
+		return nil
+	}
+	if !c.allowEnqueue || c.client == nil {
+		return ErrEnqueueRefused
+	}
+	options := make([]asynq.Option, 0, 1+len(opts))
+	options = append(options, asynq.Queue(c.defaultQueue))
+	options = append(options, opts...)
+	_, err := c.client.Enqueue(task, options...)
 	return err
 }
 
 // BuildServerConfig 生成队列服务配置
-func BuildServerConfig(cfg *config.QueueConfig) (asynq.RedisClientOpt, asynq.Config) {
+func BuildServerConfig(cfg *config.QueueConfig, keyPrefix string) (asynq.RedisClientOpt, asynq.Config) {
 	opt := buildRedisOpt(cfg)
 	concurrency := 10
 	if cfg != nil && cfg.Concurrency > 0 {
 		concurrency = cfg.Concurrency
 	}
-	queues := map[string]int{DefaultQueue: 1}
+	queues := map[string]int{QueueName(keyPrefix, DefaultQueue): 1}
 	if cfg != nil && len(cfg.Queues) > 0 {
-		queues = cfg.Queues
+		queues = make(map[string]int, len(cfg.Queues))
+		for name, weight := range cfg.Queues {
+			queues[QueueName(keyPrefix, name)] = weight
+		}
 	}
 	return opt, asynq.Config{
 		Concurrency: concurrency,

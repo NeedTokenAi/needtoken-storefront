@@ -10,12 +10,10 @@
       "scheduling_policy": "durable_object",
       "images": {
         "dujiao": {
-          "dockerfile": "../Dockerfile",
-          "build_context": ".."
+          "image": "${CLOUDFLARE_IMAGE_DIGEST}"
         },
         "dujiao-previous": {
-          "dockerfile": "../Dockerfile",
-          "build_context": ".."
+          "image": "${CLOUDFLARE_IMAGE_DIGEST}"
         }
       }
     }

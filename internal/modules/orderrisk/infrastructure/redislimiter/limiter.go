@@ -40,11 +40,11 @@ func (l *Limiter) Check(input orderriskcontract.CheckInput, config settingssecur
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if input.IsGuest && !input.SkipIPCheck && input.RiskIP != "" {
-		if err := checkSingle(ctx, client, fmt.Sprintf("dj:risk:order_rate:guest_ip:%s", input.RiskIP), config); err != nil {
+		if err := checkSingle(ctx, client, cache.Key(fmt.Sprintf("risk:order_rate:guest_ip:%s", input.RiskIP)), config); err != nil {
 			return err
 		}
 	} else if !input.IsGuest && input.UserID > 0 {
-		if err := checkSingle(ctx, client, fmt.Sprintf("dj:risk:order_rate:user:%d", input.UserID), config); err != nil {
+		if err := checkSingle(ctx, client, cache.Key(fmt.Sprintf("risk:order_rate:user:%d", input.UserID)), config); err != nil {
 			return err
 		}
 	}

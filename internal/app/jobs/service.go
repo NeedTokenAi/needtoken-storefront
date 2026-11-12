@@ -25,7 +25,7 @@ type Service struct {
 }
 
 // NewService 创建异步队列服务。consume 为 false 时不连接队列，也不注册定时任务。
-func NewService(cfg *config.QueueConfig, consumer *jobconsumer.Consumer, consume bool) (*Service, error) {
+func NewService(cfg *config.QueueConfig, consumer *jobconsumer.Consumer, consume bool, keyPrefix ...string) (*Service, error) {
 	if cfg == nil || !cfg.Enabled {
 		return nil, errors.New("queue disabled")
 	}
@@ -35,13 +35,17 @@ func NewService(cfg *config.QueueConfig, consumer *jobconsumer.Consumer, consume
 	if consumer == nil {
 		return nil, errors.New("consumer is nil")
 	}
-	opt, serverCfg := queue.BuildServerConfig(cfg)
+	prefix := ""
+	if len(keyPrefix) > 0 {
+		prefix = keyPrefix[0]
+	}
+	opt, serverCfg := queue.BuildServerConfig(cfg, prefix)
 	server := asynq.NewServer(opt, serverCfg)
 	mux := asynq.NewServeMux()
 	consumer.Register(mux)
 
 	scheduler := asynq.NewScheduler(opt, nil)
-	registerPeriodicTasks(scheduler, consumer, cfg)
+	registerPeriodicTasks(scheduler, consumer, cfg, queue.QueueName(prefix, queue.DefaultQueue))
 
 	return &Service{
 		name:      "worker",
@@ -53,13 +57,13 @@ func NewService(cfg *config.QueueConfig, consumer *jobconsumer.Consumer, consume
 }
 
 // registerPeriodicTasks 注册所有周期性任务
-func registerPeriodicTasks(scheduler *asynq.Scheduler, consumer *jobconsumer.Consumer, cfg *config.QueueConfig) {
+func registerPeriodicTasks(scheduler *asynq.Scheduler, consumer *jobconsumer.Consumer, cfg *config.QueueConfig, queueName string) {
 	if scheduler == nil || consumer == nil {
 		return
 	}
 	if consumer.AffiliateService != nil {
 		task := queue.NewAffiliateConfirmCommissionsTask()
-		entryID, err := scheduler.Register("@every 1m", task, asynq.Queue(queue.DefaultQueue))
+		entryID, err := scheduler.Register("@every 1m", task, asynq.Queue(queueName))
 		if err != nil {
 			logger.Warnw("scheduler_register_affiliate_confirm_failed", "error", err)
 		} else {
@@ -68,7 +72,7 @@ func registerPeriodicTasks(scheduler *asynq.Scheduler, consumer *jobconsumer.Con
 	}
 	if consumer.ResellerAccountingLedger != nil {
 		task := queue.NewResellerConfirmLedgerTask()
-		entryID, err := scheduler.Register("@every 1m", task, asynq.Queue(queue.DefaultQueue))
+		entryID, err := scheduler.Register("@every 1m", task, asynq.Queue(queueName))
 		if err != nil {
 			logger.Warnw("scheduler_register_reseller_confirm_ledger_failed", "error", err)
 		} else {
@@ -91,7 +95,7 @@ func registerPeriodicTasks(scheduler *asynq.Scheduler, consumer *jobconsumer.Con
 			}
 		}
 		task := queue.NewUpstreamSyncStockTask()
-		entryID, err := scheduler.Register("@every "+syncInterval, task, asynq.Queue(queue.DefaultQueue))
+		entryID, err := scheduler.Register("@every "+syncInterval, task, asynq.Queue(queueName))
 		if err != nil {
 			logger.Warnw("scheduler_register_upstream_sync_stock_failed", "error", err)
 		} else {
@@ -103,7 +107,7 @@ func registerPeriodicTasks(scheduler *asynq.Scheduler, consumer *jobconsumer.Con
 		if err != nil {
 			logger.Warnw("scheduler_register_inventory_alert_check_failed", "error", err)
 		} else {
-			entryID, registerErr := scheduler.Register("@every 1m", task, asynq.Queue(queue.DefaultQueue))
+			entryID, registerErr := scheduler.Register("@every 1m", task, asynq.Queue(queueName))
 			if registerErr != nil {
 				logger.Warnw("scheduler_register_inventory_alert_check_failed", "error", registerErr)
 			} else {
@@ -113,7 +117,7 @@ func registerPeriodicTasks(scheduler *asynq.Scheduler, consumer *jobconsumer.Con
 	}
 	if consumer.ProcurementOrderService != nil {
 		task := queue.NewProcurementSyncAcceptedTask()
-		entryID, err := scheduler.Register("@every 30m", task, asynq.Queue(queue.DefaultQueue))
+		entryID, err := scheduler.Register("@every 30m", task, asynq.Queue(queueName))
 		if err != nil {
 			logger.Warnw("scheduler_register_procurement_sync_accepted_failed", "error", err)
 		} else {

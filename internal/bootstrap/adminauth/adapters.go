@@ -170,7 +170,7 @@ func (admin2FAChallengeStoreAdapter) IsRevoked(ctx context.Context, jti string) 
 	if rdb == nil {
 		return false
 	}
-	v, _ := rdb.Exists(ctx, adminchallenge.RevocationKey(jti)).Result()
+	v, _ := rdb.Exists(ctx, cache.Key(adminchallenge.RevocationKey(jti))).Result()
 	return v == 1
 }
 
@@ -179,9 +179,9 @@ func (admin2FAChallengeStoreAdapter) BumpFails(ctx context.Context, jti string) 
 	if rdb == nil {
 		return 0
 	}
-	cnt, err := rdb.Incr(ctx, adminchallenge.FailureKey(jti)).Result()
+	cnt, err := rdb.Incr(ctx, cache.Key(adminchallenge.FailureKey(jti))).Result()
 	if err == nil && cnt == 1 {
-		_ = rdb.Expire(ctx, adminchallenge.FailureKey(jti), adminchallenge.TTL).Err()
+		_ = rdb.Expire(ctx, cache.Key(adminchallenge.FailureKey(jti)), adminchallenge.TTL).Err()
 	}
 	return cnt
 }
@@ -191,7 +191,7 @@ func (admin2FAChallengeStoreAdapter) Revoke(ctx context.Context, jti string) {
 	if rdb == nil {
 		return
 	}
-	_ = rdb.Set(ctx, adminchallenge.RevocationKey(jti), "1", adminchallenge.TTL).Err()
+	_ = rdb.Set(ctx, cache.Key(adminchallenge.RevocationKey(jti)), "1", adminchallenge.TTL).Err()
 }
 
 type adminLoginRecorderAdapter struct {

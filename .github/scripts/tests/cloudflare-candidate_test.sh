@@ -32,20 +32,13 @@ grep -q 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' "${WORKFLO
 if grep -Eq 'image_digest:|git_sha:' "${WORKFLOW}"; then
   fail "candidate dispatch still accepts a hand-filled digest"
 fi
-IMAGE_WORKFLOW="${ROOT}/.github/workflows/cloudflare-image.yml"
-[[ -f ${IMAGE_WORKFLOW} ]] || fail "image workflow missing"
-grep -q 'workflow_dispatch' "${IMAGE_WORKFLOW}" || fail "image workflow must be manual"
-if grep -q 'pull_request:' "${IMAGE_WORKFLOW}"; then
-  fail "image workflow runs on pull request"
+if [[ -f ${ROOT}/.github/workflows/cloudflare-image.yml ]]; then
+  fail "image build workflow must stay on its own branch"
 fi
-if grep -Eq 'wrangler deploy|deploy-cloudrun|gcloud ' "${IMAGE_WORKFLOW}"; then
-  fail "image workflow can publish production"
-fi
-grep -q 'containers build' "${IMAGE_WORKFLOW}" || fail "image workflow does not build the container"
 (
   cd "${ROOT}"
-  node --input-type=module -e 'import {readFileSync} from "node:fs"; const cfg=JSON.parse(readFileSync("cloudflare/wrangler.staging.jsonc","utf8")); if (cfg.name !== "needtoken-storefront-staging" || cfg.routes || cfg.workers_dev !== false || cfg.preview_urls !== false) process.exit(1);'
-) || fail "staging worker config is not isolated from production routes"
+  node --input-type=module -e 'import {readFileSync} from "node:fs"; const cfg=JSON.parse(readFileSync("cloudflare/wrangler.staging.jsonc","utf8")); const raw=JSON.stringify(cfg); const images=cfg.containers[0].images; if (cfg.name !== "needtoken-storefront-staging" || cfg.routes || cfg.workers_dev !== false || cfg.preview_urls !== false) process.exit(1); if (raw.includes("Dockerfile") || raw.includes("dockerfile") || raw.includes("build_context")) process.exit(2); if (images.dujiao.image !== "${CLOUDFLARE_IMAGE_DIGEST}" || images["dujiao-previous"].image !== "${CLOUDFLARE_IMAGE_DIGEST}") process.exit(3);'
+) || fail "staging worker config rebuilds or is not isolated from production routes"
 ok "candidate workflow cannot deploy"
 
 set +e

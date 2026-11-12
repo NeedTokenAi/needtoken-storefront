@@ -2,6 +2,7 @@ package container
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/config"
@@ -32,7 +33,10 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 
 	var queueClient *queue.Client
 	if cfg.Queue.Enabled {
-		qc, err := queue.NewClient(&cfg.Queue)
+		qc, err := queue.NewClient(&cfg.Queue,
+			queue.WithKeyPrefix(cfg.Redis.Prefix),
+			queue.WithEnqueueAllowed(!strings.EqualFold(strings.TrimSpace(cfg.Cloudflare.BackgroundConsumers), "off")),
+		)
 		if err != nil {
 			logger.Errorw("provider_init_queue_client_failed", "error", err)
 		} else {

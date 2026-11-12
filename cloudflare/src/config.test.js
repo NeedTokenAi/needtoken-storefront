@@ -29,6 +29,11 @@ test("wrangler uses the durable object policy without an instance cap", () => {
   assert.equal(staging.routes, undefined);
   assert.equal(JSON.stringify(staging).includes("needtoken.com"), false);
   assert.equal(staging.containers[0].scheduling_policy, "durable_object");
+  assert.equal(JSON.stringify(staging).includes("Dockerfile"), false);
+  assert.equal(JSON.stringify(staging).includes("dockerfile"), false);
+  assert.equal(JSON.stringify(staging).includes("build_context"), false);
+  assert.equal(staging.containers[0].images.dujiao.image, "${CLOUDFLARE_IMAGE_DIGEST}");
+  assert.equal(staging.containers[0].images["dujiao-previous"].image, "${CLOUDFLARE_IMAGE_DIGEST}");
 });
 
 test("secret bindings are names only and match the start allowlist", () => {

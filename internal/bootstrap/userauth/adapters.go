@@ -577,7 +577,7 @@ func (user2FAChallengeStoreAdapter) IsRevoked(ctx context.Context, jti string) b
 	if rdb == nil {
 		return false
 	}
-	v, _ := rdb.Exists(ctx, challenge.RevocationKey(jti)).Result()
+	v, _ := rdb.Exists(ctx, cache.Key(challenge.RevocationKey(jti))).Result()
 	return v == 1
 }
 
@@ -586,9 +586,9 @@ func (user2FAChallengeStoreAdapter) BumpFails(ctx context.Context, jti string) i
 	if rdb == nil {
 		return 0
 	}
-	cnt, err := rdb.Incr(ctx, challenge.FailureKey(jti)).Result()
+	cnt, err := rdb.Incr(ctx, cache.Key(challenge.FailureKey(jti))).Result()
 	if err == nil && cnt == 1 {
-		_ = rdb.Expire(ctx, challenge.FailureKey(jti), challenge.TTL).Err()
+		_ = rdb.Expire(ctx, cache.Key(challenge.FailureKey(jti)), challenge.TTL).Err()
 	}
 	return cnt
 }
@@ -598,7 +598,7 @@ func (user2FAChallengeStoreAdapter) Revoke(ctx context.Context, jti string) {
 	if rdb == nil {
 		return
 	}
-	_ = rdb.Set(ctx, challenge.RevocationKey(jti), "1", challenge.TTL).Err()
+	_ = rdb.Set(ctx, cache.Key(challenge.RevocationKey(jti)), "1", challenge.TTL).Err()
 }
 
 func mapUserAuthTransportError(err error) error {
