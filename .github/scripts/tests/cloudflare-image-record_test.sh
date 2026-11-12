@@ -14,19 +14,13 @@ ok() {
   printf 'ok - %s\n' "$1"
 }
 
-[[ -f ${WORKFLOW} ]] || fail "image workflow missing"
-grep -q 'workflow_dispatch' "${WORKFLOW}" || fail "image workflow must be manual"
-if grep -q 'pull_request:' "${WORKFLOW}"; then
-  fail "image workflow runs on pull request"
+if [[ -e ${WORKFLOW} ]]; then
+  fail "image workflow must stay deleted; Workers Builds publishes the Dockerfile"
 fi
-if grep -Eq 'wrangler deploy|deploy-cloudrun|gcloud ' "${WORKFLOW}"; then
-  fail "image workflow can publish production"
+if [[ -e ${ROOT}/.github/workflows/deploy-cloudrun.yml ]]; then
+  fail "cloud run workflow must stay deleted"
 fi
-grep -q 'containers build' "${WORKFLOW}" || fail "image workflow does not build the container"
-if grep -Eq 'image_digest:|git_sha:' "${WORKFLOW}"; then
-  fail "image workflow accepts a hand-filled digest"
-fi
-ok "image workflow records a build and does not deploy"
+ok "image and cloud run workflows are not a second publisher"
 
 set +e
 DEPLOY=true bash "${SCRIPT}" >/tmp/cloudflare-image-record-deploy.out 2>/tmp/cloudflare-image-record-deploy.err
@@ -36,23 +30,28 @@ set -e
 ok "deploy request exits 2"
 
 sha=$(git -C "${ROOT}" rev-parse HEAD)
-digest="registry.example/needtoken/storefront-staging@sha256:$(printf 'b%.0s' {1..64})"
+digest="sha256:$(printf 'b%.0s' {1..64})"
+summary=$(mktemp)
+record=$(mktemp)
 out=$(
   cd "${ROOT}"
   BUILD_REPOSITORY=NeedTokenAi/needtoken-storefront \
     BUILD_SHA="${sha}" \
     BUILD_RUN_ID=43175381072 \
     BUILD_SOURCE=github-actions \
-    IMAGE_REF="${digest}" \
+    IMAGE_DIGEST="${digest}" \
+    GITHUB_STEP_SUMMARY="${summary}" \
+    BUILD_RECORD_PATH="${record}" \
     bash "${SCRIPT}"
 )
-grep -q "repository=NeedTokenAi/needtoken-storefront" <<<"${out}" || fail "repository was not recorded"
-grep -q "sha=${sha}" <<<"${out}" || fail "sha was not recorded"
-grep -q "run_id=43175381072" <<<"${out}" || fail "run id was not recorded"
-grep -q "digest=${digest}" <<<"${out}" || fail "digest was not recorded"
-grep -q "source=github-actions" <<<"${out}" || fail "source was not recorded"
-grep -q "deploy=false" <<<"${out}" || fail "deploy was not refused"
-ok "record keeps repository, sha, run id, and digest"
+expected=$(printf 'repository=NeedTokenAi/needtoken-storefront\ndigest=%s\nsha=%s\nrun_id=43175381072\n' "${digest}" "${sha}")
+[[ ${out} == "${expected}" ]] || fail "stdout is not the four-field record"
+[[ $(<"${summary}") == "${expected}" ]] || fail "job summary is not the four-field record"
+[[ $(<"${record}") == "${expected}" ]] || fail "artifact is not the four-field record"
+if grep -Eq 'registry\.cloudflare\.com|account' "${summary}" "${record}"; then
+  fail "record contains an account id"
+fi
+ok "record keeps repository, sha256 digest, source SHA, and run id"
 
 set +e
 (
@@ -60,10 +59,10 @@ set +e
   BUILD_REPOSITORY=NeedTokenAi/needtoken-storefront \
     BUILD_SHA="${sha}" \
     BUILD_RUN_ID=43175381072 \
-    IMAGE_REF="sha256:${digest##*sha256:}" \
-    bash "${SCRIPT}" >/tmp/cloudflare-image-record-bare.out 2>/tmp/cloudflare-image-record-bare.err
+    IMAGE_DIGEST="registry.example/needtoken/needtoken-storefront@${digest}" \
+    bash "${SCRIPT}" >/tmp/cloudflare-image-record-ref.out 2>/tmp/cloudflare-image-record-ref.err
 )
 status=$?
 set -e
-[[ ${status} -eq 1 ]] || fail "bare sha256 exited ${status}"
-ok "bare sha256 is refused"
+[[ ${status} -eq 1 ]] || fail "registry address exited ${status}"
+ok "registry address is refused"
