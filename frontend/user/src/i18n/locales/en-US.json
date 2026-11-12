@@ -1770,6 +1770,14 @@
       "register": "Sign up",
       "help": "Help",
       "tools": "Tools",
+      "personal": "Personal products",
+      "gateway": "Need Gateway",
+      "workstation": "Need desk",
+      "comingSoon": "Not open yet",
+      "radar": "Reset radar",
+      "accountCheck": "Account check",
+      "claudeCheck": "Claude Code network check",
+      "codexCheck": "Codex account check",
       "faq": "FAQ",
       "environment": "Environment check",
       "appleIds": "Free Apple IDs",
@@ -2896,6 +2904,84 @@
       "setupTwoFactor": "Set up two-step verification after signing up",
       "setupTwoFactorHint": "After account creation, scan with an authenticator and confirm a code to enable it.",
       "securityHint": "Your existing password and two-step verification still protect your account."
+    },
+    "homeLibrary": {
+      "eyebrow": "Product library",
+      "title": "Stable, efficient, compliant",
+      "tabs": "Browse products by service",
+      "categories": "Categories",
+      "invoice": "Invoice available",
+      "officialChip": "Official {price}",
+      "payLabel": "Payment",
+      "payAlipay": "Alipay",
+      "payUsdt": "USDT",
+      "payChains": "BEP20 · TRC20",
+      "loadError": "Products could not be loaded.",
+      "empty": "This category has no products to show."
+    },
+    "apiUse": {
+      "title": "Use it in tools",
+      "intro": "An API plan delivers a console key. This page lists only the setups already documented here: the online gateway, OpenCode, curl, and the OpenAI Python SDK.",
+      "buy": "View plan catalog",
+      "console": "Open API console",
+      "toolsTitle": "Use it in tools",
+      "compatible": "Any coding tool that accepts an OpenAI-compatible base URL and bearer key can use the same address and key. Clients that are not documented on this site are not listed.",
+      "calculatorTitle": "API usage calculator",
+      "calculatorIntro": "Estimate usage from the existing plan units. The result is a budget, not a checkout price.",
+      "tools": {
+        "console": { "title": "Online gateway", "body": "Create a key in the API console and review quota and usage there. Send requests to the base URL below." },
+        "opencode": { "title": "OpenCode", "body": "Put the config in opencode.json at the project root, or in ~/.config/opencode/opencode.json. Reference the key from an environment variable." },
+        "curl": { "title": "curl", "body": "Call the chat completions endpoint with the key from the environment. Export NEEDTOKEN_API_KEY in the same terminal first." },
+        "python": { "title": "Python OpenAI SDK", "body": "Point the official openai package at this base URL and read the same environment variable for the API key." }
+      }
+    },
+    "statusStrip": {
+      "label": "Public service status",
+      "gpt": "GPT status",
+      "codex": "Codex status",
+      "codexIntro": "Only public-summary components whose names include Codex are listed.",
+      "codexEmpty": "The public summary has no component whose name includes Codex.",
+      "loading": "Loading public status.",
+      "unavailable": "This public status source is unavailable.",
+      "currentCount": "{ok} / {total} components are operational right now",
+      "noHistory": "The public summary has no historical availability, so no percentage is estimated.",
+      "updated": "Source updated {time}",
+      "stale": "The source has had no newer update since {time}",
+      "sources": { "openai": "OpenAI", "claude": "Claude", "codex": "Codex" },
+      "component": {
+        "operational": "Operational",
+        "degraded_performance": "Degraded",
+        "partial_outage": "Partial outage",
+        "major_outage": "Major outage",
+        "under_maintenance": "Maintenance",
+        "unknown": "Unknown"
+      }
+    },
+    "radar": {
+      "eyebrow": "Tools",
+      "title": "Reset radar",
+      "intro": "This board lists OpenAI public-status components whose names mention Codex, and incidents that mention Codex, or both reset and quota. It stays empty when the source has no such record.",
+      "board": "Public records",
+      "unavailable": "The public status source cannot be read, so the board has no records.",
+      "empty": "The current public incidents and components do not mention Codex or a quota reset.",
+      "note": "Reset times are not guessed, and unrelated outages are not presented as reset notices.",
+      "incidentsUnavailable": "Component status loaded. The incident list did not load this time, so there are no incident rows.",
+      "item": "Item",
+      "kind": "Type",
+      "state": "Source status",
+      "kinds": { "component": "Component", "incident": "Incident" }
+    },
+    "codexCheck": {
+      "eyebrow": "Account check",
+      "title": "Codex account check",
+      "intro": "This check needs an account credential to ask the provider about subscription, activation, and upgrade eligibility.",
+      "board": "Checks",
+      "unavailableTitle": "Check unavailable",
+      "unavailableBody": "This site has no credential API for this check and does not collect a session, password, or token. None of the rows below has a result.",
+      "item": "Item",
+      "result": "Result",
+      "notChecked": "Not checked",
+      "rows": { "subscription": "Subscription", "open": "Can activate", "upgrade": "Can upgrade" }
     }
   }
 }

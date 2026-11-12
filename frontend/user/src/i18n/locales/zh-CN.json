@@ -1770,6 +1770,14 @@
       "register": "注册",
       "help": "帮助中心",
       "tools": "实用工具",
+      "personal": "个人产品",
+      "gateway": "Need网关",
+      "workstation": "Need 工位",
+      "comingSoon": "待开放",
+      "radar": "重置雷达",
+      "accountCheck": "账号检测",
+      "claudeCheck": "Claude code 网络环境检测",
+      "codexCheck": "Codex 账号检测",
       "faq": "常见问题",
       "environment": "检测工具",
       "appleIds": "免费苹果 ID",
@@ -2896,6 +2904,107 @@
       "setupTwoFactor": "注册后设置两步验证",
       "setupTwoFactorHint": "创建账号后，用验证器扫码并输入验证码启用。",
       "securityHint": "已有密码与两步验证继续保护你的账号。"
+    },
+    "homeLibrary": {
+      "eyebrow": "产品库",
+      "title": "稳定、高效、合规",
+      "tabs": "按服务查看商品",
+      "categories": "分类",
+      "invoice": "可开发票",
+      "officialChip": "官方 {price}",
+      "payLabel": "付款方式",
+      "payAlipay": "支付宝",
+      "payUsdt": "USDT",
+      "payChains": "BEP20 · TRC20",
+      "loadError": "商品暂时没有加载出来。",
+      "empty": "这个分类下还没有可展示的商品。"
+    },
+    "apiUse": {
+      "title": "工具里使用",
+      "intro": "API 套餐交付的是控制台里的 Key。下面只列出本站已经写明配置的用法：在线网关、OpenCode、curl，以及 OpenAI Python SDK。",
+      "buy": "查看套餐目录",
+      "console": "打开 API 控制台",
+      "toolsTitle": "工具里使用",
+      "compatible": "其他编程工具只要接受 OpenAI 兼容的 baseURL 和 Bearer Key，就可以用同一组地址和 Key。未在本站文档写明的客户端不在这里列出。",
+      "calculatorTitle": "API 用量计算",
+      "calculatorIntro": "按现有套餐的计费单位估算用量。结果只用于预算，不改变下单价格。",
+      "tools": {
+        "console": {
+          "title": "在线网关",
+          "body": "在 API 控制台创建 Key，并查看额度与用量。请求发到下面的 baseURL。"
+        },
+        "opencode": {
+          "title": "OpenCode",
+          "body": "把配置放到项目根目录的 opencode.json，或全局的 ~/.config/opencode/opencode.json。Key 用环境变量引用，不要写进文件。"
+        },
+        "curl": {
+          "title": "curl",
+          "body": "用环境变量里的 Key 调用聊天补全接口。先在同一终端 export NEEDTOKEN_API_KEY。"
+        },
+        "python": {
+          "title": "Python OpenAI SDK",
+          "body": "官方 openai 包把 base_url 指到本站，api_key 读取同一环境变量。"
+        }
+      }
+    },
+    "statusStrip": {
+      "label": "公开服务状态",
+      "gpt": "GPT 状态",
+      "codex": "Codex 状态",
+      "codexIntro": "只列出公开摘要里名称包含 Codex 的组件。",
+      "codexEmpty": "公开摘要里没有名称包含 Codex 的组件。",
+      "loading": "正在读取公开状态。",
+      "unavailable": "这个公开状态源暂时不可用。",
+      "currentCount": "{ok} / {total} 项当前为正常",
+      "noHistory": "公开摘要没有历史可用率，这里不估算百分比。",
+      "updated": "来源更新于 {time}",
+      "stale": "来源自 {time} 起没有新的更新",
+      "sources": {
+        "openai": "OpenAI",
+        "claude": "Claude",
+        "codex": "Codex"
+      },
+      "component": {
+        "operational": "正常",
+        "degraded_performance": "性能下降",
+        "partial_outage": "部分中断",
+        "major_outage": "严重中断",
+        "under_maintenance": "维护中",
+        "unknown": "状态未知"
+      }
+    },
+    "radar": {
+      "eyebrow": "实用工具",
+      "title": "重置雷达",
+      "intro": "这块看板只陈列 OpenAI 公开状态里名称含 Codex 的组件，以及同时提到 Codex，或同时提到 reset 与 quota 的事件。没有这类公开记录就保持空白。",
+      "board": "公开记录",
+      "unavailable": "公开状态暂时读不到，看板没有可展示的记录。",
+      "empty": "当前公开事件和组件里没有 Codex 或额度重置记录。",
+      "note": "这里不推测重置时间，也不把无关故障写成重置公告。",
+      "incidentsUnavailable": "组件状态已经读到。事件列表这次没有读到，所以没有事件行。",
+      "item": "项目",
+      "kind": "类型",
+      "state": "来源状态",
+      "kinds": {
+        "component": "组件",
+        "incident": "事件"
+      }
+    },
+    "codexCheck": {
+      "eyebrow": "账号检测",
+      "title": "Codex 账号检测",
+      "intro": "这类检测需要拿账号凭证向服务商查询订阅、开通和升级条件。",
+      "board": "检测项",
+      "unavailableTitle": "检测暂不可用",
+      "unavailableBody": "本站没有这项检测所需的凭证接口，也不会收集 Session、密码或令牌。下面各项都没有检测结果。",
+      "item": "项目",
+      "result": "结果",
+      "notChecked": "未检测",
+      "rows": {
+        "subscription": "订阅状态",
+        "open": "能否开通",
+        "upgrade": "能否升级"
+      }
     }
   }
 }

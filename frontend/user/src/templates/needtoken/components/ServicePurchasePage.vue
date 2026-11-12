@@ -64,6 +64,34 @@
             <p v-else-if="product.fulfillment_type === 'auto'">{{ t('needtoken.purchaseServices.digitalHint') }}</p>
             <div class="guidance-links"><RouterLink to="/notice">{{ t('needtoken.purchaseServices.notices') }}<ArrowUpRight :size="13" /></RouterLink><RouterLink to="/terms">{{ t('footer.terms') }}<ArrowUpRight :size="13" /></RouterLink></div>
           </section>
+
+          <section v-if="getLocalizedText(product.content)" class="purchase-content">
+            <div class="purchase-section-head"><div><h2>{{ t('needtoken.purchaseServices.productInfo') }}</h2><p>{{ t('needtoken.purchaseServices.infoHint') }}</p></div></div>
+            <div class="prose dark:prose-invert max-w-none theme-prose" v-html="processHtmlForDisplay(getLocalizedText(product.content))"></div>
+          </section>
+          <section class="purchase-related">
+            <div class="purchase-section-head"><div><h2>{{ t('needtoken.purchaseServices.resourcesTitle') }}</h2><p>{{ t('needtoken.purchaseServices.resourcesHint') }}</p></div></div>
+            <div class="purchase-resources">
+              <section class="resource-group">
+                <div class="resource-heading"><h3>{{ t('productDetail.relatedPosts') }}</h3><RouterLink to="/blog">{{ t('needtoken.purchaseServices.allGuides') }}<ArrowUpRight :size="14" /></RouterLink></div>
+                <p v-if="!relatedPosts.length" class="resource-state" role="status">{{ t('needtoken.purchaseServices.noProductGuides') }}</p>
+                <div v-else class="related-grid"><RouterLink v-for="post in relatedPosts" :key="post.id" :to="`/blog/${post.slug}`" class="related-card">
+                  <img v-if="post.thumbnail" :src="getImageUrl(post.thumbnail)" :alt="getLocalizedText(post.title)" loading="lazy" />
+                  <div><h4>{{ getLocalizedText(post.title) }}<ArrowUpRight :size="15" /></h4><p v-if="post.summary">{{ getLocalizedText(post.summary) }}</p><time v-if="post.published_at">{{ formatRelatedPostDate(post.published_at) }}</time></div>
+                </RouterLink></div>
+              </section>
+              <section class="resource-group notice-group">
+                <div class="resource-heading"><h3><Bell :size="15" />{{ t('needtoken.purchaseServices.siteNotices') }}</h3><RouterLink to="/notice">{{ t('needtoken.purchaseServices.allNotices') }}<ArrowUpRight :size="14" /></RouterLink></div>
+                <p class="notice-scope">{{ t('needtoken.purchaseServices.siteNoticeScope') }}</p>
+                <p v-if="siteNoticeState === 'idle' || siteNoticeState === 'loading'" class="resource-state" role="status">{{ t('needtoken.common.loading') }}</p>
+                <div v-else-if="siteNoticeState === 'error'" class="resource-state notice-error" role="status"><p>{{ t('needtoken.purchaseServices.noticeLoadFailed') }}</p><button type="button" @click="loadSiteNotices"><RotateCw :size="12" />{{ t('errorBoundary.retry') }}</button></div>
+                <p v-else-if="!siteNotices.length" class="resource-state" role="status">{{ t('needtoken.purchaseServices.noSiteNotices') }}</p>
+                <div v-else class="notice-list"><RouterLink v-for="post in siteNotices" :key="post.id" :to="`/blog/${post.slug}`" class="notice-card">
+                  <div><h4>{{ getLocalizedText(post.title) || t('nav.notice') }}</h4><p v-if="post.summary">{{ getLocalizedText(post.summary) }}</p><time v-if="post.published_at">{{ formatRelatedPostDate(post.published_at) }}</time></div><ArrowUpRight :size="14" />
+                </RouterLink></div>
+              </section>
+            </div>
+          </section>
         </section>
 
         <aside class="purchase-summary">
@@ -97,35 +125,6 @@
           <div class="summary-secure"><LockKeyhole :size="13" />{{ t('needtoken.purchaseServices.secureOrder') }}</div>
         </aside>
       </div>
-
-      <section v-if="getLocalizedText(product.content)" class="purchase-content">
-        <div class="purchase-section-head"><div><h2>{{ t('needtoken.purchaseServices.productInfo') }}</h2><p>{{ t('needtoken.purchaseServices.infoHint') }}</p></div></div>
-        <div class="prose dark:prose-invert max-w-none theme-prose" v-html="processHtmlForDisplay(getLocalizedText(product.content))"></div>
-      </section>
-
-      <section class="purchase-related">
-        <div class="purchase-section-head"><div><h2>{{ t('needtoken.purchaseServices.resourcesTitle') }}</h2><p>{{ t('needtoken.purchaseServices.resourcesHint') }}</p></div></div>
-        <div class="purchase-resources">
-          <section class="resource-group">
-            <div class="resource-heading"><h3>{{ t('productDetail.relatedPosts') }}</h3><RouterLink to="/blog">{{ t('needtoken.purchaseServices.allGuides') }}<ArrowUpRight :size="14" /></RouterLink></div>
-            <p v-if="!relatedPosts.length" class="resource-state" role="status">{{ t('needtoken.purchaseServices.noProductGuides') }}</p>
-            <div v-else class="related-grid"><RouterLink v-for="post in relatedPosts" :key="post.id" :to="`/blog/${post.slug}`" class="related-card">
-              <img v-if="post.thumbnail" :src="getImageUrl(post.thumbnail)" :alt="getLocalizedText(post.title)" loading="lazy" />
-              <div><h4>{{ getLocalizedText(post.title) }}<ArrowUpRight :size="15" /></h4><p v-if="post.summary">{{ getLocalizedText(post.summary) }}</p><time v-if="post.published_at">{{ formatRelatedPostDate(post.published_at) }}</time></div>
-            </RouterLink></div>
-          </section>
-          <section class="resource-group notice-group">
-            <div class="resource-heading"><h3><Bell :size="15" />{{ t('needtoken.purchaseServices.siteNotices') }}</h3><RouterLink to="/notice">{{ t('needtoken.purchaseServices.allNotices') }}<ArrowUpRight :size="14" /></RouterLink></div>
-            <p class="notice-scope">{{ t('needtoken.purchaseServices.siteNoticeScope') }}</p>
-            <p v-if="siteNoticeState === 'idle' || siteNoticeState === 'loading'" class="resource-state" role="status">{{ t('needtoken.common.loading') }}</p>
-            <div v-else-if="siteNoticeState === 'error'" class="resource-state notice-error" role="status"><p>{{ t('needtoken.purchaseServices.noticeLoadFailed') }}</p><button type="button" @click="loadSiteNotices"><RotateCw :size="12" />{{ t('errorBoundary.retry') }}</button></div>
-            <p v-else-if="!siteNotices.length" class="resource-state" role="status">{{ t('needtoken.purchaseServices.noSiteNotices') }}</p>
-            <div v-else class="notice-list"><RouterLink v-for="post in siteNotices" :key="post.id" :to="`/blog/${post.slug}`" class="notice-card">
-              <div><h4>{{ getLocalizedText(post.title) || t('nav.notice') }}</h4><p v-if="post.summary">{{ getLocalizedText(post.summary) }}</p><time v-if="post.published_at">{{ formatRelatedPostDate(post.published_at) }}</time></div><ArrowUpRight :size="14" />
-            </RouterLink></div>
-          </section>
-        </div>
-      </section>
 
       <div class="purchase-mobile-bar" :aria-label="t('needtoken.purchaseServices.orderSummary')">
         <div class="mobile-purchase-info">
@@ -284,11 +283,11 @@ const submitCart = () => {
 </script>
 
 <style scoped>
-.nt-purchase-page { max-width: 1160px; margin: 0 auto; padding: 23px 24px 36px; }
+.nt-purchase-page { max-width: 1160px; height: calc(100dvh - 64px); margin: 0 auto; padding: 12px 20px; display: flex; flex-direction: column; overflow: hidden; animation: purchase-in .28s ease; }
 .purchase-topline { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-width: 0; }
 .purchase-back { display: inline-flex; align-items: center; gap: 7px; color: var(--ui-text-muted); font-size: 12px; transition: color .18s; }
 .purchase-back:hover { color: var(--ui-accent); }
-.purchase-heading { padding: 20px 0 22px; min-width: 0; }
+.purchase-heading { padding: 10px 0 12px; min-width: 0; flex: none; }
 .purchase-heading h1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 .3em; font-size: clamp(25px, 3vw, 33px); font-weight: 700; letter-spacing: -.035em; line-height: 1.3; overflow-wrap: anywhere; color: var(--ui-text-primary); }
 .purchase-heading h1 > span { min-width: 0; }
 .purchase-category { color: var(--ui-accent); }
@@ -299,9 +298,9 @@ const submitCart = () => {
 .purchase-steps li > span { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--ui-border-strong); border-radius: 50%; font-size: 10px; }
 .purchase-steps .current { color: var(--ui-accent); }
 .purchase-steps .current > span { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
-.purchase-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.purchase-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: stretch; flex: 1; min-height: 0; }
 .purchase-main, .purchase-summary, .purchase-content, .purchase-related { border: 1px solid var(--ui-border); border-radius: 20px; background: linear-gradient(140deg, rgba(255,255,255,.025), rgba(255,255,255,.005)), var(--ui-bg-elevated); }
-.purchase-main { padding: 20px; min-width: 0; }
+.purchase-main { padding: 16px; min-width: 0; min-height: 0; overflow: auto; }
 .purchase-section-head { display: flex; gap: 14px; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .purchase-section-head h2 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
 .purchase-section-head p { margin-top: 7px; font-size: 12px; line-height: 1.65; color: var(--ui-text-muted); }
@@ -340,7 +339,7 @@ const submitCart = () => {
 .purchase-guidance p { font-size: 12px; line-height: 1.85; color: var(--ui-text-muted); margin-top: 9px; }
 .guidance-links { display: flex; gap: 20px; margin-top: 16px; }
 .guidance-links a, .purchase-section-head > a { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--ui-accent); }
-.purchase-summary { position: sticky; top: 90px; padding: 20px; min-width: 0; }
+.purchase-summary { position: static; padding: 16px; min-width: 0; min-height: 0; overflow: auto; }
 .summary-label { font-size: 10px; letter-spacing: .1em; color: var(--ui-text-muted); }
 .purchase-summary h2 { font-size: 15px; font-weight: 600; line-height: 1.5; margin-top: 10px; overflow-wrap: anywhere; }
 .summary-option { font-size: 12px; color: var(--ui-accent); margin-top: 7px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -365,7 +364,7 @@ const submitCart = () => {
 .purchase-message { display: flex; gap: 7px; align-items: start; padding: 12px; border-radius: 8px; border: 1px solid var(--ui-border); font-size: 12px; line-height: 1.7; margin: 14px 0; color: var(--ui-text-muted); }
 .purchase-message svg { flex: none; margin-top: 2px; }
 .purchase-message.warning { color: #f0cd8c; background: rgba(230,180,80,.05); border-color: rgba(230,180,80,.2); }
-.purchase-content, .purchase-related { margin-top: 26px; padding: 25px; }
+.purchase-content, .purchase-related { margin-top: 16px; padding: 16px; border: 0; background: transparent; }
 .purchase-content :deep(.prose) { font-size: 14px; line-height: 1.85; }
 .purchase-content :deep(img) { max-width: 100%; height: auto; border-radius: 10px; }
 .purchase-content :deep(pre) { overflow-x: auto; }
@@ -410,9 +409,10 @@ const submitCart = () => {
 .mobile-purchase-action:disabled { opacity: .4; cursor: not-allowed; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 4px; }
 @keyframes purchase-pulse { 50% { opacity: .5; } }
+@keyframes purchase-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @media (max-width: 1050px) and (min-width: 851px) { .purchase-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 850px) { .purchase-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; } .purchase-summary { position: static; } .purchase-summary h2 { font-size: 19px; } .summary-price { font-size: 35px; } .summary-price.unconfirmed { font-size: 17px; } .purchase-resources { grid-template-columns: minmax(0, 1fr); gap: 23px; } .notice-group { border-top: 1px solid var(--ui-border); padding-top: 23px; } }
-@media (max-width: 850px) { .purchase-mobile-bar { position: fixed; inset: auto 0 0; z-index: 45; display: flex; align-items: center; gap: 16px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--ui-border-strong); background: rgba(14, 18, 24, .96); backdrop-filter: blur(18px); } :global(body:has(.purchase-mobile-bar)) { padding-bottom: calc(80px + env(safe-area-inset-bottom)); } }
+@media (max-width: 850px) { .nt-purchase-page { height: calc(100dvh - 64px); padding-bottom: 8px; } .purchase-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(180px, 46%) minmax(0, 1fr); gap: 10px; } .purchase-summary { order: -1; } .purchase-summary h2 { font-size: 16px; } .summary-price { font-size: 28px; } .summary-price.unconfirmed { font-size: 17px; } .purchase-resources { grid-template-columns: minmax(0, 1fr); gap: 16px; } .notice-group { border-top: 1px solid var(--ui-border); padding-top: 16px; } }
+@media (max-width: 850px) { .purchase-mobile-bar { display: none; } }
 @media (max-width: 560px) { .nt-purchase-page { padding: 19px 16px 25px; } .purchase-topline { align-items: flex-start; gap: 12px; } .purchase-back { font-size: 11px; flex: none; } .purchase-heading { padding: 18px 0; } .purchase-heading h1 { font-size: 25px; } .purchase-steps { gap: 7px; font-size: 10px; } .purchase-steps li { gap: 4px; } .purchase-steps li > span { width: 16px; height: 16px; } .purchase-steps li > svg { display: none; } .purchase-main, .purchase-summary, .purchase-content, .purchase-related { border-radius: 15px; padding: 19px; } .purchase-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; } .purchase-option { padding: 13px; } .option-top { font-size: 12px; } .option-price { font-size: 19px; } .purchase-variant-features { grid-template-columns: minmax(0, 1fr); } .purchase-count { display: none; } .related-grid { grid-template-columns: minmax(0, 1fr); } .related-card { display: flex; } .related-card > img { width: 90px; height: auto; object-fit: cover; } }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .nt-purchase-page { animation: none; } }
 </style>

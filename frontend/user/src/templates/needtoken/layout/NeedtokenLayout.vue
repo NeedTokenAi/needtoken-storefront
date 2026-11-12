@@ -9,22 +9,20 @@
         </RouterLink>
 
         <nav class="nt-desktop-navigation ml-4 flex items-center gap-1 max-[1239px]:hidden" :aria-label="t('needtoken.nav.label')">
-          <RouterLink
-            v-for="item in menuItems"
-            :key="item.key"
-            :to="item.path"
-            class="whitespace-nowrap rounded-md px-3 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            :class="isActive(item) ? '!text-primary' : ''"
-            :aria-current="isActive(item) ? 'page' : undefined"
-          >{{ item.label }}</RouterLink>
-          <div v-for="group in navGroups" :key="group.key" :ref="el => setGroupEl(group.key, el)" class="relative" @focusout="onGroupFocusOut($event, group.key)" @keydown="onGroupKeydown($event, group.key)">
-            <button :id="`nt-nav-${group.key}`" type="button" class="nt-nav-group-button" :class="group.items.some(isActive) ? 'text-primary' : 'text-muted-foreground'" :aria-expanded="openGroup === group.key" :aria-controls="`nt-nav-panel-${group.key}`" @click="toggleGroup(group.key)">
-              {{ group.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="openGroup === group.key ? 'rotate-180' : ''" />
-            </button>
-            <div v-if="openGroup === group.key" :id="`nt-nav-panel-${group.key}`" class="nt-nav-dropdown" :aria-labelledby="`nt-nav-${group.key}`">
-              <RouterLink v-for="item in group.items" :key="item.key" :to="item.path" class="nt-nav-dropdown-link" :class="isActive(item) ? 'text-primary bg-primary/5' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined" @click="closeMenus">{{ item.label }}<ArrowUpRight class="h-3.5 w-3.5 opacity-50" /></RouterLink>
+          <template v-for="node in navNodes" :key="node.key">
+            <RouterLink v-if="node.kind === 'link'" :to="node.path" class="whitespace-nowrap rounded-md px-3 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" :class="isActive(node) ? '!text-primary' : ''" :aria-current="isActive(node) ? 'page' : undefined">{{ node.label }}</RouterLink>
+            <div v-else :ref="el => setGroupEl(node.key, el)" class="relative" @focusout="onGroupFocusOut($event, node.key)" @keydown="onGroupKeydown($event, node.key)">
+              <button :id="`nt-nav-${node.key}`" type="button" class="nt-nav-group-button" :class="node.items.some(isActive) ? 'text-primary' : 'text-muted-foreground'" :aria-expanded="openGroup === node.key" :aria-controls="`nt-nav-panel-${node.key}`" @click="toggleGroup(node.key)">
+                {{ node.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="openGroup === node.key ? 'rotate-180' : ''" />
+              </button>
+              <div v-if="openGroup === node.key" :id="`nt-nav-panel-${node.key}`" class="nt-nav-dropdown" :aria-labelledby="`nt-nav-${node.key}`">
+                <template v-for="item in node.items" :key="item.key">
+                  <span v-if="item.disabled" class="nt-nav-dropdown-link is-disabled" aria-disabled="true">{{ item.label }}<em>{{ item.badge }}</em></span>
+                  <RouterLink v-else :to="item.path" class="nt-nav-dropdown-link" :class="isActive(item) ? 'text-primary bg-primary/5' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined" @click="closeMenus">{{ item.label }}<ArrowUpRight class="h-3.5 w-3.5 opacity-50" /></RouterLink>
+                </template>
+              </div>
             </div>
-          </div>
+          </template>
         </nav>
 
         <div class="ml-auto flex shrink-0 items-center gap-2">
@@ -52,13 +50,18 @@
               <X v-else class="pointer-events-none h-[18px] w-[18px]" />
             </button>
             <nav v-if="moreOpen" id="nt-mobile-navigation" class="nt-mobile-navigation absolute right-0 top-[calc(100%+8px)] z-[60] flex min-w-[230px] flex-col rounded-xl border border-border bg-card p-2" :aria-label="t('needtoken.nav.label')">
-              <RouterLink v-for="item in menuItems" :key="`m-${item.key}`" :to="item.path" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :class="isActive(item) ? '!text-primary' : ''" :aria-current="isActive(item) ? 'page' : undefined" @click="moreOpen = false">{{ item.label }}</RouterLink>
-              <div v-for="group in navGroups" :key="`m-${group.key}`" class="mt-1 border-t border-border pt-1">
-                <button type="button" class="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-expanded="mobileGroup === group.key" :aria-controls="`nt-mobile-${group.key}`" @click="mobileGroup = mobileGroup === group.key ? null : group.key">{{ group.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="mobileGroup === group.key ? 'rotate-180' : ''" /></button>
-                <div v-if="mobileGroup === group.key" :id="`nt-mobile-${group.key}`" class="ml-3 border-l border-border pl-2">
-                  <RouterLink v-for="item in group.items" :key="`m-${item.key}`" :to="item.path" class="block rounded px-3 py-2 text-sm hover:bg-secondary" :class="isActive(item) ? 'text-primary' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined" @click="closeMenus">{{ item.label }}</RouterLink>
+              <template v-for="node in navNodes" :key="`m-${node.key}`">
+                <RouterLink v-if="node.kind === 'link'" :to="node.path" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :class="isActive(node) ? '!text-primary' : ''" :aria-current="isActive(node) ? 'page' : undefined" @click="moreOpen = false">{{ node.label }}</RouterLink>
+                <div v-else class="mt-1 border-t border-border pt-1">
+                  <button type="button" class="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-expanded="mobileGroup === node.key" :aria-controls="`nt-mobile-${node.key}`" @click="mobileGroup = mobileGroup === node.key ? null : node.key">{{ node.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="mobileGroup === node.key ? 'rotate-180' : ''" /></button>
+                  <div v-if="mobileGroup === node.key" :id="`nt-mobile-${node.key}`" class="ml-3 border-l border-border pl-2">
+                    <template v-for="item in node.items" :key="`m-${item.key}`">
+                      <span v-if="item.disabled" class="flex items-center justify-between rounded px-3 py-2 text-sm text-muted-foreground" aria-disabled="true">{{ item.label }}<em class="text-[11px] not-italic text-amber-200/80">{{ item.badge }}</em></span>
+                      <RouterLink v-else :to="item.path" class="block rounded px-3 py-2 text-sm hover:bg-secondary" :class="isActive(item) ? 'text-primary' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined" @click="closeMenus">{{ item.label }}</RouterLink>
+                    </template>
+                  </div>
                 </div>
-              </div>
+              </template>
               <RouterLink to="/guest/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ t('navbar.guestOrders') }}</RouterLink>
               <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
               <span class="px-3 pb-1 pt-2 text-[11px] uppercase tracking-wider text-muted-foreground">{{ t('navbar.selectLanguage') }}</span>
@@ -136,30 +139,38 @@ const support = computed(() => normalizeNeedtokenSupport(appStore.isResellerTena
 const raiseSupport = computed(() => /^\/(?:products\/|checkout(?:\/|$)|pay(?:ment)?(?:\/|$))/.test(route.path))
 const cartCount = computed(() => cartStore.totalItems)
 
-interface MenuItem { key: string; path: string; label: string }
+interface NavLink { kind: 'link'; key: string; path: string; label: string; disabled?: boolean; badge?: string }
+interface NavGroup { kind: 'group'; key: string; label: string; items: NavLink[] }
 
-const menuItems = computed<MenuItem[]>(() => [
-  { key: 'home', path: '/', label: t('needtoken.nav.home') },
-  { key: 'recharge', path: `/categories/${CATEGORY_SLUGS.recharge}`, label: t('needtoken.nav.recharge') },
-  { key: 'rental', path: `/categories/${CATEGORY_SLUGS.rental}`, label: t('needtoken.nav.rental') },
-  { key: 'plans', path: API_SERVICES_PATH, label: t('needtoken.nav.plans') },
-  { key: 'models', path: '/models', label: t('needtoken.nav.models') },
-])
-const navGroups = computed(() => [
-  { key: 'help', label: t('needtoken.nav.help'), items: [
-    { key: 'blog', path: '/blog', label: t('needtoken.nav.blog') },
-    { key: 'docs', path: '/docs', label: t('needtoken.nav.docs') },
-    { key: 'faq', path: '/faq', label: t('needtoken.nav.faq') },
+const link = (key: string, path: string, label: string, extra: Partial<NavLink> = {}): NavLink => ({ kind: 'link', key, path, label, ...extra })
+const navNodes = computed<(NavLink | NavGroup)[]>(() => [
+  link('home', '/', t('needtoken.nav.home')),
+  { kind: 'group', key: 'personal', label: t('needtoken.nav.personal'), items: [
+    link('recharge', `/categories/${CATEGORY_SLUGS.recharge}`, t('needtoken.nav.recharge')),
+    link('rental', `/categories/${CATEGORY_SLUGS.rental}`, t('needtoken.nav.rental')),
+    link('workstation', '', t('needtoken.nav.workstation'), { disabled: true, badge: t('needtoken.nav.comingSoon') }),
   ] },
-  { key: 'tools', label: t('needtoken.nav.tools'), items: [
-    { key: 'environment', path: '/tools/environment', label: t('needtoken.nav.environment') },
-    { key: 'appleIds', path: '/free-apple-id', label: t('needtoken.nav.appleIds') },
+  { kind: 'group', key: 'gateway', label: t('needtoken.nav.gateway'), items: [
+    link('plans', API_SERVICES_PATH, t('needtoken.nav.plans')),
+    link('models', '/models', t('needtoken.nav.models')),
+    link('docs', '/docs', t('needtoken.nav.docs')),
+  ] },
+  link('radar', '/tools/radar', t('needtoken.nav.radar')),
+  { kind: 'group', key: 'accountCheck', label: t('needtoken.nav.accountCheck'), items: [
+    link('environment', '/tools/environment', t('needtoken.nav.claudeCheck')),
+    link('codexCheck', '/tools/codex-account', t('needtoken.nav.codexCheck')),
+  ] },
+  { kind: 'group', key: 'help', label: t('needtoken.nav.help'), items: [
+    link('blog', '/blog', t('needtoken.nav.blog')),
+    link('faq', '/faq', t('needtoken.nav.faq')),
   ] },
 ])
 
-const isActive = (item: MenuItem) => item.key === 'plans'
-  ? [API_PLANS_PATH, API_SERVICES_PATH].some(path => route.path === path || route.path.startsWith(`${path}/`))
-  : item.path === '/' ? route.path === '/' : route.path === item.path || route.path.startsWith(`${item.path}/`)
+const isActive = (item: { key: string; path?: string; disabled?: boolean }) => {
+  if (item.disabled || !item.path) return false
+  if (item.key === 'plans') return [API_PLANS_PATH, API_SERVICES_PATH].some(path => route.path === path || route.path.startsWith(`${path}/`))
+  return item.path === '/' ? route.path === '/' : route.path === item.path || route.path.startsWith(`${item.path}/`)
+}
 
 function setGroupEl(key: string, el: Element | ComponentPublicInstance | null) {
   if (el instanceof HTMLElement) groupEls.set(key, el)
@@ -255,8 +266,10 @@ onUnmounted(() => {
 @media (max-width: 640px) { .nt-site-header { padding-inline: 14px; } }
 .nt-nav-group-button { display: flex; align-items: center; gap: 5px; border-radius: 6px; padding: 8px 10px; white-space: nowrap; font-size: 14px; font-weight: 500; }
 .nt-nav-group-button:hover { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
-.nt-nav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 60; width: 186px; padding: 7px; border: 1px solid var(--ui-border); border-radius: 12px; background: #0e1218; box-shadow: 0 12px 32px #0005; }
+.nt-nav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 60; width: max-content; min-width: 186px; max-width: min(320px, 70vw); padding: 7px; border: 1px solid var(--ui-border); border-radius: 12px; background: #0e1218; box-shadow: 0 12px 32px #0005; }
 .nt-nav-dropdown-link { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 12px; border-radius: 6px; font-size: 13px; }
 .nt-nav-dropdown-link:hover { color: var(--ui-accent); background: var(--ui-bg-soft); }
+.nt-nav-dropdown-link.is-disabled { color: var(--ui-text-muted); cursor: default; }
+.nt-nav-dropdown-link.is-disabled em { font-style: normal; font-size: 11px; color: #e7c56a; }
 .nt-mobile-navigation { max-height: calc(100dvh - 90px); overflow-y: auto; overscroll-behavior: contain; }
 </style>
