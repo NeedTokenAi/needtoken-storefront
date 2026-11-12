@@ -1,0 +1,55 @@
+# Builds and pushes the staging container image, then outputs the registry digest.
+# workflow_dispatch only. It does not publish a Worker and it does not select a route.
+name: cloudflare-image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  push-image:
+    name: Push staging image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      repository: ${{ steps.record.outputs.repository }}
+      sha: ${{ steps.record.outputs.sha }}
+      run_id: ${{ steps.record.outputs.run_id }}
+      digest: ${{ steps.record.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Build and push the staging image
+        id: build
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          tag="needtoken-storefront-staging:${GITHUB_SHA}"
+          npx --yes wrangler@4 containers build -p -t "${tag}" .
+          uri="registry.cloudflare.com/${CLOUDFLARE_ACCOUNT_ID}/needtoken-storefront-staging:${GITHUB_SHA}"
+          digest=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "${uri}" | awk '/^registry\.cloudflare\.com\// { print; exit }')
+          printf 'digest=%s\n' "${digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Record the build
+        id: record
+        env:
+          BUILD_REPOSITORY: ${{ github.repository }}
+          BUILD_SHA: ${{ github.sha }}
+          BUILD_RUN_ID: ${{ github.run_id }}
+          BUILD_SOURCE: github-actions
+          IMAGE_REF: ${{ steps.build.outputs.digest }}
+        run: bash .github/scripts/cloudflare-image-record.sh

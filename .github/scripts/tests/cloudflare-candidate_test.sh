@@ -32,9 +32,8 @@ grep -q 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' "${WORKFLO
 if grep -Eq 'image_digest:|git_sha:' "${WORKFLOW}"; then
   fail "candidate dispatch still accepts a hand-filled digest"
 fi
-if [[ -f ${ROOT}/.github/workflows/cloudflare-image.yml ]]; then
-  fail "image build workflow must stay on its own branch"
-fi
+[[ -f ${ROOT}/.github/workflows/cloudflare-image.yml ]] || fail "main image workflow must stay"
+[[ -f ${ROOT}/.github/scripts/cloudflare-image-record.sh ]] || fail "main image record script must stay"
 (
   cd "${ROOT}"
   node --input-type=module -e 'import {readFileSync} from "node:fs"; const cfg=JSON.parse(readFileSync("cloudflare/wrangler.staging.jsonc","utf8")); const raw=JSON.stringify(cfg); const images=cfg.containers[0].images; if (cfg.name !== "needtoken-storefront-staging" || cfg.routes || cfg.workers_dev !== false || cfg.preview_urls !== false) process.exit(1); if (raw.includes("Dockerfile") || raw.includes("dockerfile") || raw.includes("build_context")) process.exit(2); if (images.dujiao.image !== "${CLOUDFLARE_IMAGE_DIGEST}" || images["dujiao-previous"].image !== "${CLOUDFLARE_IMAGE_DIGEST}") process.exit(3);'
