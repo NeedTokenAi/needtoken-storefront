@@ -11,7 +11,15 @@ export const INSTANCE_TYPE = "basic";
 
 export const MAX_INSTANCES = 2;
 
-// Platform maximum. A shorter timeout would stop the process between requests.
+// One container runs the in-process paid-fulfillment loop. max_instances 2
+// would start a second loop if another name were addressed.
+export const RESIDENT_INSTANCE = "instance-0";
+
+// UTC, once a minute. The in-process ticker does not count as container activity.
+export const RESIDENT_CRON = "* * * * *";
+
+// sleepAfter. setInactivityTimeout rejects any value above 6 hours, so 24h
+// cannot be applied. This is the platform maximum. The minute cron resets it.
 export const INACTIVITY_TIMEOUT_MS = 6 * 60 * 60 * 1000;
 
 export function containerEnv(env) {
@@ -28,12 +36,14 @@ export function containerEnv(env) {
   return out;
 }
 
-export function instanceName(random = Math.random) {
-  const index = Math.floor(Number(random()) * MAX_INSTANCES);
-  if (index < 0 || index >= MAX_INSTANCES) {
-    throw new Error("instance index out of range");
+export async function keepResident(namespace) {
+  const response = await namespace.getByName(RESIDENT_INSTANCE).fetch(
+    new Request("https://internal/health"),
+  );
+  await response.body?.cancel();
+  if (!response.ok) {
+    throw new Error(`resident health returned ${response.status}`);
   }
-  return `instance-${index}`;
 }
 
 export function forwardRequest(request) {

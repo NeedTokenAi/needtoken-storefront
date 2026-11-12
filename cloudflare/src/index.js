@@ -3,10 +3,11 @@ import { DurableObject } from "cloudflare:workers";
 import {
   APP_PORT,
   INACTIVITY_TIMEOUT_MS,
+  RESIDENT_INSTANCE,
   START_COMMAND,
   containerEnv,
   forwardRequest,
-  instanceName,
+  keepResident,
 } from "./runtime.js";
 
 export class Storefront extends DurableObject {
@@ -65,6 +66,10 @@ export class Storefront extends DurableObject {
 
 export default {
   fetch(request, env) {
-    return env.STOREFRONT.getByName(instanceName()).fetch(request);
+    return env.STOREFRONT.getByName(RESIDENT_INSTANCE).fetch(request);
+  },
+
+  async scheduled(_controller, env) {
+    await keepResident(env.STOREFRONT);
   },
 };

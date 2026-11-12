@@ -7,21 +7,26 @@ import { fileURLToPath } from "node:url";
 import {
   APP_PORT,
   INSTANCE_TYPE,
+  INACTIVITY_TIMEOUT_MS,
   MAX_INSTANCES,
+  RESIDENT_CRON,
+  RESIDENT_INSTANCE,
   START_COMMAND,
   containerEnv,
   forwardRequest,
-  instanceName,
+  keepResident,
 } from "./runtime.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test("production worker serves workers.dev and does not build an image", () => {
+test("production worker has no public dev route and does not build an image", () => {
   const wrangler = JSON.parse(readFileSync(join(root, "wrangler.jsonc"), "utf8"));
   const container = wrangler.containers[0];
   assert.equal(wrangler.name, "needtoken-storefront");
-  assert.equal(wrangler.workers_dev, true);
+  assert.equal(wrangler.workers_dev, false);
   assert.equal(wrangler.preview_urls, false);
+  assert.deepEqual(wrangler.triggers.crons, [RESIDENT_CRON]);
+  assert.equal(RESIDENT_CRON, "* * * * *");
   assert.equal(wrangler.routes, undefined);
   assert.equal(JSON.stringify(wrangler).includes("needtoken.ai"), false);
   assert.equal(JSON.stringify(wrangler).toLowerCase().includes("staging"), false);
@@ -47,9 +52,8 @@ test("start command, port, and instance size stay fixed", () => {
   assert.equal(START_COMMAND.join(" "), "/app/dujiao-next -mode=api");
   assert.equal(INSTANCE_TYPE, "basic");
   assert.equal(MAX_INSTANCES, 2);
-  assert.equal(instanceName(() => 0), "instance-0");
-  assert.equal(instanceName(() => 0.999), "instance-1");
-  assert.equal(instanceName(() => 1 - Number.EPSILON), "instance-1");
+  assert.equal(RESIDENT_INSTANCE, "instance-0");
+  assert.equal(INACTIVITY_TIMEOUT_MS, 6 * 60 * 60 * 1000);
 });
 
 test("string env and secrets pass through unchanged", () => {
@@ -87,6 +91,36 @@ test("requests are forwarded to the container port", async () => {
   assert.equal(forwarded.headers.get("content-type"), "application/json");
 });
 
+test("the minute cron wakes only instance-0", async () => {
+  const names = [];
+  const namespace = {
+    getByName(name) {
+      names.push(name);
+      return {
+        fetch() {
+          return new Response("ok", { status: 200 });
+        },
+      };
+    },
+  };
+  await keepResident(namespace);
+  await keepResident(namespace);
+  assert.deepEqual(names, ["instance-0", "instance-0"]);
+
+  const failing = {
+    getByName(name) {
+      names.push(name);
+      return {
+        fetch() {
+          return new Response("down", { status: 503 });
+        },
+      };
+    },
+  };
+  await assert.rejects(() => keepResident(failing), /resident health returned 503/);
+  assert.deepEqual(names, ["instance-0", "instance-0", "instance-0"]);
+});
+
 test("the worker source uses the runtime values and does not restrict hosts", () => {
   const source = readFileSync(join(root, "src/index.js"), "utf8");
   assert.equal(source.includes("container.images"), false);
@@ -96,7 +130,11 @@ test("the worker source uses the runtime values and does not restrict hosts", ()
   assert.match(source, /getTcpPort\(APP_PORT\)/);
   assert.match(source, /forwardRequest\(request\)/);
   assert.match(source, /enableInternet: true/);
-  assert.match(source, /getByName\(instanceName\(\)\)/);
+  assert.match(source, /getByName\(RESIDENT_INSTANCE\)/);
+  assert.match(source, /async scheduled\(_controller, env\)/);
+  assert.match(source, /keepResident\(env\.STOREFRONT\)/);
+  assert.equal(source.includes("instanceName"), false);
+  assert.equal(source.includes("instance-1"), false);
   assert.equal(source.includes("needtoken.ai"), false);
   assert.equal(source.includes("staging"), false);
   assert.equal(source.includes("dockerfile"), false);
