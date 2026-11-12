@@ -22,11 +22,13 @@ function paymentBody() {
     duplex: "half",
   });
   const guarded = new Proxy(request, {
-    get(target, prop, receiver) {
+    get(target, prop) {
       if (prop === "text" || prop === "json" || prop === "arrayBuffer" || prop === "blob") {
         reads += 1;
       }
-      const value = Reflect.get(target, prop, receiver);
+      // Node 24 Request getters use a private field. The receiver must stay
+      // the real Request; the proxy only counts body readers.
+      const value = Reflect.get(target, prop, target);
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
