@@ -8,10 +8,9 @@
     {
       "class_name": "Storefront",
       "scheduling_policy": "durable_object",
-      "max_instances": 2,
       "images": {
         "app": {
-          "image": "${CLOUDFLARE_IMAGE_DIGEST}"
+          "image": "registry.cloudflare.com/account-id/needtoken-storefront@sha256:0000000000000000000000000000000000000000000000000000000000000000"
         }
       }
     }

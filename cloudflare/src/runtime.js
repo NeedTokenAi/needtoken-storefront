@@ -1,7 +1,13 @@
 export const APP_PORT = 8080;
 
+// Cloud Run injects PORT. The production env copied into this Worker does not.
+export const CONTAINER_PORT = "8080";
+
 // argv, not a shell string. Joined, this is /app/dujiao-next -mode=api.
 export const START_COMMAND = ["/app/dujiao-next", "-mode=api"];
+
+// durable_object cannot express max_instances. These two names are the cap.
+export const MAX_INSTANCES = 2;
 
 // No named type is 1 vCPU and 512 MiB. diskMb is the durable_object minimum.
 export const INSTANCE = {
@@ -23,7 +29,16 @@ export function containerEnv(env) {
       out[key] = value;
     }
   }
+  out.PORT = CONTAINER_PORT;
   return out;
+}
+
+export function instanceName(random = Math.random) {
+  const index = Math.floor(Number(random()) * MAX_INSTANCES);
+  if (index < 0 || index >= MAX_INSTANCES) {
+    throw new Error("instance index out of range");
+  }
+  return `instance-${index}`;
 }
 
 export function forwardRequest(request) {

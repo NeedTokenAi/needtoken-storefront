@@ -7,9 +7,8 @@ import {
   START_COMMAND,
   containerEnv,
   forwardRequest,
+  instanceName,
 } from "./runtime.js";
-
-const SINGLETON_NAME = "needtoken-storefront";
 
 export class Storefront extends DurableObject {
   constructor(ctx, env) {
@@ -68,6 +67,6 @@ export class Storefront extends DurableObject {
 
 export default {
   fetch(request, env) {
-    return env.STOREFRONT.getByName(SINGLETON_NAME).fetch(request);
+    return env.STOREFRONT.getByName(instanceName()).fetch(request);
   },
 };

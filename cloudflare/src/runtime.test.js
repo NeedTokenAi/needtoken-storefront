@@ -7,9 +7,11 @@ import { fileURLToPath } from "node:url";
 import {
   APP_PORT,
   INSTANCE,
+  MAX_INSTANCES,
   START_COMMAND,
   containerEnv,
   forwardRequest,
+  instanceName,
 } from "./runtime.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -23,9 +25,14 @@ test("production worker serves workers.dev and does not build an image", () => {
   assert.equal(wrangler.routes, undefined);
   assert.equal(JSON.stringify(wrangler).includes("needtoken.ai"), false);
   assert.equal(JSON.stringify(wrangler).toLowerCase().includes("staging"), false);
-  assert.equal(container.max_instances, 2);
+  assert.equal(Object.hasOwn(container, "max_instances"), false);
   assert.equal(container.scheduling_policy, "durable_object");
-  assert.equal(container.images.app.image, "${CLOUDFLARE_IMAGE_DIGEST}");
+  assert.equal(
+    container.images.app.image,
+    "registry.cloudflare.com/account-id/needtoken-storefront@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  );
+  assert.equal(container.images.app.image.includes("registry.cloudflare.com/"), true);
+  assert.match(container.images.app.image, /@sha256:[0-9a-f]{64}$/);
   assert.equal(Object.hasOwn(container.images.app, "dockerfile"), false);
   assert.equal(Object.hasOwn(container.images.app, "build_context"), false);
   assert.equal(JSON.stringify(wrangler).includes("Dockerfile"), false);
@@ -41,6 +48,10 @@ test("start command, port, and instance size stay fixed", () => {
   assert.equal(INSTANCE.vcpu, 1);
   assert.equal(INSTANCE.memoryMib, 512);
   assert.equal(INSTANCE.diskMb, 2000);
+  assert.equal(MAX_INSTANCES, 2);
+  assert.equal(instanceName(() => 0), "instance-0");
+  assert.equal(instanceName(() => 0.999), "instance-1");
+  assert.equal(instanceName(() => 1 - Number.EPSILON), "instance-1");
 });
 
 test("string env and secrets pass through unchanged", () => {
@@ -56,7 +67,9 @@ test("string env and secrets pass through unchanged", () => {
     DATABASE_URL: "postgres://app@db.example.test:5432/store",
     REDIS_PASSWORD: "kept-secret",
     EMPTY: "",
+    PORT: "8080",
   });
+  assert.equal(containerEnv({ PORT: "3000" }).PORT, "8080");
   assert.equal(Object.hasOwn(passed, "REDIS_PREFIX"), false);
   assert.equal(Object.hasOwn(passed, "STOREFRONT"), false);
   assert.equal(passed.DATABASE_URL, env.DATABASE_URL);
@@ -85,7 +98,7 @@ test("the worker source uses the runtime values and does not restrict hosts", ()
   assert.match(source, /getTcpPort\(APP_PORT\)/);
   assert.match(source, /forwardRequest\(request\)/);
   assert.match(source, /enableInternet: true/);
-  assert.match(source, /getByName\(SINGLETON_NAME\)/);
+  assert.match(source, /getByName\(instanceName\(\)\)/);
   assert.equal(source.includes("needtoken.ai"), false);
   assert.equal(source.includes("staging"), false);
   assert.equal(source.includes("dockerfile"), false);
