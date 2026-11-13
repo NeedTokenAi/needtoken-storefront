@@ -572,4 +572,54 @@ test("glue request bodies are compared with the 100 MiB intercept limit", () => 
   assert.match(reservation, /reservationRequest\(ctx, http\.MethodGet, [^,]+, nil\)/);
   assert.match(reservation, /reservationRequest\(ctx, http\.MethodPost, "\/api\/v1\/upstream\/reservations", r\)/);
   assert.match(reservation, /doRequest\(ctx, method, path, body, &result\)/);
+
+  const planGate = readFileSync(join(repo, "internal/modules/catalog/mapping/application/service.go"), "utf8");
+  const terms = readFileSync(join(repo, "internal/shared/reservationterms/terms.go"), "utf8");
+  const checkoutReservation = readFileSync(join(repo, "internal/workflows/checkoutreservation/service.go"), "utf8");
+  const reservationRow = readFileSync(join(repo, "internal/modules/payment/domain/checkout_reservation.go"), "utf8");
+  const submit = readFileSync(join(repo, "internal/modules/procurement/application/submit.go"), "utf8");
+  const sync = readFileSync(join(repo, "internal/modules/catalog/mapping/application/sync.go"), "utf8");
+  assert.match(planGate, /len\(request\.EntitlementContract\) > 128\*1024/);
+  assert.match(planGate, /request\.Quantity != 1/);
+  assert.match(planGate, /"needtoken-storefront:user:" \+ strconv\.FormatUint\(uint64\(request\.UserID\), 10\)/);
+  assert.match(terms, /\^\[A-Za-z\]\[A-Za-z0-9_-\]\{2,95\}\$/);
+  assert.match(checkoutReservation, /wire := paymentcontract\.ReservationRequest\{OperationID: "sf_reserve_" \+ suffix/);
+  assert.match(checkoutReservation, /confirm\.OperationID = "sf_paid_" \+ stableSuffix/);
+  assert.match(checkoutReservation, /confirm\.EvidenceRef = "ev_storefront_paid_" \+ stableSuffix/);
+  assert.match(checkoutReservation, /return hex\.EncodeToString\(h\[:20\]\)/);
+  assert.match(reservationRow, /HoldVersion\s+string\s+`gorm:"size:20"/);
+  assert.equal(submit.includes("128*1024"), false);
+  assert.equal(submit.includes("MaxBytesReader"), false);
+  assert.match(submit, /req\.ManualFormData = item\.ManualFormSubmissionJSON/);
+  assert.match(sync, /localSKU\.EntitlementContractJSON = upProduct\.EntitlementContract/);
+  assert.equal(manual.includes("len(fieldList) >"), false);
+  assert.equal(readFileSync(join(root, "src/internal.js"), "utf8").includes("outboundBody"), false);
+  assert.equal(readFileSync(join(root, "wrangler.jsonc"), "utf8").includes("outbound"), false);
+
+  const contractBytes = 128 * 1024;
+  const id = "18446744073709551615";
+  const hash = "a".repeat(64);
+  const eligibilityPrefix = `{"sku_id":${id},"quantity":1,"entitlement_contract":`;
+  const eligibilitySuffix = `,"entitlement_contract_hash":"${hash}","customer_reference":{"merchant_customer_id":"needtoken-storefront:user:${id}","source":"needtoken-storefront","verification":"merchant_session"}}`;
+  const eligibilityMax = eligibilityPrefix.length + contractBytes + eligibilitySuffix.length;
+  assert.equal(eligibilityMax, 131396);
+  assert.ok(eligibilityMax < limit);
+
+  const reservationMax = JSON.stringify({
+    operation_id: `sf_paid_${"a".repeat(40)}`,
+    action: "confirm_payment",
+    order_ref: `sf_order_${"a".repeat(40)}`,
+    snapshot: {
+      sku: `A${"a".repeat(95)}`,
+      region: "US",
+      currency: "USD",
+      required_minor: "9223372036854775807",
+      expires_at: "2006-01-02T15:04:05.999999999Z",
+    },
+    expected_version: id,
+    evidence_ref: `ev_storefront_paid_${"a".repeat(40)}`,
+    payload_hash: hash,
+  }).length;
+  assert.equal(reservationMax, 593);
+  assert.ok(reservationMax < limit);
 });
