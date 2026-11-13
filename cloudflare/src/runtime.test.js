@@ -511,3 +511,65 @@ test("the trust entry concatenates CAs and does not exec when a CA is unreadable
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("two trust runs keep the CA bundle and exec /app/dujiao-next -mode=api", () => {
+  const firstScript = trustScript();
+  const secondScript = trustScript();
+  assert.equal(secondScript, firstScript);
+  assert.match(firstScript, /exec '\/app\/dujiao-next' '-mode=api'/);
+  assert.deepEqual(trustEntrypoint(), ["sh", "-c", firstScript]);
+
+  const dir = mkdtempSync(join(tmpdir(), "needtoken-ca-twice-"));
+  try {
+    const bundle = join(dir, "ca-certificates.crt");
+    const fallback = join(dir, "cert.pem");
+    const cloudflare = join(dir, "cloudflare-containers-ca.crt");
+    const out = join(dir, "needtoken-ca.pem");
+    const log = join(dir, "exec-log");
+    const bin = join(dir, "dujiao-next");
+    writeFileSync(bundle, "SYSTEM\n");
+    writeFileSync(fallback, "FALLBACK\n");
+    writeFileSync(cloudflare, "CLOUDFLARE\n");
+    writeFileSync(bin, `#!/bin/sh\nprintf '%s %s\\n' "$SSL_CERT_FILE" "$1" >> ${JSON.stringify(log)}\n`);
+    chmodSync(bin, 0o755);
+    const script = trustScript({ bundle, fallback, cloudflare, out, argv: [bin, "-mode=api"] });
+    for (const nth of [1, 2]) {
+      const run = spawnSync("sh", ["-c", script], { encoding: "utf8" });
+      assert.equal(run.status, 0, run.stderr);
+      assert.equal(readFileSync(out, "utf8"), "SYSTEM\nCLOUDFLARE\n", `run ${nth}`);
+    }
+    assert.equal(readFileSync(log, "utf8"), `${out} -mode=api\n${out} -mode=api\n`);
+    assert.match(trustScript(), /exec '\/app\/dujiao-next' '-mode=api'/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("glue request bodies are compared with the 100 MiB intercept limit", () => {
+  const repo = dirname(root);
+  const adapter = readFileSync(join(repo, "internal/upstream/dujiao_next.go"), "utf8");
+  const checkout = readFileSync(join(repo, "internal/upstream/dujiao_next_plan_checkout.go"), "utf8");
+  const reservation = readFileSync(join(repo, "internal/upstream/dujiao_next_reservation.go"), "utf8");
+  const manual = readFileSync(join(repo, "internal/modules/catalog/product/manualform/schema.go"), "utf8");
+  const createOrder = readFileSync(join(repo, "internal/modules/order/transport/http/create_handler.go"), "utf8");
+  const limit = 100 * 1024 * 1024;
+  const imageCap = 10 << 20;
+
+  assert.equal(imageCap, 10 * 1024 * 1024);
+  assert.ok(imageCap < limit);
+  assert.match(adapter, /const maxUpstreamImageBytes = 10 << 20/);
+  assert.match(adapter, /http\.NewRequestWithContext\(ctx, http\.MethodGet, target\.String\(\), nil\)/);
+  assert.match(adapter, /json\.Marshal\(body\)/);
+  assert.equal(adapter.includes("MaxBytesReader"), false);
+  assert.equal(checkout.includes("MaxBytesReader"), false);
+  assert.equal(reservation.includes("MaxBytesReader"), false);
+  assert.equal(createOrder.includes("MaxBytesReader"), false);
+  assert.match(manual, /if field\.MaxLen != nil && utf8\.RuneCountInString\(text\) > \*field\.MaxLen/);
+
+  const calls = [...adapter.matchAll(/doRequest\(ctx, http\.Method\w+, [^,]+, ([^,]+),/g)].map((match) => match[1]);
+  assert.deepEqual(calls, ["nil", "nil", "nil", "nil", "req", "nil", "nil"]);
+  assert.match(checkout, /doRequest\(ctx, http\.MethodPost, "\/api\/v1\/upstream\/checkouts\/eligibility", request,/);
+  assert.match(reservation, /reservationRequest\(ctx, http\.MethodGet, [^,]+, nil\)/);
+  assert.match(reservation, /reservationRequest\(ctx, http\.MethodPost, "\/api\/v1\/upstream\/reservations", r\)/);
+  assert.match(reservation, /doRequest\(ctx, method, path, body, &result\)/);
+});
