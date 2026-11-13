@@ -36,6 +36,12 @@
       }
     ]
   },
+  "services": [
+    {
+      "binding": "INTERNAL_GLUE",
+      "service": "needtoken-glue"
+    }
+  ],
   "exports": {
     "Storefront": {
       "type": "durable-object",

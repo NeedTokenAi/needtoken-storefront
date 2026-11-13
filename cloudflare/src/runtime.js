@@ -6,6 +6,41 @@ export const CONTAINER_PORT = "8080";
 // argv, not a shell string. Joined, this is /app/dujiao-next -mode=api.
 export const START_COMMAND = ["/app/dujiao-next", "-mode=api"];
 
+export const SYSTEM_CA_BUNDLE = "/etc/ssl/certs/ca-certificates.crt";
+export const SYSTEM_CA_FALLBACK = "/etc/ssl/cert.pem";
+export const CLOUDFLARE_CONTAINER_CA = "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
+export const TRUSTED_CA_FILE = "/tmp/needtoken-ca.pem";
+
+export function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+// Concatenate the image CA bundle with the runtime container CA, then exec.
+// An unreadable file exits non-zero. The application is not started.
+export function trustScript({
+  bundle = SYSTEM_CA_BUNDLE,
+  fallback = SYSTEM_CA_FALLBACK,
+  cloudflare = CLOUDFLARE_CONTAINER_CA,
+  out = TRUSTED_CA_FILE,
+  argv = START_COMMAND,
+} = {}) {
+  const exec = argv.map(shellQuote).join(" ");
+  return [
+    "set -eu",
+    `src=${shellQuote(bundle)}`,
+    `if [ ! -r "$src" ]; then src=${shellQuote(fallback)}; fi`,
+    'test -r "$src"',
+    `test -r ${shellQuote(cloudflare)}`,
+    `cat "$src" ${shellQuote(cloudflare)} > ${shellQuote(out)}`,
+    `export SSL_CERT_FILE=${shellQuote(out)}`,
+    `exec ${exec}`,
+  ].join("\n");
+}
+
+export function trustEntrypoint() {
+  return ["sh", "-c", trustScript()];
+}
+
 // Predefined basic is 1/4 vCPU and 1 GiB. Wrangler instance_type carries it.
 export const INSTANCE_TYPE = "basic";
 
