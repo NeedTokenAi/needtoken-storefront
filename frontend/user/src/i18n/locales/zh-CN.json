@@ -2321,7 +2321,12 @@
       "card": "信用卡",
       "paypal": "PayPal",
       "checkoutNote": "实际可用方式以结算页为准",
-      "usdt": "USDT"
+      "usdt": "USDT",
+      "loading": "正在读取付款方式",
+      "empty": "支付方式请在结算时查看",
+      "wallet": "钱包余额支付",
+      "unavailable": "付款方式暂时无法读取",
+      "retry": "重新读取付款方式"
     },
     "effects": {
       "soundOn": "按钮音效：已开启",
@@ -2992,7 +2997,53 @@
       "sourceChanged": "官方来源更新于 {time}",
       "refreshing": "正在刷新官方状态",
       "refreshPolicy": "每 60 秒检查，切到后台时暂停",
-      "refreshAction": "刷新"
+      "refreshAction": "刷新",
+      "compact": {
+        "scope": {
+          "gpt": "ChatGPT 产品服务",
+          "claude": "claude.ai 网页与 App"
+        },
+        "componentCount": "{count} 项服务",
+        "activeIncident": "当前有事故",
+        "recentIncident": "最近事故",
+        "currentSummary": "当前状态",
+        "previousSnapshot": "上次快照",
+        "noIncidentTitle": "当前运行正常",
+        "unknownSummary": "当前状态尚未确认",
+        "componentSummary": "部分组件状态异常",
+        "noIncidentBody": "官方未报告与该产品关联的未解决事故",
+        "affectedComponents": "涉及组件：{names}",
+        "noLinkedIncident": "官方未提供可关联的事故说明",
+        "noActiveIncident": "以官方状态页为准",
+        "officialProgress": "官方进展",
+        "noUpdate": "官方暂未提供更新说明",
+        "phaseLabel": "事故处理阶段",
+        "phases": {
+          "investigating": "调查中",
+          "identified": "已定位",
+          "monitoring": "监控中",
+          "resolved": "已解决"
+        },
+        "timeUnknown": "官方未提供完整起止时间",
+        "ongoingFor": "已持续 {duration}",
+        "lastedFor": "持续 {duration}",
+        "durationDays": "{count} 天",
+        "durationHours": "{count} 小时 {minutes} 分钟",
+        "durationMinutes": "{count} 分钟",
+        "checkedMinutesAgo": "{count} 分钟前",
+        "justChecked": "刚刚获取",
+        "refreshing": "刷新中",
+        "historyTitle": "近 90 天公开事故记录",
+        "incidentCount": "已关联 {count} 起",
+        "historyUnknown": "暂无可用记录",
+        "historyAlternative": "近 90 天公开事故记录，已关联 {count} 起；灰色表示缺少记录，不代表服务正常，也不用于计算可用率",
+        "unknownDay": "暂无已确认的公开记录",
+        "today": "今天",
+        "partialHistory": "仅含官方最近至多 50 条记录；灰色未覆盖，不代表可用率",
+        "noScopedHistory": "暂无可关联的产品事故记录；灰色不代表服务正常",
+        "historyUnavailable": "历史记录暂不可用；灰色表示未知",
+        "recentRecords": "查看最近事件"
+      }
     },
     "radar": {
       "eyebrow": "实用工具",

@@ -2321,7 +2321,12 @@
       "card": "Credit card",
       "paypal": "PayPal",
       "checkoutNote": "Available methods are shown at checkout",
-      "usdt": "USDT"
+      "usdt": "USDT",
+      "loading": "Loading payment methods",
+      "empty": "View payment options at checkout",
+      "wallet": "Wallet balance",
+      "unavailable": "Payment methods unavailable",
+      "retry": "Reload payment methods"
     },
     "effects": {
       "soundOn": "Button sounds: on",
@@ -2992,7 +2997,53 @@
       "sourceChanged": "Official source updated at {time}",
       "refreshing": "Refreshing official status",
       "refreshPolicy": "Checks every 60 seconds; pauses in the background",
-      "refreshAction": "Refresh"
+      "refreshAction": "Refresh",
+      "compact": {
+        "scope": {
+          "gpt": "ChatGPT product services",
+          "claude": "claude.ai web and app"
+        },
+        "componentCount": "{count} services",
+        "activeIncident": "Active incident",
+        "recentIncident": "Recent incident",
+        "currentSummary": "Current status",
+        "previousSnapshot": "Previous snapshot",
+        "noIncidentTitle": "Currently operational",
+        "unknownSummary": "Current status unconfirmed",
+        "componentSummary": "Some components are affected",
+        "noIncidentBody": "The official source reports no linked unresolved incident",
+        "affectedComponents": "Components: {names}",
+        "noLinkedIncident": "No linked incident details from the official source",
+        "noActiveIncident": "Refer to the official status page",
+        "officialProgress": "Official updates",
+        "noUpdate": "No update text provided by the official source",
+        "phaseLabel": "Incident response stage",
+        "phases": {
+          "investigating": "Investigating",
+          "identified": "Identified",
+          "monitoring": "Monitoring",
+          "resolved": "Resolved"
+        },
+        "timeUnknown": "Complete incident timing is unavailable",
+        "ongoingFor": "Ongoing for {duration}",
+        "lastedFor": "Lasted {duration}",
+        "durationDays": "{count} days",
+        "durationHours": "{count}h {minutes}m",
+        "durationMinutes": "{count}m",
+        "checkedMinutesAgo": "{count}m ago",
+        "justChecked": "Just checked",
+        "refreshing": "Refreshing",
+        "historyTitle": "Public incidents · past 90 days",
+        "incidentCount": "{count} linked",
+        "historyUnknown": "No available records",
+        "historyAlternative": "Public incident records over 90 days, {count} linked. Gray means missing records, not healthy service. This is not an uptime calculation.",
+        "unknownDay": "No confirmed public record",
+        "today": "Today",
+        "partialHistory": "Latest 50 official records at most. Gray is uncovered, not uptime.",
+        "noScopedHistory": "No linked product incidents found. Gray does not mean healthy.",
+        "historyUnavailable": "Incident history is unavailable. Gray means unknown.",
+        "recentRecords": "Recent incidents"
+      }
     },
     "radar": {
       "eyebrow": "Tools",

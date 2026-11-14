@@ -1,0 +1,8 @@
+Brand marks from Simple Icons (CC0-1.0):
+
+OpenAI: https://github.com/simple-icons/simple-icons/blob/13.0.0/icons/openai.svg
+Claude: https://github.com/simple-icons/simple-icons/blob/16.0.0/icons/claude.svg
+License: https://github.com/simple-icons/simple-icons/blob/16.0.0/LICENSE.md
+
+Brand names and marks belong to their respective owners. They identify the
+explicit provider of a catalogue product; they do not imply endorsement.

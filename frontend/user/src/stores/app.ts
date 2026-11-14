@@ -93,7 +93,7 @@ export const useAppStore = defineStore('app', () => {
         if (config.value && !force) {
             applySEO()
             applyCustomScripts(config.value?.scripts)
-            return
+            return true
         }
         if (!force) loading.value = true
         try {
@@ -118,8 +118,10 @@ export const useAppStore = defineStore('app', () => {
                     'background:transparent;',
                 )
             }
+            return true
         } catch (error) {
             console.error('Failed to load config:', error)
+            return false
         } finally {
             if (!force) loading.value = false
         }

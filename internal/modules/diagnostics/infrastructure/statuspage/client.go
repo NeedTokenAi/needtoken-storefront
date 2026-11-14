@@ -109,11 +109,16 @@ func parseSummary(body []byte, sourceURL string) (diagnosticscontract.ServiceSta
 			Description string `json:"description"`
 		} `json:"status"`
 		Components json.RawMessage `json:"components"`
+		Incidents  json.RawMessage `json:"incidents"`
 	}
 	if json.Unmarshal(body, &payload) != nil || payload.Page == nil || payload.Status == nil {
 		return diagnosticscontract.ServiceStatusSummary{}, diagnosticscontract.ErrServiceStatusUnavailable
 	}
 	components, err := parseComponents(payload.Components)
+	if err != nil {
+		return diagnosticscontract.ServiceStatusSummary{}, err
+	}
+	incidents, err := parseIncidents(payload.Incidents, sourceURL)
 	if err != nil {
 		return diagnosticscontract.ServiceStatusSummary{}, err
 	}
@@ -136,7 +141,7 @@ func parseSummary(body []byte, sourceURL string) (diagnosticscontract.ServiceSta
 	default:
 		indicator = "unknown"
 	}
-	return diagnosticscontract.ServiceStatusSummary{Page: page, Status: diagnosticscontract.ServiceStatusState{Indicator: indicator, Description: description}, Components: components}, nil
+	return diagnosticscontract.ServiceStatusSummary{Page: page, Status: diagnosticscontract.ServiceStatusState{Indicator: indicator, Description: description}, Components: components, Incidents: incidents}, nil
 }
 
 func parseComponents(body json.RawMessage) ([]diagnosticscontract.ServiceStatusComponent, error) {

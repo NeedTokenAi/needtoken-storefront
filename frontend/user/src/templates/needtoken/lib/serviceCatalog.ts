@@ -21,6 +21,7 @@ export interface ServiceProduct {
   id: number
   slug: string
   category_id: number
+  category?: PublicCategory
   title?: unknown
   description?: unknown
   images?: unknown

@@ -1,6 +1,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { categoryAPI, productAPI } from '../../../api'
 import type { PublicCategory } from '../../../utils/category'
+import { sortHomeProductsByPrice } from '../lib/homeCardPresentation'
 import {
   defaultServiceChild,
   filterServiceProducts,
@@ -61,7 +62,7 @@ export function useHomeCatalog() {
       if (disposed || ticket !== generation) return
       if (!Array.isArray(response.data.data)) throw new Error('invalid public product response')
       const scoped: ServiceScope = { ...current, selected }
-      products.value = filterServiceProducts(response.data.data, scoped)
+      products.value = sortHomeProductsByPrice(filterServiceProducts(response.data.data, scoped))
     } catch {
       if (!disposed && ticket === generation) error.value = true
     } finally {

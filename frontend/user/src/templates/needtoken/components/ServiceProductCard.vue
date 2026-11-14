@@ -1,9 +1,10 @@
 <template>
-  <article class="nt-service-card" :class="{ 'nt-service-card--muted': availability !== 'available' }" :data-sku-id="selectedSkuId || undefined">
+  <article class="nt-service-card" :class="{ 'nt-service-card--muted': availability !== 'available' }" :data-sku-id="selectedSkuId || undefined" :data-brand="brand">
     <div class="nt-service-card__heading">
       <div class="nt-service-card__identity">
         <div class="nt-service-card__icon" aria-hidden="true">
-          <img v-if="image && !imageErrored" :src="image" alt="" loading="lazy" @error="imageErrored = true" />
+          <ProductBrandMark v-if="brand !== 'unknown'" :brand="brand" />
+          <img v-else-if="image && !imageErrored" :src="image" alt="" loading="lazy" @error="imageErrored = true" />
           <Zap v-else-if="kind === 'recharge'" :size="20" :stroke-width="1.7" />
           <PackageCheck v-else :size="20" :stroke-width="1.7" />
         </div>
@@ -13,7 +14,7 @@
     </div>
 
     <div class="nt-service-card__body">
-      <h2 aria-live="polite">{{ presentation.title || getLocalizedText(product.title) }}</h2>
+      <h2 aria-live="polite">{{ titleParts.before }}<span v-if="titleParts.tier" class="nt-service-card__tier" :data-tier="titleParts.plan">{{ titleParts.tier }}</span>{{ titleParts.after }}</h2>
       <div v-if="variantAxes.length" class="nt-service-card__selectors">
         <fieldset v-for="axis in variantAxes" :key="axis.id" class="nt-service-card__axis">
           <legend class="sr-only">{{ t(`needtoken.variants.${axis.id}Label`) }}</legend>
@@ -46,7 +47,7 @@
     <div class="nt-service-card__price-row">
       <div class="nt-service-card__price-block" aria-live="polite">
         <p v-if="isConverted && price" class="nt-service-card__price-note">{{ t('needtoken.variants.convertedPrice') }}</p>
-        <p class="nt-service-card__price"><span>{{ price ? format(price.amount) || t('needtoken.catalogServices.pricePending') : t('needtoken.catalogServices.pricePending') }}</span><span v-if="presentation.priceSuffix && price" class="nt-service-card__price-suffix">{{ presentation.priceSuffix }}</span></p>
+        <p class="nt-service-card__price"><span>{{ price ? format(price.amount) || t('needtoken.catalogServices.pricePending') : t('needtoken.catalogServices.pricePending') }}</span><span v-if="priceSuffix && price" class="nt-service-card__price-suffix">/ {{ priceSuffix }}</span></p>
         <p v-if="price?.originalAmount" class="nt-service-card__discount">
           <s>{{ format(price.originalAmount) }}</s>
           <span>{{ price.kind === 'member' ? t('products.memberPriceTag') : t('products.promotionTag') }}</span>
@@ -77,6 +78,8 @@ import { formatServiceMoney } from '../lib/displayMoney'
 import { useDisplayCurrency } from '../composables/useDisplayCurrency'
 import { selectServiceVariant, serviceSkuPresentation, serviceVariantAxes, serviceVariantLabel, type ServiceVariantAxis } from '../lib/serviceVariants'
 import { apiPlanMemberLoginPath } from '../lib/apiPlanCatalog'
+import { homeCardBrand, homeCardPriceSuffix, homeCardTitle } from '../lib/homeCardPresentation'
+import ProductBrandMark from './ProductBrandMark.vue'
 import {
   activeServiceSkus, serviceAvailability, serviceDescriptionText, serviceSkuPrice,
   type ServiceKind, type ServiceProduct, type ServiceSku,
@@ -100,6 +103,9 @@ const price = computed(() => serviceSkuPrice(selectedSku.value))
 const image = computed(() => getFirstImageUrl(props.product.images))
 const description = computed(() => serviceDescriptionText(getLocalizedText(props.product.description)))
 const presentation = computed(() => serviceSkuPresentation(selectedSku.value, appStore.locale))
+const titleParts = computed(() => homeCardTitle(presentation.value.title || getLocalizedText(props.product.title)))
+const brand = computed(() => homeCardBrand(props.product, selectedSku.value, appStore.locale))
+const priceSuffix = computed(() => homeCardPriceSuffix(presentation.value.priceSuffix))
 const displayDescription = computed(() => presentation.value.description || description.value || props.descriptionFallback || t(`needtoken.catalogServices.${props.kind}.descriptionFallback`))
 const variantAxes = computed(() => serviceVariantAxes(skus.value, appStore.locale))
 const officialReference = computed(() => presentation.value.officialPriceUsd ? formatServiceMoney(presentation.value.officialPriceUsd, 'USD', appStore.locale) : null)
@@ -127,11 +133,12 @@ watch(image, () => { imageErrored.value = false })
 .nt-service-card:is(:hover, :focus-within) { border-color: var(--ui-border-strong); background: #11171e; }
 .nt-service-card__heading { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 8px; }
 .nt-service-card__identity { display: flex; flex: 1 1 90px; align-items: center; gap: 8px; min-width: 0; }
-.nt-service-card__icon { display: grid; width: 28px; height: 28px; flex-shrink: 0; place-items: center; overflow: hidden; color: var(--ui-accent); border: 1px solid rgba(45, 212, 167, .2); background: rgba(45, 212, 167, .08); border-radius: 8px; }
+.nt-service-card__icon { --product-brand-ink: #c7e9de; display: grid; width: 28px; height: 28px; flex-shrink: 0; place-items: center; overflow: hidden; color: var(--ui-accent); border: 1px solid var(--ui-border); background: var(--ui-bg-soft); border-radius: 8px; }
+.nt-service-card[data-brand="claude"] .nt-service-card__icon { --product-brand-ink: #dbab91; }
 .nt-service-card__icon > svg { width: 17px; height: 17px; }
 .nt-service-card__icon img { width: 100%; height: 100%; object-fit: contain; }
-.nt-service-card__icon > :is(img, svg) { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }
-.nt-service-card:is(:hover, :focus-within) .nt-service-card__icon > :is(img, svg) { transform: translateY(-2px) rotate(-3deg); }
+.nt-service-card__icon > :is(img, svg, .product-brand-mark) { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }
+.nt-service-card:is(:hover, :focus-within) .nt-service-card__icon > :is(img, svg, .product-brand-mark) { transform: translateY(-2px) rotate(-3deg); }
 .nt-service-card__label { min-width: 0; color: var(--ui-text-muted); font-size: 12px; overflow-wrap: anywhere; line-height: 1.4; }
 .nt-service-card__selectors { display: grid; gap: 6px; margin-top: 11px; }
 .nt-service-card__axis { display: flex; align-items: center; gap: 8px; min-inline-size: 0; margin: 0; padding: 0; border: 0; }
@@ -147,7 +154,10 @@ watch(image, () => { imageErrored.value = false })
 .nt-service-card__option.is-selected { color: var(--ui-accent); border-color: #2dd4a766; background: var(--ui-accent-soft); }
 .nt-service-card__single-option { min-width: 0; max-width: 48%; padding: 5px 8px; border: 1px solid rgba(45, 212, 167, .18); border-radius: 9px; color: var(--ui-accent); background: rgba(45, 212, 167, .06); font-size: 12px; overflow-wrap: anywhere; }
 .nt-service-card__body { min-width: 0; flex: 1; }
-h2 { margin: 0; color: var(--ui-text-primary); font-size: 21px; font-weight: 600; line-height: 1.3; letter-spacing: 0; overflow-wrap: anywhere; transition: color var(--nt-motion-fast) var(--nt-motion-ease); }
+h2 { margin: 0; color: var(--ui-text-primary); font-size: 18px; font-weight: 600; line-height: 1.4; letter-spacing: 0; overflow-wrap: anywhere; transition: color var(--nt-motion-fast) var(--nt-motion-ease); }
+.nt-service-card__tier { color: #a8b7cb; font-size: .94em; white-space: nowrap; }
+.nt-service-card__tier[data-tier="20x"] { color: #e4bd6b; }
+.nt-service-card__tier[data-tier="50x"] { color: #c6a7e2; }
 .nt-service-card:is(:hover, :focus-within) h2 { color: #c4f3e5; }
 .nt-service-card__description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 9px; min-height: 43px; font-size: 13px; line-height: 1.65; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
 .nt-service-card__features { display: grid; gap: 6px; margin-top: 11px; color: var(--ui-text-secondary); font-size: 12px; }
@@ -174,6 +184,6 @@ h2 { margin: 0; color: var(--ui-text-primary); font-size: 21px; font-weight: 600
 .nt-service-card__read-more:hover { color: var(--ui-text-primary); }
 @media (forced-colors: active) { .nt-service-card__option.is-selected { color: ButtonText; background: ButtonFace; border-color: Highlight; outline: 2px solid Highlight; outline-offset: 1px; } }
 @media (hover: none), (pointer: coarse) { .nt-service-card__option, .nt-service-card__cta, .nt-service-card__read-more { min-height: 44px; } .nt-service-card__option { min-width: 44px; } }
-@media (prefers-reduced-motion: reduce) { .nt-service-card, .nt-service-card h2, .nt-service-card__icon > :is(img, svg) { transition: none; } .nt-service-card:is(:hover, :focus-within) .nt-service-card__icon > :is(img, svg) { transform: none; } }
-@media (max-width: 640px) { .nt-service-card { padding: 20px; } h2 { font-size: 23px; } .nt-service-card__description { font-size: 13px; min-height: 43px; } .nt-service-card__price { font-size: 34px; } .nt-service-card__option, .nt-service-card__cta, .nt-service-card__read-more { min-height: 44px; } .nt-service-card__option { min-width: 44px; } }
+@media (prefers-reduced-motion: reduce) { .nt-service-card, .nt-service-card h2, .nt-service-card__icon > :is(img, svg, .product-brand-mark) { transition: none; } .nt-service-card:is(:hover, :focus-within) .nt-service-card__icon > :is(img, svg, .product-brand-mark) { transform: none; } }
+@media (max-width: 640px) { .nt-service-card { padding: 20px; } h2 { font-size: 19px; } .nt-service-card__description { font-size: 13px; min-height: 43px; } .nt-service-card__price { font-size: 30px; } .nt-service-card__option, .nt-service-card__cta, .nt-service-card__read-more { min-height: 44px; } .nt-service-card__option { min-width: 44px; } }
 </style>

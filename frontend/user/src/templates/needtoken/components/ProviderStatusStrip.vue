@@ -10,27 +10,29 @@
         <header class="status-card-head">
           <span class="status-dot" :class="`is-${provider.tone}`" aria-hidden="true"></span>
           <h2>{{ t(`needtoken.statusStrip.scopeTitle.${provider.id}`) }}</h2>
-          <a :href="provider.source.href" target="_blank" rel="noopener noreferrer">{{ sourceHost(provider.source.href) }}<ArrowUpRight :size="12" aria-hidden="true" /></a>
+          <span class="status-health">{{ t(`needtoken.statusStrip.component.${provider.tone}`) }}</span>
         </header>
-        <p class="status-scope">{{ t(`needtoken.statusStrip.scope.${provider.id}`) }}</p>
-        <p v-if="provider.source.state === 'loading'" role="status">{{ t('needtoken.statusStrip.loading') }}</p>
+        <div class="status-scope-row"><p class="status-scope">{{ t(`needtoken.statusStrip.compact.scope.${provider.id}`) }}</p><span v-if="provider.components.length" class="status-count">{{ t('needtoken.statusStrip.compact.componentCount', { count: provider.components.length }) }}</span></div>
+        <p v-if="provider.source.state === 'loading'" class="status-warning" role="status">{{ t('needtoken.statusStrip.loading') }}</p>
         <p v-else-if="provider.source.state === 'unavailable'" class="status-warning" role="status">{{ t(provider.source.error === 'timeout' ? 'needtoken.statusStrip.timeout' : 'needtoken.statusStrip.unavailable') }}</p>
         <p v-else-if="!provider.fresh" class="status-warning" role="status">{{ t('needtoken.statusStrip.outdated') }}</p>
-        <template v-if="provider.source.snapshot">
-          <p v-if="!provider.components.length" role="status">{{ t('needtoken.statusStrip.scopeEmpty') }}</p>
-          <p v-else class="status-count">{{ t(provider.fresh ? 'needtoken.statusStrip.currentCount' : 'needtoken.statusStrip.previousCount', operationalCount(provider.components)) }}</p>
-          <ul v-if="provider.components.length" class="status-components" :class="{ 'is-old': !provider.fresh }">
-            <li v-for="component in provider.components" :key="component.id || component.name">
-              <span class="status-dot" :class="`is-${provider.fresh ? component.status : 'unknown'}`" aria-hidden="true"></span>
-              <span>{{ component.name }}</span>
-              <span>{{ t(`needtoken.statusStrip.component.${component.status}`) }}</span>
-            </li>
-          </ul>
-          <p class="status-history">{{ t('needtoken.statusStrip.noHistory') }}</p>
-          <p v-if="provider.source.fetchedAt" class="status-time">{{ t('needtoken.statusStrip.checked', { time: renderTime(provider.source.fetchedAt) }) }}</p>
-          <p v-if="provider.source.snapshot.updatedAt" class="status-time">{{ t('needtoken.statusStrip.sourceChanged', { time: renderTime(provider.source.snapshot.updatedAt) }) }}</p>
-        </template>
-        <div class="status-refresh-row"><span>{{ t(provider.source.refreshing ? 'needtoken.statusStrip.refreshing' : 'needtoken.statusStrip.refreshPolicy') }}</span><button type="button" :aria-disabled="provider.source.refreshing" :aria-busy="provider.source.refreshing" @click="refresh">{{ t('needtoken.statusStrip.refreshAction') }}</button></div>
+        <article v-if="provider.source.snapshot" class="status-incident" :class="{ 'is-old': !provider.fresh }" :data-phase="provider.phase === null ? 'unknown' : phases[provider.phase]">
+          <div class="status-incident-meta"><span>{{ t(provider.fresh ? provider.incident ? incidentActive(provider.incident) ? 'needtoken.statusStrip.compact.activeIncident' : 'needtoken.statusStrip.compact.recentIncident' : 'needtoken.statusStrip.compact.currentSummary' : 'needtoken.statusStrip.compact.previousSnapshot') }}</span><time v-if="provider.incident && (provider.incident.startedAt || provider.incident.createdAt)" :datetime="provider.incident.startedAt || provider.incident.createdAt || undefined">{{ renderDate(provider.incident.startedAt || provider.incident.createdAt || '') }}</time></div>
+          <h3 class="status-incident-title">{{ provider.incident?.name || t(provider.tone === 'operational' ? 'needtoken.statusStrip.compact.noIncidentTitle' : provider.tone === 'unknown' ? 'needtoken.statusStrip.compact.unknownSummary' : 'needtoken.statusStrip.compact.componentSummary') }}</h3>
+          <p class="status-incident-update">{{ provider.incident ? provider.incident.latestUpdate?.body || t('needtoken.statusStrip.compact.noUpdate') : provider.affected.length ? t('needtoken.statusStrip.compact.affectedComponents', { names: provider.affected.slice(0, 3).map(component => component.name).join(' · ') }) : t(provider.components.length ? 'needtoken.statusStrip.compact.noIncidentBody' : 'needtoken.statusStrip.scopeEmpty') }}</p>
+          <ol v-if="provider.incident || provider.affected.length" class="status-phases" :aria-label="t('needtoken.statusStrip.compact.phaseLabel')">
+            <li v-for="(phase, index) in phases" :key="phase" class="status-phase" :class="{ 'is-reached': provider.fresh && provider.phase !== null && index <= provider.phase, 'is-current': provider.fresh && index === provider.phase }" :aria-current="provider.fresh && index === provider.phase ? 'step' : undefined" :style="{ '--phase-index': index }"><span class="status-phase-track" aria-hidden="true"><i></i></span><span>{{ t(`needtoken.statusStrip.compact.phases.${phase}`) }}</span></li>
+          </ol>
+          <div class="status-incident-footer"><span>{{ provider.incident ? incidentTiming(provider.incident) : provider.affected.length ? t('needtoken.statusStrip.compact.noLinkedIncident') : t('needtoken.statusStrip.compact.noActiveIncident') }}</span><a :href="provider.incident?.url || provider.source.href" target="_blank" rel="noopener noreferrer">{{ t('needtoken.statusStrip.compact.officialProgress') }}<ArrowUpRight :size="12" aria-hidden="true" /></a></div>
+        </article>
+        <section class="status-history-region" :aria-label="t('needtoken.statusStrip.compact.historyTitle')">
+          <div class="status-history-head"><h3>{{ t('needtoken.statusStrip.compact.historyTitle') }}</h3><span>{{ t(provider.historyReady ? 'needtoken.statusStrip.compact.incidentCount' : 'needtoken.statusStrip.compact.historyUnknown', { count: provider.historyIncidents.length }) }}</span></div>
+          <div class="status-history-bars" role="img" :aria-label="provider.historyReady ? t('needtoken.statusStrip.compact.historyAlternative', { count: provider.historyIncidents.length }) : t('needtoken.statusStrip.compact.historyUnavailable')"><i v-for="day in provider.historyDays" :key="day.date" :class="{ 'has-incident': day.incidents.length > 0 }" :title="`${day.date} UTC · ${day.incidents.length ? day.incidents.join(' / ') : t('needtoken.statusStrip.compact.unknownDay')}`"></i></div>
+          <div class="status-history-axis"><time :datetime="provider.historyDays[0]?.date">{{ provider.historyDays[0]?.date }}</time><span>UTC</span><time :datetime="provider.historyDays[89]?.date">{{ t('needtoken.statusStrip.compact.today') }}</time></div>
+          <p class="status-history-note">{{ t(provider.historyReady ? provider.historyIncidents.length ? 'needtoken.statusStrip.compact.partialHistory' : 'needtoken.statusStrip.compact.noScopedHistory' : 'needtoken.statusStrip.compact.historyUnavailable') }}</p>
+          <details v-if="provider.historyIncidents.length" class="status-history-events"><summary>{{ t('needtoken.statusStrip.compact.recentRecords') }}</summary><ul><li v-for="incident in provider.historyIncidents.slice(0, 3)" :key="incident.id || incident.name"><time v-if="incident.startedAt || incident.createdAt" :datetime="incident.startedAt || incident.createdAt || undefined">{{ renderDate(incident.startedAt || incident.createdAt || '') }}</time><a :href="incident.url || provider.source.history.sourceUrl" target="_blank" rel="noopener noreferrer">{{ incident.name }}<ArrowUpRight :size="12" aria-hidden="true" /></a></li></ul></details>
+        </section>
+        <footer class="status-refresh-row"><a :href="provider.source.href" target="_blank" rel="noopener noreferrer">{{ sourceHost(provider.source.href) }}<ArrowUpRight :size="12" aria-hidden="true" /></a><time v-if="provider.source.fetchedAt" :datetime="provider.source.fetchedAt" :title="t('needtoken.statusStrip.checked', { time: renderTime(provider.source.fetchedAt) })">{{ checkedAge(provider.source.fetchedAt) }}</time><button type="button" :aria-disabled="provider.source.refreshing" :aria-busy="provider.source.refreshing" @click="refresh">{{ t(provider.source.refreshing ? 'needtoken.statusStrip.compact.refreshing' : 'needtoken.statusStrip.refreshAction') }}</button></footer>
       </section>
       </Transition>
     </div>
@@ -41,7 +43,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowUpRight } from 'lucide-vue-next'
-import { operationalCount, parsePublicStatus, publicStatusFresh, publicStatusTone, serviceStatusComponents, PUBLIC_STATUS_MAX_AGE_MS, type PublicStatusService, type PublicStatusSnapshot } from '../lib/publicStatus'
+import { incidentActive, incidentElapsedMinutes, incidentPhase, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusFresh, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone, PUBLIC_STATUS_MAX_AGE_MS, type PublicStatusHistory, type PublicStatusIncident, type PublicStatusService, type PublicStatusSnapshot } from '../lib/publicStatus'
 
 type Provider = PublicStatusService
 interface StatusSource {
@@ -49,6 +51,7 @@ interface StatusSource {
   href: string
   state: 'loading' | 'ready' | 'unavailable'
   snapshot: PublicStatusSnapshot | null
+  history: PublicStatusHistory
   fetchedAt: string | null
   stale: boolean
   refreshing: boolean
@@ -57,8 +60,8 @@ interface StatusSource {
 }
 const { t, locale } = useI18n()
 const sources = ref<StatusSource[]>([
-  { id: 'openai', href: 'https://status.openai.com/', state: 'loading', snapshot: null, fetchedAt: null, stale: true, refreshing: false, error: null, sequence: 0 },
-  { id: 'claude', href: 'https://status.claude.com/', state: 'loading', snapshot: null, fetchedAt: null, stale: true, refreshing: false, error: null, sequence: 0 },
+  { id: 'openai', href: 'https://status.openai.com/', history: { state: 'unavailable', coverage: 'partial', sourceUrl: 'https://status.openai.com/', incidents: [] }, state: 'loading', snapshot: null, fetchedAt: null, stale: true, refreshing: false, error: null, sequence: 0 },
+  { id: 'claude', href: 'https://status.claude.com/', history: { state: 'unavailable', coverage: 'partial', sourceUrl: 'https://status.claude.com/', incidents: [] }, state: 'loading', snapshot: null, fetchedAt: null, stale: true, refreshing: false, error: null, sequence: 0 },
 ])
 const rootEl = ref<HTMLElement | null>(null)
 const hideLeavingPanel = (element: Element) => { element.setAttribute('inert', ''); element.setAttribute('aria-hidden', 'true') }
@@ -76,14 +79,39 @@ let expiryTimer: number | undefined
 let inFlight = false
 let currentRun = 0
 let disposed = false
+const phases = ['investigating', 'identified', 'monitoring', 'resolved'] as const
 const providers = computed(() => sources.value.map(source => {
   const id: Provider = source.id === 'openai' ? 'gpt' : 'claude'
   const components = serviceStatusComponents(source.snapshot?.components ?? [], id)
   const fresh = source.state === 'ready' && !source.stale && publicStatusFresh(source.fetchedAt, now.value)
-  return { id, source, components, fresh, tone: publicStatusTone(components, fresh) }
+  const incidents = serviceStatusIncidents(source.snapshot?.incidents ?? [], source.snapshot?.components ?? [], id)
+  const historyReady = fresh && source.history.state === 'ready'
+  const historyIncidents = historyReady ? publicHistoryIncidents(serviceStatusIncidents(source.history.incidents, source.snapshot?.components ?? [], id), now.value) : []
+  const incident = incidents[0] ?? null
+  return {
+    id, source, components, fresh, incident,
+    phase: incident ? incidentPhase(incident) : null,
+    affected: components.filter(component => component.status !== 'operational'),
+    tone: serviceStatusTone(components, incidents, fresh),
+    historyReady, historyIncidents,
+    historyDays: publicHistoryDays(historyIncidents, now.value),
+  }
 }))
 const sourceHost = (href: string) => { try { return new URL(href).host } catch { return href } }
 const renderTime = (value: string) => new Date(value).toLocaleString(locale.value)
+const renderDate = (value: string) => new Date(value).toLocaleDateString(locale.value, { month: 'short', day: 'numeric' })
+const checkedAge = (value: string) => {
+  const minutes = Math.max(0, Math.floor((now.value - Date.parse(value)) / 60_000))
+  return t(minutes ? 'needtoken.statusStrip.compact.checkedMinutesAgo' : 'needtoken.statusStrip.compact.justChecked', { count: minutes })
+}
+const incidentTiming = (incident: PublicStatusIncident) => {
+  const minutes = incidentElapsedMinutes(incident, now.value)
+  if (minutes === null) return t('needtoken.statusStrip.compact.timeUnknown')
+  const duration = minutes >= 1440 ? t('needtoken.statusStrip.compact.durationDays', { count: Math.floor(minutes / 1440) })
+    : minutes >= 60 ? t('needtoken.statusStrip.compact.durationHours', { count: Math.floor(minutes / 60), minutes: minutes % 60 })
+    : t('needtoken.statusStrip.compact.durationMinutes', { count: minutes })
+  return t(incidentActive(incident) ? 'needtoken.statusStrip.compact.ongoingFor' : 'needtoken.statusStrip.compact.lastedFor', { duration })
+}
 function close(restoreFocus = false) {
   const current = opened.value
   if (restoreFocus && current) rootEl.value?.querySelector<HTMLButtonElement>(`[data-provider="${current}"]`)?.focus()
@@ -135,6 +163,7 @@ async function loadSource(source: StatusSource, signal: AbortSignal, run: number
     if (!snapshot.ok) throw new Error('invalid status payload')
     if (disposed || run !== currentRun || !pageVisible.value) return
     source.snapshot = snapshot
+    source.history = parsePublicStatusHistory(data.history, source.href)
     source.fetchedAt = data.fetched_at
     source.stale = data.stale
     source.state = 'ready'
@@ -203,26 +232,20 @@ onUnmounted(() => {
 })
 </script>
 
+
 <style scoped>
 .status-pills { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .status-pill-wrap { position: static; }
 .status-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 5px 11px; border: 1px solid rgba(168,188,185,.14); border-radius: 999px; background: rgba(168,188,185,.045); color: var(--ui-text-secondary); font-size: 11px; font-weight: 500; line-height: 1.4; transition: color 160ms ease, background 160ms ease; }
 .status-pill:hover, .status-pill[aria-expanded="true"] { color: var(--ui-text-primary); background: rgba(168,188,185,.09); }
-.status-pill:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
+.status-pill:focus-visible, .status-popover a:focus-visible, .status-popover button:focus-visible, .status-popover summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; border-radius: 3px; }
 .status-bars { display: inline-flex; align-items: center; gap: 2px; height: 13px; color: #77848c; }
 .status-bars i { display: block; width: 2px; height: 12px; border-radius: 1px; background: currentColor; transform-origin: center bottom; }
 .status-bars.is-received i { animation: status-received 800ms var(--nt-motion-ease, ease-out) calc(var(--bar-index) * 60ms) 1; }
 .status-bars.is-checking i { animation: status-checking 700ms var(--nt-motion-ease, ease-in-out) calc(var(--bar-index) * -100ms) infinite; }
 @keyframes status-checking { 0%, 100% { transform: scaleY(.45); opacity: .5; } 50% { transform: scaleY(1); opacity: 1; } }
 @keyframes status-received { 0% { transform: scaleY(.4); opacity: .4; } 100% { transform: scaleY(1); opacity: 1; } }
-.status-scope { color: var(--ui-text-muted); }
-.status-popover .status-warning { color: #c7ad70; }
-.status-refresh-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ui-border); color: var(--ui-text-muted); font-size: 11px; line-height: 1.6; }
-.status-refresh-row button { color: var(--ui-accent); padding: 4px 0; }
-.status-refresh-row button[aria-disabled="true"] { opacity: .5; }
-.status-refresh-row button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-.status-components.is-old { opacity: .65; }
-.status-popover { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 50; width: min(420px, calc(100vw - 72px)); max-height: min(460px, 70vh); overflow-y: auto; padding: 20px; border: 1px solid var(--ui-border-strong); border-radius: 16px; background: var(--ui-bg-elevated); box-shadow: 0 16px 40px rgba(0,0,0,.35); color: var(--ui-text-secondary); text-align: left; }
+.status-popover { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 50; width: min(424px, calc(100vw - 72px)); max-height: min(620px, calc(100dvh - 80px)); overflow-y: auto; padding: 20px; border: 1px solid var(--ui-border-strong); border-radius: 20px; background: var(--ui-bg-elevated); box-shadow: 0 16px 40px rgba(0,0,0,.3); color: var(--ui-text-secondary); text-align: left; }
 .status-popover-enter-active { transition: opacity var(--nt-motion-enter) var(--nt-motion-ease), transform var(--nt-motion-enter) var(--nt-motion-ease); }
 .status-popover-leave-active { transition: opacity var(--nt-motion-fast) var(--nt-motion-ease); pointer-events: none; }
 .status-popover-enter-from, .status-popover-leave-to { opacity: 0; }
@@ -230,23 +253,58 @@ onUnmounted(() => {
 .status-pill-wrap::before { content: ''; position: absolute; bottom: 100%; right: 0; width: 100%; height: 12px; pointer-events: none; }
 .status-pill-wrap:has(.status-popover)::before { pointer-events: auto; }
 .status-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.status-card-head h2 { min-width: 0; color: var(--ui-text-primary); font-size: 14px; font-weight: 600; }
-.status-card-head a { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; color: var(--ui-text-muted); font-size: 10px; }
-.status-card-head a:hover { color: var(--ui-accent); }
-.status-popover p { margin-top: 10px; font-size: 12px; line-height: 1.7; }
-.status-popover .status-count { color: var(--ui-text-secondary); }
-.status-popover .status-history, .status-popover .status-time { color: var(--ui-text-muted); font-size: 11px; }
-.status-components { display: grid; gap: 9px; margin-block: 15px; }
-.status-components li { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 11px; }
-.status-components li span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
-.status-components li span:last-child { color: var(--ui-text-muted); }
+.status-card-head h2 { min-width: 0; color: var(--ui-text-primary); font-size: 15px; line-height: 20px; font-weight: 600; }
+.status-health { margin-left: auto; font-size: 12px; line-height: 20px; }
+.status-scope-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 4px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
+.status-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.status-warning { margin-top: 12px; color: #c7ad70; font-size: 12px; line-height: 20px; }
+.status-incident { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ui-border); }
+.status-incident.is-old { opacity: .65; }
+.status-incident-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ui-text-muted); font-size: 11px; line-height: 16px; }
+.status-incident-meta time { white-space: nowrap; }
+.status-incident-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 8px; color: var(--ui-text-primary); font-size: 16px; line-height: 24px; font-weight: 500; overflow-wrap: anywhere; }
+.status-incident-update { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 8px; font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
+.status-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.status-phase { min-width: 0; color: var(--ui-text-muted); font-size: 11px; line-height: 16px; }
+.status-phase > span:last-child { display: block; overflow-wrap: anywhere; }
+.status-phase-track { display: block; height: 4px; margin-bottom: 8px; overflow: hidden; border-radius: 2px; background: var(--ui-border-strong); }
+.status-phase-track i { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left center; background: #c5a65e; }
+.status-phase.is-reached .status-phase-track i { transform: scaleX(1); animation: status-phase-reveal 400ms var(--nt-motion-ease, ease-out) calc(var(--phase-index) * 60ms) 1 both; }
+.status-phase.is-current { color: var(--ui-text-primary); }
+.status-incident[data-phase="resolved"] .status-phase-track i { background: #3bcba0; }
+@keyframes status-phase-reveal { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.status-incident-footer { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
+.status-popover a { display: inline-flex; align-items: center; gap: 4px; }
+.status-incident-footer a { flex-shrink: 0; }
+.status-popover a:hover { color: var(--ui-accent); }
+.status-history-region { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ui-border); }
+.status-history-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 11px; line-height: 18px; }
+.status-history-head h3 { color: var(--ui-text-secondary); font-weight: 400; }
+.status-history-head > span { color: var(--ui-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status-history-bars { display: grid; grid-template-columns: repeat(90, minmax(0, 1fr)); gap: 2px; height: 28px; margin-top: 12px; }
+.status-history-bars i { display: block; min-width: 0; border-radius: 1px; background: rgba(148,163,184,.18); }
+.status-history-bars i.has-incident { background: #c5a65e; }
+.status-history-axis { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--ui-text-muted); font-size: 10px; line-height: 16px; font-variant-numeric: tabular-nums; }
+.status-history-note { margin-top: 8px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
+.status-history-events { margin-top: 12px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
+.status-history-events summary { cursor: pointer; width: fit-content; }
+.status-history-events ul { display: grid; gap: 8px; margin-top: 12px; }
+.status-history-events li { display: flex; align-items: baseline; gap: 8px; }
+.status-history-events li time { flex-shrink: 0; }
+.status-history-events li a { color: var(--ui-text-secondary); overflow-wrap: anywhere; }
+.status-history-events li a svg { flex-shrink: 0; }
+.status-refresh-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--ui-border); color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
+.status-refresh-row > a { margin-right: auto; }
+.status-refresh-row > time { white-space: nowrap; }
+.status-refresh-row button { color: var(--ui-accent); padding: 4px 0; white-space: nowrap; }
+.status-refresh-row button[aria-disabled="true"] { opacity: .5; }
 .status-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: #77848c; }
 .status-dot.is-operational { background: #3bcba0; }
 .status-bars.is-operational { color: #3bcba0; }
-.status-dot.is-degraded_performance, .status-dot.is-under_maintenance { background: #e2b340; }
-.status-bars.is-degraded_performance, .status-bars.is-under_maintenance { color: #e2b340; }
+.status-dot.is-degraded_performance, .status-dot.is-under_maintenance { background: #c5a65e; }
+.status-bars.is-degraded_performance, .status-bars.is-under_maintenance { color: #c5a65e; }
 .status-dot.is-partial_outage, .status-dot.is-major_outage { background: #e06a5c; }
 .status-bars.is-partial_outage, .status-bars.is-major_outage { color: #e06a5c; }
-@media (max-width: 640px) { .status-pills { justify-content: flex-start; width: 100%; }.status-pill { min-height: 36px; }.status-popover { left: 0; right: auto; padding: 16px; } }
-@media (prefers-reduced-motion: reduce) { .status-bars:is(.is-checking, .is-received) i { animation: none; }.status-pill { transition: none; }.status-popover-enter-from { transform: none; } }
+@media (max-width: 640px) { .status-pills { justify-content: flex-start; width: 100%; }.status-pill { min-height: 36px; }.status-popover { left: 0; right: auto; padding: 16px; border-radius: 16px; }.status-history-bars { gap: 1px; }.status-refresh-row { gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .status-bars:is(.is-checking, .is-received) i, .status-phase.is-reached .status-phase-track i { animation: none; }.status-pill { transition: none; }.status-popover-enter-from { transform: none; } }
 </style>

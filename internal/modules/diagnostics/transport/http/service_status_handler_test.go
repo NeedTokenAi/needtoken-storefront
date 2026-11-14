@@ -31,8 +31,9 @@ func statusRouter(reader diagnosticscontract.ServiceStatusReader) *gin.Engine {
 func TestStatusHandlerPreservesProviderStaleAndSuccessfulRetrievalContract(t *testing.T) {
 	for _, stale := range []bool{false, true} {
 		now := time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC)
+		incident := diagnosticscontract.ServiceStatusIncident{ID: "official-event", Name: "Official event", Status: "monitoring", CreatedAt: &now, URL: "https://status.openai.com/incidents/official-event", Components: []diagnosticscontract.ServiceStatusIncidentComponent{}, IncidentUpdates: []diagnosticscontract.ServiceStatusIncidentUpdate{{ID: "official-update", Status: "monitoring", Body: "Official plain-text update", DisplayAt: &now, AffectedComponents: []diagnosticscontract.ServiceStatusAffectedComponent{}}}}
 		router := statusRouter(statusReaderFunc(func(_ context.Context, provider diagnosticscontract.ServiceStatusProvider) (diagnosticscontract.ServiceStatusSnapshot, error) {
-			return diagnosticscontract.ServiceStatusSnapshot{Provider: provider, SourceURL: "https://status.openai.com/", FetchedAt: now, Stale: stale, Summary: diagnosticscontract.ServiceStatusSummary{Components: []diagnosticscontract.ServiceStatusComponent{{ID: "gpt-login", Name: "Login", Status: "major_outage", GroupID: "chatgpt"}}}}, nil
+			return diagnosticscontract.ServiceStatusSnapshot{Provider: provider, SourceURL: "https://status.openai.com/", FetchedAt: now, Stale: stale, Summary: diagnosticscontract.ServiceStatusSummary{Components: []diagnosticscontract.ServiceStatusComponent{{ID: "gpt-login", Name: "Login", Status: "major_outage", GroupID: "chatgpt"}}, Incidents: []diagnosticscontract.ServiceStatusIncident{incident}}, History: diagnosticscontract.ServiceStatusHistory{State: "ready", Coverage: "partial", SourceURL: "https://status.openai.com/history", Incidents: []diagnosticscontract.ServiceStatusIncident{incident}}}, nil
 		}))
 		recorder := httptest.NewRecorder()
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/public/tools/service-status/openai", nil))
@@ -42,6 +43,9 @@ func TestStatusHandlerPreservesProviderStaleAndSuccessfulRetrievalContract(t *te
 		}
 		if json.Unmarshal(recorder.Body.Bytes(), &envelope) != nil || recorder.Code != 200 || envelope.StatusCode != 0 || envelope.Data.Provider != "openai" || envelope.Data.Stale != stale || !envelope.Data.FetchedAt.Equal(now) || envelope.Data.Summary.Components[0].GroupID != "chatgpt" {
 			t.Fatalf("status proxy contract changed: %s", recorder.Body.String())
+		}
+		if envelope.Data.History.State != "ready" || envelope.Data.History.Coverage != "partial" || envelope.Data.History.SourceURL != "https://status.openai.com/history" || len(envelope.Data.History.Incidents) != 1 || len(envelope.Data.Summary.Incidents) != 1 || envelope.Data.History.Incidents[0].IncidentUpdates[0].Body != "Official plain-text update" || !envelope.Data.Summary.Incidents[0].CreatedAt.Equal(now) || strings.Contains(recorder.Body.String(), "percent") {
+			t.Fatal("incident/history fields or partial coverage were lost in the HTTP envelope")
 		}
 		if !strings.Contains(recorder.Header().Get("Cache-Control"), "no-store") {
 			t.Fatal("status snapshot can be cached without freshness checks")

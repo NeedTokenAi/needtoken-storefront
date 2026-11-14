@@ -67,5 +67,6 @@ const { t } = useI18n()
   .nt-page-skeleton--prices .nt-skeleton-cards { grid-template-columns: 1fr; gap: 16px; }
   .nt-page-skeleton--prices article { min-height: 176px; }
 }
+@media (max-width: 359px) { .nt-page-skeleton--prices article { min-height: 204px; } }
 @media (prefers-reduced-motion: reduce) { .nt-page-skeleton i::after { animation: none; } }
 </style>

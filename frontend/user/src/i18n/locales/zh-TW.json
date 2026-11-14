@@ -2321,7 +2321,12 @@
       "card": "信用卡",
       "paypal": "PayPal",
       "checkoutNote": "實際可用方式以結帳頁為準",
-      "usdt": "USDT"
+      "usdt": "USDT",
+      "loading": "正在讀取付款方式",
+      "empty": "付款方式請於結帳時查看",
+      "wallet": "錢包餘額付款",
+      "unavailable": "暫時無法讀取付款方式",
+      "retry": "重新讀取付款方式"
     },
     "effects": {
       "soundOn": "按鈕音效：已開啟",
@@ -2992,7 +2997,53 @@
       "sourceChanged": "官方來源更新於 {time}",
       "refreshing": "正在重新整理官方狀態",
       "refreshPolicy": "每 60 秒檢查，切至背景時暫停",
-      "refreshAction": "重新整理"
+      "refreshAction": "重新整理",
+      "compact": {
+        "scope": {
+          "gpt": "ChatGPT 產品服務",
+          "claude": "claude.ai 網頁與 App"
+        },
+        "componentCount": "{count} 項服務",
+        "activeIncident": "目前有事故",
+        "recentIncident": "最近事故",
+        "currentSummary": "目前狀態",
+        "previousSnapshot": "上次快照",
+        "noIncidentTitle": "目前運作正常",
+        "unknownSummary": "目前狀態尚未確認",
+        "componentSummary": "部分元件狀態異常",
+        "noIncidentBody": "官方未報告與此產品關聯的未解決事故",
+        "affectedComponents": "涉及元件：{names}",
+        "noLinkedIncident": "官方未提供可關聯的事故說明",
+        "noActiveIncident": "以官方狀態頁為準",
+        "officialProgress": "官方進度",
+        "noUpdate": "官方暫未提供更新說明",
+        "phaseLabel": "事故處理階段",
+        "phases": {
+          "investigating": "調查中",
+          "identified": "已定位",
+          "monitoring": "監控中",
+          "resolved": "已解決"
+        },
+        "timeUnknown": "官方未提供完整起訖時間",
+        "ongoingFor": "已持續 {duration}",
+        "lastedFor": "持續 {duration}",
+        "durationDays": "{count} 天",
+        "durationHours": "{count} 小時 {minutes} 分鐘",
+        "durationMinutes": "{count} 分鐘",
+        "checkedMinutesAgo": "{count} 分鐘前",
+        "justChecked": "剛剛取得",
+        "refreshing": "更新中",
+        "historyTitle": "近 90 天公開事故記錄",
+        "incidentCount": "已關聯 {count} 起",
+        "historyUnknown": "暫無可用記錄",
+        "historyAlternative": "近 90 天公開事故記錄，已關聯 {count} 起；灰色表示缺少記錄，不代表服務正常，也不適用於計算可用率",
+        "unknownDay": "暫無已確認的公開記錄",
+        "today": "今天",
+        "partialHistory": "僅含官方最近至多 50 條記錄；灰色未涵蓋，不代表可用率",
+        "noScopedHistory": "暫無可關聯的產品事故記錄；灰色不代表服務正常",
+        "historyUnavailable": "歷史記錄暫時無法取得；灰色表示未知",
+        "recentRecords": "檢視最近事件"
+      }
     },
     "radar": {
       "eyebrow": "實用工具",

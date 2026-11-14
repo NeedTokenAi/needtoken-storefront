@@ -13,6 +13,7 @@ const (
 	statusRetryAfter   = 30 * time.Second
 	statusStaleFor     = 10 * time.Minute
 	statusFetchTimeout = 8 * time.Second
+	statusHistoryWait  = 2 * time.Second
 )
 
 type statusCacheEntry struct {
@@ -76,21 +77,34 @@ func (s *ServiceStatus) refreshStatus(provider diagnosticscontract.ServiceStatus
 	ctx, cancel := context.WithTimeout(context.Background(), statusFetchTimeout)
 	defer cancel()
 	var summary diagnosticscontract.ServiceStatusSummary
+	sourceURL := "https://status.openai.com/"
+	if provider == diagnosticscontract.ServiceStatusClaude {
+		sourceURL = "https://status.claude.com/"
+	}
+	history := diagnosticscontract.ServiceStatusHistory{State: "unavailable", Coverage: "partial", SourceURL: sourceURL + "history", Incidents: []diagnosticscontract.ServiceStatusIncident{}}
 	var err error
 	if s.source == nil {
 		err = diagnosticscontract.ErrServiceStatusUnavailable
 	} else {
 		summary, err = s.source.Fetch(ctx, provider)
 	}
+	if err == nil {
+		if source, ok := s.source.(diagnosticscontract.ServiceStatusHistorySource); ok {
+			historyCtx, historyCancel := context.WithTimeout(ctx, statusHistoryBudget(ctx))
+			recent, historyErr := source.FetchHistory(historyCtx, provider)
+			historyCancel()
+			if historyErr == nil && recent.State == "ready" {
+				// Recent announcements never establish a complete uptime window.
+				history.State = "ready"
+				history.Incidents = recent.Incidents
+			}
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now().UTC()
 	if err == nil {
-		sourceURL := "https://status.openai.com/"
-		if provider == diagnosticscontract.ServiceStatusClaude {
-			sourceURL = "https://status.claude.com/"
-		}
-		result := copyStatusSnapshot(diagnosticscontract.ServiceStatusSnapshot{Provider: provider, SourceURL: sourceURL, FetchedAt: now, Summary: summary}, false)
+		result := copyStatusSnapshot(diagnosticscontract.ServiceStatusSnapshot{Provider: provider, SourceURL: sourceURL, FetchedAt: now, Summary: summary, History: history}, false)
 		entry.latest = &result
 		entry.retry = time.Time{}
 	} else {
@@ -98,6 +112,22 @@ func (s *ServiceStatus) refreshStatus(provider diagnosticscontract.ServiceStatus
 	}
 	entry.flight = nil
 	close(done)
+}
+
+func statusHistoryBudget(ctx context.Context) time.Duration {
+	budget := statusHistoryWait
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return 0
+		}
+		// Optional history must leave time to return a valid current summary;
+		// otherwise it can consume the browser's entire status request timeout.
+		if remaining/2 < budget {
+			budget = remaining / 2
+		}
+	}
+	return budget
 }
 
 func staleStatus(entry *statusCacheEntry, now time.Time) (diagnosticscontract.ServiceStatusSnapshot, error) {
@@ -120,7 +150,38 @@ func copyStatusSnapshot(value diagnosticscontract.ServiceStatusSnapshot, stale b
 		updated := *value.Summary.Page.UpdatedAt
 		value.Summary.Page.UpdatedAt = &updated
 	}
+	value.Summary.Incidents = copyStatusIncidents(value.Summary.Incidents)
+	value.History.Incidents = copyStatusIncidents(value.History.Incidents)
 	return value
+}
+
+func copyStatusIncidents(rows []diagnosticscontract.ServiceStatusIncident) []diagnosticscontract.ServiceStatusIncident {
+	result := append(make([]diagnosticscontract.ServiceStatusIncident, 0, len(rows)), rows...)
+	for index := range result {
+		incident := &result[index]
+		incident.CreatedAt = copyStatusTime(incident.CreatedAt)
+		incident.StartedAt = copyStatusTime(incident.StartedAt)
+		incident.UpdatedAt = copyStatusTime(incident.UpdatedAt)
+		incident.ResolvedAt = copyStatusTime(incident.ResolvedAt)
+		incident.Components = append(make([]diagnosticscontract.ServiceStatusIncidentComponent, 0, len(incident.Components)), incident.Components...)
+		incident.IncidentUpdates = append(make([]diagnosticscontract.ServiceStatusIncidentUpdate, 0, len(incident.IncidentUpdates)), incident.IncidentUpdates...)
+		for updateIndex := range incident.IncidentUpdates {
+			update := &incident.IncidentUpdates[updateIndex]
+			update.DisplayAt = copyStatusTime(update.DisplayAt)
+			update.CreatedAt = copyStatusTime(update.CreatedAt)
+			update.UpdatedAt = copyStatusTime(update.UpdatedAt)
+			update.AffectedComponents = append(make([]diagnosticscontract.ServiceStatusAffectedComponent, 0, len(update.AffectedComponents)), update.AffectedComponents...)
+		}
+	}
+	return result
+}
+
+func copyStatusTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
 
 var _ diagnosticscontract.ServiceStatusReader = (*ServiceStatus)(nil)

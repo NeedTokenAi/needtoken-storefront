@@ -44,10 +44,59 @@ type ServiceStatusComponent struct {
 	Components []string `json:"components,omitempty"`
 }
 
+type ServiceStatusIncidentComponent struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status,omitempty"`
+}
+
+type ServiceStatusAffectedComponent struct {
+	Code      string `json:"code"`
+	Name      string `json:"name"`
+	OldStatus string `json:"old_status,omitempty"`
+	NewStatus string `json:"new_status,omitempty"`
+}
+
+type ServiceStatusIncidentUpdate struct {
+	ID                 string                           `json:"id"`
+	Status             string                           `json:"status"`
+	Body               string                           `json:"body"`
+	DisplayAt          *time.Time                       `json:"display_at,omitempty"`
+	CreatedAt          *time.Time                       `json:"created_at,omitempty"`
+	UpdatedAt          *time.Time                       `json:"updated_at,omitempty"`
+	AffectedComponents []ServiceStatusAffectedComponent `json:"affected_components"`
+}
+
+// Associations come only from the official component IDs. An empty list does
+// not imply that a provider-wide incident affects a particular product.
+type ServiceStatusIncident struct {
+	ID              string                           `json:"id"`
+	Name            string                           `json:"name"`
+	Status          string                           `json:"status"`
+	Impact          string                           `json:"impact"`
+	URL             string                           `json:"url"`
+	CreatedAt       *time.Time                       `json:"created_at,omitempty"`
+	StartedAt       *time.Time                       `json:"started_at,omitempty"`
+	UpdatedAt       *time.Time                       `json:"updated_at,omitempty"`
+	ResolvedAt      *time.Time                       `json:"resolved_at,omitempty"`
+	Components      []ServiceStatusIncidentComponent `json:"components"`
+	IncidentUpdates []ServiceStatusIncidentUpdate    `json:"incident_updates"`
+}
+
+// A recent incident feed is partial event history, not an uptime measurement or
+// a guarantee that days without returned incidents were healthy.
+type ServiceStatusHistory struct {
+	State     string                  `json:"state"`
+	Coverage  string                  `json:"coverage"`
+	SourceURL string                  `json:"source_url"`
+	Incidents []ServiceStatusIncident `json:"incidents"`
+}
+
 type ServiceStatusSummary struct {
 	Page       ServiceStatusPage        `json:"page"`
 	Status     ServiceStatusState       `json:"status"`
 	Components []ServiceStatusComponent `json:"components"`
+	Incidents  []ServiceStatusIncident  `json:"incidents"`
 }
 
 type ServiceStatusSnapshot struct {
@@ -58,10 +107,17 @@ type ServiceStatusSnapshot struct {
 	FetchedAt time.Time            `json:"fetched_at"`
 	Stale     bool                 `json:"stale"`
 	Summary   ServiceStatusSummary `json:"summary"`
+	History   ServiceStatusHistory `json:"history"`
 }
 
 type ServiceStatusSource interface {
 	Fetch(context.Context, ServiceStatusProvider) (ServiceStatusSummary, error)
+}
+
+// History is optional so an unavailable recent feed cannot invalidate a
+// successfully retrieved current-status summary.
+type ServiceStatusHistorySource interface {
+	FetchHistory(context.Context, ServiceStatusProvider) (ServiceStatusHistory, error)
 }
 
 type ServiceStatusReader interface {
