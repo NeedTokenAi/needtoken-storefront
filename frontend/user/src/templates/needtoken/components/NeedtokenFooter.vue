@@ -25,6 +25,7 @@
       </section>
       <div class="nt-footer-legal"><span>© {{ year }} {{ brandName }}</span><div class="nt-footer-legal-actions"><ProviderStatusStrip /><div class="nt-footer-legal-links"><RouterLink to="/privacy">{{ t('footer.privacy') }}</RouterLink><RouterLink to="/terms">{{ t('footer.terms') }}</RouterLink></div></div></div>
       <FooterShapeWordmark :word="brandName" />
+
     </div>
   </footer>
 </template>
@@ -46,22 +47,21 @@ const year = new Date().getFullYear()
 const emailHref = computed(() => supportEmailHref(props.support.businessEmail))
 const qrCards = computed(() => [{ key: 'wecom', label: t('needtoken.support.wecom'), image: props.support.wecomQr }, { key: 'qq', label: t('needtoken.support.qq'), image: props.support.qqQr }].filter(card => !!card.image))
 const columns = computed(() => [
-  { key: 'personal', title: t('needtoken.nav.personal'), links: [{ path: '/categories/recharge', label: t('needtoken.nav.recharge') }, { path: '/categories/rental', label: t('needtoken.nav.rental') }], pending: t('needtoken.nav.workstation') },
-  { key: 'gateway', title: t('needtoken.nav.gateway'), links: [{ path: API_SERVICES_PATH, label: t('needtoken.nav.plans') }, { path: '/models', label: t('needtoken.nav.models') }, { path: '/docs', label: t('needtoken.nav.docs') }], pending: '' },
-  { key: 'help', title: t('needtoken.nav.help'), links: [{ path: '/blog', label: t('needtoken.nav.blog') }, { path: '/faq', label: t('needtoken.nav.faq') }], pending: '' },
-  { key: 'support', title: t('needtoken.footer.support'), links: [{ path: '/tools/radar', label: t('needtoken.nav.radar') }, { path: '/tools/environment', label: t('needtoken.nav.claudeCheck') }, { path: '/tools/codex-account', label: t('needtoken.nav.codexCheck') }, { path: '/free-apple-id', label: t('needtoken.nav.appleIds') }, { path: '/guest/orders', label: t('navbar.guestOrders') }], pending: '' },
+  { key: 'products', title: t('needtoken.footer.products'), links: [{ path: '/categories/recharge', label: t('needtoken.nav.recharge') }, { path: '/categories/rental', label: t('needtoken.nav.rental') }, { path: API_SERVICES_PATH, label: t('needtoken.nav.plans') }, { path: '/models', label: t('needtoken.nav.models') }], pending: '' },
+  { key: 'help', title: t('needtoken.nav.help'), links: [{ path: '/blog', label: t('needtoken.nav.blog') }, { path: '/docs', label: t('needtoken.nav.docs') }, { path: '/faq', label: t('needtoken.nav.faq') }], pending: '' },
+  { key: 'support', title: t('needtoken.footer.support'), links: [{ path: '/tools/radar', label: t('needtoken.nav.radar') }, { path: '/tools/environment', label: t('needtoken.nav.environment') }, { path: '/tools/codex-account', label: t('needtoken.nav.codexCheck') }, { path: '/free-apple-id', label: t('needtoken.nav.appleIds') }, { path: '/guest/orders', label: t('navbar.guestOrders') }], pending: '' },
 ])
 </script>
 
 <style scoped>
 .nt-footer-next { width: 100%; margin-top: clamp(64px, 7vw, 112px); padding: 0 24px 24px; color: var(--ui-text-muted); }
-.nt-footer-card { max-width: 1320px; margin: 0 auto; overflow: visible; isolation: isolate; border: 1px solid rgba(160,190,185,.13); border-radius: 28px; background: radial-gradient(ellipse at 0 0, #2dd4a70b, transparent 50%), radial-gradient(ellipse at 100% 100%, #8b5cf609, transparent 65%), #0e1218; box-shadow: inset 0 1px 0 #ffffff05; }
+.nt-footer-card { max-width: 1200px; margin: 0 auto; overflow: visible; isolation: isolate; border: 1px solid rgba(160,190,185,.13); border-radius: 22px; background: #0d1319; }
 .nt-footer-top { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.7fr); gap: 56px; padding: 42px 42px 36px; }
 .nt-footer-brand { display: inline-flex; align-items: center; gap: 11px; max-width: 100%; color: var(--ui-text-primary); font-size: 21px; font-weight: 700; letter-spacing: -.04em; }
 .nt-footer-brand > img { flex-shrink: 0; border-radius: 9px; object-fit: contain; }.nt-footer-brand > span { min-width: 0; overflow-wrap: anywhere; }
 .nt-footer-description { max-width: 31ch; margin-top: 17px; font-size: 13px; line-height: 1.9; }
 .nt-footer-business { margin-top: 26px; font-size: 11px; }.nt-footer-business a { display: flex; align-items: center; width: fit-content; max-width: 100%; gap: 8px; margin-top: 8px; color: var(--ui-text-secondary); font-size: 13px; }.nt-footer-business a > span { overflow-wrap: anywhere; }.nt-footer-business a > svg { flex-shrink: 0; color: var(--ui-accent); }
-.nt-footer-nav { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 24px; padding-top: 8px; }
+.nt-footer-nav { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; padding-top: 8px; }
 .nt-footer-pending { display: inline-flex; align-items: center; gap: 6px; color: var(--ui-text-muted); }
 .nt-footer-pending em { font-style: normal; font-size: 11px; color: #e7c56a; }
 .nt-footer-column { display: flex; flex-direction: column; align-items: flex-start; gap: 13px; min-width: 0; font-size: 13px; line-height: 1.65; }.nt-footer-column h2 { margin-bottom: 6px; color: var(--ui-text-primary); font-size: 13px; font-weight: 600; }.nt-footer-column a { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; overflow-wrap: anywhere; }
@@ -69,12 +69,13 @@ const columns = computed(() => [
 .nt-footer-contact { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin: 0 42px; padding: 28px 0; border-top: 1px solid var(--ui-border); border-bottom: 1px solid var(--ui-border); }.nt-footer-contact-copy { min-width: 0; max-width: 54ch; }
 .nt-footer-section-label { display: inline-flex; align-items: center; gap: 7px; color: var(--ui-accent); font-size: 11px; }.nt-footer-contact-copy h2 { margin-top: 9px; color: var(--ui-text-primary); font-size: 23px; line-height: 1.35; font-weight: 600; letter-spacing: -.035em; }.nt-footer-contact-copy > p { margin-top: 9px; font-size: 12px; line-height: 1.85; }.nt-footer-contact-copy > p.nt-footer-hours { display: flex; align-items: center; gap: 6px; margin-top: 11px; font-size: 11px; }.nt-footer-hours > svg { flex-shrink: 0; }.nt-footer-contact-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 13px; color: var(--ui-text-secondary); font-size: 12px; }
 .nt-footer-qr-list { display: flex; flex-shrink: 0; gap: 18px; }.nt-footer-qr-list figure { min-width: 0; text-align: center; }.nt-footer-qr-image { padding: 8px; width: 128px; border: 1px solid rgba(255,255,255,.15); border-radius: 14px; background: #fff; }.nt-footer-qr-image img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: contain; }.nt-footer-qr-list figcaption { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; color: var(--ui-text-secondary); font-size: 12px; }.nt-footer-qr-list figcaption small { color: var(--ui-text-muted); font-size: 10px; }
-.nt-footer-legal { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 24px 42px 0; font-size: 11px; line-height: 1.7; }
+.nt-footer-legal { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 22px 42px 24px; font-size: 11px; line-height: 1.7; }
 .nt-footer-legal-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px 18px; margin-left: auto; }
 .nt-footer-legal-links { display: flex; flex-wrap: wrap; gap: 16px; }
-.nt-footer-legal + :deep(.nt-footer-wordmark) { margin-top: 14px; overflow: hidden; border-radius: 0 0 28px 28px; }
-@media (max-width:900px) { .nt-footer-top { grid-template-columns:1fr; gap:32px; padding:34px 30px 30px; }.nt-footer-description { max-width:45ch; }.nt-footer-business { margin-top:18px; }.nt-footer-nav { grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }.nt-footer-contact { margin-inline:30px; }.nt-footer-legal { padding-inline:30px; } }
-@media (max-width:640px) { .nt-footer-next { padding:0 14px 14px; }.nt-footer-card { border-radius:22px; }.nt-footer-top { padding:28px 22px 26px; }.nt-footer-nav { gap:15px; }.nt-footer-column { font-size:12px; gap:11px; }.nt-footer-column h2 { font-size:12px; }.nt-footer-brand { font-size:20px; }.nt-footer-contact { flex-direction:column; align-items:flex-start; gap:24px; margin-inline:22px; padding:24px 0; }.nt-footer-contact-copy h2 { font-size:22px; }.nt-footer-qr-list { align-self:stretch; justify-content:flex-start; gap:16px; }.nt-footer-qr-image { width:118px; padding:8px; }.nt-footer-legal { padding:22px 22px 0; font-size:10px; } }
+.nt-footer-legal + :deep(.nt-footer-wordmark) { margin-top: 12px; overflow: hidden; border-radius: 0 0 22px 22px; }
+.nt-footer-card a:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 4px; border-radius: 3px; }
+@media (max-width:900px) { .nt-footer-top { grid-template-columns:1fr; gap:32px; padding:34px 30px 30px; }.nt-footer-description { max-width:45ch; }.nt-footer-business { margin-top:18px; }.nt-footer-nav { grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; }.nt-footer-contact { margin-inline:30px; }.nt-footer-legal { padding-inline:30px; } }
+@media (max-width:640px) { .nt-footer-next { padding:0 14px 14px; }.nt-footer-card { border-radius:22px; }.nt-footer-top { padding:28px 22px 26px; }.nt-footer-nav { gap:15px; }.nt-footer-column { font-size:11px; gap:12px; }.nt-footer-column h2 { font-size:12px; }.nt-footer-brand { font-size:20px; }.nt-footer-contact { flex-direction:column; align-items:flex-start; gap:24px; margin-inline:22px; padding:24px 0; }.nt-footer-contact-copy h2 { font-size:22px; }.nt-footer-qr-list { align-self:stretch; justify-content:flex-start; gap:16px; }.nt-footer-qr-image { width:118px; padding:8px; }.nt-footer-legal { flex-direction:column-reverse; align-items:flex-start; padding:20px 22px 22px; gap:22px; font-size:10px; }.nt-footer-legal-actions { width:100%; margin-left:0; justify-content:flex-start; gap:18px; } }
 @media (max-width:359px) { .nt-footer-qr-list { gap:12px; }.nt-footer-qr-image { width:108px; } }
 @media (prefers-reduced-motion:reduce) { .nt-footer-card a { transition:none; } }
 </style>

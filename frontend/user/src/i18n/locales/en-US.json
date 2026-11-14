@@ -1231,7 +1231,8 @@
       "submitFailed": "Submit failed, please try again",
       "manualFormInvalid": "Please complete required information before submitting",
       "selectPayment": "Please select a payment method"
-    }
+    },
+    "paymentNavigationFailed": "The payment page could not open. Your order is created; continue to payment"
   },
   "payment": {
     "title": "Payment",
@@ -1755,7 +1756,8 @@
       "loading": "Loading…",
       "retry": "Retry",
       "pricingPending": "Pricing coming soon. The console price list is authoritative; models without a configured price are not listed.",
-      "priceUnitNote": "USD / million tokens or USD / call is shown only when the rule can be explained accurately. Conditional pricing has no inferred unit rate. Prices come from new-api; the source version is an API marker, not a locked quote."
+      "priceUnitNote": "USD / million tokens or USD / call is shown only when the rule can be explained accurately. Conditional pricing has no inferred unit rate. Prices come from new-api; the source version is an API marker, not a locked quote.",
+      "copyFailed": "Copy failed. Select the code to copy it manually."
     },
     "nav": {
       "label": "Main navigation",
@@ -2045,9 +2047,9 @@
         "desc": "Create a key in the member console and export it in the same terminal that runs your tool."
       },
       "opencode": {
-        "desc": "Put this in opencode.json at the project root (one project) or ~/.config/opencode/opencode.json (global).",
-        "b1": "Provider name is needtoken; the npm package is {'@'}ai-sdk/openai-compatible.",
-        "b2": "apiKey references {'{'}env:NEEDTOKEN_API_KEY{'}'}; export it in the terminal that starts OpenCode.",
+        "desc": "This is the current OpenCode 2 format. Merge it into your project’s opencode.json. Follow the official migration guide before updating an older configuration.",
+        "b1": "The provider is named needtoken and uses the {'@'}opencode/ai/providers/openai-compatible package.",
+        "b2": "env reads NEEDTOKEN_API_KEY from the environment running OpenCode.",
         "b3": "Reference models as {model}.",
         "b4": "After starting, run /models to check the model list."
       },
@@ -2294,7 +2296,7 @@
       "decreaseQuantity": "Decrease quantity",
       "increaseQuantity": "Increase quantity",
       "priceNote": "Member and volume discounts update with your selection. The checkout page confirms the total and available payment methods.",
-      "continueOrder": "Confirm plan and order",
+      "continueOrder": "Confirm plan and enter details",
       "secureOrder": "Track order and payment status",
       "productInfo": "Product details and instructions",
       "infoHint": "Service coverage, recharge requirements and support policies are defined in this product description.",
@@ -2318,7 +2320,8 @@
       "crypto": "Crypto",
       "card": "Credit card",
       "paypal": "PayPal",
-      "checkoutNote": "Available methods are shown at checkout"
+      "checkoutNote": "Available methods are shown at checkout",
+      "usdt": "USDT"
     },
     "effects": {
       "soundOn": "Button sounds: on",
@@ -2929,10 +2932,22 @@
       "calculatorTitle": "API usage calculator",
       "calculatorIntro": "Estimate usage from the existing plan units. The result is a budget, not a checkout price.",
       "tools": {
-        "console": { "title": "Online gateway", "body": "Create a key in the API console and review quota and usage there. Send requests to the base URL below." },
-        "opencode": { "title": "OpenCode", "body": "Put the config in opencode.json at the project root, or in ~/.config/opencode/opencode.json. Reference the key from an environment variable." },
-        "curl": { "title": "curl", "body": "Call the chat completions endpoint with the key from the environment. Export NEEDTOKEN_API_KEY in the same terminal first." },
-        "python": { "title": "Python OpenAI SDK", "body": "Point the official openai package at this base URL and read the same environment variable for the API key." }
+        "console": {
+          "title": "Online gateway",
+          "body": "Create a key in the API console and review quota and usage there. Send requests to the base URL below."
+        },
+        "opencode": {
+          "title": "OpenCode",
+          "body": "Put the config in opencode.json at the project root, or in ~/.config/opencode/opencode.json. Reference the key from an environment variable."
+        },
+        "curl": {
+          "title": "curl",
+          "body": "Call the chat completions endpoint with the key from the environment. Export NEEDTOKEN_API_KEY in the same terminal first."
+        },
+        "python": {
+          "title": "Python OpenAI SDK",
+          "body": "Point the official openai package at this base URL and read the same environment variable for the API key."
+        }
       }
     },
     "statusStrip": {
@@ -2947,7 +2962,11 @@
       "noHistory": "The public summary has no historical availability, so no percentage is estimated.",
       "updated": "Source updated {time}",
       "stale": "The source has had no newer update since {time}",
-      "sources": { "openai": "OpenAI", "claude": "Claude", "codex": "Codex" },
+      "sources": {
+        "openai": "OpenAI",
+        "claude": "Claude",
+        "codex": "Codex"
+      },
       "component": {
         "operational": "Operational",
         "degraded_performance": "Degraded",
@@ -2955,11 +2974,29 @@
         "major_outage": "Major outage",
         "under_maintenance": "Maintenance",
         "unknown": "Unknown"
-      }
+      },
+      "claude": "Claude status",
+      "scopeTitle": {
+        "gpt": "ChatGPT",
+        "claude": "Claude"
+      },
+      "scope": {
+        "gpt": "Identified from the official ChatGPT group, excluding Codex",
+        "claude": "claude.ai web and app, excluding the API and Claude Code"
+      },
+      "timeout": "The status source timed out. Current status cannot be confirmed.",
+      "outdated": "This snapshot is stale. Current status cannot be confirmed.",
+      "scopeEmpty": "The official source has no identifiable product components. Current status cannot be confirmed.",
+      "previousCount": "Previous snapshot: {ok} / {total} operational",
+      "checked": "Retrieved by this site at {time}",
+      "sourceChanged": "Official source updated at {time}",
+      "refreshing": "Refreshing official status",
+      "refreshPolicy": "Checks every 60 seconds; pauses in the background",
+      "refreshAction": "Refresh"
     },
     "radar": {
       "eyebrow": "Tools",
-      "title": "Reset radar",
+      "title": "Codex reset radar",
       "intro": "This board lists OpenAI public-status components whose names mention Codex, and incidents that mention Codex, or both reset and quota. It stays empty when the source has no such record.",
       "board": "Public records",
       "unavailable": "The public status source cannot be read, so the board has no records.",
@@ -2969,19 +3006,393 @@
       "item": "Item",
       "kind": "Type",
       "state": "Source status",
-      "kinds": { "component": "Component", "incident": "Incident" }
+      "kinds": {
+        "component": "Component",
+        "incident": "Incident"
+      },
+      "resetTitle": "Account quota and resets",
+      "resetUnavailable": "Not connected",
+      "resetBody": "Remaining quota and reset times require an account-level data source. Only public service status is connected, so these details are unavailable.",
+      "remainingQuota": "Remaining quota",
+      "nextReset": "Next reset",
+      "notAvailable": "Unavailable",
+      "refresh": "Refresh public records",
+      "description": "Follow reset announcements and distinguish banked, automatic and paid resets",
+      "tools": "Diagnostic tools",
+      "checkAccount": "Check my account and usage",
+      "records": "Reset records",
+      "verifiedOn": "Sources reviewed: {date}",
+      "sourceNote": "Reviewed historical announcements. Check the original source for current offers and eligibility.",
+      "filterLabel": "Filter by reset type",
+      "filters": {
+        "all": "All records",
+        "banked": "Banked resets",
+        "automatic": "Automatic resets"
+      },
+      "types": {
+        "banked": "Banked reset",
+        "automatic": "Automatic reset"
+      },
+      "sources": {
+        "community": "OpenAI Community · announcement source",
+        "changelog": "OpenAI changelog"
+      },
+      "entries": {
+        "augustAutomatic": {
+          "title": "Automatic reset announced after August usage issues",
+          "body": "The August 23 announcement specified August 24 at 21:00 UTC. Refer to the original offer and your usage page for the accounts and limits covered."
+        },
+        "twentyMillion": {
+          "title": "Banked reset announced at the 20 million user milestone",
+          "body": "The announcement described a banked-reset grant. Receiving and redeeming it are separate steps; check your own usage page for delivery and expiration."
+        },
+        "bankingLaunch": {
+          "title": "Banked resets introduced",
+          "body": "The changelog introduced reset banking for Plus and Pro, a launch grant and a referral offer. Current eligibility and offer terms still apply."
+        }
+      },
+      "historicalNote": "Historical records do not imply a current offer or confirm that a reset was applied to your account",
+      "siteUpdates": "Store updates",
+      "refreshUpdates": "Refresh updates",
+      "updatesError": "Store updates are unavailable. Retry or open an original source above.",
+      "noSiteUpdates": "No new store announcements",
+      "guideTitle": "Three types of reset",
+      "guide": {
+        "banked": {
+          "title": "Banked: redeem when needed",
+          "body": "Saved to your account with specific coverage and expiration. Receiving it does not refresh usage."
+        },
+        "automatic": {
+          "title": "Automatic: applied directly",
+          "body": "Applies to the accounts and limits selected for an offer. It is not saved as a reset credit."
+        },
+        "paid": {
+          "title": "Paid: applies immediately",
+          "body": "Offered to selected eligible personal Plus / Pro accounts. Check your account for availability and coverage."
+        }
+      },
+      "resetGuide": "Official reset guide",
+      "paidGuide": "Official paid-reset guide",
+      "usageTitle": "When does usage refresh next?",
+      "usageBody": "Check your account usage page. Promotional resets may change the next refresh time; announcement times cannot determine it.",
+      "openUsage": "Open official usage settings"
     },
     "codexCheck": {
-      "eyebrow": "Account check",
+      "toolsNav": "Diagnostic tools",
       "title": "Codex account check",
-      "intro": "This check needs an account credential to ask the provider about subscription, activation, and upgrade eligibility.",
-      "board": "Checks",
-      "unavailableTitle": "Check unavailable",
-      "unavailableBody": "This site has no credential API for this check and does not collect a session, password, or token. None of the rows below has a result.",
-      "item": "Item",
-      "result": "Result",
-      "notChecked": "Not checked",
-      "rows": { "subscription": "Subscription", "open": "Can activate", "upgrade": "Can upgrade" }
+      "intro": "Check ChatGPT subscription and Codex usage without using model quota",
+      "inputTitle": "Paste your Session",
+      "inputLabel": "Session JSON or accessToken",
+      "inputPlaceholder": "Paste the Session JSON or accessToken from ChatGPT",
+      "memoryOnly": "Temporarily held on this page",
+      "credentialReady": "Credential read; the original Session input has been cleared",
+      "privacy": "Credentials pass through this server to ChatGPT for read-only queries. They are not saved in browser storage or the database; clear or leave to remove this page’s copy.",
+      "detect": "Check account",
+      "detectAgain": "Check again",
+      "cancel": "Cancel and clear",
+      "clear": "Clear credentials and results",
+      "howTo": "Get your Session",
+      "signIn": "Sign in to ChatGPT in your browser",
+      "openSession": "Open the official Session page and copy its response",
+      "pasteSession": "Paste it above and check your account; do not share it with others",
+      "board": "Check results",
+      "verified": "Checked with the official API",
+      "loading": "Reading account information",
+      "checkFailed": "Check could not finish",
+      "emptyTitle": "Ready to check",
+      "emptyBody": "See the actual subscription after checking; check usage separately for each workspace",
+      "accountLabel": "Workspace ({count})",
+      "chooseAccount": "Choose a workspace",
+      "defaultAccount": "Default workspace",
+      "subscription": "Current subscription",
+      "expiresAt": "Subscription expires",
+      "notProvided": "Not returned",
+      "accountId": "Workspace ID",
+      "usageTitle": "Codex usage",
+      "readUsage": "Check usage",
+      "usedPercent": "{percent}% used",
+      "resetsAt": "Next reset",
+      "usageUnavailable": "The official API did not return usage for this workspace; try again later",
+      "usagePrompt": "Check current usage and reset times for the selected workspace",
+      "chooseAccountHint": "Choose a workspace to see its subscription and usage",
+      "eligibilityNote": "Subscription status does not confirm purchase or upgrade eligibility; check the actual ChatGPT page",
+      "checkPlans": "Official plans",
+      "checkedAt": "Checked {time}",
+      "source": "Source: ChatGPT",
+      "windowDays": "{count}-day window",
+      "windowHours": "{count}-hour window",
+      "windowMinutes": "{count}-minute window",
+      "windows": {
+        "primary": "Primary usage window",
+        "secondary": "Secondary usage window"
+      },
+      "plans": {
+        "free": "Free",
+        "plus": "Plus",
+        "pro": "Pro",
+        "team": "Team",
+        "business": "Business",
+        "enterprise": "Enterprise",
+        "edu": "Edu",
+        "unknown": "Unknown plan",
+        "go": "Go"
+      },
+      "inputErrors": {
+        "empty": "Paste your Session JSON or accessToken first",
+        "tooLarge": "This input is too long; copy only the Session JSON or accessToken",
+        "invalidJson": "The JSON is incomplete; copy the Session page response again",
+        "missingToken": "No accessToken found; copy the complete JSON from the official Session page",
+        "invalidToken": "The accessToken format was not recognized; cookies, API keys and PATs are not supported"
+      },
+      "errors": {
+        "invalid_input": "Invalid credential format; copy your official Session response again",
+        "unauthorized": "The Session expired or was not authorized; sign in to ChatGPT and get a fresh one",
+        "challenge": "ChatGPT did not accept this server’s request. Try again later or check your account on the official ChatGPT page.",
+        "unavailable": "The official check API cannot be reached right now; try again later",
+        "invalid_response": "The official API returned incomplete information; try again later",
+        "account_not_found": "This workspace was not found in the current Session; check the account again",
+        "rate_limited": "Too many checks; try again shortly",
+        "timeout": "The official API timed out; check your connection and retry"
+      }
+    },
+    "environmentV6": {
+      "title": "Claude network check",
+      "subtitle": "Inspect Claude connections, your network exit and WebRTC routing",
+      "privacy": "Checks network access without reading your account; connects to Anthropic, IP lookup providers and optional Google STUN",
+      "idle": "Start the check to see each observation as it arrives",
+      "running": "Waiting for {count} network checks",
+      "services": "Service connections",
+      "browserScope": "These are browser measurements; use the terminal check for Claude Code proxy, DNS and TLS results",
+      "notAvailable": "Unavailable",
+      "exitUnavailable": "Exit lookup failed. Retry the check; service observations are still available",
+      "exitPartial": "IP received; location and network organization are unavailable",
+      "nextSteps": "Next steps",
+      "webrtc": "WebRTC exit comparison",
+      "localDetails": "Browser and local environment",
+      "localIdle": "Start the check to inspect browser settings and capabilities",
+      "timezoneNote": "Your local time zone differs from the exit location. Check whether this matches your setup",
+      "terminalTitle": "Terminal DNS and TLS check",
+      "terminalIntro": "Run the script in your Claude Code terminal, then import its report. Requires Node.js 18+ and curl; the report is parsed locally and never uploaded.",
+      "targets": {
+        "claudeWeb": "Claude web",
+        "anthropicWeb": "Anthropic website",
+        "anthropic": "Anthropic API"
+      },
+      "states": {
+        "idle": "Not checked",
+        "readableResponse": "HTTP readable",
+        "httpWarning": "Restriction / error",
+        "opaqueResponse": "Response received",
+        "requestUnconfirmed": "Unconfirmed",
+        "timeout": "Timed out"
+      },
+      "details": {
+        "readableResponse": "This HTTP response was readable",
+        "httpWarning": "Check the returned HTTP status",
+        "opaqueResponse": "Cross-origin response; HTTP status cannot be read",
+        "requestUnconfirmed": "The request did not complete; network, redirects or browser policy may be involved",
+        "timeout": "The request exceeded its deadline"
+      },
+      "rtcStates": {
+        "differentExit": "Different exits",
+        "sameExit": "Observed addresses match",
+        "publicOnly": "No comparison exit",
+        "localOnly": "Local candidates only",
+        "noCandidates": "No candidates received",
+        "unsupported": "Unsupported browser",
+        "notRequested": "Not enabled"
+      },
+      "advice": {
+        "offline": "Your browser reports being offline. Restore the connection first",
+        "connection": "Some requests did not complete. Check your network or proxy and retry; the terminal check can narrow down DNS, connection and certificate problems",
+        "restricted": "HTTP 403 was observed. Check supported regions and the actual service message; this does not establish account status",
+        "rateLimit": "HTTP 429 was observed. Retry later and review the service rate-limit message",
+        "upstream": "A server error was observed. Check Anthropic status or retry later",
+        "opaque": "A cross-origin browser response was received. Run the DNS and TLS check below to inspect terminal HTTP and certificate results"
+      }
+    },
+    "toolsPolish": {
+      "nav": {
+        "radar": "Reset radar",
+        "network": "Network",
+        "account": "Account"
+      },
+      "radarScope": "Historical announcements · Not live monitoring",
+      "accountScope": "Read-only checks with ChatGPT",
+      "networkScope": "Observations from this browser",
+      "responseDetails": "Response details",
+      "scopeDetails": "Scope and limits",
+      "providerStatus": "Official service status"
+    },
+    "radarLive": {
+      "scope": "Public announcement tracker",
+      "description": "Follow public Codex reset and reset-credit records, with links to their original sources.",
+      "refresh": "Refresh records",
+      "retry": "Try again",
+      "unavailableTitle": "Records are temporarily unavailable",
+      "unavailable": "The announcement source is unavailable. Try again, or check the data source linked below.",
+      "expired": "The last successful fetch is over 12 hours old, so those records are no longer displayed. Try fetching a newer snapshot.",
+      "lastSuccess": "Last successful fetch by this site: {date}",
+      "stale": "Snapshot has not updated",
+      "received": "Source snapshot received",
+      "polling": "Page refreshes every minute · paused in background",
+      "staleDetail": "The update failed. Showing the snapshot successfully fetched at {date}; newer announcements may exist.",
+      "latestRecord": "Latest record",
+      "elapsed": "Time since the latest record",
+      "elapsedValue": "{days} days {hours} hours {minutes} minutes",
+      "units": {
+        "days": "d",
+        "hours": "h",
+        "minutes": "m"
+      },
+      "types": {
+        "regular": "Usage reset",
+        "banked": "Reset credit"
+      },
+      "sources": {
+        "x_post": "Public post",
+        "observed": "Third-party observation"
+      },
+      "originalPost": "Original post",
+      "viewSource": "View source",
+      "noSourceLink": "No verifiable post provided",
+      "noRecords": "No records to display",
+      "noRecordsDetail": "The source snapshot was fetched successfully, but contains no eligible records. Check again later.",
+      "loadedCount": "Records loaded",
+      "fetchedAt": "Successfully fetched by this site",
+      "notAvailable": "—",
+      "attribution": "Announcement data from",
+      "sourceDetail": "An unofficial third party collects and automatically classifies public posts. Records may be delayed or misclassified. Announcements and observations do not confirm delivery to your account; check your official usage page.",
+      "history": "Recent posts and observations",
+      "timezone": "Beijing time · UTC+8",
+      "filters": {
+        "all": "All records",
+        "regular": "Usage resets",
+        "banked": "Reset credits"
+      },
+      "noFilteredRecords": "No records of this type",
+      "moreHistory": "Showing {count} recent records fetched by this site. The source has more history.",
+      "historyCoverage": "These are the records fetched by this site, not a complete history.",
+      "historyUnavailable": "Posts and observations will appear here when a source snapshot is available.",
+      "siteUpdatesDetail": "Related articles published by this site, separate from the source records above"
+    },
+    "apiConnect": {
+      "eyebrow": "NeedToken API",
+      "heroTitle": "Connect your API",
+      "heroAccent": "to the tools you use",
+      "heroIntro": "From coding clients to local gateways and agents. Choose a workflow, copy the configuration, and put your NeedToken API key to work.",
+      "start": "Start connecting",
+      "heroNote": "Model access, endpoints and billing depend on your plan",
+      "previewLabel": "Configuration preview: client to NeedToken gateway to model",
+      "previewTitle": "One request, three connections",
+      "example": "Example configuration",
+      "routeLabel": "Client to gateway to model",
+      "client": "Client",
+      "clientDetail": "Tool or SDK",
+      "gatewayDetail": "One API endpoint",
+      "model": "Model",
+      "modelDetail": "Access set by your key",
+      "previewLanguage": "Example code language",
+      "requestExample": "Preview only · no request sent",
+      "environmentKey": "Read from the environment",
+      "setupLabel": "Connection guide",
+      "setupTitle": "Choose a workflow and configure it",
+      "setupIntro": "Get an API key, then configure your tool. Merge with any existing settings.",
+      "getKey": "Open console and get a key",
+      "scenariosLabel": "Usage scenarios",
+      "chooseTool": "Choose a tool",
+      "docs": "Official docs",
+      "endpoint": "Base URL",
+      "copyEndpoint": "Copy Base URL",
+      "copyFailed": "Clipboard unavailable. Select the address and copy it manually.",
+      "modelId": "Model ID",
+      "modelHint": "Replace the example with a model your key can access. Check its name and endpoint in the model catalog first.",
+      "modelInvalid": "Enter a valid model ID without spaces, quotes or line breaks",
+      "configTemplate": "Configuration template",
+      "configFields": "Configuration fields",
+      "downloadConfig": "Download JSON",
+      "environmentHint": "Set this variable in the tool’s runtime environment, then merge the template. Keep the real key on your device.",
+      "compatibility": "These tools support custom upstreams. Availability depends on the tool version, API protocol, model tool-calling support and key permissions. After setup, verify the connection with a small request in the tool.",
+      "scenarios": {
+        "coding": {
+          "title": "Coding tools",
+          "caption": "Work inside your project"
+        },
+        "local": {
+          "title": "Local gateways",
+          "caption": "Manage upstreams and routing"
+        },
+        "cloud": {
+          "title": "Cloud gateway",
+          "caption": "Route requests in the cloud"
+        },
+        "agent": {
+          "title": "Agents",
+          "caption": "Give your assistant a model"
+        }
+      },
+      "tools": {
+        "opencode": {
+          "summary": "Connect from your project",
+          "kind": "Coding client",
+          "get": "Get OpenCode",
+          "description": "Add NeedToken as a custom provider in OpenCode and use models available to your key inside your project.",
+          "step1": "Install or update OpenCode from its official site and have your NeedToken API key ready.",
+          "step2": "Set NEEDTOKEN_API_KEY in the environment running OpenCode. Merge the template below into your project’s opencode.json.",
+          "step3": "Start OpenCode, select a needtoken model with /models, then send a small test request.",
+          "note": "This template uses the current OpenCode 2 providers / package / settings format. Follow the official migration guide for older configurations, and add only models you can access."
+        },
+        "ccswitch": {
+          "summary": "Switch providers and route locally",
+          "kind": "Desktop management and local routing",
+          "get": "Official download",
+          "description": "Manage upstream providers in CC Switch and enable local routing for the apps that need it.",
+          "step1": "Install CC Switch from its official Releases page and select an app to manage, such as Codex.",
+          "step2": "Add a custom provider, choose an API format matching the upstream, and enter its Base URL, key and model.",
+          "step3": "Enable local routing when protocol conversion is needed, then verify a model request in your client.",
+          "note": "The Base URL here is an upstream prefix for local routing, without /v1. Direct configuration differs by app; follow the relevant official guide to avoid duplicating /v1."
+        },
+        "sub2api": {
+          "summary": "Self-host a multi-upstream gateway",
+          "kind": "Self-hosted service",
+          "get": "Deployment guide",
+          "description": "Administrators with a Sub2API deployment can add a compatible NeedToken API key as an upstream and expose their own client endpoint.",
+          "step1": "Follow the official deployment guide to prepare the service and database, or open your existing admin dashboard.",
+          "step2": "Add an API-key upstream. Configure its endpoint, key and supported models for the selected platform, then run an account test.",
+          "step3": "Assign the upstream to a group, create a Sub2API key for your client, and use the endpoint supplied by that instance.",
+          "note": "Sub2API requires your own deployment. The fields below are upstream references; platform support, appended paths and protocols depend on your installed version."
+        },
+        "cloudflare": {
+          "summary": "Host a custom provider",
+          "kind": "Cloud gateway",
+          "get": "Open dashboard",
+          "description": "Add NeedToken as a Custom Provider in your own Cloudflare account and route requests through AI Gateway.",
+          "step1": "Open AI Gateway in Cloudflare and add a provider under Custom Providers.",
+          "step2": "Use NeedToken / needtoken for the name and slug. Enter the root URL below and store the upstream key following the official BYOK guide.",
+          "step3": "Use this provider in your own Gateway, then copy the request URL and authentication settings generated by Cloudflare.",
+          "note": "The JSON contains fields for creating a Custom Provider. Its Base URL omits the final /v1; retain /v1/chat/completions in the client request path to avoid /v1/v1 upstream."
+        },
+        "openclaw": {
+          "summary": "Configure your personal assistant",
+          "kind": "Agent runtime",
+          "get": "Official install",
+          "description": "Add a custom model provider in OpenClaw and run your assistant with the NeedToken API.",
+          "step1": "Install OpenClaw from its official site and complete the initial setup.",
+          "step2": "Set NEEDTOKEN_API_KEY in the OpenClaw runtime environment and merge the template into openclaw.json.",
+          "step3": "Choose the needtoken model, reload the configuration, and verify one request in the assistant.",
+          "note": "The download is a template to merge with your existing configuration. It uses openai-completions; agent tool calling requires support from both the model and upstream protocol."
+        }
+      }
+    },
+    "purchaseFlow": {
+      "backToPlans": "Back to plans",
+      "changePlan": "Change plan",
+      "reviewHint": "Review the product notes, enter your contact details and choose a payment method",
+      "submitting": "Creating your order. Please wait before changing plans or submitting again",
+      "orderCreated": "Order created",
+      "openingPayment": "Opening the payment page. Check your order status to confirm payment",
+      "paymentRouteFailed": "The payment page could not open. Your order is saved; continue to payment without placing another order",
+      "continuePayment": "Continue to payment"
     }
   }
 }

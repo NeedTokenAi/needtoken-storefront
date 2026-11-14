@@ -473,13 +473,14 @@ export function useProductDetail(options: { onLoaded?: () => void } = {}) {
     toast.success(t('toast.addedToCart'))
   }
 
-  const buyNow = () => {
+  // Prepare the same native draft for either inline checkout or the existing checkout route.
+  const prepareBuyNow = (): boolean => {
     purchaseWarning.value = ''
-    if (!canPurchase.value) return
-    if (!product.value) return
+    if (!canPurchase.value) return false
+    if (!product.value) return false
     if (requiresLogin.value) {
       router.push(`/auth/login?redirect=${encodeURIComponent(route.fullPath)}`)
-      return
+      return false
     }
 
     const sku = selectedSku.value
@@ -493,11 +494,15 @@ export function useProductDetail(options: { onLoaded?: () => void } = {}) {
       purchaseWarning.value = available !== null && limit === available
         ? (available > 0 ? t('productDetail.addCartStockExceeded', { count: available }) : t('productDetail.stockUnavailable'))
         : t('productDetail.addCartLimitExceeded', { count: limit })
-      return
+      return false
     }
 
     buyNowStore.setItem(buildItemPayload(sku))
-    router.push('/checkout?mode=buynow')
+    return true
+  }
+
+  const buyNow = () => {
+    if (prepareBuyNow()) router.push('/checkout?mode=buynow')
   }
 
   // 移动端购买条价格展示
@@ -718,7 +723,7 @@ export function useProductDetail(options: { onLoaded?: () => void } = {}) {
     categoryName, images,
     backToListTo,
     // 动作
-    addToCart, buyNow, goLogin, loadProduct,
+    addToCart, buyNow, prepareBuyNow, goLogin, loadProduct,
     // 移动端购买条
     mobileBarShowMemberPrice, mobileBarMemberPriceDisplay,
     mobileBarShowSkuPromotionPrice, mobileBarSkuPromotionPriceDisplay,

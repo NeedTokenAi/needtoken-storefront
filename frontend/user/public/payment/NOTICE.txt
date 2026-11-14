@@ -1,0 +1,6 @@
+Payment brand marks:
+Alipay, WeChat and PayPal: Simple Icons, CC0 1.0.
+Source: https://github.com/simple-icons/simple-icons
+Tether (USDT), BNB and TRON: Cryptocurrency Icons, CC0 1.0.
+Source: https://github.com/spothq/cryptocurrency-icons
+Trademarks belong to their respective owners.

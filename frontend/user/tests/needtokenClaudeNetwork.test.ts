@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { CLAUDE_PROBES, classifyWebRtc, claudeNetworkReport, claudeRuleCategoryIds, collectClaudeLocalChecks, isPublicIp, lookupExitNetwork, normalizeIp, parseCliReport, probeAnthropic, probeWebRtc, runClaudeNetworkChecks, timezoneDiffers, type NetworkCheckEvent } from '../src/templates/needtoken/lib/claudeNetwork.ts'
+import { CLAUDE_PROBES, CLAUDE_SERVICES, classifyWebRtc, claudeNetworkReport, claudeRuleCategoryIds, collectClaudeLocalChecks, isPublicIp, lookupExitNetwork, normalizeIp, parseCliReport, probeAnthropic, probeClaudeService, probeWebRtc, runClaudeNetworkChecks, timezoneDiffers, type NetworkCheckEvent } from '../src/templates/needtoken/lib/claudeNetwork.ts'
 
 const exit = { status: 'ok' as const, detail: 'geoAvailable' as const, source: 'ipapi.co' as const, ip: '8.8.8.8', country: 'United States', countryCode: 'US', timezone: 'America/Los_Angeles', measuredAt: '2026-11-05T00:00:00Z' }
 const cli = {
@@ -47,10 +47,14 @@ test('lookup deadlines include stalled response bodies and cancellation stops fa
 })
 
 test('opaque Anthropic response remains unknown and never becomes CLI or TLS proof', async () => {
+  const modes: Array<RequestMode | undefined> = []
   const result = await probeAnthropic({ fetcher: (async (url, options) => {
-    assert.equal(url, CLAUDE_PROBES.anthropic); assert.equal(options?.mode, 'no-cors'); assert.equal(options?.redirect, 'error'); assert.equal(options?.credentials, 'omit')
+    modes.push(options?.mode)
+    assert.equal(url, CLAUDE_PROBES.anthropic); assert.equal(options?.redirect, options?.mode === 'cors' ? 'error' : 'follow'); assert.equal(options?.credentials, 'omit')
+    if (options?.mode === 'cors') throw new TypeError('CORS blocked')
     return { type: 'opaque', status: 0 }
   }) as typeof fetch, now: () => 10 })
+  assert.deepEqual(modes, ['cors', 'no-cors'])
   assert.equal(result.status, 'unknown'); assert.equal(result.detail, 'opaqueResponse'); assert.equal(result.httpStatus, undefined)
 })
 
@@ -58,7 +62,7 @@ test('readable HTTP restrictions and failed requests remain distinct', async () 
   const restricted = await probeAnthropic({ fetcher: (async () => new Response(null, { status: 403 })) as typeof fetch })
   assert.equal(restricted.status, 'warning'); assert.equal(restricted.httpStatus, 403)
   const network = await probeAnthropic({ timeoutMs: 3, fetcher: (async () => await new Promise(() => {})) as typeof fetch })
-  assert.equal(network.status, 'unknown'); assert.equal(network.detail, 'requestUnconfirmed')
+  assert.equal(network.status, 'unknown'); assert.equal(network.detail, 'timeout')
 })
 
 test('WebRTC compares only observed public candidates and mDNS is not a proven public leak', () => {
@@ -128,7 +132,7 @@ test('same-origin health completes independently while all third-party probes st
   assert.equal(events.find(event => event.id === 'storefront')?.result.status, 'ok')
   assert.equal(finished, false)
   await pending
-  assert.equal(events.length, 3)
+  assert.equal(events.length, 5)
   assert.equal(events.find(event => event.id === 'exit')?.result.status, 'unknown')
   assert.equal(events.find(event => event.id === 'anthropic')?.result.status, 'unknown')
 })
@@ -137,7 +141,7 @@ test('blocked, synchronously throwing and uncancellable fetches all settle witho
   for (const fetcher of [() => { throw new TypeError('blocked') }, () => new Promise(() => {})]) {
     const events: NetworkCheckEvent[] = []
     await runClaudeNetworkChecks({ timeoutMs: 3, onResult: event => events.push(event), fetcher: fetcher as typeof fetch })
-    assert.equal(events.length, 3)
+    assert.equal(events.length, 5)
     assert.ok(events.every(event => event.result.status === 'unknown'))
   }
 })
@@ -156,4 +160,138 @@ test('expanded reports redact local system, clock, locale and exact browser valu
   assert.equal(report.includes('secret-'), false)
   assert.equal(JSON.parse(report).local_checks.length, 15)
   assert.equal(JSON.parse(report).storefront_connection.status, 'unknown')
+})
+
+test('three fixed service probes distinguish opaque completion, readable restrictions and deadlines', async () => {
+  const calls: string[] = []
+  const fetcher = (async (url, options) => {
+    calls.push(String(url))
+    assert.equal(options?.credentials, 'omit')
+    assert.equal(options?.referrerPolicy, 'no-referrer')
+    assert.equal(options?.redirect, options?.mode === 'cors' && url === CLAUDE_PROBES.anthropic ? 'error' : 'follow')
+    if (url === CLAUDE_PROBES.claudeWeb) {
+      if (options?.mode === 'cors') throw new TypeError('CORS blocked')
+      return { type: 'opaque', status: 0 }
+    }
+    if (url === CLAUDE_PROBES.anthropicWeb) return new Response(null, { status: 403 })
+    return new Promise(() => {})
+  }) as typeof fetch
+  const results = await Promise.all(CLAUDE_SERVICES.map(id => probeClaudeService(id, { fetcher, timeoutMs: 5 })))
+  assert.deepEqual(calls, [CLAUDE_PROBES.claudeWeb, CLAUDE_PROBES.anthropicWeb, CLAUDE_PROBES.anthropic, CLAUDE_PROBES.claudeWeb])
+  assert.equal(results[0]?.detail, 'opaqueResponse')
+  assert.equal(results[0]?.status, 'unknown')
+  assert.equal(results[0]?.httpStatus, undefined)
+  assert.equal(results[1]?.status, 'warning')
+  assert.equal(results[1]?.httpStatus, 403)
+  assert.equal(results[2]?.detail, 'timeout')
+  await assert.rejects(probeClaudeService('custom' as never, { fetcher }), /unsupported service target/)
+})
+
+test('service observations in shared reports allow only fixed target metrics', () => {
+  const result = { status: 'unknown' as const, detail: 'opaqueResponse' as const, latencyMs: 24, measuredAt: '2026-11-05T00:00:00Z', secret: 'secret-value', ip: '8.8.8.8' }
+  const report = claudeNetworkReport({ exit: null, anthropic: null, rtc: null, cli: null, measuredAt: '', services: { claudeWeb: result, custom: result } as never })
+  assert.equal(report.includes('secret-value'), false)
+  assert.equal(report.includes('8.8.8.8'), false)
+  assert.equal('custom' in JSON.parse(report).services_browser, false)
+  assert.equal(JSON.parse(report).services_browser.claudeWeb.latencyMs, 24)
+})
+
+
+test('abort-aware fetches keep deadline timeouts distinct from caller cancellation', async () => {
+  let observedSignal: AbortSignal | null | undefined
+  const modes: Array<RequestMode | undefined> = []
+  const fetcher = ((_url, init) => new Promise((_resolve, reject) => {
+    modes.push(init?.mode)
+    observedSignal = init?.signal
+    observedSignal?.addEventListener('abort', () => reject(new DOMException('Fetch aborted', 'AbortError')), { once: true })
+  })) as typeof fetch
+  const timedOut = await probeClaudeService('anthropic', { fetcher, timeoutMs: 5 })
+  assert.equal(timedOut.detail, 'timeout')
+  assert.equal(timedOut.status, 'unknown')
+  assert.equal(observedSignal?.aborted, true)
+  assert.deepEqual(modes, ['cors'])
+  const caller = new AbortController()
+  const cancelled = probeClaudeService('claudeWeb', { fetcher, signal: caller.signal, timeoutMs: 1000 })
+  caller.abort()
+  await assert.rejects(cancelled, { name: 'AbortError' })
+  assert.equal(observedSignal?.aborted, true)
+  assert.deepEqual(modes, ['cors', 'cors'])
+})
+
+test('readable CORS responses retain real HTTP outcomes without an opaque retry', async () => {
+  for (const status of [200, 401, 404, 403, 429, 503]) {
+    const calls: Array<RequestMode | undefined> = []
+    const result = await probeClaudeService('anthropic', { fetcher: (async (url, init) => {
+      calls.push(init?.mode)
+      assert.equal(url, CLAUDE_PROBES.anthropic)
+      assert.equal(init?.credentials, 'omit')
+      assert.equal(init?.referrerPolicy, 'no-referrer')
+      assert.equal(init?.headers, undefined)
+      return new Response(null, { status })
+    }) as typeof fetch })
+    assert.deepEqual(calls, ['cors'])
+    assert.equal(result.httpStatus, status)
+    assert.equal(result.detail, [403, 429, 503].includes(status) ? 'httpWarning' : 'readableResponse')
+  }
+})
+
+test('failed CORS and opaque fallback requests remain unconfirmed', async () => {
+  const modes: Array<RequestMode | undefined> = []
+  const result = await probeClaudeService('claudeWeb', { fetcher: (async (_url, init) => {
+    modes.push(init?.mode)
+    throw new TypeError('Network unavailable')
+  }) as typeof fetch })
+  assert.deepEqual(modes, ['cors', 'no-cors'])
+  assert.equal(result.detail, 'requestUnconfirmed')
+  assert.equal(result.status, 'unknown')
+  assert.equal(result.httpStatus, undefined)
+})
+
+test('every opaque fallback uses Fetch-compatible redirect handling without credentials', async () => {
+  for (const target of CLAUDE_SERVICES) {
+    const calls: Array<{ mode: RequestMode | undefined; redirect: RequestRedirect | undefined }> = []
+    const result = await probeClaudeService(target, { fetcher: (async (url, init) => {
+      assert.equal(url, CLAUDE_PROBES[target])
+      assert.equal(init?.credentials, 'omit')
+      assert.equal(init?.referrerPolicy, 'no-referrer')
+      calls.push({ mode: init?.mode, redirect: init?.redirect })
+      if (init?.mode === 'cors') throw new TypeError('CORS blocked')
+      assert.equal(init?.mode, 'no-cors')
+      assert.equal(init?.redirect, 'follow')
+      return { type: 'opaque', status: 0 }
+    }) as typeof fetch })
+    assert.deepEqual(calls, [
+      { mode: 'cors', redirect: target === 'anthropic' ? 'error' : 'follow' },
+      { mode: 'no-cors', redirect: 'follow' },
+    ])
+    assert.equal(result.detail, 'opaqueResponse')
+    assert.equal(result.status, 'unknown')
+    assert.equal(result.httpStatus, undefined)
+  }
+})
+
+test('CORS and fallback attempts share one total deadline', async context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] })
+  const modes: Array<RequestMode | undefined> = []
+  const signals: Array<AbortSignal | null | undefined> = []
+  let result: Awaited<ReturnType<typeof probeClaudeService>> | undefined
+  const pending = probeClaudeService('claudeWeb', { timeoutMs: 100, fetcher: ((_url, init) => {
+    modes.push(init?.mode)
+    signals.push(init?.signal)
+    return new Promise((_resolve, reject) => {
+      if (init?.mode === 'cors') setTimeout(() => reject(new TypeError('CORS blocked')), 60)
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
+    })
+  }) as typeof fetch }).then(value => { result = value })
+  context.mock.timers.tick(60)
+  await Promise.resolve()
+  assert.deepEqual(modes, ['cors', 'no-cors'])
+  assert.equal(signals[0], signals[1])
+  context.mock.timers.tick(39)
+  await Promise.resolve()
+  assert.equal(result, undefined)
+  context.mock.timers.tick(1)
+  await pending
+  assert.equal(result?.detail, 'timeout')
+  assert.equal(signals[0]?.aborted, true)
 })

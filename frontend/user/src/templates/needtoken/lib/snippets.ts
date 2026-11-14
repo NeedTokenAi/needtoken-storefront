@@ -1,5 +1,6 @@
 /** 示例代码片段：只用环境变量引用 key，不含任何真实密钥 */
 import { API_BASE_URL, DEFAULT_MODELS } from '../config'
+import { integrationTemplate } from './apiIntegrations'
 
 export const exportKeySnippet = () => `export NEEDTOKEN_API_KEY="<YOUR_NEEDTOKEN_API_KEY>"`
 
@@ -12,22 +13,7 @@ export const curlSnippet = (model: string = DEFAULT_MODELS[0]) => `curl ${API_BA
   }'`
 
 export const opencodeSnippet = (model: string = DEFAULT_MODELS[0]) => {
-    const models = Object.fromEntries(DEFAULT_MODELS.map(id => [id, { name: id }]))
-    return JSON.stringify({
-        $schema: 'https://opencode.ai/config.json',
-        provider: {
-            needtoken: {
-                npm: '@ai-sdk/openai-compatible',
-                name: 'needtoken',
-                options: {
-                    baseURL: API_BASE_URL,
-                    apiKey: '{env:NEEDTOKEN_API_KEY}',
-                },
-                models,
-            },
-        },
-        model: `needtoken/${model}`,
-    }, null, 2)
+    return integrationTemplate('opencode', API_BASE_URL, model) || ''
 }
 
 export const pythonSnippet = (model: string = DEFAULT_MODELS[0]) => `from openai import OpenAI

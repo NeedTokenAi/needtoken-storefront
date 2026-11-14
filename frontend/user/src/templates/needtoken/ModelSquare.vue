@@ -34,10 +34,10 @@
 
     <!-- 模型卡 -->
     <div v-else class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <article v-for="offer in visible" :key="offer.key" class="flex flex-col rounded-xl border bg-card p-5" :class="compare.includes(offer.key) ? 'border-primary' : 'border-border'">
+      <article v-for="offer in visible" :key="offer.key" class="nt-model-card flex flex-col rounded-xl border bg-card p-5" :class="compare.includes(offer.key) ? 'border-primary' : 'border-border'">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <h2 class="nt-mono truncate text-[16px] font-semibold text-foreground">{{ offer.modelId }}</h2>
+            <h2 class="nt-model-name nt-mono truncate text-[16px] font-semibold text-foreground">{{ offer.modelId }}</h2>
             <div class="mt-1 text-[13px] text-muted-foreground">{{ offer.vendor }}</div>
           </div>
           <span v-if="offer.isDefault" class="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">{{ t('needtoken.models.defaultBadge') }}</span>
@@ -193,3 +193,11 @@ const statusTitle = computed(() => {
 
 onMounted(() => { void pricing.ensureLoaded(); void pool.ensureLoaded() })
 </script>
+
+<style scoped>
+.nt-model-card { transition: background-color var(--nt-motion-fast) var(--nt-motion-ease); }
+.nt-model-card:is(:hover, :focus-within) { background: #11171e; }
+.nt-model-name { transition: color var(--nt-motion-fast) var(--nt-motion-ease); }
+.nt-model-card:is(:hover, :focus-within) .nt-model-name { color: #c4f3e5; }
+@media (prefers-reduced-motion: reduce) { .nt-model-card, .nt-model-name { transition: none; } }
+</style>

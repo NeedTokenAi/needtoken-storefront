@@ -1231,7 +1231,8 @@
       "submitFailed": "提交失敗，請稍後重試",
       "manualFormInvalid": "請先完善交付資訊再提交",
       "selectPayment": "請選擇支付方式"
-    }
+    },
+    "paymentNavigationFailed": "付款頁面暫未能開啟，訂單已建立，請繼續前往付款"
   },
   "payment": {
     "title": "發起支付",
@@ -1755,7 +1756,8 @@
       "loading": "載入中…",
       "retry": "重試",
       "pricingPending": "定價待公佈：以控制檯定價表為準，未配置價格的模型暫不展示。",
-      "priceUnitNote": "僅在規則可準確解釋時顯示美元 / 百萬 tokens 或美元 / 次；條件計費不顯示推算單價。價格來自 new-api，來源版本是介面標記，不是鎖定報價。"
+      "priceUnitNote": "僅在規則可準確解釋時顯示美元 / 百萬 tokens 或美元 / 次；條件計費不顯示推算單價。價格來自 new-api，來源版本是介面標記，不是鎖定報價。",
+      "copyFailed": "未能複製，請選取程式碼文字手動複製"
     },
     "nav": {
       "label": "主導航",
@@ -2045,9 +2047,9 @@
         "desc": "在會員控制檯建立 key，並在執行工具的同一個終端裡匯出為環境變數。"
       },
       "opencode": {
-        "desc": "放在專案根目錄 opencode.json（單個專案）或 ~/.config/opencode/opencode.json（全域性）。",
-        "b1": "供應商名為 needtoken，npm 包為 {'@'}ai-sdk/openai-compatible。",
-        "b2": "apiKey 使用 {'{'}env:NEEDTOKEN_API_KEY{'}'} 引用，在啟動 OpenCode 的同一終端裡 export。",
+        "desc": "以下為目前 OpenCode 2 設定格式，合併至專案的 opencode.json。已有舊版設定時先依官方遷移指南更新。",
+        "b1": "供應商名稱為 needtoken，package 為 {'@'}opencode/ai/providers/openai-compatible。",
+        "b2": "env 引用 NEEDTOKEN_API_KEY，請在啟動 OpenCode 的執行環境中設定。",
         "b3": "模型引用格式為 {model}。",
         "b4": "啟動後用 /models 命令核對模型列表。"
       },
@@ -2294,7 +2296,7 @@
       "decreaseQuantity": "減少購買數量",
       "increaseQuantity": "增加購買數量",
       "priceNote": "會員及階梯優惠會隨選項更新；訂單總額與可用付款方式以結帳頁為準。",
-      "continueOrder": "確認方案，立即下單",
+      "continueOrder": "確認方案，填寫資訊",
       "secureOrder": "訂單與付款狀態全程可查",
       "productInfo": "商品說明與使用須知",
       "infoHint": "服務範圍、儲值要求與售後政策以本商品說明為準。",
@@ -2318,7 +2320,8 @@
       "crypto": "加密貨幣",
       "card": "信用卡",
       "paypal": "PayPal",
-      "checkoutNote": "實際可用方式以結帳頁為準"
+      "checkoutNote": "實際可用方式以結帳頁為準",
+      "usdt": "USDT"
     },
     "effects": {
       "soundOn": "按鈕音效：已開啟",
@@ -2959,7 +2962,11 @@
       "noHistory": "公開摘要沒有歷史可用率，這裡不估算百分比。",
       "updated": "來源更新於 {time}",
       "stale": "來源自 {time} 起沒有新的更新",
-      "sources": { "openai": "OpenAI", "claude": "Claude", "codex": "Codex" },
+      "sources": {
+        "openai": "OpenAI",
+        "claude": "Claude",
+        "codex": "Codex"
+      },
       "component": {
         "operational": "正常",
         "degraded_performance": "效能下降",
@@ -2967,11 +2974,29 @@
         "major_outage": "嚴重中斷",
         "under_maintenance": "維護中",
         "unknown": "狀態未知"
-      }
+      },
+      "claude": "Claude 狀態",
+      "scopeTitle": {
+        "gpt": "ChatGPT",
+        "claude": "Claude"
+      },
+      "scope": {
+        "gpt": "按官方 ChatGPT 分組識別，不含 Codex",
+        "claude": "claude.ai 網頁與 App，不含 API 和 Claude Code"
+      },
+      "timeout": "狀態來源請求逾時，暫時無法確認目前狀態",
+      "outdated": "本次資料已過期，暫時無法確認目前狀態",
+      "scopeEmpty": "官方來源未提供可識別的產品元件，暫時無法確認",
+      "previousCount": "上次快照：{ok} / {total} 項正常",
+      "checked": "本站取得於 {time}",
+      "sourceChanged": "官方來源更新於 {time}",
+      "refreshing": "正在重新整理官方狀態",
+      "refreshPolicy": "每 60 秒檢查，切至背景時暫停",
+      "refreshAction": "重新整理"
     },
     "radar": {
       "eyebrow": "實用工具",
-      "title": "重置雷達",
+      "title": "Codex 重置雷達",
       "intro": "這塊看板只陳列 OpenAI 公開狀態裡名稱含 Codex 的元件，以及同時提到 Codex，或同時提到 reset 與 quota 的事件。沒有這類公開紀錄就保持空白。",
       "board": "公開紀錄",
       "unavailable": "公開狀態暫時讀不到，看板沒有可展示的紀錄。",
@@ -2981,19 +3006,393 @@
       "item": "項目",
       "kind": "類型",
       "state": "來源狀態",
-      "kinds": { "component": "元件", "incident": "事件" }
+      "kinds": {
+        "component": "元件",
+        "incident": "事件"
+      },
+      "resetTitle": "帳號額度與重置",
+      "resetUnavailable": "暫未接入",
+      "resetBody": "帳號剩餘額度和重置時間需要帳號級資料來源。目前僅接入公開服務狀態，無法查詢這些資訊。",
+      "remainingQuota": "剩餘額度",
+      "nextReset": "下次重置",
+      "notAvailable": "無法查詢",
+      "refresh": "重新整理公開記錄",
+      "description": "追蹤重置公告，分清重置卡、自動重置和付費重置",
+      "tools": "檢測工具導覽",
+      "checkAccount": "查詢我的帳號與額度",
+      "records": "重置記錄",
+      "verifiedOn": "資料核對：{date}",
+      "sourceNote": "這裡收錄已核對的歷史公告，最新活動和適用資格請查看來源原文",
+      "filterLabel": "依重置類型篩選",
+      "filters": {
+        "all": "全部記錄",
+        "banked": "重置卡",
+        "automatic": "自動重置"
+      },
+      "types": {
+        "banked": "重置卡",
+        "automatic": "自動重置"
+      },
+      "sources": {
+        "community": "OpenAI 社群 · 公告來源",
+        "changelog": "OpenAI 更新日誌"
+      },
+      "entries": {
+        "augustAutomatic": {
+          "title": "8 月額度問題後的自動重置公告",
+          "body": "8 月 23 日的公告列出 8 月 24 日 21:00 UTC 的重置安排。涵蓋帳號及額度以原文和個人用量頁為準。"
+        },
+        "twentyMillion": {
+          "title": "2000 萬使用者節點的重置卡發放",
+          "body": "公告介紹了一次重置卡發放。收到卡與使用卡是兩個步驟，入帳情況和有效期限需在自己的用量頁核對。"
+        },
+        "bankingLaunch": {
+          "title": "重置卡儲存功能上線",
+          "body": "更新日誌加入 Plus 和 Pro 使用者的重置卡儲存，並介紹首次贈送及推薦活動。資格和期限以目前規則為準。"
+        }
+      },
+      "historicalNote": "歷史記錄不代表目前仍可領取，也不能證明某次重置已套用到你的帳號",
+      "siteUpdates": "站內更新",
+      "refreshUpdates": "重新整理",
+      "updatesError": "暫時無法讀取站內更新，可重試或直接查看上方來源",
+      "noSiteUpdates": "暫無新增站內公告",
+      "guideTitle": "三種重置，有什麼不同",
+      "guide": {
+        "banked": {
+          "title": "重置卡：收到後自行使用",
+          "body": "保存在帳號內，有適用範圍及期限；收到時不會自動恢復額度。"
+        },
+        "automatic": {
+          "title": "自動重置：直接套用",
+          "body": "依活動選定的帳號與額度生效，不會存成一張卡；涵蓋範圍因公告而異。"
+        },
+        "paid": {
+          "title": "付費重置：購買後立即生效",
+          "body": "僅對部分符合資格的個人 Plus / Pro 帳號開放，購買選項和影響範圍以帳號顯示為準。"
+        }
+      },
+      "resetGuide": "重置與重置卡官方說明",
+      "paidGuide": "付費重置官方說明",
+      "usageTitle": "下次何時更新額度",
+      "usageBody": "以帳號用量頁顯示為準。活動重置可能改變下一輪更新時間，不能依公告時間推算。",
+      "openUsage": "開啟官方用量頁"
     },
     "codexCheck": {
-      "eyebrow": "帳號檢測",
+      "toolsNav": "檢測工具",
       "title": "Codex 帳號檢測",
-      "intro": "這類檢測需要拿帳號憑證向服務商查詢訂閱、開通和升級條件。",
-      "board": "檢測項",
-      "unavailableTitle": "檢測暫不可用",
-      "unavailableBody": "本站沒有這項檢測所需的憑證介面，也不會收集 Session、密碼或權杖。下面各項都沒有檢測結果。",
-      "item": "項目",
-      "result": "結果",
-      "notChecked": "未檢測",
-      "rows": { "subscription": "訂閱狀態", "open": "能否開通", "upgrade": "能否升級" }
+      "intro": "查看 ChatGPT 訂閱與 Codex 用量，查詢不消耗模型額度",
+      "inputTitle": "貼上 Session",
+      "inputLabel": "Session JSON 或 accessToken",
+      "inputPlaceholder": "貼上從 ChatGPT 取得的 Session JSON 或 accessToken",
+      "memoryOnly": "本頁暫時保留",
+      "credentialReady": "已讀取憑據，原始 Session 內容已清除",
+      "privacy": "憑據經本站伺服器轉送給 ChatGPT，僅作唯讀查詢，不存入瀏覽器或資料庫；清除或離頁即移除本頁憑據",
+      "detect": "檢測帳號",
+      "detectAgain": "重新檢測",
+      "cancel": "取消並清除",
+      "clear": "清除憑據與結果",
+      "howTo": "如何取得 Session",
+      "signIn": "先在瀏覽器登入 ChatGPT",
+      "openSession": "開啟官方 Session 頁面，複製傳回內容",
+      "pasteSession": "貼到上方輸入框並檢測，請勿分享給他人",
+      "board": "檢測結果",
+      "verified": "官方介面已核對",
+      "loading": "正在讀取帳號資訊",
+      "checkFailed": "檢測未完成",
+      "emptyTitle": "等待檢測",
+      "emptyBody": "檢測後顯示真實訂閱，多個工作區可分別查詢用量",
+      "accountLabel": "工作區（{count} 個）",
+      "chooseAccount": "選擇要查看的工作區",
+      "defaultAccount": "預設工作區",
+      "subscription": "目前訂閱",
+      "expiresAt": "訂閱到期",
+      "notProvided": "官方未傳回",
+      "accountId": "工作區 ID",
+      "usageTitle": "Codex 用量",
+      "readUsage": "查詢用量",
+      "usedPercent": "已用 {percent}%",
+      "resetsAt": "下次重置",
+      "usageUnavailable": "官方暫未傳回這個工作區的用量，可稍後重試",
+      "usagePrompt": "查詢所選工作區的目前用量與重置時間",
+      "chooseAccountHint": "請選擇工作區，再查看該帳號的訂閱與用量",
+      "eligibilityNote": "訂閱狀態不等於開通或升級資格，以 ChatGPT 實際頁面為準",
+      "checkPlans": "查看官方方案",
+      "checkedAt": "核對時間 {time}",
+      "source": "來源 ChatGPT",
+      "windowDays": "{count} 天視窗",
+      "windowHours": "{count} 小時視窗",
+      "windowMinutes": "{count} 分鐘視窗",
+      "windows": {
+        "primary": "主要用量視窗",
+        "secondary": "次要用量視窗"
+      },
+      "plans": {
+        "free": "Free",
+        "plus": "Plus",
+        "pro": "Pro",
+        "team": "Team",
+        "business": "Business",
+        "enterprise": "Enterprise",
+        "edu": "Edu",
+        "unknown": "方案未知",
+        "go": "Go"
+      },
+      "inputErrors": {
+        "empty": "請先貼上 Session JSON 或 accessToken",
+        "tooLarge": "輸入內容過長，請只複製 Session JSON 或 accessToken",
+        "invalidJson": "JSON 格式不完整，請重新複製 Session 頁面內容",
+        "missingToken": "沒有找到 accessToken，請複製官方 Session 頁面傳回的完整 JSON",
+        "invalidToken": "未識別到有效格式的 accessToken；Cookie、API Key 與 PAT 不支援此檢測"
+      },
+      "errors": {
+        "invalid_input": "憑據格式不正確，請重新複製官方 Session 內容",
+        "unauthorized": "Session 已失效或未獲授權，請重新登入 ChatGPT 後取得",
+        "challenge": "官方未接受本站的查詢請求，可稍後重試，或直接在 ChatGPT 官方頁面查看",
+        "unavailable": "暫時無法連接官方檢測介面，請稍後重試",
+        "invalid_response": "官方傳回的資訊不完整，請稍後重試",
+        "account_not_found": "未在目前 Session 中找到這個工作區，請重新檢測帳號",
+        "rate_limited": "查詢過於頻繁，請稍後再試",
+        "timeout": "官方介面回應逾時，請檢查連線後重試"
+      }
+    },
+    "environmentV6": {
+      "title": "Claude 網路檢測",
+      "subtitle": "查看 Claude 服務連線、目前網路出口與 WebRTC 分流",
+      "privacy": "僅檢查網路，不讀取帳號；會連接 Anthropic、IP 查詢服務及可選的 Google STUN",
+      "idle": "點擊開始檢測，結果會逐項顯示",
+      "running": "正在等待 {count} 個連線項目",
+      "services": "服務連線",
+      "browserScope": "本頁測量瀏覽器連線；Claude Code 的代理、DNS 與 TLS 需用終端檢測核對",
+      "notAvailable": "未取得",
+      "exitUnavailable": "出口資訊查詢失敗，可重新檢測；服務連線結果仍可查看",
+      "exitPartial": "已取得 IP，地區與網路組織暫不可用",
+      "nextSteps": "排查建議",
+      "webrtc": "WebRTC 出口對比",
+      "localDetails": "瀏覽器與本地環境",
+      "localIdle": "開始檢測後顯示瀏覽器設定與功能檢查",
+      "timezoneNote": "本地時區與出口地區時區不同，請核對是否符合你的使用環境",
+      "terminalTitle": "終端 DNS 與 TLS 檢測",
+      "terminalIntro": "在 Claude Code 所用終端執行腳本後匯入報告。需 Node.js 18+ 與 curl；報告僅在本頁解析，不上傳",
+      "targets": {
+        "claudeWeb": "Claude 網頁",
+        "anthropicWeb": "Anthropic 官網",
+        "anthropic": "Anthropic API"
+      },
+      "states": {
+        "idle": "待檢測",
+        "readableResponse": "HTTP 可讀取",
+        "httpWarning": "返回限制／錯誤",
+        "opaqueResponse": "已收到回應",
+        "requestUnconfirmed": "連線未確認",
+        "timeout": "連線逾時"
+      },
+      "details": {
+        "readableResponse": "已讀取本次 HTTP 回應",
+        "httpWarning": "請結合返回的 HTTP 狀態排查",
+        "opaqueResponse": "跨來源回應，HTTP 狀態不可讀取",
+        "requestUnconfirmed": "請求未完成，可能受網路、重新導向或瀏覽器政策影響",
+        "timeout": "請求未在限定時間內完成"
+      },
+      "rtcStates": {
+        "differentExit": "出口不同",
+        "sameExit": "已觀察地址一致",
+        "publicOnly": "缺少對比出口",
+        "localOnly": "僅本地候選",
+        "noCandidates": "未取得候選地址",
+        "unsupported": "瀏覽器不支援",
+        "notRequested": "未啟用"
+      },
+      "advice": {
+        "offline": "瀏覽器回報離線，請先恢復網路連線",
+        "connection": "有請求未完成，核對目前網路或代理後重試；終端檢測可以進一步定位 DNS、連線或憑證問題",
+        "restricted": "檢測到 HTTP 403。請核對服務支援地區及實際存取提示，不據此判斷帳號狀態",
+        "rateLimit": "檢測到 HTTP 429，請稍後重試並查看服務端的限流提示",
+        "upstream": "檢測到服務端錯誤，可查看 Anthropic 官方狀態或稍後重試",
+        "opaque": "瀏覽器已收到跨來源回應。如需確認終端的 HTTP 狀態與憑證，請執行下方 DNS 與 TLS 檢測"
+      }
+    },
+    "toolsPolish": {
+      "nav": {
+        "radar": "重置雷達",
+        "network": "Claude 網路",
+        "account": "帳號檢測"
+      },
+      "radarScope": "歷史公告資料 · 非即時監控",
+      "accountScope": "ChatGPT 官方唯讀查詢",
+      "networkScope": "目前瀏覽器的網路觀測",
+      "responseDetails": "回應詳情",
+      "scopeDetails": "檢測範圍與限制",
+      "providerStatus": "官方服務狀態"
+    },
+    "radarLive": {
+      "scope": "公開公告追蹤",
+      "description": "查看 Codex 額度重置與重置卡的公開紀錄，依原始來源核對。",
+      "refresh": "重新整理紀錄",
+      "retry": "重新取得",
+      "unavailableTitle": "暫時無法取得紀錄",
+      "unavailable": "公告來源暫時無法使用。請重試，或開啟下方資料來源核對。",
+      "expired": "上次成功取得已超過 12 小時，舊紀錄已停止顯示。請重試取得較新的快照。",
+      "lastSuccess": "本站上次成功取得：{date}",
+      "stale": "快照暫未更新",
+      "received": "已取得來源快照",
+      "polling": "頁面每分鐘重新整理 · 背景分頁暫停",
+      "staleDetail": "更新暫時失敗，正在顯示 {date} 成功取得的快照；這不代表沒有新公告。",
+      "latestRecord": "最近一筆紀錄",
+      "elapsed": "距最近一筆紀錄已過",
+      "elapsedValue": "{days} 天 {hours} 小時 {minutes} 分鐘",
+      "units": {
+        "days": "天",
+        "hours": "時",
+        "minutes": "分"
+      },
+      "types": {
+        "regular": "額度重置",
+        "banked": "重置卡"
+      },
+      "sources": {
+        "x_post": "公開動態",
+        "observed": "第三方觀察"
+      },
+      "originalPost": "查看原文",
+      "viewSource": "查看來源",
+      "noSourceLink": "未提供可核驗原文",
+      "noRecords": "來源暫無可顯示紀錄",
+      "noRecordsDetail": "已成功取得來源快照，目前尚無符合條件的紀錄。稍後可再次重新整理。",
+      "loadedCount": "本次載入紀錄",
+      "fetchedAt": "本站成功取得時間",
+      "notAvailable": "—",
+      "attribution": "公告資料來源",
+      "sourceDetail": "非官方第三方依公開動態收錄及自動分類，可能延遲或誤判。公告與觀察紀錄不代表你的帳號已到帳；個人額度以官方用量頁為準。",
+      "history": "近期公告與觀察",
+      "timezone": "北京時間 · UTC+8",
+      "filters": {
+        "all": "全部紀錄",
+        "regular": "額度重置",
+        "banked": "重置卡"
+      },
+      "noFilteredRecords": "此類型暫無紀錄",
+      "moreHistory": "本次載入最近 {count} 筆紀錄，上游還有更多歷史。",
+      "historyCoverage": "僅顯示本站本次取得的紀錄，不代表全部歷史。",
+      "historyUnavailable": "取得來源快照後，這裡會顯示公告與觀察紀錄。",
+      "siteUpdatesDetail": "本站發布的相關文章，獨立於上方來源紀錄"
+    },
+    "apiConnect": {
+      "eyebrow": "NeedToken API",
+      "heroTitle": "把 API 接入",
+      "heroAccent": "你常用的工具",
+      "heroIntro": "從程式設計客戶端到本機閘道與 Agent，選擇使用情境，複製設定，把 NeedToken API Key 用起來。",
+      "start": "開始接入",
+      "heroNote": "模型權限、可用介面與計費以實際方案為準",
+      "previewLabel": "客戶端經 NeedToken 閘道呼叫模型的設定預覽",
+      "previewTitle": "一次請求，三步連接",
+      "example": "設定範例",
+      "routeLabel": "客戶端到閘道再到模型",
+      "client": "客戶端",
+      "clientDetail": "工具或 SDK",
+      "gatewayDetail": "統一 API 入口",
+      "model": "模型",
+      "modelDetail": "依 Key 權限呼叫",
+      "previewLanguage": "範例程式碼語言",
+      "requestExample": "請求預覽，不發起呼叫",
+      "environmentKey": "從執行環境讀取",
+      "setupLabel": "接入指南",
+      "setupTitle": "選一個情境，開始設定",
+      "setupIntro": "先取得 API Key，再依工具設定。已有設定請合併保留。",
+      "getKey": "開啟控制台，取得 Key",
+      "scenariosLabel": "使用情境",
+      "chooseTool": "選擇接入工具",
+      "docs": "官方文件",
+      "endpoint": "Base URL",
+      "copyEndpoint": "複製 Base URL",
+      "copyFailed": "無法寫入剪貼簿，請選取網址手動複製",
+      "modelId": "模型 ID",
+      "modelHint": "範例模型可換成你的 Key 有權使用的模型；先在模型廣場確認介面與名稱。",
+      "modelInvalid": "請填寫有效模型 ID，不含空白、引號或換行",
+      "configTemplate": "設定範本",
+      "configFields": "填寫參數",
+      "downloadConfig": "下載 JSON",
+      "environmentHint": "在工具執行環境設定此變數，再合併設定範本；真實 Key 留在本機。",
+      "compatibility": "這些工具可設定自訂上游。實際可用性取決於工具版本、介面協定、模型工具呼叫能力與 Key 權限；設定完成後，請在工具內用小型請求驗證。",
+      "scenarios": {
+        "coding": {
+          "title": "程式設計工具",
+          "caption": "在專案裡寫程式"
+        },
+        "local": {
+          "title": "本機閘道",
+          "caption": "管理上游與路由"
+        },
+        "cloud": {
+          "title": "線上閘道",
+          "caption": "在雲端轉送請求"
+        },
+        "agent": {
+          "title": "Agent",
+          "caption": "為助手設定模型"
+        }
+      },
+      "tools": {
+        "opencode": {
+          "summary": "專案內直接接入",
+          "kind": "程式設計客戶端",
+          "get": "官方取得",
+          "description": "為 OpenCode 加入 NeedToken 自訂供應商，在專案裡使用有權限的模型。",
+          "step1": "從官方入口安裝或更新 OpenCode，準備好 NeedToken API Key。",
+          "step2": "在執行 OpenCode 的環境設定 NEEDTOKEN_API_KEY；將下方範本合併到專案的 opencode.json。",
+          "step3": "啟動 OpenCode，用 /models 選擇 needtoken 下的模型，再發起小型請求。",
+          "note": "範本採用目前 OpenCode 2 的 providers / package / settings 格式。舊版設定請先依官方遷移文件更新；只加入實際可用的模型。"
+        },
+        "ccswitch": {
+          "summary": "設定切換與本機代理",
+          "kind": "桌面管理與本機路由",
+          "get": "官方下載",
+          "description": "在 CC Switch 中管理上游供應商，並依應用程式需要開啟本機路由。",
+          "step1": "從官方 Releases 安裝 CC Switch，選擇要管理的應用程式，例如 Codex。",
+          "step2": "加入自訂供應商，選擇符合上游的介面格式，填寫 Base URL、Key 與模型。",
+          "step3": "需要協定轉換時開啟該應用程式的本機路由，再在客戶端驗證模型呼叫。",
+          "note": "這裡的 Base URL 是本機路由上游前綴，不含 /v1。不同應用程式的直連格式可能不同，請依官方對應說明填寫，避免重複拼接 /v1。"
+        },
+        "sub2api": {
+          "summary": "自行託管多上游閘道",
+          "kind": "自行託管服務",
+          "get": "官方部署",
+          "description": "已部署 Sub2API 的管理員可將相容的 NeedToken API Key 作為上游，再向自己的客戶端提供入口。",
+          "step1": "依官方部署指南準備服務與資料庫；已有實例可直接進入管理後台。",
+          "step2": "加入 API Key 類型上游，依選定平台填入網址、Key 與支援模型，先執行帳戶測試。",
+          "step3": "將上游分配到合適群組，為客戶端建立 Sub2API Key，使用該實例提供的接入網址。",
+          "note": "Sub2API 是需要自行部署的閘道。下方是上游參數參考，特定平台、路徑追加規則與相容協定請以使用版本為準。"
+        },
+        "cloudflare": {
+          "summary": "託管自訂供應商",
+          "kind": "雲端閘道",
+          "get": "開啟控制台",
+          "description": "在自己的 Cloudflare 帳戶加入 NeedToken Custom Provider，透過 AI Gateway 轉送請求。",
+          "step1": "開啟 Cloudflare 的 AI Gateway，在 Custom Providers 中新增供應商。",
+          "step2": "名稱與 slug 可用 NeedToken / needtoken；Base URL 填入下方根網址，依官方 BYOK 指引儲存上游 Key。",
+          "step3": "在自己的 Gateway 中使用此供應商，複製官方產生的請求網址與驗證設定。",
+          "note": "JSON 是建立 Custom Provider 的欄位參考。Base URL 不含末尾 /v1；客戶端請求路徑應保留 /v1/chat/completions，避免上游收到重複的 /v1/v1。"
+        },
+        "openclaw": {
+          "summary": "為個人助手設定模型",
+          "kind": "Agent 執行環境",
+          "get": "官方安裝",
+          "description": "為 OpenClaw（龍蝦）加入自訂模型供應商，以 NeedToken API 驅動助手。",
+          "step1": "從官方入口安裝 OpenClaw，完成基本初始化。",
+          "step2": "在 OpenClaw 的執行環境設定 NEEDTOKEN_API_KEY，將範本合併到 openclaw.json。",
+          "step3": "選擇 needtoken 下的模型，重新載入設定後在助手中驗證呼叫。",
+          "note": "下載檔案是合併用範本，請保留現有設定。範本使用 openai-completions；Agent 的工具呼叫能力須同時獲得模型與上游協定支援。"
+        }
+      }
+    },
+    "purchaseFlow": {
+      "backToPlans": "返回選方案",
+      "changePlan": "修改方案",
+      "reviewHint": "核對商品須知，填寫聯絡資訊並選擇付款方式",
+      "submitting": "訂單處理中，請勿重複提交或修改方案",
+      "orderCreated": "訂單已建立",
+      "openingPayment": "正在開啟付款頁面，請稍候。付款結果以訂單狀態為準",
+      "paymentRouteFailed": "付款頁面暫未能開啟，訂單已保留。請繼續付款，無需重新下單",
+      "continuePayment": "繼續前往付款"
     }
   }
 }

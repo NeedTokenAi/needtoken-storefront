@@ -6,6 +6,8 @@ export const CLAUDE_PROBES = {
   geo: 'https://ipapi.co/json/',
   ip: 'https://api.ipify.org?format=json',
   anthropic: 'https://api.anthropic.com/',
+  claudeWeb: 'https://claude.ai/',
+  anthropicWeb: 'https://www.anthropic.com/',
   stun: 'stun:stun.l.google.com:19302',
 } as const
 
@@ -24,9 +26,12 @@ export interface ExitNetwork {
   timezone?: string
   measuredAt: string
 }
+export type ClaudeServiceId = 'claudeWeb' | 'anthropicWeb' | 'anthropic'
+export const CLAUDE_SERVICES: readonly ClaudeServiceId[] = ['claudeWeb', 'anthropicWeb', 'anthropic']
+
 export interface AnthropicConnection {
   status: NetworkStatus
-  detail: 'readableResponse' | 'httpWarning' | 'opaqueResponse' | 'requestUnconfirmed'
+  detail: 'readableResponse' | 'httpWarning' | 'opaqueResponse' | 'requestUnconfirmed' | 'timeout'
   latencyMs?: number
   httpStatus?: number
   measuredAt: string
@@ -58,11 +63,11 @@ export interface ClaudeLocalCheck {
   value?: string
 }
 export type ClaudeLocalEnvironment = Partial<Record<LocalCheckId, () => unknown>>
-export type NetworkCheckId = 'storefront' | 'exit' | 'anthropic' | 'rtc'
+export type NetworkCheckId = 'storefront' | 'exit' | ClaudeServiceId | 'rtc'
 export type NetworkCheckEvent =
   | { id: 'storefront'; result: ConnectionDiagnostic }
   | { id: 'exit'; result: ExitNetwork }
-  | { id: 'anthropic'; result: AnthropicConnection }
+  | { id: ClaudeServiceId; result: AnthropicConnection }
   | { id: 'rtc'; result: WebRtcObservation }
 
 /** Each getter is isolated: a restricted browser feature cannot prevent a run. */
@@ -135,7 +140,7 @@ export async function runClaudeNetworkChecks(options: {
   const tasks = [
     Promise.resolve().then(() => probeStorefrontConnection({ ...options, timeoutMs })).then(result => notify({ id: 'storefront', result })).catch(() => notify({ id: 'storefront', result: { status: 'unknown', detail: 'networkError' } })),
     Promise.resolve().then(() => lookupExitNetwork({ ...options, timeoutMs })).then(result => { expectedIp = result.ip; notify({ id: 'exit', result }); publishRtc() }).catch(() => notify({ id: 'exit', result: { status: 'unknown', detail: 'lookupUnavailable', source: '', measuredAt: new Date().toISOString() } })),
-    Promise.resolve().then(() => probeAnthropic({ ...options, timeoutMs })).then(result => notify({ id: 'anthropic', result })).catch(() => notify({ id: 'anthropic', result: { status: 'unknown', detail: 'requestUnconfirmed', measuredAt: new Date().toISOString() } })),
+    ...CLAUDE_SERVICES.map(id => Promise.resolve().then(() => probeClaudeService(id, { ...options, timeoutMs })).then(result => notify({ id, result })).catch(() => notify({ id, result: { status: 'unknown', detail: 'requestUnconfirmed', measuredAt: new Date().toISOString() } }))),
   ]
   if (options.includeWebRtc) tasks.push(Promise.resolve().then(() => probeWebRtc({ signal: options.signal, timeoutMs, factory: options.rtcFactory })).then(result => { rtcRaw = result; publishRtc() }).catch(() => notify({ id: 'rtc', result: { status: 'unknown', detail: 'unsupported', publicAddresses: [], localCount: 0, mdnsCount: 0 } })))
   await Promise.allSettled(tasks)
@@ -181,9 +186,10 @@ async function deadline<T>(task: (signal: AbortSignal) => Promise<T>, signal?: A
   let timer: ReturnType<typeof setTimeout> | undefined
   let onAbort: (() => void) | undefined
   const stop = new Promise<never>((_resolve, reject) => {
-    onAbort = () => { controller.abort(); reject(abortError()) }
+    onAbort = () => { reject(abortError()); controller.abort() }
     signal?.addEventListener('abort', onAbort, { once: true })
-    timer = setTimeout(() => { controller.abort(); reject(new Error('timeout')) }, timeoutMs)
+    // Settle the deadline before abort dispatch synchronously rejects fetch.
+    timer = setTimeout(() => { reject(new Error('timeout')); controller.abort() }, timeoutMs)
   })
   try { return await Promise.race([task(controller.signal), stop]) }
   finally { if (timer) clearTimeout(timer); if (onAbort) signal?.removeEventListener('abort', onAbort) }
@@ -220,25 +226,40 @@ export async function lookupExitNetwork(options: { fetcher?: typeof fetch; signa
   }
 }
 
-export async function probeAnthropic(options: { fetcher?: typeof fetch; signal?: AbortSignal; timeoutMs?: number; now?: () => number } = {}): Promise<AnthropicConnection> {
+/** Try readable CORS first; both attempts share one deadline and omit credentials. */
+export async function probeClaudeService(target: ClaudeServiceId, options: { fetcher?: typeof fetch; signal?: AbortSignal; timeoutMs?: number; now?: () => number } = {}): Promise<AnthropicConnection> {
+  if (!CLAUDE_SERVICES.includes(target)) throw new Error('unsupported service target')
   const fetcher = options.fetcher ?? fetch
   const now = options.now ?? (() => performance.now())
   const start = now()
   try {
-    const response = await deadline(signal => fetcher(CLAUDE_PROBES.anthropic, {
-      signal, mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store', redirect: 'error',
-    }), options.signal, options.timeoutMs ?? 8000)
+    const response = await deadline(async signal => {
+      const request = (mode: RequestMode) => fetcher(CLAUDE_PROBES[target], {
+        signal, mode, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store',
+        // Fetch requires redirect:follow for no-cors, including the API fallback.
+        // Opaque results still cannot establish HTTP status or API health.
+        redirect: mode === 'no-cors' || target !== 'anthropic' ? 'follow' : 'error',
+      })
+      try { return await request('cors') }
+      catch (error) {
+        if (signal.aborted) throw error
+        // Opaque fallback observes response completion, never HTTP/API health.
+        return await request('no-cors')
+      }
+    }, options.signal, options.timeoutMs ?? 8000)
     const latencyMs = Math.max(0, Math.round(now() - start))
     if (response.type === 'opaque' || response.type === 'opaqueredirect' || response.status === 0) {
       return { status: 'unknown', detail: 'opaqueResponse', latencyMs, measuredAt: new Date().toISOString() }
     }
     const warning = response.status === 403 || response.status === 429 || response.status >= 500
     return { status: warning ? 'warning' : 'ok', detail: warning ? 'httpWarning' : 'readableResponse', httpStatus: response.status, latencyMs, measuredAt: new Date().toISOString() }
-  } catch {
+  } catch (error) {
     if (options.signal?.aborted) throw abortError()
-    return { status: 'unknown', detail: 'requestUnconfirmed', measuredAt: new Date().toISOString() }
+    return { status: 'unknown', detail: error instanceof Error && error.message === 'timeout' ? 'timeout' : 'requestUnconfirmed', measuredAt: new Date().toISOString() }
   }
 }
+
+export const probeAnthropic = (options: Parameters<typeof probeClaudeService>[1] = {}) => probeClaudeService('anthropic', options)
 
 export function classifyWebRtc(addresses: string[], mdnsCount: number, expectedIp?: string): WebRtcObservation {
   const normalized = [...new Set(addresses.map(normalizeIp).filter((ip): ip is string => !!ip))]
@@ -330,13 +351,17 @@ export function parseCliReport(raw: string): CliReport | null {
   } catch { return null }
 }
 
-export function claudeNetworkReport(data: { exit: ExitNetwork | null; anthropic: AnthropicConnection | null; rtc: WebRtcObservation | null; cli: CliReport | null; measuredAt: string; local?: ClaudeLocalCheck[]; storefront?: ConnectionDiagnostic | null }): string {
+export function claudeNetworkReport(data: { exit: ExitNetwork | null; anthropic: AnthropicConnection | null; rtc: WebRtcObservation | null; cli: CliReport | null; measuredAt: string; local?: ClaudeLocalCheck[]; storefront?: ConnectionDiagnostic | null; services?: Partial<Record<ClaudeServiceId, AnthropicConnection>> }): string {
   return JSON.stringify({
     schema: 'needtoken.claude-network.browser.v1', measured_at: data.measuredAt,
     local_checks: (data.local ?? []).map(({ id, group, status }) => ({ id, group, status })),
     storefront_connection: data.storefront ?? null,
     exit: data.exit ? { status: data.exit.status, detail: data.exit.detail, source: data.exit.source, measured_at: data.exit.measuredAt } : null,
     anthropic_browser: data.anthropic,
+    services_browser: Object.fromEntries(CLAUDE_SERVICES.flatMap(id => {
+      const result = data.services?.[id]
+      return result ? [[id, { status: result.status, detail: result.detail, latencyMs: result.latencyMs, httpStatus: result.httpStatus, measuredAt: result.measuredAt }]] : []
+    })),
     webrtc: data.rtc ? { status: data.rtc.status, detail: data.rtc.detail, public_address_count: data.rtc.publicAddresses.length, local_count: data.rtc.localCount, mdns_count: data.rtc.mdnsCount } : null,
     cli: data.cli ? { scope: data.cli.scope, measured_at: data.cli.measured_at, dns: data.cli.dns, curl: { status: data.cli.curl.status, exit_code: data.cli.curl.exit_code, http_status: data.cli.curl.http_status, ssl_verify_result: data.cli.curl.ssl_verify_result, time_ms: data.cli.curl.time_ms }, proxy_configured: data.cli.proxy.http || data.cli.proxy.https || data.cli.proxy.all } : null,
     ip_reputation: 'not_tested', account_eligibility: 'not_tested', shared_data: 'statuses_only_no_ip_timezone_language_or_secrets',

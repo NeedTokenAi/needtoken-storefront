@@ -100,3 +100,18 @@ test('timeout also covers a health response body that never completes', async ()
   const response = new Response(body, { headers: { 'content-type': 'application/json' } })
   assert.deepEqual(await probeStorefrontConnection({ fetcher: fetchResult(response), timeoutMs: 5 }), { status: 'unknown', detail: 'timeout' })
 })
+
+
+test('abort-aware health fetch and body readers preserve timeout classification', async () => {
+  for (const bodyPending of [false, true]) {
+    const fetcher = ((_url, init) => {
+      const pending = () => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('Fetch aborted', 'AbortError')), { once: true })
+      })
+      return bodyPending
+        ? Promise.resolve({ ok: true, headers: new Headers({ 'content-type': 'application/json' }), json: pending })
+        : pending()
+    }) as typeof fetch
+    assert.deepEqual(await probeStorefrontConnection({ fetcher, timeoutMs: 5 }), { status: 'unknown', detail: 'timeout' })
+  }
+})

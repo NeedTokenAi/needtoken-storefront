@@ -15,12 +15,14 @@
               <button :id="`nt-nav-${node.key}`" type="button" class="nt-nav-group-button" :class="node.items.some(isActive) ? 'text-primary' : 'text-muted-foreground'" :aria-expanded="openGroup === node.key" :aria-controls="`nt-nav-panel-${node.key}`" @click="toggleGroup(node.key)">
                 {{ node.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="openGroup === node.key ? 'rotate-180' : ''" />
               </button>
+              <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
               <div v-if="openGroup === node.key" :id="`nt-nav-panel-${node.key}`" class="nt-nav-dropdown" :aria-labelledby="`nt-nav-${node.key}`">
                 <template v-for="item in node.items" :key="item.key">
                   <span v-if="item.disabled" class="nt-nav-dropdown-link is-disabled" aria-disabled="true">{{ item.label }}<em>{{ item.badge }}</em></span>
                   <RouterLink v-else :to="item.path" class="nt-nav-dropdown-link" :class="isActive(item) ? 'text-primary bg-primary/5' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined" @click="closeMenus">{{ item.label }}<ArrowUpRight class="h-3.5 w-3.5 opacity-50" /></RouterLink>
                 </template>
               </div>
+              </Transition>
             </div>
           </template>
         </nav>
@@ -37,9 +39,11 @@
             <button type="button" class="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-label="t('navbar.selectLanguage')" :aria-expanded="langOpen" aria-controls="nt-language-options" @click="langOpen = !langOpen; openGroup = null">
               <Languages class="h-[18px] w-[18px]" />
             </button>
-            <div v-if="langOpen" id="nt-language-options" class="absolute right-0 top-[calc(100%+8px)] z-[60] flex min-w-[150px] flex-col rounded-md border border-border bg-card p-1.5">
+            <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
+            <div v-if="langOpen" id="nt-language-options" class="nt-language-options absolute right-0 top-[calc(100%+8px)] z-[60] flex min-w-[150px] flex-col rounded-md border border-border bg-card p-2">
               <button v-for="lang in languages" :key="lang.code" type="button" class="rounded px-3 py-2 text-left text-sm hover:bg-secondary" :class="appStore.locale === lang.code ? 'text-primary' : 'text-muted-foreground'" @click="changeLanguage(lang.code)">{{ lang.name }}</button>
             </div>
+            </Transition>
           </div>
           <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('navbar.personalCenter') }}</RouterLink>
           <RouterLink v-else :to="loginTarget" class="nt-auth-entry inline-flex min-h-9 items-center whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.nav.authEntry') }}</RouterLink>
@@ -49,6 +53,7 @@
               <Menu v-if="!moreOpen" class="pointer-events-none h-[18px] w-[18px]" />
               <X v-else class="pointer-events-none h-[18px] w-[18px]" />
             </button>
+            <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
             <nav v-if="moreOpen" id="nt-mobile-navigation" class="nt-mobile-navigation absolute right-0 top-[calc(100%+8px)] z-[60] flex min-w-[230px] flex-col rounded-xl border border-border bg-card p-2" :aria-label="t('needtoken.nav.label')">
               <template v-for="node in navNodes" :key="`m-${node.key}`">
                 <RouterLink v-if="node.kind === 'link'" :to="node.path" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :class="isActive(node) ? '!text-primary' : ''" :aria-current="isActive(node) ? 'page' : undefined" @click="moreOpen = false">{{ node.label }}</RouterLink>
@@ -64,16 +69,17 @@
               </template>
               <RouterLink to="/guest/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ t('navbar.guestOrders') }}</RouterLink>
               <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
-              <span class="px-3 pb-1 pt-2 text-[11px] uppercase tracking-wider text-muted-foreground">{{ t('navbar.selectLanguage') }}</span>
+              <span class="px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('navbar.selectLanguage') }}</span>
               <button v-for="lang in languages" :key="`ml-${lang.code}`" type="button" class="rounded px-3 py-2 text-left text-sm hover:bg-secondary" :class="appStore.locale === lang.code ? 'text-primary' : 'text-muted-foreground'" @click="changeLanguage(lang.code); moreOpen = false">{{ lang.name }}</button>
             </nav>
+            </Transition>
           </div>
         </div>
       </div>
     </header>
 
     <main class="relative isolate flex-1">
-      <GhostFibersBackground v-if="route.path !== '/'" variant="subtle" />
+      <GhostFibersBackground v-if="route.path !== '/' && !route.path.startsWith('/tools/')" variant="subtle" />
       <div class="relative z-[1]"><slot /></div>
     </main>
 
@@ -119,6 +125,8 @@ const moreButtonEl = ref<HTMLButtonElement | null>(null)
 const openGroup = ref<string | null>(null)
 const mobileGroup = ref<string | null>(null)
 const groupEls = new Map<string, HTMLElement>()
+const hideLeavingPanel = (element: Element) => { element.setAttribute('inert', ''); element.setAttribute('aria-hidden', 'true') }
+const showEnteringPanel = (element: Element) => { element.removeAttribute('inert'); element.removeAttribute('aria-hidden') }
 
 const brandName = computed(() => appStore.isResellerTenant
   ? String(appStore.config?.brand?.site_name || '').trim() || NEEDTOKEN_BRAND_NAME
@@ -187,16 +195,16 @@ function closeMenus() {
   langOpen.value = false
 }
 function onGroupFocusOut(event: FocusEvent, key: string) {
-  if (event.relatedTarget instanceof Node && !groupEls.get(key)?.contains(event.relatedTarget)) openGroup.value = null
+  if (!(event.relatedTarget instanceof Node) || !groupEls.get(key)?.contains(event.relatedTarget)) openGroup.value = null
 }
 function onMoreFocusOut(event: FocusEvent) {
-  if (event.relatedTarget instanceof Node && !moreEl.value?.contains(event.relatedTarget)) {
+  if (!(event.relatedTarget instanceof Node) || !moreEl.value?.contains(event.relatedTarget)) {
     moreOpen.value = false
     mobileGroup.value = null
   }
 }
 function onLanguageFocusOut(event: FocusEvent) {
-  if (event.relatedTarget instanceof Node && !langEl.value?.contains(event.relatedTarget)) langOpen.value = false
+  if (!(event.relatedTarget instanceof Node) || !langEl.value?.contains(event.relatedTarget)) langOpen.value = false
 }
 function onGroupKeydown(event: KeyboardEvent, key: string) {
   if (event.key === 'Escape') {
@@ -263,13 +271,19 @@ onUnmounted(() => {
 
 <style scoped>
 .nt-site-header { padding-inline: 24px; }
+@media (min-width: 1240px) { .nt-header-inner { padding-inline: 24px; } }
 @media (max-width: 640px) { .nt-site-header { padding-inline: 14px; } }
-.nt-nav-group-button { display: flex; align-items: center; gap: 5px; border-radius: 6px; padding: 8px 10px; white-space: nowrap; font-size: 14px; font-weight: 500; }
-.nt-nav-group-button:hover { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
-.nt-nav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 60; width: max-content; min-width: 186px; max-width: min(320px, 70vw); padding: 7px; border: 1px solid var(--ui-border); border-radius: 12px; background: #0e1218; box-shadow: 0 12px 32px #0005; }
-.nt-nav-dropdown-link { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 12px; border-radius: 6px; font-size: 13px; }
+.nt-site-header :where(a, button) { transition: color var(--nt-motion-fast) var(--nt-motion-ease), background-color var(--nt-motion-fast) var(--nt-motion-ease); }
+.nt-nav-group-button { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 8px 12px; white-space: nowrap; font-size: 14px; font-weight: 500; }
+.nt-nav-group-button:hover, .nt-nav-group-button[aria-expanded="true"] { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
+.nt-nav-dropdown { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: max-content; min-width: 192px; max-width: min(320px, 70vw); padding: 8px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); box-shadow: 0 12px 32px #0005; }
+.nt-nav-dropdown-link { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 40px; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
 .nt-nav-dropdown-link:hover { color: var(--ui-accent); background: var(--ui-bg-soft); }
 .nt-nav-dropdown-link.is-disabled { color: var(--ui-text-muted); cursor: default; }
 .nt-nav-dropdown-link.is-disabled em { font-style: normal; font-size: 11px; color: #e7c56a; }
 .nt-mobile-navigation { max-height: calc(100dvh - 90px); overflow-y: auto; overscroll-behavior: contain; }
+.nt-menu-enter-active { transition: opacity var(--nt-motion-enter) var(--nt-motion-ease), transform var(--nt-motion-enter) var(--nt-motion-ease); }
+.nt-menu-leave-active { transition: opacity var(--nt-motion-fast) var(--nt-motion-ease), transform var(--nt-motion-fast) var(--nt-motion-ease); pointer-events: none; }
+.nt-menu-enter-from, .nt-menu-leave-to { opacity: 0; transform: translateY(-4px); }
+@media (prefers-reduced-motion: reduce) { .nt-menu-enter-from, .nt-menu-leave-to { transform: none; } }
 </style>

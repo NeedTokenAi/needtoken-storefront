@@ -1,134 +1,118 @@
 <template>
-  <div class="nt-claude-network mx-auto w-full max-w-[1200px] px-4 pb-16 pt-10 sm:px-6 sm:pt-12">
+  <div class="nt-claude-network">
+    <ToolNavigation />
     <header class="network-heading">
-      <span class="network-eyebrow"><Activity :size="15" aria-hidden="true" />{{ t('needtoken.claudeEnvironment.eyebrow') }}</span>
-      <h1>{{ t('needtoken.claudeEnvironment.title') }}</h1>
-      <p>{{ t('needtoken.environmentV5.subtitle') }}</p>
-      <nav class="network-anchors" :aria-label="t('needtoken.claudeEnvironment.sections')"><a href="#network-local">{{ t('needtoken.environmentV5.localTitle') }}</a><a href="#network-overview">{{ t('needtoken.claudeEnvironment.overview') }}</a><a href="#network-terminal">{{ t('needtoken.claudeEnvironment.terminal') }}</a><a href="#network-rules">{{ t('needtoken.claudeEnvironment.rules') }}</a></nav>
+      <div><span class="tool-capability"><Network :size="16" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.toolsPolish.networkScope') }}</span><h1>{{ t('needtoken.environmentV6.title') }}</h1><p>{{ t('needtoken.environmentV6.subtitle') }}</p></div>
+      <div class="network-actions">
+        <a href="https://status.claude.com/" target="_blank" rel="noopener noreferrer" class="network-status-link">{{ t('needtoken.toolsPolish.providerStatus') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
+        <button v-if="running" type="button" class="network-button secondary" @click="cancel"><Square :size="16" aria-hidden="true" />{{ t('needtoken.claudeEnvironment.cancel') }}</button>
+        <button type="button" class="network-button primary" :disabled="running" :aria-busy="running" @click="run"><LoaderCircle v-if="running" class="network-spin" :size="16" aria-hidden="true" /><Play v-else :size="16" aria-hidden="true" />{{ t(running ? 'needtoken.claudeEnvironment.running' : measuredAt ? 'needtoken.claudeEnvironment.runAgain' : 'needtoken.claudeEnvironment.run') }}</button>
+      </div>
     </header>
-
-    <section class="network-start" :aria-busy="running">
-      <div class="network-start-top">
-        <div><h2>{{ t('needtoken.claudeEnvironment.startTitle') }}</h2><p role="status" aria-live="polite">{{ running ? t('needtoken.environmentV5.runningHint') : cancelled ? t('needtoken.environmentV5.cancelledHint') : measuredAt ? t('needtoken.claudeEnvironment.checkedAt', { time: dateTime(measuredAt) }) : t('needtoken.environmentV5.idleHint') }}</p></div>
-        <div class="network-actions"><button v-if="running" type="button" class="network-button secondary" @click="cancel"><Square :size="14" />{{ t('needtoken.claudeEnvironment.cancel') }}</button><button type="button" class="network-button primary" :disabled="running" @click="run"><LoaderCircle v-if="running" class="network-spin" :size="17" /><Play v-else :size="16" />{{ t(running ? 'needtoken.claudeEnvironment.running' : measuredAt ? 'needtoken.claudeEnvironment.runAgain' : 'needtoken.claudeEnvironment.run') }}</button></div>
-      </div>
-      <div class="network-dashboard">
-        <div class="network-progress" role="progressbar" :aria-label="t('needtoken.environmentV5.progressTitle')" :aria-valuenow="completedCount" :aria-valuemax="totalChecks" :aria-valuetext="t('needtoken.environmentV5.checkFraction', { count: completedCount, total: totalChecks })" aria-valuemin="0"><svg viewBox="0 0 112 112" aria-hidden="true"><circle class="network-progress-track" cx="56" cy="56" r="47" /><circle class="network-progress-value" cx="56" cy="56" r="47" :stroke-dasharray="ringLength" :stroke-dashoffset="ringLength * (1 - completedCount / totalChecks)" /></svg><div><strong>{{ completedCount }}<small>/ {{ totalChecks }}</small></strong><span>{{ t('needtoken.environmentV5.progressTitle') }}</span></div></div>
-        <div class="network-progress-copy"><h3>{{ t(measuredAt ? 'needtoken.environmentV5.localComplete' : 'needtoken.environmentV5.localFirst') }}</h3><p>{{ t('needtoken.environmentV5.progressNote') }}</p><div v-if="measuredAt" class="network-summary" aria-live="polite"><span><Check :size="13" />{{ t('needtoken.claudeEnvironment.confirmedCount', { count: summary.ok }) }}</span><span class="review"><TriangleAlert :size="13" />{{ t('needtoken.claudeEnvironment.reviewCount', { count: summary.warning }) }}</span><span><CircleHelp :size="13" />{{ t('needtoken.claudeEnvironment.unknownCount', { count: summary.unknown }) }}</span></div><p v-if="running" class="network-remaining">{{ t('needtoken.environmentV5.remaining', { count: pending.size }) }}</p></div>
-      </div>
-      <label class="network-rtc-choice"><input v-model="includeWebRtc" type="checkbox" :disabled="running" /><span>{{ t('needtoken.claudeEnvironment.rtcChoice') }}<small>{{ t('needtoken.claudeEnvironment.rtcChoiceHint') }}</small></span></label>
-      <p class="network-disclosure"><ShieldCheck :size="16" aria-hidden="true" /><span>{{ t('needtoken.environmentV5.disclosure') }} <RouterLink to="/privacy">{{ t('footer.privacy') }}</RouterLink></span></p>
+    <div class="network-options"><label><input v-model="includeWebRtc" type="checkbox" :disabled="running" />{{ t('needtoken.claudeEnvironment.rtcChoice') }}</label><p>{{ t('needtoken.environmentV6.privacy') }}</p></div>
+    <p class="network-run-state" :class="{ 'is-running': running }" role="status" aria-live="polite">{{ running ? t('needtoken.environmentV6.running', { count: pending.size }) : cancelled ? t('needtoken.environmentV5.cancelledHint') : measuredAt ? t('needtoken.claudeEnvironment.checkedAt', { time: dateTime(measuredAt) }) : t('needtoken.environmentV6.idle') }}</p>
+    <div class="network-primary">
+      <section class="network-panel network-services" :aria-label="t('needtoken.environmentV6.services')" :aria-busy="running">
+        <div class="network-panel-heading"><h2><Globe2 :size="16" aria-hidden="true" />{{ t('needtoken.environmentV6.services') }}</h2><span class="network-meta">{{ serviceCompleted }} / {{ CLAUDE_SERVICES.length }}</span></div>
+        <progress v-if="running" class="network-progress" :value="serviceCompleted" :max="CLAUDE_SERVICES.length" :aria-label="t('needtoken.environmentV6.services')" />
+        <ul class="network-service-list">
+          <li v-for="id in CLAUDE_SERVICES" :key="id" :data-network-check="id" :class="{ 'is-pending': pending.has(id) }">
+            <div class="network-service-name"><span class="network-service-icon" aria-hidden="true"><Code2 v-if="id === 'anthropic'" :size="16" /><Globe2 v-else :size="16" /></span><strong>{{ t(`needtoken.environmentV6.targets.${id}`) }}</strong><span translate="no">{{ serviceHost(id) }}</span></div>
+            <span class="network-service-state" :class="serviceClass(id)"><LoaderCircle v-if="pending.has(id)" :size="14" class="network-spin" aria-hidden="true" /><span v-else class="network-status-dot" aria-hidden="true" />{{ serviceLabel(id) }}</span>
+            <span class="network-latency" translate="no"><span v-if="pending.has(id)" class="network-skeleton-line latency-skeleton" aria-hidden="true" /><template v-else>{{ services[id]?.latencyMs !== undefined ? `${services[id]!.latencyMs} ms` : '—' }}</template></span>
+            <details v-if="services[id]" class="network-service-detail"><summary>{{ t('needtoken.toolsPolish.responseDetails') }}<span v-if="services[id]!.httpStatus" translate="no">HTTP {{ services[id]!.httpStatus }}</span><ChevronDown :size="14" aria-hidden="true" /></summary><p>{{ t(`needtoken.environmentV6.details.${services[id]!.detail}`) }}</p></details>
+          </li>
+        </ul>
+        <p v-if="adviceKeys.includes('opaque')" class="network-observed-note"><Info :size="14" aria-hidden="true" />{{ t('needtoken.environmentV6.details.opaqueResponse') }}</p>
+        <details class="network-scope"><summary>{{ t('needtoken.toolsPolish.scopeDetails') }}<ChevronDown :size="14" aria-hidden="true" /></summary><p>{{ t('needtoken.environmentV6.browserScope') }}</p></details>
+      </section>
+      <section class="network-panel network-exit" :aria-label="t('needtoken.claudeEnvironment.overview')" data-network-check="exit" :aria-busy="pending.has('exit')">
+        <div class="network-panel-heading"><h2><Network :size="16" aria-hidden="true" />{{ t('needtoken.claudeEnvironment.overview') }}</h2><span class="network-meta">{{ pending.has('exit') ? t('needtoken.environmentV5.pending') : exit?.source || '—' }}</span></div>
+        <p class="network-exit-ip" translate="no"><span v-if="pending.has('exit')" class="network-skeleton-line exit-skeleton" aria-hidden="true" /><template v-else>{{ exit?.ip || '—' }}</template></p>
+        <dl class="network-facts"><div><dt>{{ t('needtoken.claudeEnvironment.country') }}</dt><dd><span v-if="pending.has('exit')" class="network-skeleton-line" aria-hidden="true" /><template v-else>{{ exit?.country || unknown }}</template></dd></div><div><dt>{{ t('needtoken.claudeEnvironment.location') }}</dt><dd><span v-if="pending.has('exit')" class="network-skeleton-line" aria-hidden="true" /><template v-else>{{ [exit?.region, exit?.city].filter(Boolean).join(' · ') || unknown }}</template></dd></div><div><dt translate="no">ASN</dt><dd><span v-if="pending.has('exit')" class="network-skeleton-line" aria-hidden="true" /><template v-else>{{ exit?.asn || unknown }}</template></dd></div><div><dt>{{ t('needtoken.claudeEnvironment.organization') }}</dt><dd><span v-if="pending.has('exit')" class="network-skeleton-line" aria-hidden="true" /><template v-else>{{ exit?.organization || unknown }}</template></dd></div></dl>
+        <p v-if="exit?.detail === 'lookupUnavailable'" class="network-note">{{ t('needtoken.environmentV6.exitUnavailable') }}</p><p v-else-if="exit?.detail === 'ipOnly'" class="network-note">{{ t('needtoken.environmentV6.exitPartial') }}</p>
+      </section>
+    </div>
+    <section v-if="measuredAt && !running && !cancelled && adviceKeys.length" class="network-advice" :aria-label="t('needtoken.environmentV6.nextSteps')"><h2>{{ t('needtoken.environmentV6.nextSteps') }}</h2><ul><li v-for="key in adviceKeys" :key="key">{{ t(`needtoken.environmentV6.advice.${key}`) }}</li></ul></section>
+    <section v-if="rtcIncluded" class="network-panel network-rtc" data-network-check="rtc">
+      <div class="network-panel-heading"><h2>{{ t('needtoken.environmentV6.webrtc') }}</h2><span class="network-service-state" :class="rtc?.status === 'warning' ? 'is-warning' : rtc?.status === 'ok' ? 'is-readable' : ''">{{ pending.has('rtc') ? t('needtoken.environmentV5.pending') : rtc ? t(`needtoken.environmentV6.rtcStates.${rtc.detail}`) : '—' }}</span></div>
+      <p class="network-copy">{{ t(`needtoken.claudeEnvironment.rtcDetails.${rtc?.detail || 'notChecked'}`) }}</p><div v-if="rtc?.publicAddresses.length" class="network-addresses"><code v-for="address in rtc.publicAddresses" :key="address">{{ address }}</code></div><p v-if="rtc" class="network-note">{{ t('needtoken.claudeEnvironment.rtcCounts', { local: rtc.localCount, mdns: rtc.mdnsCount }) }}</p>
     </section>
-
-    <section id="network-local" class="network-local-groups" :aria-label="t('needtoken.environmentV5.localTitle')">
-      <article v-for="group in localGroups" :key="group.id" class="network-panel network-local-card" :data-local-group="group.id"><div class="network-panel-heading"><h2><component :is="group.icon" :size="18" aria-hidden="true" />{{ t(`needtoken.environmentV5.groups.${group.id}`) }}</h2><span class="network-group-count">{{ group.checks.length }} / {{ group.total }}</span></div><p class="network-group-intro">{{ t(`needtoken.environmentV5.groupHints.${group.id}`) }}</p><p v-if="!measuredAt" class="network-empty">{{ t('needtoken.environmentV5.localIdle') }}</p><ul v-else class="network-check-list"><li v-for="check in group.checks" :key="check.id" :data-check-id="check.id"><component :is="check.status === 'ok' ? Check : check.status === 'warning' ? TriangleAlert : CircleHelp" :size="15" class="network-check-icon" :class="`is-${check.status}`" aria-hidden="true" /><div><div class="network-check-title"><h3>{{ localLabel(check.id) }}</h3><span class="network-check-state" :class="`is-${check.status}`">{{ statusLabel(check.status) }}</span></div><p v-if="check.value" class="network-check-value">{{ check.value }}</p><details><summary>{{ t('needtoken.environmentV5.checkDetail') }}</summary><p>{{ localDetail(check.detail) }}</p></details></div></li></ul><div v-if="group.id === 'connection'" class="network-health" data-network-check="storefront"><div class="network-check-title"><h3><Server :size="14" aria-hidden="true" />{{ t('needtoken.environmentV5.healthTitle') }}</h3><span class="network-status" :class="`is-${storefront?.status || 'unknown'}`">{{ networkStatus('storefront', storefront?.status) }}</span></div><p>{{ storefront?.detail === 'timeout' ? t('needtoken.environmentV5.healthTimeout') : t(`needtoken.environment.connection.${storefront?.detail || 'notChecked'}`) }}</p><span v-if="storefront?.latencyMs !== undefined" class="network-health-time">{{ storefront.latencyMs }} ms</span><span v-if="storefront?.httpStatus" class="network-health-time">HTTP {{ storefront.httpStatus }}</span><small>{{ t('needtoken.environmentV5.healthScope') }}</small></div></article>
-    </section>
-
-    <div class="network-layout">
-      <div class="network-main">
-        <section id="network-overview" class="network-panel" :aria-label="t('needtoken.claudeEnvironment.overview')" data-network-check="exit">
-          <div class="network-panel-heading"><h2><Globe2 :size="19" />{{ t('needtoken.claudeEnvironment.overview') }}</h2><span class="network-status" :class="`is-${exit?.status || 'unknown'}`">{{ networkStatus('exit', exit?.status) }}</span></div>
-          <div class="network-exit-ip"><span>{{ t('needtoken.claudeEnvironment.exitIp') }}</span><strong>{{ exit?.ip || (measuredAt && !pending.has('exit') ? unknown : t('needtoken.claudeEnvironment.unmeasured')) }}</strong><small v-if="exit?.source">{{ t('needtoken.claudeEnvironment.source', { source: exit.source }) }}</small></div>
-          <dl class="network-facts"><div><dt>{{ t('needtoken.claudeEnvironment.country') }}</dt><dd>{{ exit?.country || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.location') }}</dt><dd>{{ [exit?.region, exit?.city].filter(Boolean).join(' · ') || unknown }}</dd></div><div><dt>ASN</dt><dd>{{ exit?.asn || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.organization') }}</dt><dd>{{ exit?.organization || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.exitTimezone') }}</dt><dd>{{ exit?.timezone || unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.reputation') }}</dt><dd>{{ t('needtoken.claudeEnvironment.reputationUnknown') }}</dd></div></dl>
-          <p class="network-note">{{ t(`needtoken.claudeEnvironment.exitDetails.${exit?.detail || 'notChecked'}`) }}</p><p v-if="timeMismatch" class="network-review-note"><Info :size="15" />{{ t('needtoken.claudeEnvironment.timeMismatch') }}</p><p v-if="exit" class="network-timestamp">{{ t('needtoken.claudeEnvironment.observedAt', { time: dateTime(exit.measuredAt) }) }}</p>
-        </section>
-        <section id="network-browser" class="network-browser-grid" :aria-label="t('needtoken.claudeEnvironment.browser')">
-          <article class="network-panel" data-network-check="anthropic"><div class="network-panel-heading"><h2><Radio :size="19" />{{ t('needtoken.claudeEnvironment.anthropic') }}</h2><span class="network-status" :class="`is-${anthropic?.status || 'unknown'}`">{{ networkStatus('anthropic', anthropic?.status) }}</span></div><p class="network-target" translate="no">api.anthropic.com</p><p class="network-copy">{{ t(`needtoken.claudeEnvironment.connectionDetails.${anthropic?.detail || 'notChecked'}`) }}</p><div v-if="anthropic?.latencyMs !== undefined" class="network-metric">{{ anthropic.latencyMs }}<small>ms</small></div><p v-if="anthropic?.httpStatus" class="network-note">HTTP {{ anthropic.httpStatus }}</p><p class="network-note">{{ t('needtoken.claudeEnvironment.browserScope') }}</p></article>
-          <article class="network-panel" data-network-check="rtc"><div class="network-panel-heading"><h2><Waypoints :size="19" />WebRTC</h2><span class="network-status" :class="`is-${rtc?.status || 'unknown'}`">{{ networkStatus('rtc', rtc?.status) }}</span></div><p class="network-copy">{{ t(`needtoken.claudeEnvironment.rtcDetails.${rtc?.detail || 'notChecked'}`) }}</p><div v-if="rtc?.publicAddresses.length" class="network-addresses"><code v-for="address in rtc.publicAddresses" :key="address">{{ address }}</code></div><p v-if="rtc && rtc.detail !== 'notRequested'" class="network-note">{{ t('needtoken.claudeEnvironment.rtcCounts', { local: rtc.localCount, mdns: rtc.mdnsCount }) }}</p><p class="network-note">{{ t('needtoken.claudeEnvironment.rtcScope') }}</p></article>
-        </section>
-        <section id="network-terminal" class="network-panel" :aria-label="t('needtoken.claudeEnvironment.terminal')">
-          <div class="network-panel-heading"><h2><Terminal :size="19" />{{ t('needtoken.claudeEnvironment.terminal') }}</h2><span class="network-status" :class="`is-${cliStatus || 'idle'}`">{{ cli ? statusLabel(cliStatus) : t('needtoken.claudeEnvironment.notImported') }}</span></div>
-          <p class="network-copy">{{ t('needtoken.claudeEnvironment.cliIntro') }}</p>
+    <details class="network-details"><summary><Monitor :size="16" class="network-detail-symbol" aria-hidden="true" />{{ t('needtoken.environmentV6.localDetails') }}<ChevronDown :size="16" aria-hidden="true" /></summary><div class="network-details-content">
+      <p v-if="!measuredAt" class="network-note">{{ t('needtoken.environmentV6.localIdle') }}</p>
+      <dl v-else class="network-local-facts"><div v-for="check in localChecks" :key="check.id"><dt>{{ localLabel(check.id) }}</dt><dd>{{ check.value || statusLabel(check.status) }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.exitTimezone') }}</dt><dd>{{ exit?.timezone || unknown }}</dd></div><div><dt>{{ t('needtoken.environmentV5.healthTitle') }}</dt><dd>{{ storefront?.latencyMs !== undefined ? `${storefront.latencyMs} ms` : statusLabel(storefront?.status) }}</dd></div></dl><p v-if="timeMismatch" class="network-note">{{ t('needtoken.environmentV6.timezoneNote') }}</p>
+    </div></details>
+        <details id="network-terminal" class="network-details">
+          <summary><Terminal :size="16" class="network-detail-symbol" aria-hidden="true" />{{ t('needtoken.environmentV6.terminalTitle') }}<span class="network-meta">{{ cli ? t(`needtoken.claudeEnvironment.cliStates.${cli.curl.status}`) : t('needtoken.claudeEnvironment.notImported') }}</span><ChevronDown :size="16" aria-hidden="true" /></summary><div class="network-details-content">
+          <p class="network-copy">{{ t('needtoken.environmentV6.terminalIntro') }}</p>
           <ol class="network-cli-steps"><li>{{ t('needtoken.claudeEnvironment.cliStep1') }} <a href="/needtoken-claude-network-check.mjs" download>{{ t('needtoken.claudeEnvironment.downloadScript') }}<Download :size="13" /></a><a href="/needtoken-claude-network-check.mjs" target="_blank" rel="noopener noreferrer">{{ t('needtoken.claudeEnvironment.reviewScript') }}<ArrowUpRight :size="13" /></a></li><li>{{ t('needtoken.claudeEnvironment.cliStep2') }}<code class="network-command">node needtoken-claude-network-check.mjs &gt; claude-network-report.json</code></li><li>{{ t('needtoken.claudeEnvironment.cliStep3') }}</li></ol>
           <label class="network-import"><Upload :size="16" />{{ t('needtoken.claudeEnvironment.importReport') }}<input type="file" accept="application/json,.json" @change="importCliReport" /></label><p v-if="importMessage" class="network-note" role="status">{{ t(`needtoken.claudeEnvironment.${importMessage}`) }}</p>
           <template v-if="cli"><p class="network-import-label">{{ t('needtoken.claudeEnvironment.importedAt', { time: dateTime(cli.measured_at) }) }}</p><dl class="network-facts"><div><dt>{{ t('needtoken.claudeEnvironment.cliDns') }}</dt><dd>{{ t(`needtoken.claudeEnvironment.cliStates.${cli.dns.status}`) }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.cliCurl') }}</dt><dd>{{ t(`needtoken.claudeEnvironment.cliStates.${cli.curl.status}`) }}<span v-if="cli.curl.http_status"> · HTTP {{ cli.curl.http_status }}</span><span v-if="cli.curl.exit_code >= 0"> · {{ t('needtoken.claudeEnvironment.curlExit', { code: cli.curl.exit_code }) }}</span></dd></div><div><dt>{{ t('needtoken.claudeEnvironment.cliTls') }}</dt><dd>{{ cli.curl.ssl_verify_result === 0 && cli.curl.http_status ? t('needtoken.claudeEnvironment.cliTlsVerified') : cli.curl.ssl_verify_result ? t('needtoken.claudeEnvironment.tlsErrorCode', { code: cli.curl.ssl_verify_result }) : unknown }}</dd></div><div><dt>{{ t('needtoken.claudeEnvironment.cliProxy') }}</dt><dd>{{ t(hasCliProxy ? 'needtoken.claudeEnvironment.proxyPresent' : 'needtoken.claudeEnvironment.proxyAbsent') }}</dd></div></dl><p v-if="cli.curl.status === 'error' && [5, 6, 7, 28, 35, 60].includes(cli.curl.exit_code)" class="network-note">{{ t(`needtoken.claudeEnvironment.curlErrors.${cli.curl.exit_code}`) }}</p><p v-if="cli.proxy.custom_base_url" class="network-review-note"><Info :size="15" />{{ t('needtoken.claudeEnvironment.customBaseUrl') }}</p></template>
-          <p class="network-note">{{ t('needtoken.claudeEnvironment.cliScope') }}</p>
-        </section>
 
-        <section class="network-panel" :aria-label="t('needtoken.claudeEnvironment.reportTitle')"><div class="network-panel-heading"><h2><FileJson :size="18" />{{ t('needtoken.claudeEnvironment.reportTitle') }}</h2><button type="button" class="network-button secondary" :disabled="(!measuredAt && !cli) || running" @click="copyReport"><Copy :size="14" />{{ t('needtoken.claudeEnvironment.copyReport') }}</button></div><p class="network-note">{{ t('needtoken.claudeEnvironment.reportHint') }}</p><p v-if="copyMessage" class="network-note" role="status">{{ t(`needtoken.claudeEnvironment.${copyMessage}`) }}</p><details v-if="measuredAt || cli"><summary>{{ t('needtoken.claudeEnvironment.viewReport') }}</summary><textarea :value="report" readonly :aria-label="t('needtoken.claudeEnvironment.reportTitle')" /></details></section>
-      </div>
-
-      <aside id="network-rules" class="network-rules" :aria-label="t('needtoken.claudeEnvironment.rules')"><section class="network-panel"><div class="network-panel-heading"><h2><ShieldCheck :size="19" />{{ t('needtoken.claudeEnvironment.rules') }}</h2></div><p class="network-copy">{{ t('needtoken.claudeEnvironment.rulesIntro') }}</p><ul class="network-rule-list"><li v-for="key in ['region','account','consistency','limits']" :key="key"><span><Check :size="13" /></span><p>{{ t(`needtoken.claudeEnvironment.staticRules.${key}`) }}</p></li></ul><a class="network-link" href="https://www.anthropic.com/supported-countries" target="_blank" rel="noopener noreferrer">{{ t('needtoken.claudeEnvironment.officialRegions') }}<ArrowUpRight :size="13" /></a><a class="network-link" href="https://www.anthropic.com/legal/aup" target="_blank" rel="noopener noreferrer">{{ t('needtoken.claudeEnvironment.officialPolicy') }}<ArrowUpRight :size="13" /></a></section>
-        <section class="network-panel network-operator"><h2>{{ t('needtoken.claudeEnvironment.operatorUpdates') }}</h2><p v-if="rulesLoading" class="network-note" role="status">{{ t('needtoken.claudeEnvironment.rulesLoading') }}</p><div v-else-if="rulesFailed" class="network-empty"><p>{{ t('needtoken.claudeEnvironment.rulesFailed') }}</p><button type="button" @click="loadRules">{{ t('needtoken.common.retry') }}</button></div><p v-else-if="!rules.length" class="network-note">{{ t('needtoken.claudeEnvironment.rulesEmpty') }}</p><article v-for="rule in rules" v-else :key="rule.id" class="network-rule-article"><h3>{{ localized(rule.title) }}</h3><p>{{ plain(localized(rule.summary)) }}</p><RouterLink :to="`/blog/${encodeURIComponent(rule.slug)}`">{{ t('needtoken.claudeEnvironment.readUpdate') }}<ArrowUpRight :size="12" /></RouterLink></article></section>
-      </aside>
-    </div>
+        </div></details>
+    <details v-if="measuredAt || cli" class="network-details network-report"><summary><FileJson :size="16" class="network-detail-symbol" aria-hidden="true" />{{ t('needtoken.claudeEnvironment.reportTitle') }}<ChevronDown :size="16" aria-hidden="true" /></summary><div class="network-details-content"><p class="network-copy">{{ t('needtoken.claudeEnvironment.reportHint') }}</p><button type="button" class="network-button secondary" :disabled="running" @click="copyReport"><Copy :size="16" aria-hidden="true" />{{ t('needtoken.claudeEnvironment.copyReport') }}</button><p v-if="copyMessage" class="network-note" role="status">{{ t(`needtoken.claudeEnvironment.${copyMessage}`) }}</p><textarea :value="report" readonly :aria-label="t('needtoken.claudeEnvironment.reportTitle')" /></div></details>
   </div>
 </template>
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Activity, ArrowUpRight, Check, CircleHelp, Copy, Download, FileJson, Globe2, Info, Cpu, LoaderCircle, Monitor, Play, Radio, Server, ShieldCheck, Square, Terminal, TriangleAlert, Upload, Waypoints } from 'lucide-vue-next'
-import { postAPI } from '../../api'
+import { ArrowUpRight, ChevronDown, Code2, Copy, Download, FileJson, Globe2, Info, LoaderCircle, Monitor, Network, Play, Square, Terminal, Upload } from 'lucide-vue-next'
+import ToolNavigation from './components/ToolNavigation.vue'
 import { usePageSeo } from '../../composables/usePageSeo'
-import { useAppStore } from '../../stores/app'
-import { getLocalizedText } from '../../utils/resellerSiteConfig'
-import { serviceDescriptionText } from './lib/serviceCatalog'
-import { claudeNetworkReport, claudeRuleCategoryIds, collectClaudeLocalChecks, parseCliReport, runClaudeNetworkChecks, timezoneDiffers } from './lib/claudeNetwork'
+import { CLAUDE_PROBES, CLAUDE_SERVICES, claudeNetworkReport, collectClaudeLocalChecks, parseCliReport, runClaudeNetworkChecks, timezoneDiffers } from './lib/claudeNetwork'
 import type { ConnectionDiagnostic } from './lib/browserDiagnostics'
-import type { AnthropicConnection, ClaudeLocalCheck, CliReport, ExitNetwork, LocalCheckId, NetworkCheckId, NetworkStatus, WebRtcObservation } from './lib/claudeNetwork'
+import type { AnthropicConnection, ClaudeLocalCheck, ClaudeServiceId, CliReport, ExitNetwork, LocalCheckId, NetworkCheckId, NetworkStatus, WebRtcObservation } from './lib/claudeNetwork'
 
 const { t, locale } = useI18n()
-const appStore = useAppStore()
-usePageSeo({ title: () => t('needtoken.claudeEnvironment.title'), description: () => t('needtoken.claudeEnvironment.subtitle') })
-const unknown = computed(() => t('needtoken.claudeEnvironment.unknown'))
-const localized = (value?: Record<string, unknown>) => getLocalizedText(value, appStore.locale)
-const plain = serviceDescriptionText
-const exit = ref<ExitNetwork | null>(null), anthropic = ref<AnthropicConnection | null>(null), rtc = ref<WebRtcObservation | null>(null), cli = ref<CliReport | null>(null)
+usePageSeo({ title: () => t('needtoken.claudeEnvironment.title'), description: () => t('needtoken.environmentV6.subtitle') })
+const unknown = computed(() => t('needtoken.environmentV6.notAvailable'))
+const exit = ref<ExitNetwork | null>(null), services = ref<Partial<Record<ClaudeServiceId, AnthropicConnection>>>({}), rtc = ref<WebRtcObservation | null>(null), cli = ref<CliReport | null>(null)
 const running = ref(false), measuredAt = ref(''), includeWebRtc = ref(false), copyMessage = ref(''), importMessage = ref(''), cancelled = ref(false)
 const localChecks = ref<ClaudeLocalCheck[]>([]), storefront = ref<ConnectionDiagnostic | null>(null), pending = ref(new Set<NetworkCheckId>()), rtcIncluded = ref(false)
-const rulesLoading = ref(true), rulesFailed = ref(false), rules = ref<Array<{ id: number; slug: string; title: Record<string, unknown>; summary: Record<string, unknown> }>>([])
-let active: AbortController | null = null, generation = 0, importGeneration = 0, rulesGeneration = 0, disposed = false
-const dateTime = (value: string) => { try { return Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString(locale.value) : unknown.value } catch { return value } }
+let active: AbortController | null = null, generation = 0, importGeneration = 0, disposed = false
+const dateTime = (value: string) => { try { return Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString(locale.value) : unknown.value } catch { return unknown.value } }
 const statusLabel = (status?: NetworkStatus) => t(`needtoken.claudeEnvironment.status.${status || 'idle'}`)
-const networkStatus = (id: NetworkCheckId, status?: NetworkStatus) => pending.value.has(id) ? t('needtoken.environmentV5.pending') : cancelled.value && !status ? t('needtoken.environmentV5.stopped') : statusLabel(status)
-const localValue = (id: LocalCheckId) => localChecks.value.find(check => check.id === id)?.value || ''
-const timeMismatch = computed(() => timezoneDiffers(localValue('timezone'), exit.value))
+const timeMismatch = computed(() => timezoneDiffers(localChecks.value.find(check => check.id === 'timezone')?.value || '', exit.value))
 const hasCliProxy = computed(() => !!cli.value && (cli.value.proxy.http || cli.value.proxy.https || cli.value.proxy.all))
-const cliStatus = computed<NetworkStatus | undefined>(() => !cli.value ? undefined : cli.value.curl.status === 'unsupported' ? 'unknown' : cli.value.curl.status === 'ok' && ![403, 429].includes(cli.value.curl.http_status || 0) && (cli.value.curl.http_status || 0) < 500 ? 'ok' : 'warning')
-const localGroups = computed(() => [
-  { id: 'connection', icon: ShieldCheck, total: 2, checks: localChecks.value.filter(check => check.group === 'connection') },
-  { id: 'features', icon: Cpu, total: 7, checks: localChecks.value.filter(check => check.group === 'features') },
-  { id: 'system', icon: Monitor, total: 6, checks: localChecks.value.filter(check => check.group === 'system') },
-])
+const serviceCompleted = computed(() => CLAUDE_SERVICES.filter(id => !!services.value[id]).length)
+const serviceHost = (id: ClaudeServiceId) => new URL(CLAUDE_PROBES[id]).hostname
+const serviceLabel = (id: ClaudeServiceId) => pending.value.has(id) ? t('needtoken.environmentV5.pending') : cancelled.value && !services.value[id] ? t('needtoken.environmentV5.stopped') : t(`needtoken.environmentV6.states.${services.value[id]?.detail || 'idle'}`)
+const serviceClass = (id: ClaudeServiceId) => services.value[id]?.detail === 'opaqueResponse' ? 'is-observed' : services.value[id]?.status === 'warning' ? 'is-warning' : services.value[id]?.detail === 'readableResponse' ? 'is-readable' : ''
 const oldIds = new Set(['secure', 'online', 'cookies', 'storage', 'crypto', 'wasm', 'language', 'timezone'])
-const oldDetails = new Set(['secureReady', 'secureLimited', 'onlineHint', 'offlineHint', 'cookiesReady', 'cookiesLimited', 'storageReady', 'storageLimited', 'cryptoReady', 'cryptoLimited', 'wasmReady', 'wasmLimited', 'localOnly'])
 const localLabel = (id: LocalCheckId) => t(`${oldIds.has(id) ? 'needtoken.environment' : 'needtoken.environmentV5'}.labels.${id}`)
-const localDetail = (detail: string) => t(`${oldDetails.has(detail) ? 'needtoken.environment' : 'needtoken.environmentV5'}.details.${detail}`)
-const totalChecks = computed(() => 18 + (measuredAt.value ? rtcIncluded.value ? 1 : 0 : includeWebRtc.value ? 1 : 0))
-const networkResults = computed(() => [storefront.value, exit.value, anthropic.value, ...(rtcIncluded.value ? [rtc.value] : [])].filter(Boolean))
-const completedCount = computed(() => localChecks.value.length + networkResults.value.length)
-const ringLength = 2 * Math.PI * 47
-const summary = computed(() => {
-  const rows = [...localChecks.value, ...networkResults.value]
-  return { ok: rows.filter(row => row?.status === 'ok').length, warning: rows.filter(row => row?.status === 'warning').length, unknown: rows.filter(row => row?.status === 'unknown').length }
+const adviceKeys = computed(() => {
+  const rows = Object.values(services.value), keys: string[] = []
+  if (localChecks.value.some(check => check.id === 'online' && check.status === 'warning')) keys.push('offline')
+  if (rows.some(row => row?.detail === 'timeout' || row?.detail === 'requestUnconfirmed')) keys.push('connection')
+  if (rows.some(row => row?.httpStatus === 403)) keys.push('restricted')
+  if (rows.some(row => row?.httpStatus === 429)) keys.push('rateLimit')
+  if (rows.some(row => (row?.httpStatus || 0) >= 500)) keys.push('upstream')
+  if (rows.some(row => row?.detail === 'opaqueResponse')) keys.push('opaque')
+  return keys
 })
-const report = computed(() => claudeNetworkReport({ exit: exit.value, anthropic: anthropic.value, rtc: rtc.value, cli: cli.value, measuredAt: measuredAt.value, local: localChecks.value, storefront: storefront.value }))
-
+const report = computed(() => claudeNetworkReport({ exit: exit.value, anthropic: services.value.anthropic || null, services: services.value, rtc: rtc.value, cli: cli.value, measuredAt: measuredAt.value, local: localChecks.value, storefront: storefront.value }))
 async function run() {
   if (running.value) return
-  const current = ++generation
-  const controller = typeof AbortController === 'function' ? new AbortController() : null
+  const current = ++generation, controller = typeof AbortController === 'function' ? new AbortController() : null
   active = controller; running.value = true; cancelled.value = false; copyMessage.value = ''
-  measuredAt.value = new Date().toISOString(); exit.value = null; anthropic.value = null; storefront.value = null
+  measuredAt.value = new Date().toISOString(); exit.value = null; services.value = {}; storefront.value = null
   rtcIncluded.value = includeWebRtc.value
   rtc.value = includeWebRtc.value ? null : { status: 'unknown', detail: 'notRequested', publicAddresses: [], localCount: 0, mdnsCount: 0 }
-  pending.value = new Set<NetworkCheckId>(['storefront', 'exit', 'anthropic', ...(includeWebRtc.value ? ['rtc' as const] : [])])
-  // Publish local results before scheduling any network request.
+  pending.value = new Set<NetworkCheckId>(['storefront', 'exit', ...CLAUDE_SERVICES, ...(rtcIncluded.value ? ['rtc' as const] : [])])
   localChecks.value = collectClaudeLocalChecks()
   try {
     await runClaudeNetworkChecks({ signal: controller?.signal, includeWebRtc: rtcIncluded.value, onResult: event => {
       if (disposed || generation !== current) return
       if (event.id === 'storefront') storefront.value = event.result
       else if (event.id === 'exit') exit.value = event.result
-      else if (event.id === 'anthropic') anthropic.value = event.result
-      else rtc.value = event.result
+      else if (event.id === 'rtc') rtc.value = event.result
+      else services.value = { ...services.value, [event.id]: event.result }
       const remaining = new Set(pending.value); remaining.delete(event.id); pending.value = remaining
     } })
-  } catch { /* Cancellation and inaccessible browser APIs remain individual unknown results. */ }
+  } catch { /* Cancelled runs keep completed observations. */ }
   finally { if (!disposed && generation === current) { running.value = false; pending.value = new Set(); active = null } }
 }
 function cancel() { generation++; active?.abort(); active = null; running.value = false; cancelled.value = true; pending.value = new Set() }
-
 async function copyReport() { try { await navigator.clipboard.writeText(report.value); copyMessage.value = 'copied' } catch { copyMessage.value = 'copyFailed' } }
 async function importCliReport(event: Event) {
   const input = event.target as HTMLInputElement, file = input.files?.[0], current = ++importGeneration
@@ -142,140 +126,158 @@ async function importCliReport(event: Event) {
     cli.value = parsed; importMessage.value = 'imported'
   } catch { if (!disposed && current === importGeneration) importMessage.value = 'invalidReport' }
 }
-async function loadRules() {
-  const current = ++rulesGeneration; rulesLoading.value = true; rulesFailed.value = false
-  try {
-    const categoryResponse = await postAPI.categories()
-    if (disposed || current !== rulesGeneration) return
-    if (!Array.isArray(categoryResponse.data.data)) throw new Error('invalid public categories')
-    const allowed = new Set(claudeRuleCategoryIds(categoryResponse.data.data))
-    if (!allowed.size) { rules.value = []; return }
-    const response = await postAPI.list({ type: 'blog', category_slug: 'claude-code-rules', page: 1, page_size: 5 })
-    if (disposed || current !== rulesGeneration) return
-    rules.value = Array.isArray(response.data.data) ? response.data.data.filter((row: any) => row && typeof row.slug === 'string' && row.type === 'blog' && allowed.has(Number(row.category_id))).slice(0, 5) : []
-  } catch { if (!disposed && current === rulesGeneration) rulesFailed.value = true }
-  finally { if (!disposed && current === rulesGeneration) rulesLoading.value = false }
-}
-onMounted(loadRules)
-onBeforeUnmount(() => { disposed = true; generation++; importGeneration++; rulesGeneration++; active?.abort() })
+onBeforeUnmount(() => { disposed = true; generation++; importGeneration++; active?.abort() })
 </script>
-
 <style scoped>
-.network-heading { max-width: 820px; margin-bottom: 30px; }
-.network-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-accent); font-size: 12px; letter-spacing: .06em; }
-.network-heading h1 { margin: 15px 0; font-size: clamp(28px, 4.2vw, 46px); font-weight: 750; letter-spacing: -.04em; line-height: 1.25; text-wrap: balance; }
-.network-heading > p { color: var(--ui-text-secondary); font-size: 14px; line-height: 1.9; }
-.network-anchors { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; }
-.network-anchors a { padding: 7px 12px; border: 1px solid var(--ui-border); border-radius: 999px; color: var(--ui-text-muted); font-size: 12px; }
-.network-anchors a:hover { color: var(--ui-accent); border-color: #2dd4a745; }
-.network-start { border: 1px solid #2dd4a733; border-radius: 20px; background: linear-gradient(115deg, #2dd4a709, transparent), var(--ui-bg-elevated); margin-bottom: 28px; padding: 23px; }
-.network-start-top { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between; }
-.network-start h2 { font-size: 17px; font-weight: 650; }
-.network-start-top p { margin-top: 6px; font-size: 12px; color: var(--ui-text-muted); line-height: 1.8; }
-.network-actions { display: flex; flex-wrap: wrap; gap: 9px; }
-.network-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 9px 14px; border: 1px solid transparent; border-radius: 10px; font-size: 12px; font-weight: 650; }
-.network-button.primary { background: var(--ui-accent); color: var(--ui-text-on-accent); }
-.network-button.secondary { background: var(--ui-bg-soft); border-color: var(--ui-border); color: var(--ui-text-secondary); }
-.network-button:disabled { cursor: default; opacity: .5; }
-.network-rtc-choice { display: flex; gap: 10px; align-items: flex-start; margin-top: 20px; padding-top: 17px; border-top: 1px solid var(--ui-border); font-size: 12px; color: var(--ui-text-secondary); }
-.network-rtc-choice input { margin-top: 4px; accent-color: var(--ui-accent); }
-.network-rtc-choice small { display: block; margin-top: 4px; font-size: 11px; color: var(--ui-text-muted); line-height: 1.7; }
-.network-disclosure { display: flex; align-items: flex-start; gap: 8px; margin-top: 14px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.8; }
-.network-disclosure svg { flex: none; margin-top: 3px; color: var(--ui-accent); }
-.network-summary { display: flex; flex-wrap: wrap; gap: 12px 22px; margin-top: 19px; font-size: 11px; }
-.network-summary > span { display: inline-flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); }
-.network-summary .review { color: #e5b969; }
-.network-dashboard { display: flex; align-items: center; gap: 27px; margin-top: 23px; padding-top: 23px; border-top: 1px solid var(--ui-border); }
-.network-progress { position: relative; width: 118px; height: 118px; flex: none; }
-.network-progress svg { width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 5; }
-.network-progress-track { stroke: #2dd4a714; }
-.network-progress-value { stroke: var(--ui-accent); stroke-linecap: round; transition: stroke-dashoffset 220ms ease; }
-.network-progress > div { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; }
-.network-progress strong { font-size: 26px; font-weight: 650; letter-spacing: -.04em; }
-.network-progress strong small { margin-left: 3px; font-size: 13px; color: var(--ui-text-muted); font-weight: 400; }
-.network-progress > div > span { color: var(--ui-text-muted); font-size: 10px; }
-.network-progress-copy { flex: 1; min-width: 0; }
-.network-progress-copy h3 { font-size: 15px; font-weight: 650; }
-.network-progress-copy > p { margin-top: 8px; font-size: 12px; color: var(--ui-text-muted); line-height: 1.85; }
-.network-progress-copy .network-summary { margin-top: 14px; }
-.network-progress-copy > .network-remaining { color: var(--ui-accent); font-size: 11px; }
-.network-disclosure a { color: var(--ui-accent); text-decoration: underline; text-underline-offset: 3px; }
-.network-local-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 18px; margin-bottom: 25px; scroll-margin-top: 88px; }
-.network-local-card { padding: 20px; }
-.network-local-card .network-panel-heading { gap: 8px; margin-bottom: 11px; }
-.network-local-card .network-panel-heading h2 { font-size: 14px; }
-.network-group-count { flex: none; color: var(--ui-text-muted); font-size: 10px; font-family: var(--nt-font-mono); }
-.network-group-intro { color: var(--ui-text-muted); font-size: 11px; line-height: 1.8; margin-bottom: 18px; }
-.network-check-list { display: grid; gap: 14px; }
-.network-check-list > li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
-.network-check-icon { flex: none; color: var(--ui-text-muted); margin-top: 3px; }
-.network-check-icon.is-ok, .network-check-state.is-ok { color: var(--ui-accent); }
-.network-check-icon.is-warning, .network-check-state.is-warning { color: #e5b969; }
-.network-check-list > li > div { flex: 1; min-width: 0; }
-.network-check-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.network-check-title h3 { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 550; color: var(--ui-text-secondary); min-width: 0; }
-.network-check-state { flex: none; font-size: 10px; color: var(--ui-text-muted); }
-.network-check-value { color: var(--ui-text-secondary); font-size: 11px; line-height: 1.7; overflow-wrap: anywhere; margin-top: 4px; }
-.network-local-card .network-check-list details { margin-top: 2px; }
-.network-local-card .network-check-list summary { display: inline-block; padding: 2px 0; font-size: 10px; color: var(--ui-text-muted); }
-.network-check-list details p { margin-top: 5px; color: var(--ui-text-muted); font-size: 10px; line-height: 1.8; }
-.network-health { border-top: 1px solid var(--ui-border); margin-top: 20px; padding-top: 18px; }
-.network-health .network-check-title { align-items: center; }
-.network-health > p { margin-top: 11px; font-size: 11px; color: var(--ui-text-secondary); line-height: 1.9; }
-.network-health > small { display: block; margin-top: 12px; font-size: 10px; color: var(--ui-text-muted); line-height: 1.8; }
-.network-health-time { display: inline-block; margin-top: 12px; margin-right: 10px; color: var(--ui-accent); font-size: 12px; font-family: var(--nt-font-mono); }
-.network-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 24px; align-items: start; }
-.network-main { display: grid; gap: 22px; min-width: 0; }
-.network-panel { min-width: 0; padding: 23px; border: 1px solid var(--ui-border); border-radius: 18px; background: color-mix(in srgb, var(--ui-bg-elevated) 88%, transparent); scroll-margin-top: 88px; }
-.network-panel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 17px; }
-.network-panel h2 { display: flex; align-items: center; gap: 9px; font-size: 16px; font-weight: 650; }
-.network-panel h2 > svg { flex: none; color: var(--ui-accent); }
-.network-status { display: inline-flex; flex: none; padding: 4px 8px; border: 1px solid var(--ui-border); border-radius: 999px; font-size: 10px; color: var(--ui-text-muted); }
-.network-status.is-ok { color: var(--ui-accent); border-color: #2dd4a733; background: #2dd4a709; }
-.network-status.is-warning { color: #e5b969; border-color: #e5b96940; background: #e5b9690a; }
-.network-exit-ip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px 15px; margin-bottom: 24px; }
-.network-exit-ip > span { flex-basis: 100%; color: var(--ui-text-muted); font-size: 11px; }
-.network-exit-ip > strong { font-family: var(--nt-font-mono); font-size: clamp(21px, 3vw, 30px); color: var(--ui-accent); overflow-wrap: anywhere; }
-.network-exit-ip small { color: var(--ui-text-muted); font-size: 10px; }
-.network-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.network-facts dt { color: var(--ui-text-muted); font-size: 11px; }
-.network-facts dd { margin-top: 5px; color: var(--ui-text-secondary); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
-.network-note { margin-top: 15px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.9; overflow-wrap: anywhere; }
-.network-timestamp { margin-top: 12px; color: var(--ui-text-muted); font-size: 10px; }
-.network-browser-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; scroll-margin-top: 88px; }
-.network-copy { color: var(--ui-text-secondary); font-size: 12px; line-height: 1.9; }
-.network-target { margin: 0 0 12px; font-family: var(--nt-font-mono); font-size: 13px; color: var(--ui-accent); }
-.network-metric { margin-top: 15px; font-family: var(--nt-font-mono); font-size: 27px; color: var(--ui-text-primary); }
-.network-metric small { font-size: 12px; color: var(--ui-text-muted); margin-left: 5px; }
-.network-addresses { display: grid; gap: 6px; margin-top: 15px; }
-.network-addresses code { color: var(--ui-text-secondary); font-size: 12px; overflow-wrap: anywhere; }
-.network-local { grid-column: 1 / -1; }
-.network-cli-steps { display: grid; gap: 14px; list-style: decimal; margin: 18px 0 20px; padding-left: 18px; color: var(--ui-text-secondary); font-size: 12px; line-height: 1.9; }
-.network-cli-steps a, .network-link, .network-rule-article a { display: inline-flex; align-items: center; gap: 4px; margin: 5px 9px 0 0; color: var(--ui-accent); font-size: 11px; }
-.network-command { display: block; max-width: 100%; margin-top: 9px; padding: 12px; border: 1px solid var(--ui-border); border-radius: 9px; background: var(--ui-bg-page); color: var(--ui-text-primary); font-size: 11px; overflow-wrap: anywhere; white-space: normal; }
-.network-import { display: inline-flex; align-items: center; gap: 8px; padding: 10px 13px; border: 1px solid var(--ui-border-strong); border-radius: 10px; font-size: 12px; color: var(--ui-text-secondary); cursor: pointer; }
-.network-import input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.network-import:has(input:focus-visible) { outline: 2px solid var(--ui-accent); outline-offset: 4px; }
-.network-import-label { margin: 17px 0; padding: 10px 12px; border: 1px solid #e5b96933; border-radius: 8px; color: #e5b969; font-size: 11px; line-height: 1.8; }
-.network-review-note { display: flex; gap: 7px; margin-top: 15px; color: #e5b969; font-size: 11px; line-height: 1.8; }
-.network-review-note svg { flex: none; margin-top: 3px; }
-.network-panel details { margin-top: 17px; }
-.network-panel summary { padding: 4px 0; color: var(--ui-accent); font-size: 12px; cursor: pointer; }
-.network-panel textarea { width: 100%; height: 190px; resize: vertical; margin-top: 12px; padding: 12px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-bg-page); color: var(--ui-text-secondary); font-family: var(--nt-font-mono); font-size: 10px; line-height: 1.8; }
-.network-rules { display: grid; gap: 20px; min-width: 0; scroll-margin-top: 88px; }
-.network-rule-list { display: grid; gap: 18px; margin-top: 22px; }
-.network-rule-list > li { display: flex; gap: 9px; align-items: flex-start; color: var(--ui-text-secondary); font-size: 12px; line-height: 1.85; }
-.network-rule-list > li > span { display: grid; flex: none; place-items: center; width: 18px; height: 18px; margin-top: 3px; border: 1px solid #2dd4a72b; border-radius: 50%; color: var(--ui-accent); }
-.network-operator h2 { margin-bottom: 16px; }
-.network-rule-article + .network-rule-article { border-top: 1px solid var(--ui-border); padding-top: 16px; margin-top: 16px; }
-.network-rule-article h3 { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
-.network-rule-article p { margin-top: 7px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.85; overflow-wrap: anywhere; }
-.network-empty { color: var(--ui-text-muted); font-size: 11px; line-height: 1.8; }
-.network-empty button { margin-top: 8px; color: var(--ui-accent); }
-.network-spin { animation: network-spin 1s linear infinite; }
-@keyframes network-spin { to { transform: rotate(360deg); } }
-@media (max-width: 1000px) { .network-layout { grid-template-columns: minmax(0, 1fr); } .network-rules { grid-template-columns: repeat(2, minmax(0, 1fr)); } .network-local-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); } .network-local-card:last-child { grid-column: 1 / -1; } }
-@media (max-width: 640px) { .network-local-groups { grid-template-columns: minmax(0, 1fr); } .network-dashboard { gap: 17px; align-items: flex-start; } .network-progress { width: 93px; height: 93px; } .network-progress strong { font-size: 22px; } .network-progress > div > span { font-size: 9px; } .network-progress-copy h3 { font-size: 13px; } .network-progress-copy > p { font-size: 11px; } .network-summary { gap: 8px 14px; } }
-@media (max-width: 600px) { .network-start, .network-panel { padding: 19px; } .network-browser-grid, .network-rules { grid-template-columns: minmax(0, 1fr); } .network-facts { gap: 15px 12px; } .network-heading > p { font-size: 13px; } .network-panel-heading h2 { font-size: 15px; } .network-start-top { gap: 16px; } .network-actions { width: 100%; } .network-actions > .primary { flex: 1; } }
-@media (prefers-reduced-motion: reduce) { .network-spin { animation: none; } .network-progress-value { transition: none; } }
+.nt-claude-network { width:100%; max-width:1120px; margin:0 auto; padding:32px 24px 64px; }
+.tool-capability { display:inline-flex; min-height:24px; align-items:center; margin-bottom:12px; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-heading { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.network-heading h1 { font-size:clamp(28px,3vw,36px); line-height:1.2; font-weight:500; }
+.network-heading p { max-width:56ch; margin-top:12px; color:var(--ui-text-secondary); font-size:14px; line-height:1.7; }
+.network-actions { display:flex; flex:none; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px 16px; }
+.network-status-link { display:inline-flex; min-height:44px; align-items:center; gap:4px; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-status-link:hover { color:var(--ui-text-primary); }
+.network-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:12px 16px; border:1px solid transparent; border-radius:8px; font-size:13px; line-height:20px; font-weight:500; transition:color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),background-color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),border-color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),transform var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-button.primary { background:var(--ui-accent); color:var(--ui-text-on-accent); }
+.network-button.secondary { background:var(--ui-bg-soft); border-color:var(--ui-border); color:var(--ui-text-primary); }
+.network-button:hover:not(:disabled) { background:var(--ui-bg-muted); color:var(--ui-text-primary); }
+.network-button.primary:hover:not(:disabled) { background:var(--ui-accent-hover); color:var(--ui-text-on-accent); }
+.network-button:disabled { cursor:wait; opacity:.6; }
+.network-options { display:flex; flex-wrap:wrap; align-items:center; gap:12px 24px; margin-top:20px; }
+.network-options label { display:inline-flex; flex:none; align-items:center; gap:8px; color:var(--ui-text-secondary); font-size:13px; min-height:32px; }
+.network-options input { accent-color:var(--ui-accent); }
+.network-options p { max-width:64ch; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-run-state { min-height:20px; margin:12px 0 20px; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-primary { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr); gap:24px; align-items:start; }
+.network-panel { min-width:0; padding:24px; border:1px solid var(--ui-border); border-radius:16px; background:var(--ui-bg-elevated); }
+.network-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; }
+.network-panel-heading h2,.network-advice h2 { font-size:16px; line-height:24px; font-weight:500; }
+.network-panel-heading h2 { display:flex; align-items:center; gap:8px; }
+.network-meta { margin-left:auto; color:var(--ui-text-muted); font-size:12px; line-height:20px; font-variant-numeric:tabular-nums; }
+.network-service-list { display:grid; }
+.network-service-list>li { display:grid; grid-template-columns:minmax(0,1fr) minmax(100px,auto) 64px; gap:8px 16px; padding:16px 0; border-top:1px solid var(--ui-border); align-items:center; }
+.network-service-list>li:first-child { padding-top:0; border-top:0; }
+.network-service-name { display:grid; grid-template-columns:20px minmax(0,1fr); gap:4px 8px; min-width:0; }
+.network-service-name strong,.network-service-name>span:not(.network-service-icon) { grid-column:2; }
+.network-service-icon { display:grid; grid-row:1/3; place-items:center; align-self:center; color:var(--ui-text-muted); transition:color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),transform var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-service-list>li:hover .network-service-icon { color:var(--ui-text-primary); transform:translateY(-1px); }
+.network-service-name strong { font-size:14px; line-height:20px; font-weight:500; }
+.network-service-name>span { font-size:12px; line-height:20px; color:var(--ui-text-muted); overflow-wrap:anywhere; }
+.network-service-state { display:inline-flex; align-items:center; gap:8px; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-service-state.is-observed { color:var(--ui-text-secondary); }
+.network-service-state.is-readable { color:var(--ui-accent); }
+.network-service-state.is-warning { color:#e5b969; }
+.network-latency { justify-self:end; color:var(--ui-text-secondary); font-family:var(--nt-font-mono); font-size:12px; line-height:20px; font-variant-numeric:tabular-nums; }
+.network-service-detail { grid-column:1/-1; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-service-detail summary, .network-scope summary { display:flex; width:fit-content; max-width:100%; align-items:center; gap:8px; cursor:pointer; list-style:none; }
+.network-service-detail summary::-webkit-details-marker, .network-scope summary::-webkit-details-marker { display:none; }
+.network-service-detail summary > span { color:var(--ui-text-secondary); }
+.network-service-detail[open] summary > svg, .network-scope[open] summary > svg { transform:rotate(180deg); }
+.network-service-detail p { margin-top:8px; }
+.network-scope { margin-top:20px; padding-top:16px; border-top:1px solid var(--ui-border); color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-scope p { margin-top:8px; }
+.network-exit { align-self:stretch; }
+.network-exit-ip { margin-bottom:24px; color:var(--ui-text-primary); font-family:var(--nt-font-mono); font-size:clamp(20px,2.5vw,28px); line-height:1.4; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.network-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 16px; }
+.network-facts dt { color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-facts dd { margin-top:4px; color:var(--ui-text-secondary); font-size:13px; line-height:20px; overflow-wrap:anywhere; }
+.network-note { margin-top:16px; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-copy { color:var(--ui-text-secondary); font-size:13px; line-height:20px; }
+.network-advice { margin:24px 0; padding:0 4px; }
+.network-advice ul { display:grid; gap:8px; margin-top:12px; padding-left:16px; list-style:disc; color:var(--ui-text-secondary); font-size:13px; line-height:20px; }
+.network-rtc { margin-top:24px; }
+.network-addresses { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:16px; font-size:13px; }
+.network-details { margin-top:16px; border:1px solid var(--ui-border); border-radius:12px; background:var(--ui-bg-elevated); }
+.network-details summary { display:flex; align-items:center; gap:12px; padding:20px 24px; color:var(--ui-text-secondary); font-size:14px; line-height:20px; cursor:pointer; list-style:none; }
+.network-details summary::-webkit-details-marker { display:none; }
+.network-details summary>svg:last-child { flex:none; margin-left:auto; color:var(--ui-text-muted); transition:transform var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-details[open] summary>svg:last-child { transform:rotate(180deg); }
+.network-details-content { padding:0 24px 24px; }
+.network-local-facts { display:grid; }
+.network-local-facts>div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.4fr); gap:16px; padding:12px 0; border-bottom:1px solid var(--ui-border); font-size:13px; line-height:20px; }
+.network-local-facts dt { color:var(--ui-text-muted); }
+.network-local-facts dd { color:var(--ui-text-secondary); text-align:right; overflow-wrap:anywhere; }
+.network-cli-steps { display:grid; gap:16px; margin-top:20px; padding-left:20px; list-style:decimal; color:var(--ui-text-secondary); font-size:13px; line-height:20px; }
+.network-cli-steps a { display:inline-flex; align-items:center; gap:4px; margin-left:12px; color:var(--ui-accent); }
+.network-command { display:block; padding:16px; margin-top:12px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-bg-page); color:var(--ui-text-secondary); font-size:12px; line-height:20px; overflow-wrap:anywhere; }
+.network-import { position:relative; display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:12px 16px; margin-top:20px; border:1px solid var(--ui-border); border-radius:8px; color:var(--ui-text-secondary); font-size:13px; line-height:20px; cursor:pointer; }
+.network-import input { position:absolute; inset:0; width:100%; opacity:0; cursor:pointer; }
+#network-terminal .network-facts { margin-top:24px; }
+.network-review-note { margin-top:16px; color:#e5b969; font-size:13px; line-height:20px; }
+.network-review-note>svg { display:inline; vertical-align:middle; margin-right:4px; }
+.network-import-label { margin:20px 0; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-report .network-button { margin-top:16px; }
+.network-report textarea { display:block; width:100%; min-height:240px; margin-top:16px; padding:16px; border:1px solid var(--ui-border); border-radius:8px; background:var(--ui-bg-page); color:var(--ui-text-secondary); font-family:var(--nt-font-mono); font-size:12px; line-height:20px; resize:vertical; }
+.nt-claude-network :is(button,a,input,summary,textarea):focus-visible,.network-import:focus-within { outline:2px solid var(--ui-accent); outline-offset:4px; }
+@keyframes network-spin { to { transform:rotate(360deg); } }
+.network-spin { animation:network-spin 1s linear infinite; }
+
+.tool-capability { gap:8px; }
+.tool-capability svg { transition:color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),transform var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-heading:hover .tool-capability svg { color:var(--ui-accent); transform:translateY(-1px); }
+.network-button:active:not(:disabled) { transform:translateY(1px); }
+.network-button>svg { flex:none; transition:transform var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-button:hover:not(:disabled)>svg:not(.network-spin),.network-button:focus-visible>svg:not(.network-spin) { transform:translateX(2px); }
+.network-button:disabled { cursor:not-allowed; }
+.network-button[aria-busy="true"] { cursor:progress; }
+.network-options input { width:16px; height:16px; }
+.network-run-state.is-running { color:var(--ui-text-secondary); }
+.network-status-dot { width:6px; height:6px; flex:none; border-radius:50%; background:currentColor; }
+.network-progress { display:block; width:100%; height:3px; margin:-8px 0 20px; border:0; border-radius:2px; appearance:none; background:var(--ui-bg-soft); accent-color:var(--ui-accent); }
+.network-progress::-webkit-progress-bar { background:var(--ui-bg-soft); border-radius:2px; }
+.network-progress::-webkit-progress-value { background:var(--ui-accent); border-radius:2px; }
+.network-progress::-moz-progress-bar { background:var(--ui-accent); border-radius:2px; }
+.network-observed-note { display:flex; align-items:flex-start; gap:8px; margin-top:8px; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
+.network-observed-note>svg { flex:none; margin-top:3px; }
+.network-skeleton-line { display:block; width:80%; height:12px; min-height:12px; border-radius:4px; background:var(--ui-bg-soft); animation:network-pending 1.4s ease-in-out infinite; }
+.latency-skeleton { width:40px; }
+.exit-skeleton { width:72%; height:28px; }
+.network-facts .network-skeleton-line { margin-top:8px; }
+.network-detail-symbol { flex:none; color:var(--ui-text-muted); transition:color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-details>summary { border-radius:11px; transition:color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),background-color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-details>summary:hover,.network-details>summary:focus-visible { color:var(--ui-text-primary); background:var(--ui-bg-soft); }
+.network-details>summary:hover .network-detail-symbol,.network-details>summary:focus-visible .network-detail-symbol { color:var(--ui-text-primary); }
+.network-details[open]>.network-details-content { animation:network-details-in var(--nt-motion-enter,180ms) var(--nt-motion-ease,ease-out); }
+.network-service-detail summary>svg,.network-scope summary>svg { flex:none; transition:transform var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-service-detail summary:hover,.network-scope summary:hover { color:var(--ui-text-primary); }
+.nt-claude-network a { transition:color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.nt-claude-network a:hover { color:var(--ui-accent); }
+.nt-claude-network a>svg { flex:none; transition:transform var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.nt-claude-network a:hover>svg,.nt-claude-network a:focus-visible>svg { transform:translate(1px,-1px); }
+.network-import { transition:color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),border-color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out),background-color var(--nt-motion-fast,120ms) var(--nt-motion-ease,ease-out); }
+.network-import:hover { color:var(--ui-text-primary); border-color:var(--ui-border-strong); background:var(--ui-bg-soft); }
+.network-rtc .network-panel-heading { margin-bottom:16px; }
+@keyframes network-pending { 50% { opacity:.45; } }
+@keyframes network-details-in { from { opacity:.5; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+@media(max-width:900px) { .network-primary { grid-template-columns:1fr; } }
+@media(max-width:640px) {
+ .nt-claude-network { padding:24px 20px 48px; }
+ .network-heading { align-items:flex-start; flex-direction:column; gap:20px; }
+ .network-actions { width:100%; justify-content:space-between; gap:8px; }
+ .network-actions .primary { order:-2; flex:1; }
+ .network-actions .secondary { order:-1; }
+ .network-actions .network-button { padding-inline:12px; }
+ .network-heading h1 { font-size:28px; }
+ .network-panel { padding:20px; }
+ .network-primary { gap:16px; }
+ .network-service-list>li { grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; }
+ .network-service-state { justify-self:end; max-width:140px; text-align:right; }
+ .network-latency { grid-column:2; grid-row:2; }
+ .network-service-detail { grid-column:1; grid-row:2; }
+ .network-details summary { padding:20px; }
+ .network-details-content { padding:0 20px 20px; }
+ .network-local-facts>div { grid-template-columns:1fr; gap:4px; }
+ .network-local-facts dd { text-align:left; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .nt-claude-network :deep(*) { transition:none !important; animation:none !important; }
+  .network-button:active:not(:disabled),
+  .network-button:hover:not(:disabled)>svg:not(.network-spin),
+  .network-button:focus-visible>svg:not(.network-spin),
+  .network-heading:hover .tool-capability svg,
+  .network-service-list>li:hover .network-service-icon,
+  .nt-claude-network a:hover>svg,
+  .nt-claude-network a:focus-visible>svg { transform:none; }
+}
 </style>

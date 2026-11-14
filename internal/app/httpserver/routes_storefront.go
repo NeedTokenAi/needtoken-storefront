@@ -4,6 +4,7 @@ import (
 	"github.com/dujiao-next/internal/app/container"
 	"github.com/dujiao-next/internal/app/httpserver/middleware"
 	affiliatebootstrap "github.com/dujiao-next/internal/bootstrap/affiliate"
+	diagnosticsbootstrap "github.com/dujiao-next/internal/bootstrap/diagnostics"
 	"github.com/dujiao-next/internal/config"
 	affiliatetransport "github.com/dujiao-next/internal/modules/affiliate/transport/http"
 	apicredentialtransport "github.com/dujiao-next/internal/modules/apicredential/transport/http"
@@ -13,6 +14,7 @@ import (
 	categoryhttp "github.com/dujiao-next/internal/modules/catalog/category/transport/http"
 	producthttp "github.com/dujiao-next/internal/modules/catalog/product/transport/http"
 	contenttransport "github.com/dujiao-next/internal/modules/content/transport/http"
+	diagnosticstransport "github.com/dujiao-next/internal/modules/diagnostics/transport/http"
 	giftcardtransport "github.com/dujiao-next/internal/modules/giftcard/transport/http"
 	userauthtransport "github.com/dujiao-next/internal/modules/identity/userauth/transport/http"
 	memberleveltransport "github.com/dujiao-next/internal/modules/memberlevel/transport/http"
@@ -81,6 +83,18 @@ func registerStorefrontRoutes(
 		captchatransport.RegisterPublicRoutes(public, captchatransport.NewPublicHandler(c.CaptchaService))
 		affiliatetransport.RegisterPublicRoutes(public, affiliateHandler)
 		memberleveltransport.RegisterPublicRoutes(public, publicMemberLevelHandler)
+		accountTools := public.Group("/tools")
+		accountTools.Use(diagnosticstransport.NoStore(), middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
+			Prefix: "public_account_diagnostic", WindowSeconds: 60, MaxRequests: 5, BlockSeconds: 60,
+		}, middleware.KeyByIP))
+		diagnosticstransport.RegisterPublicRoutes(accountTools, diagnosticsbootstrap.NewHandler())
+		resetTools := public.Group("/tools")
+		resetTools.Use(diagnosticstransport.NoStore(), middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
+			Prefix: "public_codex_resets", WindowSeconds: 60, MaxRequests: 30, BlockSeconds: 60,
+		}, middleware.KeyByIP))
+		diagnosticstransport.RegisterResetRoutes(resetTools, diagnosticsbootstrap.NewResetHandler())
+		// Public provider status shares only the read limit, never credential checks.
+		diagnosticstransport.RegisterServiceStatusRoutes(resetTools, diagnosticsbootstrap.NewServiceStatusHandler())
 	}
 
 	// 游客接口

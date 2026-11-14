@@ -1,30 +1,19 @@
 <template>
-  <div class="payment-method-strip">
-    <div v-if="methods.length" class="payment-methods" role="list" :aria-label="t('needtoken.paymentMarks.label')">
+  <div v-if="methods.length" class="payment-method-strip" :class="{ 'is-compact': compact, 'is-mobile-inline': mobileInline, 'is-dense': methods.length > 2 }">
+    <div class="payment-methods" role="list" :aria-label="t('needtoken.paymentMarks.label')">
+      <span class="payment-label" aria-hidden="true">{{ t('needtoken.paymentMarks.label') }}</span>
       <span v-for="method in methods" :key="method" class="payment-method" role="listitem">
-        <svg v-if="method === 'alipay'" viewBox="0 0 24 24" class="payment-logo alipay" aria-hidden="true">
-          <rect width="24" height="24" rx="6" fill="currentColor" />
-          <path d="M7 7h10M12 4.5v5M7.5 10h8.3c-1 4.6-4.3 7.1-8.8 8M9 12.2c2 2.6 5.1 4.4 9.5 5.8" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" />
-        </svg>
-        <svg v-else-if="method === 'wechat'" viewBox="0 0 24 24" class="payment-logo wechat" aria-hidden="true">
-          <path d="M2 9a8 7 0 0 1 16-1.3A7.6 7.6 0 0 0 8.6 16l-3 1 .6-3A6.5 6.5 0 0 1 2 9Z" fill="currentColor" />
-          <path d="M10 14a6 5.3 0 1 1 10.1 3.8l.4 2.3-2.6-.8A6.5 6.5 0 0 1 10 14Z" fill="currentColor" />
-          <circle cx="7" cy="8" r="1" fill="white" /><circle cx="12" cy="8" r="1" fill="white" />
-          <circle cx="14" cy="13.5" r=".85" fill="white" /><circle cx="18" cy="13.5" r=".85" fill="white" />
-        </svg>
-        <svg v-else-if="method === 'unionpay'" viewBox="0 0 30 22" class="payment-logo unionpay" aria-hidden="true">
-          <path d="M4 2h9L9 20H0Z" fill="#dc354b" /><path d="M13 2h9l-4 18H9Z" fill="#2479b0" /><path d="M22 2h8l-4 18h-8Z" fill="#1e9272" />
-          <path d="m8 7-1.2 5.4c-.6 2.4 3.4 2.4 4 0L12 7m4-0.1h2c3.1 0 2.4 4.5-.5 4.5H15m1-4.5-2.4 9" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" />
-        </svg>
+        <img v-if="brandAssets[method]" :src="brandAssets[method]" class="payment-logo" :class="method" alt="" width="21" height="21" />
         <Coins v-else-if="method === 'crypto'" class="payment-logo crypto" :stroke-width="1.7" aria-hidden="true" />
-        <CreditCard v-else-if="method === 'card'" class="payment-logo card" :stroke-width="1.7" aria-hidden="true" />
-        <svg v-else viewBox="0 0 24 24" class="payment-logo paypal" aria-hidden="true">
-          <path d="m7 3-3 18h4l1-6h3c10 0 12-12 2-12Z" fill="#87baff" /><path d="m10 8-2 13h4l1-5h2c7 0 9-8 2-8Z" fill="#4d92e2" />
-        </svg>
-        <span :translate="method === 'paypal' ? 'no' : undefined">{{ t(`needtoken.paymentMarks.${method}`) }}</span>
+        <CreditCard v-else class="payment-logo card" :stroke-width="1.7" aria-hidden="true" />
+        <span class="payment-method-label" :translate="method === 'paypal' || method === 'usdt' ? 'no' : undefined">{{ t(`needtoken.paymentMarks.${method}`) }}</span>
+      </span>
+      <span v-if="networks.length" class="payment-networks" role="listitem" translate="no">
+        <span class="network-logos" aria-hidden="true"><img v-for="network in networks" :key="network" :src="network === 'bep20' ? '/payment/bnb.svg' : '/payment/tron.svg'" alt="" width="18" height="18" /></span>
+        <span class="network-label">{{ networks.map(network => network.toUpperCase()).join(' · ') }}</span>
       </span>
     </div>
-    <p>{{ t('needtoken.paymentMarks.checkoutNote') }}</p>
+    <p v-if="!compact">{{ t('needtoken.paymentMarks.checkoutNote') }}</p>
   </div>
 </template>
 
@@ -33,23 +22,46 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Coins, CreditCard } from 'lucide-vue-next'
 import { useAppStore } from '../../../stores/app'
-import { paymentMarks } from '../lib/paymentMarks'
+import { paymentMarks, paymentNetworks, type PaymentMark } from '../lib/paymentMarks'
 
+defineProps<{ compact?: boolean; mobileInline?: boolean }>()
 const { t } = useI18n()
 const appStore = useAppStore()
-const methods = computed(() => appStore.config?.wallet_only_payment ? [] : paymentMarks(appStore.config?.payment_channels))
+const channels = computed(() => appStore.config?.wallet_only_payment ? [] : appStore.config?.payment_channels)
+const methods = computed(() => paymentMarks(channels.value))
+const networks = computed(() => paymentNetworks(channels.value))
+const brandAssets: Partial<Record<PaymentMark, string>> = {
+  alipay: '/payment/alipay.svg', wechat: '/payment/wechat.svg',
+  usdt: '/payment/usdt.svg', paypal: '/payment/paypal.svg',
+}
 </script>
 
 <style scoped>
-.payment-method-strip { margin-top: 20px; text-align: center; }
-.payment-methods { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 18px; }
-.payment-method { display: inline-flex; align-items: center; gap: 7px; color: var(--ui-text-secondary); font-size: 11px; line-height: 1.5; }
-.payment-logo { width: 21px; height: 21px; flex: none; }
-.alipay { color: #429afa; }
-.wechat { color: #42d27b; }
-.unionpay { width: 27px; }
-.crypto { color: #e8c273; }
+.payment-method-strip { text-align: center; }
+.payment-methods { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 16px; }
+.payment-label { color: var(--ui-text-muted); font-size: 12px; font-weight: 400; }
+.payment-method, .payment-networks { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-text-secondary); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.payment-logo { display: block; width: 20px; height: 20px; flex: none; }
+.payment-logo.alipay { filter: invert(39%) sepia(98%) saturate(2818%) hue-rotate(201deg) brightness(101%) contrast(101%); }
+.payment-logo.wechat { filter: invert(68%) sepia(65%) saturate(480%) hue-rotate(87deg) brightness(94%) contrast(100%); }
+.payment-logo.paypal { filter: invert(66%) sepia(47%) saturate(1459%) hue-rotate(186deg) brightness(107%) contrast(100%); }
+.crypto { color: #a8bcbd; }
 .card { color: #b8c5d9; }
-.payment-method-strip p { margin-top: 9px; color: var(--ui-text-muted); font-size: 10px; line-height: 1.6; }
-@media (max-width: 640px) { .payment-method-strip { margin-top: 16px; } .payment-methods { gap: 9px 14px; } }
+.network-logos { display: inline-flex; align-items: center; padding-right: 1px; }
+.network-logos img { display: block; width: 18px; height: 18px; }
+.network-logos img + img { margin-left: -4px; border: 1px solid var(--ui-bg-page, #0d1217); border-radius: 50%; }
+.payment-method-strip p { margin-top: 8px; color: var(--ui-text-muted); font-size: 11px; line-height: 20px; }
+.is-compact .payment-methods { justify-content: flex-end; gap: 8px 16px; }
+@media (max-width: 640px) { .payment-methods, .is-compact .payment-methods { justify-content: flex-start; gap: 8px 12px; } .payment-method, .payment-networks { font-size: 11px; } .payment-label { font-size: 11px; } .payment-logo { width: 19px; height: 19px; } }
+@media (max-width: 640px) {
+  .is-mobile-inline .payment-label { display: none; }
+  .is-mobile-inline .payment-methods { flex-wrap: nowrap; gap: 8px; }
+  .is-mobile-inline .payment-method, .is-mobile-inline .payment-networks { gap: 6px; }
+  .is-mobile-inline .payment-logo { width: 18px; height: 18px; }
+  .is-mobile-inline.is-dense .payment-methods { gap: 6px; }
+  .is-mobile-inline.is-dense .payment-method-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+}
+@media (max-width: 359px) {
+  .is-mobile-inline .network-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+}
 </style>

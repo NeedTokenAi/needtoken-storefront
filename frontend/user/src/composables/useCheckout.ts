@@ -16,6 +16,7 @@ import { refreshCartStockSnapshots, cartItemPurchaseLimit as itemPurchaseLimit, 
 import { getImageUrl } from '../utils/image'
 import { getAffiliateCode, getAffiliateVisitorKey } from '../utils/affiliate'
 import { saveGuestOrderAuth } from '../utils/guestOrderAuth'
+import { checkoutSourceItems, resolveCheckoutSource } from '../utils/checkoutSource'
 import ImageCaptcha from '../components/captcha/ImageCaptcha.vue'
 import TurnstileCaptcha from '../components/captcha/TurnstileCaptcha.vue'
 import { useLocalized, useProductLabels } from './useProduct'
@@ -45,7 +46,7 @@ interface ManualFormProduct {
  * 结算页共享逻辑（classic + vault 双模板共用）。
  * 完整保留原 views/Checkout.vue 的行为，仅抽离为 composable。
  */
-export function useCheckout() {
+export function useCheckout(options: { source?: 'buynow' } = {}) {
   const router = useRouter()
   const route = useRoute()
   const cartStore = useCartStore()
@@ -59,17 +60,15 @@ export function useCheckout() {
   const { getLocalizedText, siteCurrency, formatPrice } = useLocalized()
   const { resolveWholesalePriceAmount } = useProductLabels()
 
-  const isBuyNowMode = computed(() => route.query.mode === 'buynow')
-  const cartItems = computed<CartItem[]>(() => {
-    if (isBuyNowMode.value) {
-      return buyNowStore.item ? [buyNowStore.item] : []
-    }
-    return cartStore.items
-  })
+  const source = computed(() => resolveCheckoutSource(route.query.mode, options.source))
+  const isBuyNowMode = computed(() => source.value === 'buynow')
+  const cartItems = computed<CartItem[]>(() => checkoutSourceItems(source.value, cartStore.items, buyNowStore.item))
   const totalItems = computed(() => cartItems.value.reduce((sum, item) => sum + item.quantity, 0))
   const couponCode = ref('')
   const normalizedCouponCode = computed(() => couponCode.value.trim())
   const submitting = ref(false)
+  const paymentTarget = ref('')
+  const paymentNavigationFailed = ref(false)
   const error = ref('')
   const preview = ref<any>(null)
   const previewLoading = ref(false)
@@ -804,7 +803,35 @@ export function useCheckout() {
     }
   }
 
+  // Order creation has already completed before this navigation helper is called.
+  // Retrying a failed route load must never create a second order.
+  const openCreatedPayment = async () => {
+    if (!paymentTarget.value) return
+    paymentNavigationFailed.value = false
+    try {
+      const failure = await router.push(paymentTarget.value)
+      if (failure) throw new Error('payment route not opened')
+    } catch {
+      paymentNavigationFailed.value = true
+      error.value = t('checkout.paymentNavigationFailed')
+    }
+  }
+  const retryPaymentNavigation = () => {
+    if (submitting.value || !paymentTarget.value || !paymentNavigationFailed.value) return
+    submitting.value = true
+    // A failed lazy import can remain cached for this document. Reload the saved,
+    // internally generated payment route without submitting the order again.
+    try {
+      window.location.assign(paymentTarget.value)
+      paymentNavigationFailed.value = false
+    } catch {
+      submitting.value = false
+      error.value = t('checkout.paymentNavigationFailed')
+    }
+  }
+
   const handleSubmit = async () => {
+    if (submitting.value || paymentTarget.value) return
     submitAttempted.value = true
     error.value = ''
     previewError.value = ''
@@ -862,7 +889,8 @@ export function useCheckout() {
       const query = userAuthStore.isAuthenticated
         ? `order_no=${encodeURIComponent(responseData.order_no)}`
         : `guest=1&order_no=${encodeURIComponent(responseData.order_no)}`
-      router.push(`/pay?${query}`)
+      paymentTarget.value = `/pay?${query}`
+      await openCreatedPayment()
     } catch (err: any) {
       error.value = err.message || t('checkout.errors.submitFailed')
       if (guestCaptchaEnabled.value && captchaProvider.value === 'image') {
@@ -1190,6 +1218,9 @@ export function useCheckout() {
     formatChannelFixedFee,
     // submit
     submitting,
+    paymentTarget,
+    paymentNavigationFailed,
+    retryPaymentNavigation,
     canSubmit,
     handleSubmit,
   }

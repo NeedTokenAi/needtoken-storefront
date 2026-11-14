@@ -96,13 +96,14 @@ export async function probeStorefrontConnection(options: {
   const started = now()
   const deadline = new Promise<ConnectionDiagnostic>((resolve, reject) => {
     onAbort = () => {
-      controller.abort()
       reject(abortedError())
+      controller.abort()
     }
     signal?.addEventListener('abort', onAbort, { once: true })
     timer = setTimeout(() => {
-      controller.abort()
+      // Win the race before fetch or response-body readers reject on abort.
       resolve({ status: 'unknown', detail: 'timeout' })
+      controller.abort()
     }, Math.max(1, timeoutMs))
   })
   const request = (async (): Promise<ConnectionDiagnostic> => {

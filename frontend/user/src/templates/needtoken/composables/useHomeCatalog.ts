@@ -13,7 +13,9 @@ import {
 export function useHomeCatalog() {
   const categories = ref<PublicCategory[]>([])
   const products = ref<ServiceProduct[]>([])
-  const loading = ref(true)
+  const categoriesLoading = ref(true)
+  const productsLoading = ref(false)
+  const loading = computed(() => categoriesLoading.value || productsLoading.value)
   const error = ref(false)
   const kind = ref<ServiceKind>('recharge')
   const selectedId = ref(0)
@@ -30,27 +32,30 @@ export function useHomeCatalog() {
       selectedId.value = 0
       return
     }
-    const child = defaultServiceChild({ ...current, selected: current.root })
+    const child = defaultServiceChild({ ...current, selected: current.root }) || current.categories[0]
     selectedId.value = child?.id || current.root.id
   }
 
   const loadProducts = async () => {
+    // A service tab can change before the first category request returns.
+    // Keep the catalogue skeleton until that request can resolve its scope.
+    if (categoriesLoading.value) return
     const ticket = ++generation
     const current = scope.value
     products.value = []
     error.value = false
+    productsLoading.value = true
     if (!current?.root || !selectedId.value) {
-      loading.value = false
+      productsLoading.value = false
       return
     }
     const selected = selectedId.value === current.root.id
       ? current.root
       : current.categories.find(row => row.id === selectedId.value) || null
     if (!selected) {
-      loading.value = false
+      productsLoading.value = false
       return
     }
-    loading.value = true
     try {
       const response = await productAPI.list({ category_id: selected.id, page: 1, page_size: 12 })
       if (disposed || ticket !== generation) return
@@ -60,13 +65,16 @@ export function useHomeCatalog() {
     } catch {
       if (!disposed && ticket === generation) error.value = true
     } finally {
-      if (!disposed && ticket === generation) loading.value = false
+      if (!disposed && ticket === generation) productsLoading.value = false
     }
   }
 
   const load = async () => {
     const ticket = ++categoryGeneration
-    loading.value = true
+    generation += 1
+    categoriesLoading.value = true
+    productsLoading.value = false
+    products.value = []
     error.value = false
     try {
       const response = await categoryAPI.list()
@@ -74,12 +82,14 @@ export function useHomeCatalog() {
       if (!Array.isArray(response.data.data)) throw new Error('invalid public category response')
       categories.value = response.data.data
       applyDefaultSelection()
+      categoriesLoading.value = false
       await loadProducts()
     } catch {
       if (!disposed && ticket === categoryGeneration) {
         error.value = true
-        loading.value = false
       }
+    } finally {
+      if (!disposed && ticket === categoryGeneration) categoriesLoading.value = false
     }
   }
 
@@ -91,7 +101,7 @@ export function useHomeCatalog() {
   }
 
   const selectCategory = (id: number) => {
-    if (!scope.value?.root) return
+    if (categoriesLoading.value || !scope.value?.root) return
     const allowed = id === scope.value.root.id || scope.value.categories.some(row => row.id === id)
     if (!allowed || selectedId.value === id) return
     selectedId.value = id
@@ -111,6 +121,7 @@ export function useHomeCatalog() {
     childCategories,
     selectedId,
     products,
+    categoriesLoading,
     loading,
     error,
     setKind,
