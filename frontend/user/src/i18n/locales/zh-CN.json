@@ -1,4 +1,19 @@
 {
+  "subscriptionAuthorization": {
+    "title": "订阅办理授权",
+    "description": "订单 {order} 的授权仅用于本次指定账号与套餐",
+    "emailCode": "订单邮箱验证码",
+    "sendCode": "发送验证码",
+    "codeSent": "验证码已发送",
+    "credential": "短期账号 Token 或 Session JSON",
+    "consent": "我同意为此订单核验并办理一个订阅周期，并在购买后关闭自动续费。账号 Token 只在短期授权内使用",
+    "submit": "提交本次授权",
+    "submitting": "正在提交",
+    "submitted": "授权已提交，等待目标账号核验；此状态不表示订阅已到账",
+    "failed": "本次未确认完成，请检查原订单和授权状态后重试",
+    "invalidCredential": "请填写有效的短期 Token 或包含 accessToken 的 Session JSON",
+    "expired": "本次授权已过期，请重新验证"
+  },
   "common": {
     "siteName": "Dujiao-Next",
     "loading": "加载中...",

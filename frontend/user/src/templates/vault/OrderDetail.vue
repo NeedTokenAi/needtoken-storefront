@@ -46,6 +46,8 @@
         </div>
       </div>
 
+      <SubscriptionAuthorizationPanel :order="order" />
+
       <VaultOrderBody
         :order="order"
         variant="user"
@@ -57,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import SubscriptionAuthorizationPanel from "../../components/SubscriptionAuthorizationPanel.vue"
 import { useI18n } from 'vue-i18n'
 import { AlertCircle } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'

@@ -61,6 +61,7 @@ func AutoMigrate() error {
 		&auditlogdomain.AdminLoginLog{},
 		&emailverificationdomain.Code{},
 		&orderdomain.Order{},
+		&orderdomain.SubscriptionAuthorization{},
 		&orderdomain.OrderItem{},
 		&orderdomain.OrderRefundRecord{},
 		&orderriskdomain.LockKey{},
