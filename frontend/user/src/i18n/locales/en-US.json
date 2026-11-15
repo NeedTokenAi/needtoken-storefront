@@ -3015,10 +3015,10 @@
       "refreshAction": "Refresh",
       "compact": {
         "scope": {
-          "gpt": "ChatGPT product services",
+          "gpt": "Official ChatGPT group · excludes Codex",
           "claude": "claude.ai web and app"
         },
-        "componentCount": "{count} services",
+        "componentCount": "{count} monitored",
         "activeIncident": "Active incident",
         "recentIncident": "Recent incident",
         "currentSummary": "Current status",
@@ -3057,7 +3057,9 @@
         "partialHistory": "Latest 50 official records at most. Gray is uncovered, not uptime.",
         "noScopedHistory": "No linked product incidents found. Gray does not mean healthy.",
         "historyUnavailable": "Incident history is unavailable. Gray means unknown.",
-        "recentRecords": "Recent incidents"
+        "recentRecords": "Recent incidents",
+        "allUpdates": "All {count} updates",
+        "otherIncidents": "{count} other active incidents"
       }
     },
     "radar": {
@@ -3122,25 +3124,25 @@
       "refreshUpdates": "Refresh updates",
       "updatesError": "Store updates are unavailable. Retry or open an original source above.",
       "noSiteUpdates": "No new store announcements",
-      "guideTitle": "Three types of reset",
+      "guideTitle": "How resets work",
       "guide": {
         "banked": {
-          "title": "Banked: redeem when needed",
-          "body": "Saved to your account with specific coverage and expiration. Receiving it does not refresh usage."
+          "title": "Reset credits · redeem manually",
+          "body": "Credits are saved to your account. Redeem one to restore the covered limits; check its scope and expiry first."
         },
         "automatic": {
-          "title": "Automatic: applied directly",
-          "body": "Applies to the accounts and limits selected for an offer. It is not saved as a reset credit."
+          "title": "Usage resets · applied automatically",
+          "body": "An offer restores the limits it covers without a credit to redeem. Check your usage page to confirm delivery."
         },
         "paid": {
-          "title": "Paid: applies immediately",
-          "body": "Offered to selected eligible personal Plus / Pro accounts. Check your account for availability and coverage."
+          "title": "Paid resets · offered per account",
+          "body": "Eligible accounts may purchase a reset on the official usage page. That page determines availability, price and coverage."
         }
       },
       "resetGuide": "Official reset guide",
       "paidGuide": "Official paid-reset guide",
-      "usageTitle": "When does usage refresh next?",
-      "usageBody": "Check your account usage page. Promotional resets may change the next refresh time; announcement times cannot determine it.",
+      "usageTitle": "When is the next reset?",
+      "usageBody": "Check the countdown on your account usage page. Historical intervals and announcement times cannot predict when your own limits refresh.",
       "openUsage": "Open official usage settings"
     },
     "codexCheck": {
@@ -3219,7 +3221,17 @@
         "account_not_found": "This workspace was not found in the current Session; check the account again",
         "rate_limited": "Too many checks; try again shortly",
         "timeout": "The official API timed out; check your connection and retry"
-      }
+      },
+      "heroTitle": "Ready to subscribe?",
+      "heroIntro": "Paste your Session to check your subscription and Codex usage, without placing an order. ChatGPT determines purchase and upgrade eligibility.",
+      "waitingPaste": "Waiting for Session",
+      "openStep": "Open",
+      "copyStep": "Select and copy the page, then paste it here. Sign in to ChatGPT in the same browser first.",
+      "copySessionLink": "Copy official Session link",
+      "pasteAction": "Paste Session",
+      "manualPaste": "Paste manually",
+      "manualHint": "Clipboard access is unavailable. Paste your Session into the input field.",
+      "privacyShort": "Read-only subscription and usage checks. Your account is not changed."
     },
     "environmentV6": {
       "title": "Claude network check",
@@ -3291,20 +3303,17 @@
       "providerStatus": "Official service status"
     },
     "radarLive": {
-      "scope": "Public announcement tracker",
       "description": "Follow public Codex reset and reset-credit records, with links to their original sources.",
       "refresh": "Refresh records",
       "retry": "Try again",
       "unavailableTitle": "Records are temporarily unavailable",
-      "unavailable": "The announcement source is unavailable. Try again, or check the data source linked below.",
+      "unavailable": "The record source is temporarily unavailable. Please try again later.",
       "expired": "The last successful fetch is over 12 hours old, so those records are no longer displayed. Try fetching a newer snapshot.",
       "lastSuccess": "Last successful fetch by this site: {date}",
       "stale": "Snapshot has not updated",
-      "received": "Source snapshot received",
-      "polling": "Page refreshes every minute · paused in background",
       "staleDetail": "The update failed. Showing the snapshot successfully fetched at {date}; newer announcements may exist.",
       "latestRecord": "Latest record",
-      "elapsed": "Time since the latest record",
+      "elapsed": "Time since the last reset",
       "elapsedValue": "{days} days {hours} hours {minutes} minutes",
       "units": {
         "days": "d",
@@ -3323,7 +3332,7 @@
       "viewSource": "View source",
       "noSourceLink": "No verifiable post provided",
       "noRecords": "No records to display",
-      "noRecordsDetail": "The source snapshot was fetched successfully, but contains no eligible records. Check again later.",
+      "noRecordsDetail": "There are no reset records to display yet.",
       "loadedCount": "Records loaded",
       "fetchedAt": "Successfully fetched by this site",
       "notAvailable": "—",
@@ -3337,10 +3346,11 @@
         "banked": "Reset credits"
       },
       "noFilteredRecords": "No records of this type",
-      "moreHistory": "Showing {count} recent records fetched by this site. The source has more history.",
-      "historyCoverage": "These are the records fetched by this site, not a complete history.",
+      "moreHistory": "The latest {count} records are collected here. Earlier records exist at the source.",
+      "historyCoverage": "Based on collected records. Check your official usage page for personal limits.",
       "historyUnavailable": "Posts and observations will appear here when a source snapshot is available.",
-      "siteUpdatesDetail": "Related articles published by this site, separate from the source records above"
+      "siteUpdatesDetail": "Related articles published by this site, separate from the source records above",
+      "showMore": "Show {count} more"
     },
     "apiConnect": {
       "eyebrow": "NeedToken API",
@@ -3413,10 +3423,10 @@
           "kind": "Desktop management and local routing",
           "get": "Official download",
           "description": "Manage upstream providers in CC Switch and enable local routing for the apps that need it.",
-          "step1": "Install CC Switch from its official Releases page and select an app to manage, such as Codex.",
-          "step2": "Add a custom provider, choose an API format matching the upstream, and enter its Base URL, key and model.",
-          "step3": "Enable local routing when protocol conversion is needed, then verify a model request in your client.",
-          "note": "The Base URL here is an upstream prefix for local routing, without /v1. Direct configuration differs by app; follow the relevant official guide to avoid duplicating /v1."
+          "step1": "Install CC Switch, choose “Import to CC Switch” in the API console’s key list, and select your target app.",
+          "step2": "Review the endpoint, API format, and model in CC Switch, then confirm import. If no import option is available, add the parameters below manually.",
+          "step3": "Select the NeedToken provider in your client and test a request. Enable the app’s local routing if the client needs protocol conversion.",
+          "note": "The manual example below uses OpenAI Chat Completions with /v1 in the Base URL. Follow the app’s documentation for other formats. Import links require your key and are generated in the signed-in API console; this storefront does not read or store it."
         },
         "sub2api": {
           "summary": "Self-host a multi-upstream gateway",
@@ -3448,7 +3458,13 @@
           "step3": "Choose the needtoken model, reload the configuration, and verify one request in the assistant.",
           "note": "The download is a template to merge with your existing configuration. It uses openai-completions; agent tool calling requires support from both the model and upstream protocol."
         }
-      }
+      },
+      "reference": "Layout reference · CC Switch official",
+      "configure": "Configure",
+      "configureTool": "Configure {name}",
+      "quickConfigTitle": "Import directly from your key list",
+      "quickConfigHint": "Sign in to the API console and choose “Import to CC Switch” in the API key list. If it is unavailable, copy the parameters below and add the provider manually.",
+      "quickConfig": "Quick setup"
     },
     "purchaseFlow": {
       "backToPlans": "Back to plans",
@@ -3459,6 +3475,29 @@
       "openingPayment": "Opening the payment page. Check your order status to confirm payment",
       "paymentRouteFailed": "The payment page could not open. Your order is saved; continue to payment without placing another order",
       "continuePayment": "Continue to payment"
+    },
+    "radarStats": {
+      "title": "Reset statistics and calendar",
+      "averageRemaining": "Until the historical average interval",
+      "averagePassed": "Past the historical average interval",
+      "averageEvery": "Every {days} days on average",
+      "averageNote": "Based on collected usage resets; not a forecast.",
+      "elapsedDays": "{days} days since the last reset",
+      "noRegular": "No usage resets collected yet",
+      "recorded": "Collected records",
+      "times": "times",
+      "typeCounts": "{regular} usage resets, {banked} reset credits",
+      "regularCount": "Usage resets {count}",
+      "bankedCount": "Reset credits {count}",
+      "recent30": "Last 30 days",
+      "previous30": "{count} collected in the previous 30 days",
+      "calendar": "Reset calendar",
+      "calendarIntro": "Past year · hover or use arrow keys for details",
+      "calendarKeyboard": "Daily reset records; use arrow keys to change dates",
+      "noRecord": "No record collected",
+      "outsideCoverage": "Outside collected record coverage",
+      "coverage": "Based on {count} collected records.",
+      "partialCoverage": "Based on {count} recent records; history is incomplete."
     }
   }
 }

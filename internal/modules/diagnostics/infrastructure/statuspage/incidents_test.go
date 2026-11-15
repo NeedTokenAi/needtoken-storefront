@@ -55,9 +55,10 @@ func TestClaudeIncidentPreservesExactComponentAssociationsAndUpdateText(t *testi
 }
 
 func TestHistoryReadsOnlyFixedPublicEndpointsAndCapsRecentRecords(t *testing.T) {
-	var records []string
+	var records, nativeRecords []string
 	for index := 0; index < 55; index++ {
 		records = append(records, fmt.Sprintf(`{"id":"incident-%d","name":"Official incident","status":"resolved","impact":"minor","created_at":"2026-11-01T00:00:00Z","resolved_at":"2026-11-01T01:00:00Z"}`, index))
+		nativeRecords = append(nativeRecords, fmt.Sprintf(`{"id":"incident-%d","name":"Official incident","status":"resolved","published_at":"2026-11-01T00:00:00Z","updates":[]}`, index))
 	}
 	var requested []string
 	client := NewClient(&http.Client{Transport: transportFunc(func(request *http.Request) (*http.Response, error) {
@@ -67,6 +68,9 @@ func TestHistoryReadsOnlyFixedPublicEndpointsAndCapsRecentRecords(t *testing.T) 
 		}
 		if deadline, ok := request.Context().Deadline(); !ok || time.Until(deadline) > requestTimeout {
 			t.Fatal("history source is not bounded by timeout")
+		}
+		if request.URL.Host == "status.openai.com" {
+			return upstreamResponse(request, 200, `{"incidents":[`+strings.Join(nativeRecords, ",")+`]}`), nil
 		}
 		return upstreamResponse(request, 200, `{"incidents":[`+strings.Join(records, ",")+`]}`), nil
 	})})
@@ -80,7 +84,7 @@ func TestHistoryReadsOnlyFixedPublicEndpointsAndCapsRecentRecords(t *testing.T) 
 			t.Fatal("recent event history claimed a measured uptime window")
 		}
 	}
-	if len(requested) != 2 || requested[0] != "https://status.openai.com/api/v2/incidents.json" || requested[1] != "https://status.claude.com/api/v2/incidents.json" {
+	if len(requested) != 2 || requested[0] != openAINativeURL+"/incidents" || requested[1] != "https://status.claude.com/api/v2/incidents.json" {
 		t.Fatalf("history endpoints changed: %v", requested)
 	}
 	if _, err := client.FetchHistory(context.Background(), "other"); !errors.Is(err, diagnosticscontract.ErrServiceStatusProvider) || len(requested) != 2 {

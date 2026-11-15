@@ -32,6 +32,7 @@ export interface PublicStatusIncident {
   url: string | null
   components: PublicIncidentComponent[]
   latestUpdate: PublicIncidentUpdate | null
+  updates: PublicIncidentUpdate[]
 }
 
 export interface PublicIncidentComponent {
@@ -125,20 +126,21 @@ const incidentComponents = (value: unknown): PublicIncidentComponent[] => {
 
 const parseIncident = (row: unknown, sourceUrl: string): PublicStatusIncident | null => {
   const item = record(row)
-  const name = shortText(item?.name, 160)
+  const name = shortText(item?.name, 500)
   if (!item || !name) return null
   const id = shortText(item.id, 80)
   const updates = Array.isArray(item.incident_updates) ? item.incident_updates.flatMap(row => {
     const update = record(row)
     if (!update) return []
     return [{
-      body: shortText(update.body, 1200),
+      body: typeof update.body === 'string' ? update.body.replace(/\r\n?/g, '\n').trim().slice(0, 16_384) : '',
       status: shortText(update.status, 40) || 'unknown',
       updatedAt: timestamp(update.display_at) ?? timestamp(update.updated_at) ?? timestamp(update.created_at),
       components: incidentComponents(update.affected_components),
     }]
   }) : []
-  const latest = updates.slice().sort((a, b) => (Date.parse(b.updatedAt || '') || 0) - (Date.parse(a.updatedAt || '') || 0))[0]
+  updates.sort((a, b) => (Date.parse(b.updatedAt || '') || 0) - (Date.parse(a.updatedAt || '') || 0))
+  const latest = updates.find(update => update.body) ?? updates[0]
   const components = incidentComponents(item.components)
   for (const component of updates.flatMap(update => update.components)) {
     if (!components.some(known => component.id ? component.id === known.id : component.name === known.name)) components.push(component)
@@ -154,6 +156,7 @@ const parseIncident = (row: unknown, sourceUrl: string): PublicStatusIncident | 
     url: incidentUrl(item.url ?? item.shortlink, sourceUrl),
     components,
     latestUpdate: latest ? { body: latest.body, status: latest.status, updatedAt: latest.updatedAt } : null,
+    updates: updates.map(({ body, status, updatedAt }) => ({ body, status, updatedAt })),
   }
 }
 
@@ -246,10 +249,11 @@ export function matchesTerms(value: string, terms: string[]): boolean {
 
 export type PublicStatusService = 'gpt' | 'claude'
 
-// OpenAI's compatibility API currently flattens product groups and repeats names
+// Compatibility snapshots may flatten product groups and repeat names
 // such as "Login". These IDs were verified against the ChatGPT group on the
 // official status page and /api/v2/components.json on 2026-11-14. Match both ID
-// and name; renamed or unfamiliar components stay outside this scoped summary.
+// and name only when native group metadata is absent. Renamed or unfamiliar
+// components stay outside the compatibility fallback.
 // https://status.openai.com/ (ChatGPT group, excluding Codex in ChatGPT Desktop)
 const CHATGPT_COMPONENTS: Record<string, string> = {
   '01JMXBNJXGV1T5GT2M9XA83XNG': 'Conversations',
@@ -279,6 +283,8 @@ export function serviceStatusComponents(components: PublicStatusComponent[], ser
     if (component.isGroup || /codex/i.test(component.name)) return false
     if (component.groupId && groupIds.has(component.groupId)) return true
     if (component.id && childIds.has(component.id)) return true
+    // Real product boundaries take precedence over the compatibility fallback.
+    if (groups.length || component.groupId) return false
     if (/^chatgpt(?:$|[\s:/-])/i.test(component.name.trim())) return true
     return !!component.id && CHATGPT_COMPONENTS[component.id] === component.name
   })
@@ -288,14 +294,31 @@ export function serviceStatusComponents(components: PublicStatusComponent[], ser
 export function serviceStatusIncidents(incidents: PublicStatusIncident[], components: PublicStatusComponent[], service: PublicStatusService): PublicStatusIncident[] {
   const scoped = serviceStatusComponents(components, service)
   const scopeIds = new Set(scoped.flatMap(component => component.id ? [component.id] : []))
+  const nativeGroups = service === 'gpt' && components.some(component => component.isGroup && /^chatgpt$/i.test(component.name.trim()))
   if (service === 'gpt') for (const group of components.filter(component => component.isGroup && /^chatgpt$/i.test(component.name.trim()))) if (group.id) scopeIds.add(group.id)
   return incidents.filter(incident => incident.components.some(component => {
     if (component.id && scopeIds.has(component.id)) return true
+    if (nativeGroups) return false
     return serviceStatusComponents([{ ...component, status: 'unknown' }], service).length > 0
   })).sort((a, b) => {
     const activeDifference = Number(incidentActive(b)) - Number(incidentActive(a))
     return activeDifference || incidentTime(b) - incidentTime(a)
   })
+}
+
+/** A later optional history fetch may be cached older than the current summary. */
+export function mergePublicStatusIncidents(current: PublicStatusIncident[], history: PublicStatusIncident[]): PublicStatusIncident[] {
+  const key = (incident: PublicStatusIncident) => incident.id || incident.url || incident.name
+  const currentKeys = new Set(current.map(key))
+  const records = new Map<string, PublicStatusIncident>()
+  for (const row of [...history, ...current]) {
+    // The current summary lists unresolved incidents. A cached historical
+    // "active" record absent there cannot prove an impact continuing today.
+    const incident = incidentActive(row) && !currentKeys.has(key(row)) ? { ...row, status: 'unknown' } : row
+    const known = records.get(key(incident))
+    if (!known || incidentTime(incident) >= incidentTime(known)) records.set(key(incident), incident)
+  }
+  return [...records.values()]
 }
 
 const incidentTime = (incident: PublicStatusIncident): number => {

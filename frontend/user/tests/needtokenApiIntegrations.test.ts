@@ -24,12 +24,20 @@ test('OpenClaw template merges an explicit provider without embedding an API key
 })
 
 test('gateway prefixes avoid duplicated /v1 and preserve deployment path prefixes', () => {
-  for (const id of ['cloudflare', 'sub2api', 'ccswitch'] as const) assert.equal(integrationEndpoint(id, endpoint), 'https://api.needtoken.example/gateway')
+  for (const id of ['cloudflare', 'sub2api'] as const) assert.equal(integrationEndpoint(id, endpoint), 'https://api.needtoken.example/gateway')
   assert.equal(integrationEndpoint('opencode', endpoint), endpoint)
   assert.equal(integrationEndpoint('openclaw', endpoint), endpoint)
   const config = JSON.parse(integrationTemplate('cloudflare', endpoint, '')!)
   assert.deepEqual(config, { name: 'NeedToken', slug: 'needtoken', base_url: 'https://api.needtoken.example/gateway' })
   assert.equal(integrationEndpoint('cloudflare', 'https://api.example/gateway/v1/'), 'https://api.example/gateway')
+})
+
+test('CC Switch OpenAI-compatible setup preserves the SDK /v1 endpoint', () => {
+  assert.equal(integrationEndpoint('ccswitch', endpoint), endpoint)
+  const template = integrationTemplate('ccswitch', endpoint, model)!
+  assert.ok(template.includes(`Base URL: ${endpoint}\n`))
+  assert.ok(template.includes('API Format: OpenAI Chat Completions'))
+  assert.ok(template.includes('API Key: <YOUR_NEEDTOKEN_API_KEY>'))
 })
 
 test('model input cannot produce malformed config or shell fragments', () => {

@@ -26,7 +26,7 @@
         </div>
         <div v-if="categoriesLoading" class="library-filters library-filters--loading" aria-hidden="true"><i /><i /></div>
         <div v-else-if="scope?.root && childCategories.length" class="library-filters" role="group" :aria-label="t('needtoken.homeLibrary.categories')">
-          <button v-for="category in childCategories" :key="category.id" type="button" :class="{ active: selectedId === category.id }" :aria-pressed="selectedId === category.id" @click="selectCategory(category.id)">{{ getLocalizedText(category.name) }}</button>
+          <button v-for="category in childCategories" :key="category.id" type="button" :class="{ active: selectedId === category.id }" :aria-pressed="selectedId === category.id" @click="selectCategory(category.id)" @pointerenter="prefetchCategory(category.id)" @focus="prefetchCategory(category.id)">{{ getLocalizedText(category.name) }}</button>
         </div>
         <div class="price-rail" :class="{ 'is-ready': !loading && !error && products.length }" :aria-busy="loading">
           <template v-if="loading">
@@ -35,7 +35,7 @@
           <p v-else-if="error" class="price-rail-state" role="alert">{{ t('needtoken.homeLibrary.loadError') }} <button type="button" @click="reload">{{ t('needtoken.common.retry') }}</button></p>
           <p v-else-if="!products.length" class="price-rail-state" role="status">{{ t('needtoken.homeLibrary.empty') }}</p>
           <template v-else>
-            <HomePriceCard v-for="product in products" :key="product.id" :product="product" :kind="kind" />
+            <HomePriceCard v-for="product in products" :key="serviceCardKey(product)" :product="product" :kind="kind" />
           </template>
         </div>
 
@@ -49,7 +49,6 @@
       </div>
     </section>
 
-    <NeedtokenDeferredRegion :estimated-height="385" :mobile-estimated-height="630">
     <section class="home-container purchase-section" aria-labelledby="purchase-title" @mouseenter="hoverPaused = true" @mouseleave="hoverPaused = false" @focusin="focusPaused = true" @focusout="onFlowFocusOut">
       <div class="section-heading">
         <p class="section-eyebrow">{{ t('needtoken.homeServices.steps.eyebrow') }}</p>
@@ -88,9 +87,7 @@
         </RouterLink>
       </div>
     </section>
-    </NeedtokenDeferredRegion>
 
-    <NeedtokenDeferredRegion :estimated-height="360" :mobile-estimated-height="500">
     <section class="home-container information-section" aria-labelledby="questions-title">
       <div class="questions-intro">
         <p class="section-eyebrow">{{ t('needtoken.homeServices.faq.eyebrow') }}</p>
@@ -110,7 +107,6 @@
         </details>
       </div>
     </section>
-    </NeedtokenDeferredRegion>
   </div>
 </template>
 
@@ -127,11 +123,11 @@ import { useHomeCatalog } from './composables/useHomeCatalog'
 import GhostFibersBackground from './components/GhostFibersBackground.vue'
 import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
-import NeedtokenDeferredRegion from './components/NeedtokenDeferredRegion.vue'
+import { serviceCardKey } from './lib/serviceCatalog'
 
 const { t } = useI18n()
 const { getLocalizedText } = useLocalized()
-const { kind, scope, childCategories, selectedId, products, categoriesLoading, loading, error, setKind, selectCategory, reload } = useHomeCatalog()
+const { kind, scope, childCategories, selectedId, products, categoriesLoading, loading, error, setKind, selectCategory, prefetchCategory, reload } = useHomeCatalog()
 const sloganParts = computed(() => t('needtoken.homeLibrary.title').split(/[、,]/).map(part => part.trim()).filter(Boolean))
 usePageSeo({
   title: () => t('needtoken.homeServices.seoTitle'),

@@ -5,20 +5,28 @@
       <a :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer">{{ t('needtoken.apiConnect.getKey') }}<ArrowUpRight :size="16" aria-hidden="true" /></a>
     </header>
 
+    <div class="connect-toolbar">
     <div class="scenario-tabs" role="tablist" :aria-label="t('needtoken.apiConnect.scenariosLabel')">
       <button v-for="(item, index) in scenarios" :id="`api-scenario-${item.id}`" :key="item.id" :data-api-scenario="item.id" type="button" role="tab" :aria-selected="scenario === item.id" aria-controls="api-scenario-panel" :tabindex="scenario === item.id ? 0 : -1" @click="selectScenario(item.id)" @keydown="onScenarioKey($event, index)">
-        <component :is="item.icon" :size="18" :stroke-width="1.5" aria-hidden="true" /><span>{{ t(`needtoken.apiConnect.scenarios.${item.id}.title`) }}<small>{{ t(`needtoken.apiConnect.scenarios.${item.id}.caption`) }}</small></span>
+        <component :is="item.icon" :size="17" :stroke-width="1.5" aria-hidden="true" /><span>{{ t(`needtoken.apiConnect.scenarios.${item.id}.title`) }}</span>
       </button>
+    </div>
+    <a class="connect-reference" :href="CC_SWITCH_REFERENCE_URL" target="_blank" rel="noopener noreferrer">{{ t('needtoken.apiConnect.reference') }}<ArrowUpRight :size="13" aria-hidden="true" /></a>
     </div>
 
     <div id="api-scenario-panel" class="integration-workspace" role="tabpanel" :aria-labelledby="`api-scenario-${scenario}`">
-      <div class="integration-options" role="group" :aria-label="t('needtoken.apiConnect.chooseTool')">
-        <button v-for="tool in scenarioTools" :key="tool.id" :data-api-tool="tool.id" type="button" :aria-pressed="selected.id === tool.id" @click="selectedId = tool.id">
-          <span><strong translate="no">{{ tool.name }}</strong><small>{{ t(`needtoken.apiConnect.tools.${tool.id}.summary`) }}</small></span><ChevronRight :size="16" aria-hidden="true" />
-        </button>
-      </div>
+      <ul class="integration-options" :aria-label="t('needtoken.apiConnect.chooseTool')">
+        <li v-for="tool in scenarioTools" :key="tool.id" :class="{ 'is-selected': selected.id === tool.id }">
+          <span class="integration-icon" aria-hidden="true"><component :is="toolIcons[tool.id]" :size="22" :stroke-width="1.5" /></span>
+          <div class="integration-summary">
+            <a :href="tool.get || tool.docs" target="_blank" rel="noopener noreferrer"><strong translate="no">{{ tool.name }}</strong><ArrowUpRight :size="13" aria-hidden="true" /></a>
+            <p>{{ t(`needtoken.apiConnect.tools.${tool.id}.summary`) }}</p>
+          </div>
+          <button :data-api-tool="tool.id" type="button" :aria-pressed="selected.id === tool.id" aria-controls="api-integration-detail" :aria-label="t('needtoken.apiConnect.configureTool', { name: tool.name })" @click="selectedId = tool.id"><Settings2 :size="15" aria-hidden="true" /><span>{{ t('needtoken.apiConnect.configure') }}</span></button>
+        </li>
+      </ul>
 
-      <article class="integration-detail" :aria-label="selected.name">
+      <article id="api-integration-detail" class="integration-detail" :aria-label="selected.name">
         <header class="integration-heading">
           <div><p>{{ t(`needtoken.apiConnect.tools.${selected.id}.kind`) }}</p><h3 translate="no">{{ selected.name }}</h3></div>
           <div class="integration-links">
@@ -27,6 +35,10 @@
           </div>
         </header>
         <p class="integration-description">{{ t(`needtoken.apiConnect.tools.${selected.id}.description`) }}</p>
+        <div v-if="selected.id === 'ccswitch'" class="quick-config">
+          <div><strong>{{ t('needtoken.apiConnect.quickConfigTitle') }}</strong><p>{{ t('needtoken.apiConnect.quickConfigHint') }}</p></div>
+          <a :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer" data-api-quick-config><Zap :size="15" aria-hidden="true" />{{ t('needtoken.apiConnect.quickConfig') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
+        </div>
         <ol class="integration-steps">
           <li v-for="step in 3" :key="step"><span aria-hidden="true">{{ step }}</span><p>{{ t(`needtoken.apiConnect.tools.${selected.id}.step${step}`) }}</p></li>
         </ol>
@@ -55,9 +67,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowUpRight, Bot, Check, ChevronRight, Cloud, Code2, Copy, Download, Network } from 'lucide-vue-next'
+import { ArrowUpRight, Bot, Check, Cloud, Code2, Copy, Download, Network, Server, Settings2, Zap } from 'lucide-vue-next'
 import { API_BASE_URL, CONSOLE_URL, DEFAULT_MODELS } from '../config'
-import { API_INTEGRATIONS, integrationEndpoint, integrationModel, integrationTemplate, type IntegrationId, type IntegrationScenario } from '../lib/apiIntegrations'
+import { API_INTEGRATIONS, CC_SWITCH_REFERENCE_URL, integrationEndpoint, integrationModel, integrationTemplate, type IntegrationId, type IntegrationScenario } from '../lib/apiIntegrations'
 import CodeBlock from './CodeBlock.vue'
 
 const { t } = useI18n()
@@ -67,6 +79,7 @@ const scenarios = [
   { id: 'cloud', icon: Cloud },
   { id: 'agent', icon: Bot },
 ] as const
+const toolIcons = { opencode: Code2, ccswitch: Network, sub2api: Server, cloudflare: Cloud, openclaw: Bot }
 const scenario = ref<IntegrationScenario>('coding')
 const selectedId = ref<IntegrationId>('opencode')
 const model = ref<string>(DEFAULT_MODELS[0])
@@ -124,22 +137,30 @@ onUnmounted(() => { disposed = true; if (copyTimer) clearTimeout(copyTimer) })
 .connect-heading h2 { margin-top: 12px; font-size: 32px; line-height: 1.3; font-weight: 500; letter-spacing: -.02em; }
 .connect-intro { margin-top: 12px; color: var(--ui-text-secondary); font-size: 14px; line-height: 1.8; }
 .connect-heading > a { display: inline-flex; align-items: center; gap: 8px; flex: none; min-height: 40px; color: var(--ui-accent); font-size: 13px; }
-.scenario-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 32px; padding: 8px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-soft); }
-.scenario-tabs button { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; min-height: 72px; padding: 12px; border: 1px solid transparent; border-radius: 10px; color: var(--ui-text-secondary); text-align: left; font-size: 14px; transition: color 160ms, background 160ms, border-color 160ms; }
+.connect-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.scenario-tabs { display: inline-flex; gap: 4px; max-width: 100%; padding: 4px; border: 1px solid var(--ui-border); border-radius: 13px; background: var(--ui-bg-soft); }
+.scenario-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; min-height: 40px; padding: 8px 16px; border: 1px solid transparent; border-radius: 9px; color: var(--ui-text-secondary); white-space: nowrap; font-size: 14px; transition: color 160ms, background 160ms, border-color 160ms; }
 .scenario-tabs button > svg { color: var(--ui-text-muted); flex: none; }
-.scenario-tabs button small { display: block; margin-top: 4px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.4; }
 .scenario-tabs button:hover { color: var(--ui-text-primary); }
 .scenario-tabs button[aria-selected=true] { color: var(--ui-text-primary); border-color: var(--ui-border-strong); background: var(--ui-bg-elevated); }
 .scenario-tabs button[aria-selected=true] > svg { color: var(--ui-accent); }
-.integration-workspace { display: grid; grid-template-columns: 228px minmax(0, 1fr); gap: 32px; margin-top: 28px; }
-.integration-options { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.integration-options button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; min-height: 88px; padding: 16px; border: 1px solid var(--ui-border); border-radius: 12px; color: var(--ui-text-secondary); text-align: left; transition: color 160ms, background 160ms, border-color 160ms; }
-.integration-options strong { display: block; font-size: 14px; font-weight: 500; }
-.integration-options small { display: block; margin-top: 8px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.6; }
-.integration-options svg { flex: none; color: var(--ui-text-muted); }
-.integration-options button:hover { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
-.integration-options button[aria-pressed=true] { border-color: var(--ui-border-strong); background: var(--ui-bg-elevated); color: var(--ui-text-primary); }
-.integration-options button[aria-pressed=true] > svg { color: var(--ui-accent); }
+.connect-reference { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; color: var(--ui-text-muted); font-size: 12px; }
+.connect-reference:hover { color: var(--ui-accent); }
+.integration-workspace { display: grid; gap: 20px; margin-top: 20px; }
+.integration-options { display: grid; gap: 10px; min-width: 0; padding: 0; list-style: none; }
+.integration-options li { display: flex; align-items: center; gap: 16px; min-width: 0; min-height: 84px; padding: 16px 20px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); transition: background 160ms, border-color 160ms; }
+.integration-options li.is-selected { border-color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border)); background: color-mix(in srgb, var(--ui-accent) 5%, var(--ui-bg-elevated)); }
+.integration-icon { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 1px solid var(--ui-border); border-radius: 12px; color: var(--ui-text-secondary); background: var(--ui-bg-soft); }
+.integration-options li.is-selected .integration-icon { color: var(--ui-accent); }
+.integration-summary { flex: 1; min-width: 0; }
+.integration-summary > a { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 24px; color: var(--ui-text-primary); }
+.integration-summary > a:hover { color: var(--ui-accent); }
+.integration-summary strong { font-size: 15px; font-weight: 500; }
+.integration-summary > a svg { flex: none; color: var(--ui-text-muted); }
+.integration-summary > p { margin-top: 4px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.6; }
+.integration-options button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; min-height: 36px; padding: 6px 12px; border: 1px solid var(--ui-border); border-radius: 9px; color: var(--ui-text-secondary); font-size: 12px; transition: color 160ms, background 160ms, border-color 160ms; }
+.integration-options button:hover { color: var(--ui-accent); background: var(--ui-bg-soft); border-color: var(--ui-border-strong); }
+.integration-options button[aria-pressed=true] { color: var(--ui-accent); border-color: color-mix(in srgb, var(--ui-accent) 35%, var(--ui-border)); }
 .integration-detail { min-width: 0; padding: 28px; border: 1px solid var(--ui-border); border-radius: 20px; background: var(--ui-bg-elevated); }
 .integration-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .integration-heading > div:first-child > p { color: var(--ui-text-muted); font-size: 12px; }
@@ -147,6 +168,11 @@ onUnmounted(() => { disposed = true; if (copyTimer) clearTimeout(copyTimer) })
 .integration-links { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px 16px; }
 .integration-links a { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; color: var(--ui-accent); font-size: 12px; }
 .integration-description { max-width: 64ch; margin-top: 16px; color: var(--ui-text-secondary); font-size: 14px; line-height: 1.8; }
+.quick-config { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 20px; padding: 16px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-bg-soft); }
+.quick-config strong { color: var(--ui-text-primary); font-size: 13px; font-weight: 500; }
+.quick-config p { max-width: 65ch; margin-top: 6px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
+.quick-config > a { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; min-height: 40px; padding: 8px 14px; border: 1px solid var(--ui-border-strong); border-radius: 10px; color: var(--ui-accent); font-size: 13px; transition: background 160ms; }
+.quick-config > a:hover { background: var(--ui-bg-elevated); }
 .integration-steps { display: grid; gap: 16px; margin-top: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--ui-border); }
 .integration-steps li { display: flex; align-items: flex-start; gap: 12px; color: var(--ui-text-secondary); font-size: 13px; line-height: 1.8; }
 .integration-steps li > span { display: grid; place-items: center; width: 24px; height: 24px; flex: none; border: 1px solid var(--ui-border-strong); border-radius: 6px; color: var(--ui-text-muted); font: 12px var(--nt-font-mono); }
@@ -175,8 +201,8 @@ onUnmounted(() => { disposed = true; if (copyTimer) clearTimeout(copyTimer) })
 .integration-note { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ui-border); color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
 .connect-compatibility { max-width: 92ch; margin-top: 24px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
 .api-connect :is(a,button,input):focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-@media (max-width: 1000px) { .integration-workspace { grid-template-columns: 188px minmax(0, 1fr); gap: 20px; } .integration-detail { padding: 24px; } .scenario-tabs button { gap: 8px; font-size: 13px; } }
-@media (max-width: 760px) { .api-connect { padding-block: 40px; } .connect-heading { align-items: flex-start; flex-direction: column; gap: 12px; } .connect-heading h2 { font-size: 28px; } .scenario-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .scenario-tabs button { justify-content: flex-start; min-height: 64px; padding: 12px; } .integration-workspace { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 20px; } .integration-options { flex-direction: row; flex-wrap: wrap; gap: 8px; } .integration-options button { flex: 1 1 140px; min-height: 64px; padding: 12px; } .integration-options small { margin-top: 4px; font-size: 11px; } .integration-options strong { font-size: 13px; } .integration-options svg { width: 14px; } .integration-heading { flex-direction: column; gap: 12px; } .integration-links { justify-content: flex-start; } }
-@media (max-width: 480px) { .integration-detail { padding: 20px; border-radius: 16px; } .integration-heading h3 { font-size: 22px; } .integration-description { font-size: 13px; } .integration-steps { gap: 16px; } .integration-steps li { gap: 8px; font-size: 12px; } .template-heading { flex-wrap: wrap; } .environment-hint code { font-size: 10px; } }
-@media (prefers-reduced-motion: reduce) { .api-connect :is(a,button) { transition: none; } }
+@media (max-width: 1000px) { .integration-detail { padding: 24px; } }
+@media (max-width: 760px) { .api-connect { padding-block: 40px; } .connect-heading { align-items: flex-start; flex-direction: column; gap: 12px; } .connect-heading h2 { font-size: 28px; } .connect-toolbar { margin-top: 20px; } .scenario-tabs button { gap: 6px; padding: 8px 10px; font-size: 12px; } .integration-workspace { gap: 16px; } .integration-heading { flex-direction: column; gap: 12px; } .integration-links { justify-content: flex-start; } .quick-config { align-items: flex-start; flex-direction: column; gap: 12px; } }
+@media (max-width: 480px) { .scenario-tabs { width: 100%; } .scenario-tabs button { flex: 1; gap: 4px; padding: 8px 6px; } .scenario-tabs button > svg { width: 15px; } .integration-options li { gap: 12px; padding: 12px; min-height: 76px; border-radius: 13px; } .integration-icon { width: 36px; height: 36px; border-radius: 10px; } .integration-summary strong { font-size: 13px; } .integration-summary > p { font-size: 12px; } .integration-options button { min-width: 36px; padding: 8px; } .integration-options button > span { display: none; } .integration-detail { padding: 20px; border-radius: 16px; } .integration-heading h3 { font-size: 22px; } .integration-description { font-size: 13px; } .integration-steps { gap: 16px; } .integration-steps li { gap: 8px; font-size: 12px; } .template-heading { flex-wrap: wrap; } .environment-hint code { font-size: 12px; } }
+@media (prefers-reduced-motion: reduce) { .api-connect :is(a,button,li) { transition: none; } }
 </style>

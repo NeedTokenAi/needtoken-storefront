@@ -32,6 +32,26 @@ export interface ServiceProduct {
   skus?: ServiceSku[]
 }
 
+/** A view of one native purchase option; IDs, prices and fulfillment stay native. */
+export interface ServiceCardProduct extends ServiceProduct {
+  cardSkuId?: number
+  cardHasVariants?: boolean
+}
+
+/** Recharge plans are independent cards even while an older import keeps them
+ * under one product. Publishing separate products needs no frontend tier list. */
+export const serviceCardProducts = (products: readonly ServiceProduct[], kind: ServiceKind): ServiceCardProduct[] =>
+  products.flatMap(product => {
+    if (kind !== 'recharge') return [product]
+    const skus = activeServiceSkus(product)
+    return skus.length > 1
+      ? skus.map(sku => ({ ...product, skus: [sku], cardSkuId: sku.id, cardHasVariants: true }))
+      : [product]
+  })
+
+export const serviceCardKey = (product: ServiceCardProduct): string =>
+  `${product.id}:${product.cardSkuId || 'product'}`
+
 export interface ServiceScope {
   kind: ServiceKind
   root: PublicCategory | null
@@ -83,6 +103,15 @@ export const defaultServiceChild = (
   if (!scope?.root || scope.selected?.id !== scope.root.id) return null
   if (explicitRootSlug === scope.root.slug) return null
   return scope.categories.find(category => category.slug === defaultChildSlug[scope.kind]) || null
+}
+
+/** Refreshing identity, language or configuration keeps the visitor's category
+ * whenever it still belongs to this service. A new service starts at its default. */
+export const homeServiceSelectionId = (scope: ServiceScope | null, previousId = 0): number => {
+  if (!scope?.root) return 0
+  if (previousId === scope.root.id || scope.categories.some(category => category.id === previousId)) return previousId
+  const child = defaultServiceChild({ ...scope, selected: scope.root }) || scope.categories[0]
+  return child?.id || scope.root.id
 }
 
 export const serviceCategoryIds = (scope: ServiceScope): number[] => {

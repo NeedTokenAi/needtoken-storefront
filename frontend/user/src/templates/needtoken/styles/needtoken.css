@@ -36,6 +36,19 @@ body.nt-tokens {
   color: var(--ui-text-primary);
 }
 
+/* Quiet feedback is shared by native and template controls; never animate layout. */
+:is(.nt-scope, body.nt-tokens) :where(button, a, summary, [role="tab"]) {
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--nt-motion-fast) ease-out, background-color var(--nt-motion-fast) ease-out, border-color var(--nt-motion-fast) ease-out, box-shadow var(--nt-motion-fast) ease-out;
+}
+/* Native summary inherits through a browser slot; pass corners explicitly. */
+.nt-scope details > summary { border-radius: var(--nt-disclosure-radius, 0); }
+.nt-scope details > summary > svg { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }
+@media (prefers-reduced-motion: reduce) {
+  :is(.nt-scope, body.nt-tokens) :where(button, a, summary, [role="tab"]) { transition: none; }
+  .nt-scope details > summary > svg { transition: none; }
+}
+
 /* Match the native cart/order views to the header's 1200px outer container.
    Only these NeedToken wrappers opt in; classic and vault retain their layout. */
 .nt-scope .nt-native-page > div {

@@ -4,6 +4,9 @@ import {
   homeCardBrand, homeCardPlan, homeCardPriceSuffix, homeCardSku, homeCardTitle, sortHomeProductsByPrice,
 } from '../src/templates/needtoken/lib/homeCardPresentation.ts'
 import type { ServiceProduct, ServiceSku } from '../src/templates/needtoken/lib/serviceCatalog.ts'
+import { serviceAvailability, serviceCardKey, serviceCardProducts, serviceSkuPrice } from '../src/templates/needtoken/lib/serviceCatalog.ts'
+import { serviceCardTitle } from '../src/templates/needtoken/lib/serviceVariants.ts'
+import { productBrandMarks } from '../src/templates/needtoken/lib/productBrandMarks.ts'
 
 const option = (id: number, price: unknown, extra: Partial<ServiceSku> = {}): ServiceSku => ({
   id, is_active: true, stock_status: 'in_stock', price_amount: price, ...extra,
@@ -74,4 +77,38 @@ test('price suffix accepts editor slash prefixes without duplicating the separat
   for (const [raw, clean] of [['/月', '月'], [' / / 月 ', '月'], ['／ 年', '年'], ['month', 'month'], [' / ', ''], ['', '']]) {
     assert.equal(homeCardPriceSuffix(raw!), clean)
   }
+})
+
+test('each published recharge option has its own stable purchase card without tier or period whitelists', () => {
+  const legacy = product(1, [
+    option(11, '100', { spec_values: { tier: 'Pro 100', period: 'Monthly' } }),
+    option(12, '200', { display_meta: { title: 'ChatGPT Pro 200 annual' }, spec_values: { period: 'year' } }),
+    option(13, '500', { is_active: false }),
+    option(14, '300', { spec_values: { tier: 'Future Plan', period: '2 years' }, stock_status: 'out_of_stock' }),
+  ], { title: { 'en-US': 'ChatGPT Pro' } })
+  const independent = product(2, [option(21, '20')], { title: { 'en-US': 'Gemini monthly' } })
+  const cards = serviceCardProducts([legacy, independent], 'recharge')
+  assert.deepEqual(cards.map(serviceCardKey), ['1:11', '1:12', '1:14', '2:product'])
+  assert.deepEqual(cards.map(card => homeCardSku(card)?.id), [11, 12, 14, 21])
+  assert.deepEqual(cards.map(card => serviceSkuPrice(homeCardSku(card))?.amount), ['100.00', '200.00', '300.00', '20.00'])
+  assert.equal(serviceCardTitle(cards[0]!, homeCardSku(cards[0]!), 'en-US'), 'ChatGPT Pro · Pro 100 · Monthly')
+  assert.equal(serviceCardTitle(cards[1]!, homeCardSku(cards[1]!), 'en-US'), 'ChatGPT Pro 200 annual')
+  assert.equal(serviceCardTitle(cards[2]!, homeCardSku(cards[2]!), 'en-US'), 'ChatGPT Pro · Future Plan · 2 years')
+  assert.equal(serviceAvailability(cards[2]!, homeCardSku(cards[2]!)), 'sold_out')
+  assert.equal(legacy.skus?.length, 4, 'projection never changes the native catalogue')
+  assert.deepEqual(serviceCardProducts([legacy], 'rental'), [legacy], 'rental choices keep their native selector')
+})
+
+test('Meta, Gemini and Grok are explicit brands with local, immediately renderable vectors', () => {
+  for (const [title, category, brand] of [
+    ['Meta AI Pro', 'meta-recharge', 'meta'], ['Google Gemini', 'gemini-recharge', 'gemini'], ['SuperGrok', 'grok-recharge', 'grok'],
+  ] as const) {
+    assert.equal(homeCardBrand(product(1, [], { title, category: { id: 1, slug: category } }), null, 'en-US'), brand)
+    assert.equal(productBrandMarks[brand].viewBox, '0 0 24 24')
+    assert.ok(productBrandMarks[brand].paths.every(path => path.length > 100))
+  }
+  assert.equal(homeCardBrand(product(1, [], { title: 'Gemini Advanced' }), null, 'en-US'), 'gemini')
+  assert.equal(homeCardBrand(product(1, [], { title: 'Grok subscription' }), null, 'en-US'), 'grok')
+  assert.equal(homeCardBrand(product(1, [], { title: 'Meta + ChatGPT bundle' }), null, 'en-US'), 'unknown')
+  assert.equal(homeCardBrand(product(1, [], { title: 'Metaverse Grokking Geminish' }), null, 'en-US'), 'unknown')
 })

@@ -3015,10 +3015,10 @@
       "refreshAction": "重新整理",
       "compact": {
         "scope": {
-          "gpt": "ChatGPT 產品服務",
+          "gpt": "ChatGPT 官方分組 · 不含 Codex",
           "claude": "claude.ai 網頁與 App"
         },
-        "componentCount": "{count} 項服務",
+        "componentCount": "監測 {count} 項",
         "activeIncident": "目前有事故",
         "recentIncident": "最近事故",
         "currentSummary": "目前狀態",
@@ -3057,7 +3057,9 @@
         "partialHistory": "僅含官方最近至多 50 條記錄；灰色未涵蓋，不代表可用率",
         "noScopedHistory": "暫無可關聯的產品事故記錄；灰色不代表服務正常",
         "historyUnavailable": "歷史記錄暫時無法取得；灰色表示未知",
-        "recentRecords": "檢視最近事件"
+        "recentRecords": "檢視最近事件",
+        "allUpdates": "查看全部 {count} 則進展",
+        "otherIncidents": "另有 {count} 起進行中的事件"
       }
     },
     "radar": {
@@ -3122,25 +3124,25 @@
       "refreshUpdates": "重新整理",
       "updatesError": "暫時無法讀取站內更新，可重試或直接查看上方來源",
       "noSiteUpdates": "暫無新增站內公告",
-      "guideTitle": "三種重置，有什麼不同",
+      "guideTitle": "重置怎麼用",
       "guide": {
         "banked": {
-          "title": "重置卡：收到後自行使用",
-          "body": "保存在帳號內，有適用範圍及期限；收到時不會自動恢復額度。"
+          "title": "重置卡 · 需要手動使用",
+          "body": "收到後存入帳號，使用時才恢復對應額度。先確認適用範圍和有效期。"
         },
         "automatic": {
-          "title": "自動重置：直接套用",
-          "body": "依活動選定的帳號與額度生效，不會存成一張卡；涵蓋範圍因公告而異。"
+          "title": "額度重置 · 自動生效",
+          "body": "直接恢復活動涵蓋的帳號額度，無須領卡；是否到帳請查看自己的用量頁。"
         },
         "paid": {
-          "title": "付費重置：購買後立即生效",
-          "body": "僅對部分符合資格的個人 Plus / Pro 帳號開放，購買選項和影響範圍以帳號顯示為準。"
+          "title": "付費重置 · 依帳號提供",
+          "body": "符合資格的帳號可在官方用量頁購買，價格、範圍及是否可用以頁面顯示為準。"
         }
       },
       "resetGuide": "重置與重置卡官方說明",
       "paidGuide": "付費重置官方說明",
-      "usageTitle": "下次何時更新額度",
-      "usageBody": "以帳號用量頁顯示為準。活動重置可能改變下一輪更新時間，不能依公告時間推算。",
+      "usageTitle": "下一次什麼時候重置？",
+      "usageBody": "查看帳號用量頁的倒數計時。歷史間隔僅供觀察，公告時間不能用來推算個人額度恢復時間。",
       "openUsage": "開啟官方用量頁"
     },
     "codexCheck": {
@@ -3219,7 +3221,17 @@
         "account_not_found": "未在目前 Session 中找到這個工作區，請重新檢測帳號",
         "rate_limited": "查詢過於頻繁，請稍後再試",
         "timeout": "官方介面回應逾時，請檢查連線後重試"
-      }
+      },
+      "heroTitle": "能不能開？",
+      "heroIntro": "貼上 Session，看清目前訂閱與 Codex 用量，不用下單。開通與升級資格以 ChatGPT 官方頁面為準。",
+      "waitingPaste": "等待貼上",
+      "openStep": "開啟",
+      "copyStep": "全選並複製頁面內容，回到這裡貼上。請先在同一瀏覽器登入 ChatGPT。",
+      "copySessionLink": "複製官方 Session 連結",
+      "pasteAction": "貼上 Session",
+      "manualPaste": "手動貼上",
+      "manualHint": "無法讀取剪貼簿，請在輸入框貼上 Session。",
+      "privacyShort": "唯讀訂閱與用量資訊，不更動帳號。"
     },
     "environmentV6": {
       "title": "Claude 網路檢測",
@@ -3291,20 +3303,17 @@
       "providerStatus": "官方服務狀態"
     },
     "radarLive": {
-      "scope": "公開公告追蹤",
       "description": "查看 Codex 額度重置與重置卡的公開紀錄，依原始來源核對。",
       "refresh": "重新整理紀錄",
       "retry": "重新取得",
       "unavailableTitle": "暫時無法取得紀錄",
-      "unavailable": "公告來源暫時無法使用。請重試，或開啟下方資料來源核對。",
+      "unavailable": "紀錄來源暫時無法使用，請稍後重試。",
       "expired": "上次成功取得已超過 12 小時，舊紀錄已停止顯示。請重試取得較新的快照。",
       "lastSuccess": "本站上次成功取得：{date}",
       "stale": "快照暫未更新",
-      "received": "已取得來源快照",
-      "polling": "頁面每分鐘重新整理 · 背景分頁暫停",
       "staleDetail": "更新暫時失敗，正在顯示 {date} 成功取得的快照；這不代表沒有新公告。",
       "latestRecord": "最近一筆紀錄",
-      "elapsed": "距最近一筆紀錄已過",
+      "elapsed": "距上次重置已過",
       "elapsedValue": "{days} 天 {hours} 小時 {minutes} 分鐘",
       "units": {
         "days": "天",
@@ -3323,7 +3332,7 @@
       "viewSource": "查看來源",
       "noSourceLink": "未提供可核驗原文",
       "noRecords": "來源暫無可顯示紀錄",
-      "noRecordsDetail": "已成功取得來源快照，目前尚無符合條件的紀錄。稍後可再次重新整理。",
+      "noRecordsDetail": "目前還沒有可顯示的重置紀錄。",
       "loadedCount": "本次載入紀錄",
       "fetchedAt": "本站成功取得時間",
       "notAvailable": "—",
@@ -3337,10 +3346,11 @@
         "banked": "重置卡"
       },
       "noFilteredRecords": "此類型暫無紀錄",
-      "moreHistory": "本次載入最近 {count} 筆紀錄，上游還有更多歷史。",
-      "historyCoverage": "僅顯示本站本次取得的紀錄，不代表全部歷史。",
+      "moreHistory": "已收錄最近 {count} 筆，來源仍有更早紀錄。",
+      "historyCoverage": "依已收錄紀錄顯示，個人額度以官方用量頁為準。",
       "historyUnavailable": "取得來源快照後，這裡會顯示公告與觀察紀錄。",
-      "siteUpdatesDetail": "本站發布的相關文章，獨立於上方來源紀錄"
+      "siteUpdatesDetail": "本站發布的相關文章，獨立於上方來源紀錄",
+      "showMore": "再看 {count} 筆"
     },
     "apiConnect": {
       "eyebrow": "NeedToken API",
@@ -3413,10 +3423,10 @@
           "kind": "桌面管理與本機路由",
           "get": "官方下載",
           "description": "在 CC Switch 中管理上游供應商，並依應用程式需要開啟本機路由。",
-          "step1": "從官方 Releases 安裝 CC Switch，選擇要管理的應用程式，例如 Codex。",
-          "step2": "加入自訂供應商，選擇符合上游的介面格式，填寫 Base URL、Key 與模型。",
-          "step3": "需要協定轉換時開啟該應用程式的本機路由，再在客戶端驗證模型呼叫。",
-          "note": "這裡的 Base URL 是本機路由上游前綴，不含 /v1。不同應用程式的直連格式可能不同，請依官方對應說明填寫，避免重複拼接 /v1。"
+          "step1": "安裝 CC Switch，在 API 控制台的 Key 清單中選擇「匯入至 CC Switch」，並選擇要使用的應用程式。",
+          "step2": "在 CC Switch 中核對位址、介面格式與模型，再確認匯入；若沒有匯入入口，請按下方參數手動新增。",
+          "step3": "在客戶端選擇 NeedToken 供應商並驗證一次呼叫；客戶端需要協定轉換時，再開啟對應應用程式的本機路由。",
+          "note": "下方為 OpenAI Chat Completions 的手動設定參考，Base URL 保留 /v1。其他介面請按應用程式文件填寫；匯入連結需要你的 Key，只在登入後的 API 控制台產生，店面不會讀取或儲存。"
         },
         "sub2api": {
           "summary": "自行託管多上游閘道",
@@ -3448,7 +3458,13 @@
           "step3": "選擇 needtoken 下的模型，重新載入設定後在助手中驗證呼叫。",
           "note": "下載檔案是合併用範本，請保留現有設定。範本使用 openai-completions；Agent 的工具呼叫能力須同時獲得模型與上游協定支援。"
         }
-      }
+      },
+      "reference": "版面參考 · CC Switch 官方",
+      "configure": "設定",
+      "configureTool": "設定 {name}",
+      "quickConfigTitle": "從你的 Key 清單快速匯入",
+      "quickConfigHint": "登入 API 控制台，在 API Key 清單中選擇「匯入至 CC Switch」。若未看到匯入入口，可複製下方參數手動新增。",
+      "quickConfig": "快速設定"
     },
     "purchaseFlow": {
       "backToPlans": "返回選方案",
@@ -3459,6 +3475,29 @@
       "openingPayment": "正在開啟付款頁面，請稍候。付款結果以訂單狀態為準",
       "paymentRouteFailed": "付款頁面暫未能開啟，訂單已保留。請繼續付款，無需重新下單",
       "continuePayment": "繼續前往付款"
+    },
+    "radarStats": {
+      "title": "重置統計與日曆",
+      "averageRemaining": "依歷史平均間隔，還差",
+      "averagePassed": "已超過歷史平均間隔",
+      "averageEvery": "平均每 {days} 天一次",
+      "averageNote": "依已收錄的額度重置統計，並非下次重置預告。",
+      "elapsedDays": "距上次重置已過 {days} 天",
+      "noRegular": "暫無額度重置紀錄",
+      "recorded": "收錄紀錄",
+      "times": "次",
+      "typeCounts": "額度重置 {regular} 次，重置卡 {banked} 次",
+      "regularCount": "額度重置 {count}",
+      "bankedCount": "重置卡 {count}",
+      "recent30": "近 30 天",
+      "previous30": "再往前 30 天收錄 {count} 次",
+      "calendar": "重置日曆",
+      "calendarIntro": "近一年紀錄，懸停或使用方向鍵查看詳情",
+      "calendarKeyboard": "每日重置紀錄，使用上下左右方向鍵切換日期",
+      "noRecord": "未收錄紀錄",
+      "outsideCoverage": "不在已收錄紀錄範圍內",
+      "coverage": "依已收錄的 {count} 筆紀錄統計。",
+      "partialCoverage": "依最近 {count} 筆紀錄統計，未涵蓋完整歷史。"
     }
   }
 }

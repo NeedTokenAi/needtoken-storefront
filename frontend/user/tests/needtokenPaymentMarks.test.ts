@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { paymentDisplayState, publicPaymentMethods, paymentMarks, paymentNetworks } from '../src/templates/needtoken/lib/paymentMarks.ts'
+import { displayPaymentChannels, paymentDisplayState, publicPaymentMethods, paymentMarks, paymentNetworks } from '../src/templates/needtoken/lib/paymentMarks.ts'
 
 test('payment logos require recognized public channel metadata, not display-name guesses', () => {
   for (const rows of [null, undefined, {}, [], [{ name: 'Alipay UnionPay crypto credit card' }]]) assert.deepEqual(paymentMarks(rows), [])
@@ -70,4 +70,29 @@ test('missing, empty, loading and wallet-only public configuration remain distin
   assert.equal(paymentDisplayState({ wallet_only_payment: true, payment_channels: [{ channel_type: 'alipay' }] }), 'wallet')
   assert.equal(paymentDisplayState({ payment_channels: [{ id: 1, name: 'Future method', channel_type: 'future' }] }), 'ready')
   assert.equal(paymentDisplayState({ payment_channels: [{ channel_type: 'alipay' }] }, true), 'loading')
+})
+
+test('configured display brands remain visible independently of guest checkout eligibility', () => {
+  const channels = [
+    { id: 1, name: 'Alipay', channel_type: 'alipay' },
+    { id: 2, name: 'WeChat', channel_type: 'wechat' },
+    { id: 3, name: 'Crypto', channel_type: 'tron-usdt' },
+  ]
+  const config = { display_payment_channels: channels, payment_channels: [] }
+  assert.equal(paymentDisplayState(config), 'ready')
+  assert.deepEqual(paymentMarks(displayPaymentChannels(config)), ['alipay', 'wechat', 'usdt'])
+  assert.deepEqual(config.payment_channels, [], 'display brands must not enable an order channel')
+  assert.equal(paymentDisplayState({ ...config, wallet_only_payment: true }), 'wallet')
+  assert.deepEqual(displayPaymentChannels({ ...config, wallet_only_payment: true }), [])
+})
+
+test('display metadata is authoritative while older servers retain channel compatibility', () => {
+  const legacy = { payment_channels: [{ channel_type: 'alipay' }] }
+  assert.deepEqual(displayPaymentChannels(legacy), legacy.payment_channels)
+  assert.equal(paymentDisplayState(legacy), 'ready')
+  assert.equal(paymentDisplayState({ ...legacy, display_payment_channels: [] }), 'empty')
+  for (const channels of [null, {}, undefined]) {
+    assert.equal(paymentDisplayState({ ...legacy, display_payment_channels: channels }), 'unavailable')
+  }
+  assert.equal(displayPaymentChannels(null), undefined)
 })

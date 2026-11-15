@@ -1,6 +1,6 @@
 import { amountToCents, centsToAmount } from '../../../utils/money.ts'
 import { getLocalizedText } from '../../../utils/resellerSiteConfig.ts'
-import type { ServiceSku } from './serviceCatalog.ts'
+import type { ServiceCardProduct, ServiceSku } from './serviceCatalog.ts'
 import { serviceDescriptionText } from './serviceCatalog.ts'
 
 const record = (value: unknown): Record<string, unknown> => {
@@ -86,6 +86,18 @@ export function serviceVariantLabel(sku: ServiceSku, locale: string, fallback: s
   // Raw inventory keys are often opaque. Only a short phrase can be a final label.
   if (code && code.length <= 48 && /[\u3400-\u9fff\s]/.test(code) && !/[_:/\\]/.test(code) && !/[a-f0-9]{16}/i.test(code)) return code
   return fallback
+}
+
+/** Keep a legacy SKU's actual tier/term visible when it becomes its own card.
+ * Explicit per-SKU titles remain authoritative; no tier or period is invented. */
+export function serviceCardTitle(product: ServiceCardProduct, sku: ServiceSku | null, locale: string): string {
+  const meta = serviceSkuPresentation(sku, locale)
+  if (meta.title) return meta.title
+  const title = text(product.title, locale)
+  if (!sku || !product.cardHasVariants) return title
+  const variant = serviceVariantLabel(sku, locale, '')
+  if (!variant || title.toLocaleLowerCase().includes(variant.toLocaleLowerCase())) return title
+  return title ? `${title} · ${variant}` : variant
 }
 
 export interface ServiceVariantAxis {

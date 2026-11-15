@@ -79,6 +79,66 @@ export function resetElapsedTime(announcedAt: string, now = Date.now()) {
   return { days: Math.floor(minutes / 1440), hours: Math.floor(minutes % 1440 / 60), minutes: minutes % 60 }
 }
 
+const DAY_MS = 86_400_000
+const BEIJING_OFFSET_MS = 8 * 60 * 60_000
+export const RESET_RECORD_PAGE_SIZE = 10
+
+/** Statistics describe the fetched sample, never an account's next reset. */
+export function resetStatistics(records: readonly ResetRecord[], now = Date.now()) {
+  const known = records.filter(record => Date.parse(record.announced_at) <= now)
+  const regularTimes = [...new Set(known.filter(record => record.type === 'regular').map(record => Date.parse(record.announced_at)))].sort((a, b) => b - a)
+  const lastResetAt = regularTimes[0] ?? null
+  const averageIntervalDays = regularTimes.length > 1 ? (regularTimes[0]! - regularTimes[regularTimes.length - 1]!) / (regularTimes.length - 1) / DAY_MS : null
+  const elapsedDays = lastResetAt === null ? null : Math.max(0, (now - lastResetAt) / DAY_MS)
+  return {
+    total: known.length,
+    regular: known.filter(record => record.type === 'regular').length,
+    banked: known.filter(record => record.type === 'banked').length,
+    recent30: known.filter(record => Date.parse(record.announced_at) > now - 30 * DAY_MS).length,
+    previous30: known.filter(record => Date.parse(record.announced_at) > now - 60 * DAY_MS && Date.parse(record.announced_at) <= now - 30 * DAY_MS).length,
+    lastResetAt,
+    elapsedDays,
+    averageIntervalDays,
+    averageRemainingDays: averageIntervalDays === null || elapsedDays === null ? null : Math.max(0, averageIntervalDays - elapsedDays),
+  }
+}
+
+export interface ResetCalendarDay {
+  date: string
+  regular: number
+  banked: number
+  inCoverage: boolean
+  future: boolean
+}
+
+/** Align weeks Monday-first and group records by the displayed UTC+8 day. */
+export function resetCalendar(records: readonly ResetRecord[], now = Date.now()): ResetCalendarDay[][] {
+  const today = Math.floor((now + BEIJING_OFFSET_MS) / DAY_MS) * DAY_MS
+  const yearStart = today - 364 * DAY_MS
+  const weekday = (new Date(yearStart).getUTCDay() + 6) % 7
+  const start = yearStart - weekday * DAY_MS
+  const earliest = records.reduce((min, record) => Math.min(min, Math.floor((Date.parse(record.announced_at) + BEIJING_OFFSET_MS) / DAY_MS) * DAY_MS), today)
+  const counts = new Map<string, { regular: number; banked: number }>()
+  for (const record of records) {
+    if (Date.parse(record.announced_at) > now) continue
+    const date = new Date(Date.parse(record.announced_at) + BEIJING_OFFSET_MS).toISOString().slice(0, 10)
+    const current = counts.get(date) ?? { regular: 0, banked: 0 }
+    current[record.type]++
+    counts.set(date, current)
+  }
+  return Array.from({ length: Math.ceil(((today - start) / DAY_MS + 1) / 7) }, (_, week) => Array.from({ length: 7 }, (_, day) => {
+    const time = start + (week * 7 + day) * DAY_MS
+    const date = new Date(time).toISOString().slice(0, 10)
+    return { date, ...(counts.get(date) ?? { regular: 0, banked: 0 }), inCoverage: records.length > 0 && time >= earliest && time <= today, future: time > today }
+  }))
+}
+
+export function resetRecordPage(records: readonly ResetRecord[], type: 'all' | ResetRecord['type'], count = RESET_RECORD_PAGE_SIZE) {
+  const filtered = records.filter(record => type === 'all' || record.type === type)
+  const limit = Math.max(RESET_RECORD_PAGE_SIZE, Math.floor(count / RESET_RECORD_PAGE_SIZE) * RESET_RECORD_PAGE_SIZE)
+  return { records: filtered.slice(0, limit), remaining: Math.max(0, filtered.length - limit) }
+}
+
 export async function fetchResetFeed(signal: AbortSignal, fetcher: typeof fetch = fetch): Promise<ResetFeed> {
   const response = await fetcher(RESET_FEED_PATH, { method: 'GET', mode: 'same-origin', credentials: 'omit', redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' }, signal })
   if (!response.ok || !/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type') || '')) throw new Error('reset feed unavailable')

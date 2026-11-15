@@ -58,7 +58,11 @@ func (c *Client) FetchHistory(ctx context.Context, provider diagnosticscontract.
 	history := diagnosticscontract.ServiceStatusHistory{State: "unavailable", Coverage: "partial", SourceURL: base + "history", Incidents: []diagnosticscontract.ServiceStatusIncident{}}
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
-	body, err := c.read(ctx, base+"api/v2/incidents.json")
+	endpoint := base + "api/v2/incidents.json"
+	if provider == diagnosticscontract.ServiceStatusOpenAI {
+		endpoint = openAINativeURL + "/incidents"
+	}
+	body, err := c.read(ctx, endpoint)
 	if err != nil {
 		return history, err
 	}
@@ -68,7 +72,12 @@ func (c *Client) FetchHistory(ctx context.Context, provider diagnosticscontract.
 	if json.Unmarshal(body, &payload) != nil || len(payload.Incidents) == 0 {
 		return history, diagnosticscontract.ErrServiceStatusUnavailable
 	}
-	incidents, err := parseIncidents(payload.Incidents, base)
+	var incidents []diagnosticscontract.ServiceStatusIncident
+	if provider == diagnosticscontract.ServiceStatusOpenAI {
+		incidents, err = parseIncidentIOIncidents(payload.Incidents, nil)
+	} else {
+		incidents, err = parseIncidents(payload.Incidents, base)
+	}
 	if err != nil {
 		return history, err
 	}
@@ -114,7 +123,7 @@ func parseIncidents(body json.RawMessage, sourceURL string) ([]diagnosticscontra
 			}
 		}
 		for _, part := range row.Components {
-			if !componentID.MatchString(part.ID) || !validIncidentText(part.Name, 200) {
+			if !componentID.MatchString(part.ID) || (part.Name != "" && !validIncidentText(part.Name, 200)) {
 				return nil, diagnosticscontract.ErrServiceStatusUnavailable
 			}
 			incident.Components = append(incident.Components, diagnosticscontract.ServiceStatusIncidentComponent{ID: part.ID, Name: strings.TrimSpace(part.Name), Status: optionalComponentStatus(part.Status)})
@@ -138,7 +147,7 @@ func parseIncidents(body json.RawMessage, sourceURL string) ([]diagnosticscontra
 				}
 			}
 			for _, part := range update.AffectedComponents {
-				if !componentID.MatchString(part.Code) || !validIncidentText(part.Name, 200) {
+				if !componentID.MatchString(part.Code) || (part.Name != "" && !validIncidentText(part.Name, 200)) {
 					return nil, diagnosticscontract.ErrServiceStatusUnavailable
 				}
 				parsed.AffectedComponents = append(parsed.AffectedComponents, diagnosticscontract.ServiceStatusAffectedComponent{Code: part.Code, Name: strings.TrimSpace(part.Name), OldStatus: optionalComponentStatus(part.OldStatus), NewStatus: optionalComponentStatus(part.NewStatus)})

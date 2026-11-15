@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { incidentElapsedMinutes, incidentPhase, matchesTerms, operationalCount, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusFresh, publicStatusTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone } from '../src/templates/needtoken/lib/publicStatus.ts'
+import { incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, matchesTerms, operationalCount, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusFresh, publicStatusTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone } from '../src/templates/needtoken/lib/publicStatus.ts'
 
 test('parsePublicStatus keeps component states and does not invent uptime', () => {
   const view = parsePublicStatus({
@@ -208,4 +208,60 @@ test('an unknown incident phase never proves ongoing impact or fills subsequent 
   assert.equal(incidentElapsedMinutes(incidents[0]!, now), null)
   assert.equal(serviceStatusTone(components, incidents, true), 'operational')
   assert.deepEqual(publicHistoryDays(incidents, now).filter(day => day.incidents.length).map(day => day.date), ['2026-11-01'])
+})
+
+test('native groups override compatibility identities even when names or IDs are familiar', () => {
+  const components = [
+    { id: 'gpt-group', name: 'ChatGPT', isGroup: true, childIds: ['real-child'], status: 'unknown' as const },
+    { id: 'real-child', name: 'New official ChatGPT feature', groupId: 'gpt-group', status: 'operational' as const },
+    { id: '01JMXBNJXG1S2D9V65P1ZZTD94', name: 'Login', groupId: 'other-group', status: 'major_outage' as const },
+    { id: 'other-child', name: 'ChatGPT misleading name', groupId: 'other-group', status: 'major_outage' as const },
+  ]
+  assert.deepEqual(serviceStatusComponents(components, 'gpt').map(component => component.id), ['real-child'])
+})
+
+test('full incident titles and all updates retain context beyond the latest generic message', () => {
+  const longTitle = 'Official incident '.repeat(20)
+  const fullBody = 'Detailed official scope. '.repeat(100) + '\nChatGPT usage is not affected.'
+  const rows = parsePublicIncidents({ page: { url: 'https://status.openai.com/' }, incidents: [{
+    id: 'incident-with-context', name: longTitle, status: 'monitoring', impact: 'minor',
+    incident_updates: [
+      { status: 'identified', body: fullBody, display_at: '2026-11-14T12:00:00Z' },
+      { status: 'monitoring', body: 'Monitoring recovery.', display_at: '2026-11-14T13:00:00Z' },
+    ],
+  }] })!
+  assert.equal(rows[0]!.name, longTitle.trim())
+  assert.equal(rows[0]!.updates.length, 2)
+  assert.equal(rows[0]!.updates[1]!.body, fullBody)
+  assert.equal(rows[0]!.latestUpdate?.body, 'Monitoring recovery.')
+})
+
+test('an optional older history response cannot overwrite newer incident progress', () => {
+  const current = parsePublicIncidents({ incidents: [{ id: 'same-incident', name: 'Current progress', status: 'monitoring', impact: 'minor', updated_at: '2026-11-14T13:00:00Z' }] })!
+  const history = parsePublicIncidents({ incidents: [{ id: 'same-incident', name: 'Earlier progress', status: 'investigating', impact: 'minor', updated_at: '2026-11-14T12:00:00Z' }] })!
+  const combined = mergePublicStatusIncidents(current, history)
+  assert.equal(combined.length, 1)
+  assert.equal(combined[0]!.status, 'monitoring')
+  assert.equal(mergePublicStatusIncidents(current, [...current])[0], current[0])
+})
+
+test('an older historical active record missing from the current summary cannot extend impact through today', () => {
+  const history = parsePublicIncidents({ incidents: [{ id: 'old-active', name: 'Old progress', status: 'investigating', impact: 'minor', started_at: '2026-11-12T13:00:00Z', updated_at: '2026-11-12T13:00:00Z' }] })!
+  const combined = mergePublicStatusIncidents([], history)
+  assert.equal(combined[0]!.status, 'unknown')
+  const days = publicHistoryDays(combined, Date.parse('2026-11-15T12:00:00Z'))
+  assert.deepEqual(days.filter(day => day.incidents.length).map(day => day.date), ['2026-11-12'])
+})
+
+
+test('native incident linkage cannot fall back to a similarly named component from another product', () => {
+  const components = [
+    { id: 'gpt-group', name: 'ChatGPT', isGroup: true, childIds: ['gpt-login'], status: 'unknown' as const },
+    { id: 'gpt-login', name: 'Login', groupId: 'gpt-group', status: 'operational' as const },
+  ]
+  const rows = parsePublicIncidents({ incidents: [
+    { id: 'api-only', name: 'API incident', status: 'investigating', components: [{ id: 'api-id', name: 'ChatGPT Work' }] },
+    { id: 'gpt-login-incident', name: 'Login incident', status: 'investigating', components: [{ id: 'gpt-login', name: 'Login' }] },
+  ] })!
+  assert.deepEqual(serviceStatusIncidents(rows, components, 'gpt').map(row => row.id), ['gpt-login-incident'])
 })

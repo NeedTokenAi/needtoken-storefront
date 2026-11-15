@@ -1,44 +1,48 @@
 <template>
   <div class="account-tool">
-    <ToolNavigation />
     <header class="tool-heading">
-      <span class="tool-capability"><ShieldCheck :size="16" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.toolsPolish.accountScope') }}</span>
-      <h1>{{ t('needtoken.codexCheck.title') }}</h1>
-      <p>{{ t('needtoken.codexCheck.intro') }}</p>
+      <h1>{{ t('needtoken.codexCheck.heroTitle') }}</h1>
+      <p>{{ t('needtoken.codexCheck.heroIntro') }}</p>
     </header>
 
     <div class="account-layout" :class="{ 'has-credential': hasCredential }">
-      <section class="account-input-panel" :aria-labelledby="'session-input-title'">
+      <section class="account-input-panel" aria-labelledby="session-input-title">
         <div class="panel-heading">
-          <h2 id="session-input-title">{{ t('needtoken.codexCheck.inputTitle') }}</h2>
-          <span v-if="hasCredential" class="credential-memory"><LockKeyhole :size="14" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.codexCheck.memoryOnly') }}</span>
+          <h2 id="session-input-title"><ProductBrandMark brand="gpt" />ChatGPT Session</h2>
+          <span class="credential-memory"><LockKeyhole v-if="hasCredential" :size="16" aria-hidden="true" /><Clipboard v-else :size="16" aria-hidden="true" />{{ t(hasCredential ? 'needtoken.codexCheck.memoryOnly' : 'needtoken.codexCheck.waitingPaste') }}</span>
         </div>
         <form @submit.prevent="detect">
-          <template v-if="!hasCredential">
-            <label class="session-label" for="codex-session">{{ t('needtoken.codexCheck.inputLabel') }}</label>
-            <textarea id="codex-session" v-model="sessionInput" :maxlength="MAX_CODEX_SESSION_INPUT" :placeholder="t('needtoken.codexCheck.inputPlaceholder')" :disabled="busy" :aria-invalid="!!inputError" :aria-describedby="inputError ? 'session-error session-privacy' : 'session-privacy'" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true" @input="inputError = null" />
-          </template>
-          <p v-else class="credential-ready"><ShieldCheck :size="18" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.codexCheck.credentialReady') }}</p>
-          <p v-if="inputError" id="session-error" class="inline-error" role="alert">{{ t(`needtoken.codexCheck.inputErrors.${inputError}`) }}</p>
-          <div class="form-actions">
-            <button v-if="!hasCredential" type="submit" class="primary-action" :disabled="busy || !sessionInput.trim()"><ScanLine :size="16" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.codexCheck.detect') }}</button>
-            <button v-else type="button" class="primary-action" :disabled="busy" :aria-busy="busy" @click="requestCheck()"><LoaderCircle v-if="busy" :size="16" :stroke-width="1.5" class="loading-icon" aria-hidden="true" /><RefreshCw v-else :size="16" :stroke-width="1.5" aria-hidden="true" />{{ t(busy ? 'needtoken.codexCheck.loading' : 'needtoken.codexCheck.detectAgain') }}</button>
-            <button v-if="busy" type="button" class="secondary-action" @click="clear"><X :size="16" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.codexCheck.cancel') }}</button>
-            <button v-else-if="sessionInput || hasCredential || result || requestError" type="button" class="secondary-action" @click="clear">{{ t('needtoken.codexCheck.clear') }}</button>
+          <div v-if="!hasCredential" class="session-paste-body">
+            <h3>{{ t('needtoken.codexCheck.inputTitle') }} <kbd>{{ pasteShortcut }}</kbd></h3>
+            <ol class="session-steps">
+              <li><span>{{ t('needtoken.codexCheck.openStep') }}</span><a href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer"><span translate="no">chatgpt.com/api/auth/session</span><ArrowUpRight :size="15" aria-hidden="true" /></a><button type="button" class="copy-session-link" :aria-label="t('needtoken.codexCheck.copySessionLink')" @click="copySessionLink"><Check v-if="linkCopied" :size="15" aria-hidden="true" /><Copy v-else :size="15" aria-hidden="true" /></button></li>
+              <li>{{ t('needtoken.codexCheck.copyStep') }}</li>
+            </ol>
+            <template v-if="manualInput">
+              <label class="session-label" for="codex-session">{{ t('needtoken.codexCheck.inputLabel') }}</label>
+              <textarea id="codex-session" ref="inputElement" v-model="sessionInput" :maxlength="MAX_CODEX_SESSION_INPUT" :placeholder="t('needtoken.codexCheck.inputPlaceholder')" :disabled="busy" :aria-invalid="!!inputError" :aria-describedby="inputError ? 'session-error session-privacy' : 'session-privacy'" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true" @input="handleInput" />
+            </template>
+            <p v-if="clipboardUnavailable" class="clipboard-note" role="status">{{ t('needtoken.codexCheck.manualHint') }}</p>
+            <p v-if="inputError" id="session-error" class="inline-error" role="alert">{{ t(`needtoken.codexCheck.inputErrors.${inputError}`) }}</p>
+            <div class="form-actions">
+              <button v-if="manualInput && sessionInput.trim()" type="submit" class="primary-action" :disabled="busy"><ScanLine :size="19" aria-hidden="true" />{{ t('needtoken.codexCheck.detect') }}</button>
+              <button v-else type="button" class="primary-action" :disabled="readingClipboard" :aria-busy="readingClipboard" @click="pasteFromClipboard"><LoaderCircle v-if="readingClipboard" :size="19" class="loading-icon" aria-hidden="true" /><Clipboard v-else :size="19" aria-hidden="true" />{{ t(readingClipboard ? 'needtoken.common.loading' : 'needtoken.codexCheck.pasteAction') }}</button>
+              <button v-if="readingClipboard" type="button" class="secondary-action" @click="clear">{{ t('needtoken.codexCheck.cancel') }}</button>
+            </div>
+            <button v-if="!manualInput" type="button" class="manual-input-action" @click="showManualInput">{{ t('needtoken.codexCheck.manualPaste') }}</button>
           </div>
-          <p id="session-privacy" class="privacy-copy">{{ t('needtoken.codexCheck.privacy') }}</p>
+          <div v-else class="credential-body">
+            <p class="credential-ready"><ShieldCheck :size="18" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.codexCheck.credentialReady') }}</p>
+            <div class="form-actions">
+              <button type="button" class="primary-action" :disabled="busy" :aria-busy="busy" @click="requestCheck()"><LoaderCircle v-if="busy" :size="16" class="loading-icon" aria-hidden="true" /><RefreshCw v-else :size="16" aria-hidden="true" />{{ t(busy ? 'needtoken.codexCheck.loading' : 'needtoken.codexCheck.detectAgain') }}</button>
+              <button type="button" class="secondary-action" @click="clear"><X v-if="busy" :size="16" aria-hidden="true" />{{ t(busy ? 'needtoken.codexCheck.cancel' : 'needtoken.codexCheck.clear') }}</button>
+            </div>
+          </div>
         </form>
-        <details class="session-help">
-          <summary>{{ t('needtoken.codexCheck.howTo') }}<ChevronDown :size="16" :stroke-width="1.5" aria-hidden="true" /></summary>
-          <ol>
-            <li><a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer">{{ t('needtoken.codexCheck.signIn') }}<ArrowUpRight :size="13" aria-hidden="true" /></a></li>
-            <li><a href="https://chatgpt.com/api/auth/session" target="_blank" rel="noopener noreferrer">{{ t('needtoken.codexCheck.openSession') }}<ArrowUpRight :size="13" aria-hidden="true" /></a></li>
-            <li>{{ t('needtoken.codexCheck.pasteSession') }}</li>
-          </ol>
-        </details>
       </section>
+      <div id="session-privacy" class="privacy-note"><p><LockKeyhole :size="15" aria-hidden="true" />{{ t('needtoken.codexCheck.privacyShort') }}</p><p>{{ t('needtoken.codexCheck.privacy') }}</p></div>
 
-      <section class="account-results" aria-live="polite" :aria-busy="busy" :aria-labelledby="'account-results-title'">
+      <section v-if="hasCredential || busy || result || requestError" class="account-results" aria-live="polite" :aria-busy="busy" :aria-labelledby="'account-results-title'">
         <div class="panel-heading"><h2 id="account-results-title">{{ t('needtoken.codexCheck.board') }}</h2><span v-if="result" class="verified-label"><span class="result-dot" />{{ t('needtoken.codexCheck.verified') }}</span></div>
         <div v-if="busy" class="result-loading" role="status">
           <p class="loading-label"><LoaderCircle :size="18" :stroke-width="1.5" class="loading-icon" aria-hidden="true" />{{ t('needtoken.codexCheck.loading') }}</p>
@@ -83,15 +87,69 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowUpRight, ChevronDown, CircleAlert, LoaderCircle, LockKeyhole, RefreshCw, ScanLine, ShieldCheck, X } from 'lucide-vue-next'
-import ToolNavigation from './components/ToolNavigation.vue'
+import { ArrowUpRight, Check, CircleAlert, Clipboard, Copy, LoaderCircle, LockKeyhole, RefreshCw, ScanLine, ShieldCheck, X } from 'lucide-vue-next'
+import ProductBrandMark from './components/ProductBrandMark.vue'
 import { usePageSeo } from '../../composables/usePageSeo'
 import { checkCodexAccount, CodexCheckError, MAX_CODEX_SESSION_INPUT, parseCodexSessionInput, type CodexAccountResult, type CodexCheckErrorCode, type SessionInputError } from './lib/codexAccountCheck'
 
 const { t, locale } = useI18n()
 const sessionInput = ref('')
+const inputElement = ref<HTMLTextAreaElement | null>(null)
+const manualInput = ref(false)
+const clipboardUnavailable = ref(false)
+const readingClipboard = ref(false)
+const linkCopied = ref(false)
+const pasteShortcut = ref('Ctrl V')
+let copyTimer: ReturnType<typeof setTimeout> | undefined
+let clipboardGeneration = 0
+let copyGeneration = 0
+function invalidateClipboardRead() { clipboardGeneration++; readingClipboard.value = false }
+function handleInput() { invalidateClipboardRead(); inputError.value = null }
+async function showManualInput() {
+  invalidateClipboardRead()
+  manualInput.value = true
+  await nextTick()
+  if (!disposed && manualInput.value) inputElement.value?.focus()
+}
+async function pasteFromClipboard() {
+  if (disposed || readingClipboard.value || hasCredential.value || busy.value) return
+  const ticket = ++clipboardGeneration
+  readingClipboard.value = true
+  try {
+    const text = await navigator.clipboard.readText()
+    if (disposed || ticket !== clipboardGeneration) return
+    sessionInput.value = text
+    if (!sessionInput.value.trim()) { clipboardUnavailable.value = true; await showManualInput(); return }
+    detect()
+    if (inputError.value) await showManualInput()
+  } catch {
+    if (!disposed && ticket === clipboardGeneration) { clipboardUnavailable.value = true; await showManualInput() }
+  } finally {
+    if (ticket === clipboardGeneration) readingClipboard.value = false
+  }
+}
+function handlePaste(event: ClipboardEvent) {
+  if (hasCredential.value || busy.value) return
+  const text = event.clipboardData?.getData('text')
+  if (!text) return
+  event.preventDefault()
+  invalidateClipboardRead()
+  sessionInput.value = text
+  detect()
+  if (inputError.value) void showManualInput()
+}
+async function copySessionLink() {
+  const ticket = ++copyGeneration
+  try {
+    await navigator.clipboard.writeText('https://chatgpt.com/api/auth/session')
+    if (disposed || ticket !== copyGeneration) return
+    linkCopied.value = true
+    if (copyTimer !== undefined) clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => { if (ticket === copyGeneration) linkCopied.value = false }, 1800)
+  } catch { /* The adjacent official link remains available when clipboard access is denied. */ }
+}
 const inputError = ref<SessionInputError | null>(null)
 const requestError = ref<CodexCheckErrorCode | null>(null)
 const busy = ref(false)
@@ -118,6 +176,11 @@ const windowLabel = (seconds: number) => seconds % 86400 === 0 ? t('needtoken.co
 usePageSeo({ title: () => t('needtoken.codexCheck.title'), description: () => t('needtoken.codexCheck.intro'), canonicalPath: () => '/tools/codex-account' })
 
 function clear() {
+  invalidateClipboardRead()
+  copyGeneration++
+  if (copyTimer !== undefined) clearTimeout(copyTimer)
+  copyTimer = undefined
+  linkCopied.value = false
   generation++
   controller?.abort()
   controller = null
@@ -129,8 +192,12 @@ function clear() {
   selectedAccountId.value = ''
   result.value = null
   busy.value = false
+  manualInput.value = false
+  clipboardUnavailable.value = false
 }
 function detect() {
+  if (disposed || hasCredential.value || busy.value) return
+  invalidateClipboardRead()
   const parsed = parseCodexSessionInput(sessionInput.value)
   if (!parsed.ok) { inputError.value = parsed.error; return }
   accessToken = parsed.accessToken
@@ -161,59 +228,61 @@ async function requestCheck(accountId?: string) {
     if (requestError.value === 'unauthorized' || requestError.value === 'invalid_input') { accessToken = ''; hasCredential.value = false }
   } finally { if (!disposed && ticket === generation) { busy.value = false; controller = null } }
 }
-onMounted(() => window.addEventListener('pagehide', clear))
-onUnmounted(() => { disposed = true; window.removeEventListener('pagehide', clear); clear() })
+onMounted(() => { pasteShortcut.value = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ V' : 'Ctrl V'; window.addEventListener('pagehide', clear); window.addEventListener('paste', handlePaste) })
+onUnmounted(() => { disposed = true; window.removeEventListener('pagehide', clear); window.removeEventListener('paste', handlePaste); clear() })
 </script>
 
 <style scoped>
-.account-tool { width: 100%; max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
-.tool-heading { margin-bottom: 32px; }
-.tool-capability { display: inline-flex; align-items: center; gap: 8px; min-height: 24px; margin-bottom: 12px; color: var(--ui-text-muted); font-size: 12px; line-height: 20px; }
-.tool-capability svg { transition: color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.tool-heading:hover .tool-capability svg { color: var(--ui-accent); transform: translateY(-1px); }
-.tool-heading h1 { font-size: clamp(28px, 3vw, 36px); font-weight: 500; line-height: 1.2; }
-.tool-heading > p { margin-top: 12px; color: var(--ui-text-secondary); font-size: 14px; line-height: 1.7; }
-.account-layout { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: start; gap: 24px; }
-.account-layout.has-credential { grid-template-columns: minmax(240px, .65fr) minmax(0, 1.35fr); }
-.account-input-panel, .account-results { min-width: 0; padding: 24px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); }
+.account-tool { width: 100%; max-width: 1024px; margin: 0 auto; padding: 56px 24px 72px; }
+.tool-heading { max-width: 680px; margin: 0 auto 40px; text-align: center; }
+.tool-heading h1 { font-size: clamp(40px, 6vw, 72px); font-weight: 400; line-height: 1.15; letter-spacing: -.045em; }
+.tool-heading > p { margin-top: 20px; color: var(--ui-text-secondary); font-size: clamp(16px, 2vw, 21px); line-height: 1.8; text-wrap: balance; }
+.account-layout { display: flex; flex-direction: column; gap: 24px; }
+.account-input-panel, .account-results { width: 100%; min-width: 0; border: 1px solid var(--ui-border); border-radius: 24px; background: var(--ui-bg-elevated); }
+.account-input-panel { overflow: hidden; }
 .panel-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.panel-heading h2 { font-size: 16px; font-weight: 500; }
-.credential-memory { display: flex; align-items: center; gap: 6px; color: var(--ui-text-muted); font-size: 12px; }
-.session-label { display: block; margin-top: 24px; color: var(--ui-text-secondary); font-size: 13px; }
-textarea { display: block; width: 100%; min-height: 160px; margin-top: 12px; padding: 16px; resize: vertical; border: 1px solid var(--ui-border-strong); border-radius: 8px; background: var(--ui-bg-page); color: var(--ui-text-primary); font-family: var(--nt-font-mono); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; transition: border-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
+.account-input-panel > .panel-heading { padding: 24px 28px; border-bottom: 1px solid var(--ui-border); }
+.panel-heading h2 { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 500; }
+.panel-heading :deep(.product-brand-mark) { --product-brand-ink: var(--ui-text-primary); }
+.credential-memory { display: flex; align-items: center; gap: 8px; color: var(--ui-text-secondary); font-size: 12px; }
+.session-paste-body { padding: 40px 28px 24px; text-align: center; }
+.session-paste-body h3 { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 21px; font-weight: 500; }
+kbd { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 3px 8px; border: 1px solid var(--ui-border-strong); border-radius: 6px; color: var(--ui-text-muted); font-family: var(--nt-font-mono); font-size: 12px; font-weight: 400; }
+.session-steps { display: grid; justify-content: center; gap: 16px; width: max-content; max-width: 100%; margin: 24px auto 36px; padding-left: 24px; color: var(--ui-text-secondary); font-size: 15px; line-height: 1.8; list-style: decimal; text-align: left; }
+.session-steps > li { padding-left: 8px; }
+.session-steps li::marker { color: var(--ui-text-muted); font-family: var(--nt-font-mono); font-size: 12px; }
+.session-steps a { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; margin-left: 8px; padding: 4px 8px; border-radius: 8px; background: var(--ui-bg-soft); color: var(--ui-text-primary); vertical-align: middle; }
+.session-steps a > span { min-width: 0; overflow-wrap: anywhere; font-family: var(--nt-font-mono); font-size: 14px; }
+.copy-session-link { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin-left: 4px; border-radius: 6px; color: var(--ui-text-muted); vertical-align: middle; }
+.copy-session-link:hover { color: var(--ui-accent); background: var(--ui-bg-soft); }
+.session-label { display: block; margin-top: 24px; color: var(--ui-text-secondary); font-size: 13px; text-align: left; }
+textarea { display: block; width: 100%; min-height: 128px; margin-top: 12px; padding: 16px; resize: vertical; border: 1px solid var(--ui-border-strong); border-radius: 12px; background: var(--ui-bg-page); color: var(--ui-text-primary); font-family: var(--nt-font-mono); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; transition: border-color 160ms ease; }
 textarea:hover:not(:disabled):not(:focus-visible) { border-color: var(--ui-text-muted); }
-textarea:focus-visible { background: var(--ui-bg-elevated); }
 textarea::placeholder { color: var(--ui-text-muted); }
 textarea[aria-invalid="true"] { border-color: #c9a36b; }
-.privacy-copy { margin-top: 16px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
-.form-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-.form-actions .primary-action { flex: 1; }
-.primary-action, .secondary-action { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 44px; padding: 12px 16px; border: 1px solid var(--ui-border-strong); border-radius: 8px; font-size: 13px; font-weight: 500; transition: color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), border-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
+.privacy-note { text-align: center; color: var(--ui-text-muted); }
+.privacy-note p:first-child { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--ui-text-secondary); font-size: 13px; }
+.privacy-note p + p { max-width: 680px; margin: 10px auto 0; font-size: 12px; line-height: 1.8; }
+.privacy-note svg { flex: none; }
+.form-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.primary-action, .secondary-action { display: inline-flex; justify-content: center; align-items: center; gap: 10px; min-height: 48px; padding: 12px 28px; border: 1px solid var(--ui-border-strong); border-radius: 999px; font-size: 15px; font-weight: 500; transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, transform 160ms ease; }
+.session-paste-body .primary-action { min-width: 240px; }
 .primary-action { color: var(--ui-text-on-accent); background: var(--ui-accent); border-color: transparent; }
-.primary-action:hover:not(:disabled) { background: var(--ui-accent-hover); }
-.secondary-action { color: var(--ui-text-secondary); background: transparent; }
+.primary-action:hover:not(:disabled) { background: var(--ui-accent-hover); transform: translateY(-1px); }
+.primary-action:active:not(:disabled), .secondary-action:active:not(:disabled) { transform: scale(.98); }
+.secondary-action { color: var(--ui-text-secondary); background: transparent; font-size: 13px; }
 .secondary-action:hover:not(:disabled) { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
-.primary-action:active:not(:disabled), .secondary-action:active:not(:disabled) { transform: translateY(1px); }
-.primary-action > svg, .usage-action > svg { flex: none; transition: transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.primary-action:hover:not(:disabled) > svg:not(.loading-icon), .primary-action:focus-visible > svg:not(.loading-icon), .usage-action:hover:not(:disabled) > svg, .usage-action:focus-visible > svg { transform: translateX(2px); }
+.manual-input-action { display: inline-flex; justify-content: center; min-height: 36px; margin-top: 12px; padding: 8px 12px; border-radius: 8px; color: var(--ui-text-muted); font-size: 12px; }
+.manual-input-action:hover { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
 button:disabled { cursor: not-allowed; opacity: .5; }
-.credential-ready { display: flex; align-items: flex-start; gap: 8px; margin-top: 24px; color: var(--ui-text-secondary); font-size: 13px; line-height: 1.8; }
-.credential-ready svg { flex: none; margin-top: 4px; color: var(--ui-accent); }
+.credential-body { padding: 24px 28px; }
+.credential-ready { display: flex; align-items: flex-start; gap: 8px; color: var(--ui-text-secondary); font-size: 13px; line-height: 1.8; }
+.credential-ready svg { flex: none; margin-top: 3px; color: var(--ui-accent); }
 .inline-error { margin-top: 12px; color: #e5bb83; font-size: 12px; line-height: 1.7; }
-.session-help { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--ui-border); }
-.session-help summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--ui-text-secondary); font-size: 13px; cursor: pointer; list-style: none; }
-.session-help summary::-webkit-details-marker { display: none; }
-.session-help summary > svg { flex: none; color: var(--ui-text-muted); transition: transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.session-help summary:hover, .session-help summary:focus-visible { color: var(--ui-text-primary); }
-.session-help[open] summary > svg { transform: rotate(180deg); }
-.session-help ol { display: grid; gap: 12px; margin: 16px 0 0 20px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; list-style: decimal; }
-.session-help a { display: inline-flex; align-items: center; gap: 4px; color: var(--ui-text-secondary); }
-.session-help a:hover { color: var(--ui-accent); }
+.clipboard-note { margin-top: 12px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.7; }
+.account-results { padding: 28px; }
 .account-results { min-height: 320px; }
 .has-credential .account-results { min-height: 0; }
-.has-credential .account-input-panel { padding: 20px; }
-.has-credential .credential-ready { margin-top: 16px; }
-.has-credential .session-help { margin-top: 20px; padding-top: 20px; }
 .has-credential .form-actions { gap: 8px; margin-top: 20px; }
 .has-credential .form-actions button { flex: 1; padding-inline: 12px; }
 .verified-label { display: flex; align-items: center; gap: 8px; color: var(--ui-text-secondary); font-size: 12px; }
@@ -272,10 +341,9 @@ progress::-moz-progress-bar { border-radius: 2px; background: var(--ui-accent); 
 .account-tool :is(a, button, select, textarea, summary):focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 4px; }
 @keyframes check-spin { to { transform: rotate(360deg); } }
 @keyframes account-pending { 50% { opacity: .45; } }
-@media (max-width: 800px) { .account-layout, .account-layout.has-credential { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .account-tool { padding: 24px 20px 48px; } .tool-heading { margin-bottom: 24px; } }
+@media (max-width: 640px) { .account-tool { padding: 40px 20px 48px; } .tool-heading { margin-bottom: 28px; } .account-input-panel > .panel-heading { padding: 20px; } .session-paste-body { padding: 32px 20px 20px; } .session-steps { font-size: 13px; padding-left: 18px; } .session-steps a { margin-left: 0; margin-top: 6px; } .session-steps a > span { font-size: 12px; } .copy-session-link { display: none; } .session-paste-body .primary-action { width: 100%; min-width: 0; } .privacy-note p:first-child { align-items: flex-start; font-size: 12px; } .privacy-note svg { margin-top: 2px; } }
 @media (max-width: 640px) { .usage-windows { grid-template-columns: 1fr; } }
-@media (max-width: 480px) { .account-input-panel, .account-results { padding: 20px; } .account-facts > div { flex-direction: column; align-items: flex-start; gap: 8px; } .account-facts dd { text-align: left; } .usage-heading { gap: 12px; } }
+@media (max-width: 480px) { .account-results { padding: 20px; } .account-facts > div { flex-direction: column; align-items: flex-start; gap: 8px; } .account-facts dd { text-align: left; } .usage-heading { gap: 12px; } }
 @media (prefers-reduced-motion: reduce) {
   .account-tool :deep(*) { transition: none !important; animation: none !important; }
   .account-tool :is(.primary-action, .secondary-action, .usage-action):active:not(:disabled),
@@ -285,7 +353,6 @@ progress::-moz-progress-bar { border-radius: 2px; background: var(--ui-accent); 
   .account-tool .usage-action:focus-visible > svg,
   .account-tool a:hover > svg,
   .account-tool a:focus-visible > svg,
-  .tool-heading:hover .tool-capability svg { transform: none; }
-  .session-help[open] summary > svg { transform: rotate(180deg); }
+  .account-tool .primary-action:hover:not(:disabled) { transform: none; }
 }
 </style>

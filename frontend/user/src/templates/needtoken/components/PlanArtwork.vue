@@ -122,7 +122,7 @@
 <script setup lang="ts">
 withDefaults(defineProps<{
   plan: 'plus' | '5x' | '20x' | '50x' | 'neutral'
-  brand?: 'gpt' | 'claude' | 'unknown'
+  brand?: 'gpt' | 'claude' | 'meta' | 'gemini' | 'grok' | 'unknown'
 }>(), {
   brand: 'unknown',
 })

@@ -21,14 +21,14 @@ const loginViewLoader: RouteComponentLoader = () => import('../views/auth/Login.
 const resellerLayoutLoader: RouteComponentLoader = () => import('../views/reseller/ResellerConsoleLayout.vue')
 
 const routeWarmupLoaders: RouteComponentLoader[] = [
-    productsViewLoader,
-    productDetailViewLoader,
-    cartViewLoader,
-    checkoutViewLoader,
-    paymentViewLoader,
-    blogViewLoader,
-    noticeViewLoader,
-    loginViewLoader,
+    templateView('Products', productsViewLoader),
+    templateView('ProductDetail', productDetailViewLoader),
+    templateView('Cart', cartViewLoader),
+    templateView('Checkout', checkoutViewLoader),
+    templateView('Payment', paymentViewLoader),
+    templateView('Blog', blogViewLoader),
+    templateView('Notice', noticeViewLoader),
+    templateView('auth/Login', loginViewLoader),
 ]
 
 let hasScheduledRouteWarmup = false
@@ -50,6 +50,32 @@ const shouldWarmupRoutes = () => {
     }
 
     return connection?.effectiveType !== 'slow-2g' && connection?.effectiveType !== '2g'
+}
+
+const warmedRouteLoaders = new WeakSet<Function>()
+const intentRouteNames = new Set([
+    'home', 'products', 'category-products', 'product-detail', 'cart',
+    'model-square', 'api-services', 'plans', 'api-docs', 'faq', 'blog', 'blog-detail',
+    'environment-tools', 'reset-radar', 'codex-account-check', 'user-login',
+])
+
+/** Warm only page code on link intent; guards and account-specific data still run on navigation. */
+export function prefetchStorefrontRoute(href: string) {
+    if (!shouldWarmupRoutes() || document.hidden) return
+    let target: URL
+    try { target = new URL(href, window.location.href) } catch { return }
+    if (target.origin !== window.location.origin) return
+    const resolved = router.resolve(`${target.pathname}${target.search}${target.hash}`)
+    if (!intentRouteNames.has(String(resolved.name))) return
+    for (const record of resolved.matched) {
+        const loader = record.components?.default
+        if (typeof loader !== 'function' || warmedRouteLoaders.has(loader)) continue
+        warmedRouteLoaders.add(loader)
+        void Promise.resolve().then(() => (loader as RouteComponentLoader)()).catch(() => {
+            // A transient preload failure must remain retryable on the next interaction.
+            warmedRouteLoaders.delete(loader)
+        })
+    }
 }
 
 const scheduleIdleTask = (task: () => void) => {

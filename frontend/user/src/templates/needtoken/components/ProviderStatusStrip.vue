@@ -19,11 +19,20 @@
         <article v-if="provider.source.snapshot" class="status-incident" :class="{ 'is-old': !provider.fresh }" :data-phase="provider.phase === null ? 'unknown' : phases[provider.phase]">
           <div class="status-incident-meta"><span>{{ t(provider.fresh ? provider.incident ? incidentActive(provider.incident) ? 'needtoken.statusStrip.compact.activeIncident' : 'needtoken.statusStrip.compact.recentIncident' : 'needtoken.statusStrip.compact.currentSummary' : 'needtoken.statusStrip.compact.previousSnapshot') }}</span><time v-if="provider.incident && (provider.incident.startedAt || provider.incident.createdAt)" :datetime="provider.incident.startedAt || provider.incident.createdAt || undefined">{{ renderDate(provider.incident.startedAt || provider.incident.createdAt || '') }}</time></div>
           <h3 class="status-incident-title">{{ provider.incident?.name || t(provider.tone === 'operational' ? 'needtoken.statusStrip.compact.noIncidentTitle' : provider.tone === 'unknown' ? 'needtoken.statusStrip.compact.unknownSummary' : 'needtoken.statusStrip.compact.componentSummary') }}</h3>
-          <p class="status-incident-update">{{ provider.incident ? provider.incident.latestUpdate?.body || t('needtoken.statusStrip.compact.noUpdate') : provider.affected.length ? t('needtoken.statusStrip.compact.affectedComponents', { names: provider.affected.slice(0, 3).map(component => component.name).join(' · ') }) : t(provider.components.length ? 'needtoken.statusStrip.compact.noIncidentBody' : 'needtoken.statusStrip.scopeEmpty') }}</p>
-          <ol v-if="provider.incident || provider.affected.length" class="status-phases" :aria-label="t('needtoken.statusStrip.compact.phaseLabel')">
+          <p class="status-incident-update">{{ provider.incident ? provider.incident.latestUpdate?.body || t('needtoken.statusStrip.compact.noUpdate') : provider.affected.length ? t('needtoken.statusStrip.compact.affectedComponents', { names: provider.affected.map(component => component.name).join(' · ') }) : t(provider.components.length ? 'needtoken.statusStrip.compact.noIncidentBody' : 'needtoken.statusStrip.scopeEmpty') }}</p>
+          <p v-if="provider.incident && provider.incidentComponents.length" class="status-affected">{{ t('needtoken.statusStrip.compact.affectedComponents', { names: provider.incidentComponents.map(component => component.name).join(' · ') }) }}</p>
+          <ol v-if="provider.incident" class="status-phases" :aria-label="t('needtoken.statusStrip.compact.phaseLabel')">
             <li v-for="(phase, index) in phases" :key="phase" class="status-phase" :class="{ 'is-reached': provider.fresh && provider.phase !== null && index <= provider.phase, 'is-current': provider.fresh && index === provider.phase }" :aria-current="provider.fresh && index === provider.phase ? 'step' : undefined" :style="{ '--phase-index': index }"><span class="status-phase-track" aria-hidden="true"><i></i></span><span>{{ t(`needtoken.statusStrip.compact.phases.${phase}`) }}</span></li>
           </ol>
           <div class="status-incident-footer"><span>{{ provider.incident ? incidentTiming(provider.incident) : provider.affected.length ? t('needtoken.statusStrip.compact.noLinkedIncident') : t('needtoken.statusStrip.compact.noActiveIncident') }}</span><a :href="provider.incident?.url || provider.source.href" target="_blank" rel="noopener noreferrer">{{ t('needtoken.statusStrip.compact.officialProgress') }}<ArrowUpRight :size="12" aria-hidden="true" /></a></div>
+          <details v-if="provider.incident && provider.incident.updates.length > 1" class="status-update-history">
+            <summary>{{ t('needtoken.statusStrip.compact.allUpdates', { count: provider.incident.updates.length }) }}</summary>
+            <ol><li v-for="(update, index) in provider.incident.updates" :key="`${update.updatedAt}-${index}`"><div><span>{{ phaseName(update.status) }}</span><time v-if="update.updatedAt" :datetime="update.updatedAt">{{ renderTime(update.updatedAt) }}</time></div><p>{{ update.body || t('needtoken.statusStrip.compact.noUpdate') }}</p></li></ol>
+          </details>
+          <details v-if="provider.otherIncidents.length" class="status-update-history">
+            <summary>{{ t('needtoken.statusStrip.compact.otherIncidents', { count: provider.otherIncidents.length }) }}</summary>
+            <ul><li v-for="incident in provider.otherIncidents" :key="incident.id || incident.name"><a :href="incident.url || provider.source.href" target="_blank" rel="noopener noreferrer">{{ incident.name }}<ArrowUpRight :size="12" aria-hidden="true" /></a><p>{{ incident.latestUpdate?.body }}</p></li></ul>
+          </details>
         </article>
         <section class="status-history-region" :aria-label="t('needtoken.statusStrip.compact.historyTitle')">
           <div class="status-history-head"><h3>{{ t('needtoken.statusStrip.compact.historyTitle') }}</h3><span>{{ t(provider.historyReady ? 'needtoken.statusStrip.compact.incidentCount' : 'needtoken.statusStrip.compact.historyUnknown', { count: provider.historyIncidents.length }) }}</span></div>
@@ -43,7 +52,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowUpRight } from 'lucide-vue-next'
-import { incidentActive, incidentElapsedMinutes, incidentPhase, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusFresh, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone, PUBLIC_STATUS_MAX_AGE_MS, type PublicStatusHistory, type PublicStatusIncident, type PublicStatusService, type PublicStatusSnapshot } from '../lib/publicStatus'
+import { incidentActive, incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusFresh, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone, PUBLIC_STATUS_MAX_AGE_MS, type PublicStatusHistory, type PublicStatusIncident, type PublicStatusService, type PublicStatusSnapshot } from '../lib/publicStatus'
 
 type Provider = PublicStatusService
 interface StatusSource {
@@ -86,10 +95,12 @@ const providers = computed(() => sources.value.map(source => {
   const fresh = source.state === 'ready' && !source.stale && publicStatusFresh(source.fetchedAt, now.value)
   const incidents = serviceStatusIncidents(source.snapshot?.incidents ?? [], source.snapshot?.components ?? [], id)
   const historyReady = fresh && source.history.state === 'ready'
-  const historyIncidents = historyReady ? publicHistoryIncidents(serviceStatusIncidents(source.history.incidents, source.snapshot?.components ?? [], id), now.value) : []
-  const incident = incidents[0] ?? null
+  const historyIncidents = historyReady ? publicHistoryIncidents(serviceStatusIncidents(mergePublicStatusIncidents(source.snapshot?.incidents ?? [], source.history.incidents), source.snapshot?.components ?? [], id), now.value) : []
+  const incident = incidents.find(incidentActive) ?? null
   return {
     id, source, components, fresh, incident,
+    otherIncidents: incidents.filter(item => incidentActive(item) && item !== incident),
+    incidentComponents: components.filter(component => incident?.components.some(part => component.id && part.id === component.id || !part.id && part.name === component.name)),
     phase: incident ? incidentPhase(incident) : null,
     affected: components.filter(component => component.status !== 'operational'),
     tone: serviceStatusTone(components, incidents, fresh),
@@ -97,6 +108,7 @@ const providers = computed(() => sources.value.map(source => {
     historyDays: publicHistoryDays(historyIncidents, now.value),
   }
 }))
+const phaseName = (status: string) => t(phases.includes(status as typeof phases[number]) ? `needtoken.statusStrip.compact.phases.${status}` : 'needtoken.statusStrip.component.unknown')
 const sourceHost = (href: string) => { try { return new URL(href).host } catch { return href } }
 const renderTime = (value: string) => new Date(value).toLocaleString(locale.value)
 const renderDate = (value: string) => new Date(value).toLocaleDateString(locale.value, { month: 'short', day: 'numeric' })
@@ -238,7 +250,7 @@ onUnmounted(() => {
 .status-pill-wrap { position: static; }
 .status-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 5px 11px; border: 1px solid rgba(168,188,185,.14); border-radius: 999px; background: rgba(168,188,185,.045); color: var(--ui-text-secondary); font-size: 11px; font-weight: 500; line-height: 1.4; transition: color 160ms ease, background 160ms ease; }
 .status-pill:hover, .status-pill[aria-expanded="true"] { color: var(--ui-text-primary); background: rgba(168,188,185,.09); }
-.status-pill:focus-visible, .status-popover a:focus-visible, .status-popover button:focus-visible, .status-popover summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; border-radius: 3px; }
+.status-pill:focus-visible, .status-popover a:focus-visible, .status-popover button:focus-visible, .status-popover summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
 .status-bars { display: inline-flex; align-items: center; gap: 2px; height: 13px; color: #77848c; }
 .status-bars i { display: block; width: 2px; height: 12px; border-radius: 1px; background: currentColor; transform-origin: center bottom; }
 .status-bars.is-received i { animation: status-received 800ms var(--nt-motion-ease, ease-out) calc(var(--bar-index) * 60ms) 1; }
@@ -262,8 +274,15 @@ onUnmounted(() => {
 .status-incident.is-old { opacity: .65; }
 .status-incident-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ui-text-muted); font-size: 11px; line-height: 16px; }
 .status-incident-meta time { white-space: nowrap; }
-.status-incident-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 8px; color: var(--ui-text-primary); font-size: 16px; line-height: 24px; font-weight: 500; overflow-wrap: anywhere; }
-.status-incident-update { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 8px; font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
+.status-incident-title { margin-top: 8px; color: var(--ui-text-primary); font-size: 16px; line-height: 24px; font-weight: 500; overflow-wrap: anywhere; }
+.status-incident-update { white-space: pre-line; margin-top: 8px; font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
+.status-affected { margin-top: 10px; font-size: 11px; line-height: 18px; color: var(--ui-text-muted); overflow-wrap: anywhere; }
+.status-update-history { margin-top: 14px; font-size: 12px; line-height: 20px; }
+.status-update-history summary { width: fit-content; cursor: pointer; color: var(--ui-accent); }
+.status-update-history ol, .status-update-history ul { display: grid; gap: 14px; margin-top: 12px; padding-left: 12px; border-left: 1px solid var(--ui-border); }
+.status-update-history li > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; color: var(--ui-text-muted); font-size: 11px; }
+.status-update-history li p { margin-top: 5px; white-space: pre-line; overflow-wrap: anywhere; }
+.status-update-history li > a { display: inline-flex; align-items: baseline; gap: 4px; color: var(--ui-text-primary); }
 .status-phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
 .status-phase { min-width: 0; color: var(--ui-text-muted); font-size: 11px; line-height: 16px; }
 .status-phase > span:last-child { display: block; overflow-wrap: anywhere; }

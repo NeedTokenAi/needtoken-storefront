@@ -155,7 +155,7 @@ onBeforeUnmount(() => { disposed = true; generation++ })
 .nt-faq-result h2 { font-size: 20px; font-weight: 650; }
 .nt-faq-result > span { color: var(--ui-text-muted); font-size: 12px; }
 .nt-faq-answers { display: grid; gap: 12px; }
-.nt-faq-answer { border: 1px solid var(--ui-border); border-radius: 14px; background: color-mix(in srgb, var(--ui-bg-elevated) 75%, transparent); }
+.nt-faq-answer { --nt-disclosure-radius: 14px; border: 1px solid var(--ui-border); border-radius: var(--nt-disclosure-radius); background: color-mix(in srgb, var(--ui-bg-elevated) 75%, transparent); }
 .nt-faq-answer[open] { border-color: color-mix(in srgb, var(--ui-accent) 30%, transparent); }
 .nt-faq-answer summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 21px 23px; cursor: pointer; list-style: none; font-size: 15px; font-weight: 550; line-height: 1.6; }
 .nt-faq-answer summary::-webkit-details-marker { display: none; }
