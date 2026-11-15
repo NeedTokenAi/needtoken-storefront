@@ -1,4 +1,19 @@
 {
+  "subscriptionAuthorization": {
+    "title": "訂閱辦理授權",
+    "description": "訂單 {order} 的授權僅用於本次指定帳號與方案",
+    "emailCode": "訂單信箱驗證碼",
+    "sendCode": "傳送驗證碼",
+    "codeSent": "驗證碼已傳送",
+    "credential": "短期帳號 Token 或 Session JSON",
+    "consent": "我同意為此訂單查驗並辦理一個訂閱週期，並在購買後關閉自動續訂。帳號 Token 僅在短期授權內使用",
+    "submit": "提交本次授權",
+    "submitting": "正在提交",
+    "submitted": "授權已提交，等待目標帳號查驗；此狀態不表示訂閱已到帳",
+    "failed": "本次尚未確認完成，請檢查原訂單與授權狀態後重試",
+    "invalidCredential": "請填寫有效的短期 Token 或包含 accessToken 的 Session JSON",
+    "expired": "本次授權已過期，請重新驗證"
+  },
   "common": {
     "siteName": "Dujiao-Next",
     "loading": "載入中...",

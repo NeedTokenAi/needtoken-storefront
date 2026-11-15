@@ -5,6 +5,7 @@ import (
 	"github.com/dujiao-next/internal/app/httpserver/middleware"
 	affiliatebootstrap "github.com/dujiao-next/internal/bootstrap/affiliate"
 	diagnosticsbootstrap "github.com/dujiao-next/internal/bootstrap/diagnostics"
+	orderbootstrap "github.com/dujiao-next/internal/bootstrap/order"
 	"github.com/dujiao-next/internal/config"
 	affiliatetransport "github.com/dujiao-next/internal/modules/affiliate/transport/http"
 	apicredentialtransport "github.com/dujiao-next/internal/modules/apicredential/transport/http"
@@ -19,6 +20,7 @@ import (
 	userauthtransport "github.com/dujiao-next/internal/modules/identity/userauth/transport/http"
 	memberleveltransport "github.com/dujiao-next/internal/modules/memberlevel/transport/http"
 	ordertransport "github.com/dujiao-next/internal/modules/order/transport/http"
+	authorizationtransport "github.com/dujiao-next/internal/modules/order/transport/http/subscriptionauthorization"
 	paymenttransport "github.com/dujiao-next/internal/modules/payment/transport/http"
 	paymentcallbacktransport "github.com/dujiao-next/internal/modules/payment/transport/http/callback"
 	resellertransport "github.com/dujiao-next/internal/modules/reseller/transport/http/user"
@@ -72,6 +74,9 @@ func registerStorefrontRoutes(
 	storefront := apiV1.Group("")
 	storefront.Use(middleware.ResellerTenantMiddleware(c.ResellerDomainResolver))
 	affiliateHandler := affiliatebootstrap.NewStorefrontHandler(c)
+	authorizationHandler := orderbootstrap.NewSubscriptionAuthorizationHandler(c)
+	consentRead := storefront.Group("", middleware.RateLimitMiddleware(redisClient, guestReadRule, middleware.KeyByIP))
+	authorizationtransport.RegisterConsentRoute(consentRead, authorizationHandler)
 
 	// 公开接口
 	public := storefront.Group("/public")
@@ -104,12 +109,14 @@ func registerStorefrontRoutes(
 	{
 		ordertransport.RegisterGuestPreviewRoute(guestRead, orderPreviewHandler)
 		ordertransport.RegisterGuestReadRoutes(guestRead, guestOrderHandler)
+		authorizationtransport.RegisterGuestReadRoutes(guestRead, authorizationHandler)
 		paymenttransport.RegisterGuestLatestRoute(guestRead, paymentLatestHandler)
 	}
 	guestWrite := guest.Group("")
 	guestWrite.Use(middleware.RateLimitMiddleware(redisClient, guestWriteRule, middleware.KeyByIP))
 	{
 		ordertransport.RegisterGuestCreateRoute(guestWrite, orderCreateHandler)
+		authorizationtransport.RegisterGuestWriteRoutes(guestWrite, authorizationHandler)
 		ordertransport.RegisterGuestCreateAndPayRoute(guestWrite, orderCreateHandler)
 		paymenttransport.RegisterGuestWriteRoutes(guestWrite, paymentWriteHandler)
 	}
@@ -161,6 +168,8 @@ func registerStorefrontRoutes(
 		ordertransport.RegisterUserPreviewRoute(user, orderPreviewHandler)
 		ordertransport.RegisterUserPaymentChannelsRoute(user, userOrderHandler)
 		ordertransport.RegisterUserReadRoutes(user, userOrderHandler)
+		authorizationUser := user.Group("", middleware.RateLimitMiddleware(redisClient, guestWriteRule, middleware.KeyByUserIDAndIP))
+		authorizationtransport.RegisterMemberRoutes(authorizationUser, authorizationHandler)
 		ordertransport.RegisterUserCancelRoute(user, userOrderHandler)
 		paymenttransport.RegisterUserWriteRoutes(user, paymentWriteHandler)
 		paymenttransport.RegisterUserLatestRoute(user, paymentLatestHandler)

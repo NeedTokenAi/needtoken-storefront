@@ -1,4 +1,19 @@
 {
+  "subscriptionAuthorization": {
+    "title": "Subscription authorization",
+    "description": "Authorization for order {order} applies only to this account and plan",
+    "emailCode": "Order email verification code",
+    "sendCode": "Send code",
+    "codeSent": "Code sent",
+    "credential": "Short-lived account token or session JSON",
+    "consent": "I authorize verification and purchase of one subscription period for this order, followed by cancellation of automatic renewal. My account token is used only within this short-lived authorization",
+    "submit": "Submit authorization",
+    "submitting": "Submitting",
+    "submitted": "Authorization submitted; awaiting target account verification. The subscription has not yet been confirmed",
+    "failed": "Completion was not confirmed. Check this order and its authorization before retrying",
+    "invalidCredential": "Enter a valid short-lived token or session JSON containing accessToken",
+    "expired": "This authorization expired. Verify again"
+  },
   "common": {
     "siteName": "Dujiao-Next",
     "loading": "Loading...",

@@ -50,10 +50,24 @@ export const userOrderAPI = {
     stats: (params?: any) => userApi.get('/orders/stats', { params }),
     detail: (orderNo: string, options?: any) => userApi.get(`/orders/${encodeURIComponent(orderNo)}`, options),
     cancel: (orderNo: string) => userApi.post(`/orders/${encodeURIComponent(orderNo)}/cancel`),
+    subscriptionAuthorization: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/subscription-authorization`, { silentBusinessError: true }),
+    openSubscriptionAuthorization: (orderNo: string, data: any) => userApi.post(`/orders/${encodeURIComponent(orderNo)}/subscription-authorization/session`, data, { silentBusinessError: true }),
     downloadFulfillment: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/fulfillment/download`, { blob: true }),
 }
 
 export const guestOrderAPI = {
+    subscriptionAuthorization: (orderNo: string, auth: GuestAuthInput) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.get(`/guest/orders/${encodeURIComponent(orderNo)}/subscription-authorization`, request.options)
+    },
+    challengeSubscriptionAuthorization: (orderNo: string, auth: GuestAuthInput, operationID: string) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.post(`/guest/orders/${encodeURIComponent(orderNo)}/subscription-authorization/challenge`, { operation_id: operationID }, request.options)
+    },
+    openSubscriptionAuthorization: (orderNo: string, auth: GuestAuthInput, data: any) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.post(`/guest/orders/${encodeURIComponent(orderNo)}/subscription-authorization/session`, data, request.options)
+    },
     preview: (data: any) => userApi.post('/guest/orders/preview', data),
     create: (data: any) => userApi.post('/guest/orders', data),
     createAndPay: (data: any) => userApi.post('/guest/orders/create-and-pay', data),

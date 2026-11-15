@@ -128,3 +128,35 @@ func (r *InvoiceRequest) UnmarshalJSON(raw []byte) error {
 	*r = InvoiceRequest(decoded)
 	return nil
 }
+
+// SubscriptionAuthorization stores an order-scoped ownership proof and buyer
+// consent. It never stores the platform credential or the bearer session token.
+type SubscriptionAuthorization struct {
+	ID                 string     `gorm:"primarykey;size:128" json:"-"`
+	OrderID            uint       `gorm:"index;not null" json:"-"`
+	OrderNo            string     `gorm:"size:64;not null" json:"-"`
+	TenantRef          string     `gorm:"size:128;not null" json:"-"`
+	BuyerRef           string     `gorm:"size:128;not null" json:"-"`
+	ConnectionID       uint       `gorm:"not null" json:"-"`
+	UpstreamOrderID    uint       `gorm:"not null" json:"-"`
+	SnapshotHash       string     `gorm:"size:64;not null" json:"-"`
+	GlueSnapshotHash   string     `gorm:"size:64;not null" json:"-"`
+	ContextHash        string     `gorm:"size:64;not null" json:"-"`
+	Platform           string     `gorm:"size:32;not null" json:"-"`
+	Route              string     `gorm:"size:32;not null" json:"-"`
+	Plan               string     `gorm:"size:64;not null" json:"-"`
+	Period             string     `gorm:"size:32;not null" json:"-"`
+	PaymentEnvironment string     `gorm:"size:16;not null" json:"-"`
+	CodeHash           string     `gorm:"size:64" json:"-"`
+	Attempts           int        `gorm:"not null;default:0" json:"-"`
+	CodeExpiresAt      time.Time  `json:"-"`
+	VerifiedAt         *time.Time `json:"-"`
+	ConsentPurchase    bool       `gorm:"not null;default:false" json:"-"`
+	ConsentCancel      bool       `gorm:"not null;default:false" json:"-"`
+	SessionTokenHash   string     `gorm:"size:64" json:"-"`
+	Status             string     `gorm:"size:32;not null;index" json:"-"`
+	CreatedAt          time.Time  `gorm:"index" json:"-"`
+	ExpiresAt          time.Time  `gorm:"index" json:"-"`
+}
+
+func (SubscriptionAuthorization) TableName() string { return "order_subscription_authorizations" }

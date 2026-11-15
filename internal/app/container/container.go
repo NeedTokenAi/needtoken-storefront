@@ -94,6 +94,7 @@ type Container struct {
 	ExternalIdentityStore  externalidentitycontract.Store
 	EmailVerificationStore emailverificationcontract.Store
 	OrderStore             ordercontract.Store
+	OrderAuthStore         ordercontract.SubscriptionAuthorizationStore
 	PaymentStore           paymentcontract.Store
 	PaymentChannelStore    paymentcontract.ChannelStore
 	CardSecretRepo         *cardsecretgormstore.Store
