@@ -1,6 +1,6 @@
 <template>
   <div class="payment-method-strip" :data-payment-state="state" :class="{ 'is-compact': compact, 'is-mobile-inline': mobileInline, 'is-dense': methods.length > 2 }">
-    <div v-if="state === 'ready'" class="payment-methods" role="list" :aria-label="t('needtoken.paymentMarks.label')">
+    <div v-if="state === 'ready'" class="payment-methods" role="list" :aria-label="t('needtoken.paymentMarks.label')" :title="t('needtoken.paymentMarks.checkoutNote')">
       <span class="payment-label" aria-hidden="true">{{ t('needtoken.paymentMarks.label') }}</span>
       <span v-for="method in methods" :key="method.key" class="payment-method" :class="{ 'is-custom': !method.mark }" role="listitem" :title="methodLabel(method)">
         <img v-if="assetFor(method.mark)" :src="assetFor(method.mark)" class="payment-logo" :class="method.mark || undefined" alt="" width="21" height="21" />
@@ -27,7 +27,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Coins, CreditCard, RefreshCw, Wallet } from 'lucide-vue-next'
 import { useAppStore } from '../../../stores/app'
-import { paymentDisplayState, publicPaymentMethods, paymentNetworks, type PaymentMark, type PublicPaymentMethod } from '../lib/paymentMarks'
+import { displayPaymentChannels, paymentDisplayState, publicPaymentMethods, paymentNetworks, type PaymentMark, type PublicPaymentMethod } from '../lib/paymentMarks'
 
 defineProps<{ compact?: boolean; mobileInline?: boolean }>()
 const { t } = useI18n()
@@ -36,7 +36,7 @@ const refreshing = ref(false), refreshFailed = ref(false)
 let disposed = false
 const state = computed(() => refreshing.value ? 'loading' : refreshFailed.value ? 'unavailable' : paymentDisplayState(appStore.config, appStore.loading))
 watch(() => appStore.config, () => { refreshFailed.value = false })
-const channels = computed(() => appStore.config?.wallet_only_payment === true ? [] : appStore.config?.payment_channels)
+const channels = computed(() => displayPaymentChannels(appStore.config))
 const methods = computed(() => publicPaymentMethods(channels.value))
 const networks = computed(() => paymentNetworks(channels.value))
 const brandAssets: Partial<Record<PaymentMark, string>> = {
@@ -72,8 +72,6 @@ onUnmounted(() => { disposed = true })
 .payment-status button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 .payment-skeleton { width: 88px; height: 16px; border-radius: 4px; background: var(--ui-bg-soft); }
 .payment-method.is-custom .payment-method-label { max-width: 112px; overflow: hidden; text-overflow: ellipsis; }
-.payment-logo.alipay { filter: invert(39%) sepia(98%) saturate(2818%) hue-rotate(201deg) brightness(101%) contrast(101%); }
-.payment-logo.wechat { filter: invert(68%) sepia(65%) saturate(480%) hue-rotate(87deg) brightness(94%) contrast(100%); }
 .payment-logo.paypal { filter: invert(66%) sepia(47%) saturate(1459%) hue-rotate(186deg) brightness(107%) contrast(100%); }
 .crypto { color: #a8bcbd; }
 .card { color: #b8c5d9; }

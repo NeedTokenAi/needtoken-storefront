@@ -10,10 +10,13 @@ export interface ApiIntegration {
   filename?: string
 }
 
+export const CC_SWITCH_REFERENCE_URL = 'https://ccswitch.io/'
+export const CC_SWITCH_IMPORT_GUIDE_URL = 'https://github.com/farion1231/cc-switch/blob/main/docs/guides/deeplink-site-integration-guide-en.md'
+
 // Public project-owned sources checked against their current documentation.
 export const API_INTEGRATIONS: ApiIntegration[] = [
   { id: 'opencode', name: 'OpenCode', scenario: 'coding', docs: 'https://opencode.ai/docs/providers/', get: 'https://opencode.ai/product', filename: 'opencode.json' },
-  { id: 'ccswitch', name: 'CC Switch', scenario: 'local', docs: 'https://ccswitch.io/zh/docs?item=service&section=proxy', get: 'https://github.com/farion1231/cc-switch/releases/latest' },
+  { id: 'ccswitch', name: 'CC Switch', scenario: 'local', docs: CC_SWITCH_IMPORT_GUIDE_URL, get: 'https://github.com/farion1231/cc-switch/releases/latest' },
   { id: 'sub2api', name: 'Sub2API', scenario: 'local', docs: 'https://github.com/Wei-Shaw/sub2api', get: 'https://github.com/Wei-Shaw/sub2api#deployment' },
   { id: 'cloudflare', name: 'Cloudflare AI Gateway', scenario: 'cloud', docs: 'https://developers.cloudflare.com/ai-gateway/configuration/custom-providers/', get: 'https://dash.cloudflare.com/', filename: 'needtoken-cloudflare-provider.json' },
   { id: 'openclaw', name: 'OpenClaw', scenario: 'agent', docs: 'https://docs.openclaw.ai/gateway/config-tools/custom-providers', get: 'https://openclaw.ai/', filename: 'needtoken-openclaw.template.json' },
@@ -25,7 +28,7 @@ export const integrationModel = (value: string): string | null => {
 }
 
 const rootEndpoint = (baseUrl: string) => baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '')
-export const integrationEndpoint = (id: IntegrationId, baseUrl: string) => id === 'cloudflare' || id === 'sub2api' || id === 'ccswitch' ? rootEndpoint(baseUrl) : baseUrl
+export const integrationEndpoint = (id: IntegrationId, baseUrl: string) => id === 'cloudflare' || id === 'sub2api' ? rootEndpoint(baseUrl) : baseUrl
 
 export function integrationTemplate(id: IntegrationId, baseUrl: string, model: string): string | null {
   // Provider creation is independent of the model used by the client.
@@ -62,7 +65,7 @@ export function integrationTemplate(id: IntegrationId, baseUrl: string, model: s
   // Cloudflare appends the complete provider path after custom-needtoken/.
   // Keeping /v1 here and in that path would send /v1/v1 upstream.
   if (id === 'sub2api') return `Base URL: ${rootEndpoint(baseUrl)}\nAPI Key: <YOUR_NEEDTOKEN_API_KEY>\nModel: ${modelId}`
-  return `Name: NeedToken\nBase URL: ${rootEndpoint(baseUrl)}\nAPI Key: <YOUR_NEEDTOKEN_API_KEY>\nModel: ${modelId}`
+  return `Name: NeedToken\nBase URL: ${baseUrl}\nAPI Format: OpenAI Chat Completions\nAPI Key: <YOUR_NEEDTOKEN_API_KEY>\nModel: ${modelId}`
 }
 
 export type ApiPreview = 'curl' | 'python' | 'opencode'

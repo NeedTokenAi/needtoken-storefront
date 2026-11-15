@@ -18,7 +18,7 @@ type transportFunc func(*http.Request) (*http.Response, error)
 func (f transportFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }
 
 const summaryFixture = `{"page":{"name":"Official provider","url":"https://other.invalid/","updated_at":"2026-01-01T00:00:00Z"},"status":{"indicator":"none","description":"All Systems Operational"},"components":[{"id":"chatgpt-group","name":"ChatGPT","status":"operational","group":true,"components":["gpt-login"]},{"id":"gpt-login","name":"Login","status":"operational","group_id":"chatgpt-group"}],"private":"must-not-be-returned"}`
-const componentsFixture = `{"components":[{"id":"gpt-login","name":"Login","status":"degraded_performance"},{"id":"api-login","name":"Login","status":"operational"},{"id":"gpt-voice","name":"Voice","status":"operational","group_id":"chatgpt-group"}]}`
+const nativeSummaryFixture = `{"summary":{"name":"OpenAI","components":[{"id":"gpt-login","name":"Login"},{"id":"api-login","name":"Login"},{"id":"gpt-voice","name":"Voice"}],"affected_components":[{"component_id":"gpt-login","status":"degraded_performance"}],"ongoing_incidents":[],"structure":{"items":[{"group":{"id":"chatgpt-group","name":"ChatGPT","components":[{"component_id":"gpt-login"},{"component_id":"gpt-voice"}]}},{"group":{"id":"api-group","name":"APIs","components":[{"component_id":"api-login"}]}}]},"private":"must-not-be-returned"}}`
 
 func upstreamResponse(request *http.Request, status int, body string) *http.Response {
 	return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {"application/json; charset=utf-8"}}, Body: io.NopCloser(strings.NewReader(body)), ContentLength: -1, Request: request}
@@ -34,8 +34,8 @@ func TestOfficialRequestsAreFixedReadOnlyAndOpenAIComponentsAreComplete(t *testi
 		if deadline, ok := request.Context().Deadline(); !ok || time.Until(deadline) > requestTimeout {
 			t.Fatal("official request has no bounded context")
 		}
-		if request.URL.Path == "/api/v2/components.json" {
-			return upstreamResponse(request, 200, componentsFixture), nil
+		if request.URL.Path == "/proxy/status.openai.com" {
+			return upstreamResponse(request, 200, nativeSummaryFixture), nil
 		}
 		return upstreamResponse(request, 200, summaryFixture), nil
 	})})
@@ -43,13 +43,13 @@ func TestOfficialRequestsAreFixedReadOnlyAndOpenAIComponentsAreComplete(t *testi
 		t.Fatal("unsafe status client settings")
 	}
 	summary, err := client.Fetch(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
-	if err != nil || len(requested) != 2 || requested[0] != "https://status.openai.com/api/v2/summary.json" || requested[1] != "https://status.openai.com/api/v2/components.json" {
+	if err != nil || len(requested) != 1 || requested[0] != openAINativeURL {
 		t.Fatalf("official endpoints changed: %v %v", requested, err)
 	}
-	if len(summary.Components) != 4 || summary.Components[1].ID != "gpt-login" || summary.Components[1].Status != "degraded_performance" || summary.Components[1].GroupID != "chatgpt-group" || !summary.Components[0].Group || summary.Components[0].Components[0] != "gpt-login" {
+	if len(summary.Components) != 5 || summary.Components[0].ID != "gpt-login" || summary.Components[0].Status != "degraded_performance" || summary.Components[0].GroupID != "chatgpt-group" || !summary.Components[3].Group || summary.Components[3].Components[0] != "gpt-login" {
 		t.Fatalf("complete component IDs/status/group metadata were lost: %#v", summary.Components)
 	}
-	if summary.Page.URL != "https://status.openai.com/" || summary.Page.UpdatedAt == nil || summary.Page.UpdatedAt.Year() != 2026 || summary.Page.UpdatedAt.Month() != time.January {
+	if summary.Page.URL != "https://status.openai.com/" || summary.Page.UpdatedAt != nil {
 		t.Fatalf("source URL/date relabeled: %#v", summary.Page)
 	}
 	encoded, _ := json.Marshal(summary)
@@ -66,15 +66,15 @@ func TestOfficialRequestsAreFixedReadOnlyAndOpenAIComponentsAreComplete(t *testi
 	}
 }
 
-func TestOpenAICompleteListFailureCannotBecomeFreshPartialStatus(t *testing.T) {
+func TestOpenAINativeFailureCannotFallBackToIncompleteCompatibilityStatus(t *testing.T) {
 	client := NewClient(&http.Client{Transport: transportFunc(func(request *http.Request) (*http.Response, error) {
-		if request.URL.Path == "/api/v2/components.json" {
+		if request.URL.Path == "/proxy/status.openai.com" {
 			return upstreamResponse(request, 503, "private upstream error"), nil
 		}
 		return upstreamResponse(request, 200, summaryFixture), nil
 	})})
 	if _, err := client.Fetch(context.Background(), diagnosticscontract.ServiceStatusOpenAI); !errors.Is(err, diagnosticscontract.ErrServiceStatusUnavailable) {
-		t.Fatal("partial OpenAI summary was accepted after complete list failure")
+		t.Fatal("native failure was accepted as a partial compatibility status")
 	}
 }
 

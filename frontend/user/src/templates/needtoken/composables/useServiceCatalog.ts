@@ -7,8 +7,10 @@ import {
   filterServiceProducts,
   resolveServiceScope,
   serviceKindFromSlug,
-  type ServiceProduct,
+  serviceCardProducts,
+  type ServiceCardProduct,
 } from '../lib/serviceCatalog'
+import { useCatalogRequests } from './useCatalogRequests'
 
 const firstQueryValue = (value: unknown) => String(Array.isArray(value) ? value[0] || '' : value || '').trim()
 const readPage = (value: unknown) => {
@@ -20,10 +22,11 @@ const readPage = (value: unknown) => {
 export function useServiceCatalog() {
   const route = useRoute()
   const router = useRouter()
+  const requests = useCatalogRequests()
   const categories = ref<PublicCategory[]>([])
   const categoriesLoading = ref(true)
   const categoriesError = ref(false)
-  const products = ref<ServiceProduct[]>([])
+  const products = ref<ServiceCardProduct[]>([])
   const loading = ref(false)
   const loadError = ref(false)
   const totalPages = ref(0)
@@ -34,6 +37,7 @@ export function useServiceCatalog() {
   const serviceKind = computed(() => scope.value?.kind || serviceKindFromSlug(slug.value))
   const page = computed(() => readPage(route.query.page))
   let generation = 0
+  let categoryGeneration = 0
   let disposed = false
   // Set when the visitor clicks ALL, so the root URL stays put instead of bouncing to ChatGPT.
   let explicitRootSlug: string | null = null
@@ -65,16 +69,21 @@ export function useServiceCatalog() {
     }
     loading.value = true
     try {
-      const response = await productAPI.list({
+      const params = {
         category_id: currentScope.selected.id,
         page: page.value,
         page_size: 6,
         search: firstQueryValue(route.query.q) || undefined,
+      }
+      const response = await requests.read(`products:${JSON.stringify(params)}`, async () => {
+        const response = await productAPI.list(params)
+        if (!Array.isArray(response.data.data)) throw new Error('Invalid public product response')
+        return response
       })
       if (disposed || ticket !== generation) return
       if (!Array.isArray(response.data.data)) throw new Error('Invalid public product response')
       const rows = response.data.data
-      products.value = filterServiceProducts(rows, currentScope)
+      products.value = serviceCardProducts(filterServiceProducts(rows, currentScope), currentScope.kind)
       const pages = Number(response.data.pagination?.total_page)
       const total = Number(response.data.pagination?.total)
       totalPages.value = Number.isSafeInteger(pages) && pages >= 0 ? pages : 0
@@ -90,25 +99,31 @@ export function useServiceCatalog() {
   }
 
   const loadCategories = async () => {
+    const ticket = ++categoryGeneration
+    generation++
     categoriesLoading.value = true
     categoriesError.value = false
     try {
-      const response = await categoryAPI.list()
-      if (disposed) return
+      const response = await requests.read('categories', async () => {
+        const response = await categoryAPI.list()
+        if (!Array.isArray(response.data.data)) throw new Error('Invalid public category response')
+        return response
+      })
+      if (disposed || ticket !== categoryGeneration) return
       if (!Array.isArray(response.data.data)) throw new Error('Invalid public category response')
       const rows = response.data.data as PublicCategory[]
       const child = defaultServiceChild(resolveServiceScope(rows, slug.value), explicitRootSlug)
       if (child?.slug && child.slug !== slug.value) {
         await router.replace({ path: `/categories/${child.slug}`, query: queryWithoutPage() }).catch(() => {})
-        if (disposed) return
+        if (disposed || ticket !== categoryGeneration) return
       }
       categories.value = rows
       categoriesLoading.value = false
       await loadProducts()
     } catch {
-      if (!disposed) categoriesError.value = true
+      if (!disposed && ticket === categoryGeneration) categoriesError.value = true
     } finally {
-      if (!disposed) categoriesLoading.value = false
+      if (!disposed && ticket === categoryGeneration) categoriesLoading.value = false
     }
   }
 
@@ -147,7 +162,11 @@ export function useServiceCatalog() {
     })()
   })
   onMounted(() => { void loadCategories() })
-  onUnmounted(() => { disposed = true; generation += 1 })
+  watch(requests.scopeKey, () => {
+    generation++
+    if (!disposed) void loadCategories()
+  })
+  onUnmounted(() => { disposed = true; generation += 1; categoryGeneration += 1 })
 
   return {
     scope, serviceKind, categoriesLoading, categoriesError, products, loading, loadError,

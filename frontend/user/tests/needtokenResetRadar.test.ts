@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fetchResetFeed, parseResetFeed, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetElapsedTime, resetFeedIsExpired, resetSourceUrl } from '../src/templates/needtoken/lib/resetRadar.ts'
+import { fetchResetFeed, parseResetFeed, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetCalendar, resetElapsedTime, resetFeedIsExpired, resetRecordPage, resetSourceUrl, resetStatistics } from '../src/templates/needtoken/lib/resetRadar.ts'
 
 // Synthetic contract fixtures. These do not verify a live upstream or account delivery.
 const fixtureRecord = (overrides: Record<string, unknown> = {}) => ({
@@ -104,4 +104,59 @@ test('HTTP or business failures and SPA HTML responses never count as successful
     await assert.rejects(fetchResetFeed(controller.signal, async () => result))
   }
   await assert.rejects(fetchResetFeed(controller.signal, async () => { throw new TypeError('Synthetic offline failure') }))
+})
+
+
+test('historical intervals and elapsed time use actual usage resets, not newer reset-credit announcements', () => {
+  const feed = parseResetFeed(fixtureFeed([
+    fixtureRecord({ id: 'regular-older', announced_at: '2026-11-01T00:00:00Z' }),
+    fixtureRecord({ id: 'regular-latest', announced_at: '2026-11-07T00:00:00Z' }),
+    fixtureRecord({ id: 'credit-newer', type: 'banked', announced_at: '2026-11-08T00:00:00Z' }),
+    fixtureRecord({ id: 'future-reset', announced_at: '2026-11-20T00:00:00Z' }),
+  ]))
+  const stats = resetStatistics(feed.records, Date.parse('2026-11-09T00:00:00Z'))
+  assert.equal(stats.lastResetAt, Date.parse('2026-11-07T00:00:00Z'))
+  assert.equal(stats.averageIntervalDays, 6)
+  assert.equal(stats.elapsedDays, 2)
+  assert.equal(stats.averageRemainingDays, 4)
+  assert.deepEqual([stats.total, stats.regular, stats.banked], [3, 2, 1])
+  const creditOnly = resetStatistics(feed.records.filter(record => record.type === 'banked'))
+  assert.equal(creditOnly.averageIntervalDays, null)
+  assert.equal(creditOnly.elapsedDays, null)
+})
+
+test('rolling thirty-day counts keep the previous interval separate without counting future records', () => {
+  const now = Date.parse('2026-11-15T00:00:00Z')
+  const rows = [0, 29, 30, 59, 60, -1].map((days, index) => fixtureRecord({ id: `window-${index}`, announced_at: new Date(now - days * 86400000).toISOString() }))
+  const stats = resetStatistics(parseResetFeed(fixtureFeed(rows)).records, now)
+  assert.equal(stats.recent30, 2)
+  assert.equal(stats.previous30, 2)
+})
+
+test('reset calendar groups UTC+8 days, keeps mixed reset types, and marks uncovered dates honestly', () => {
+  const rows = parseResetFeed(fixtureFeed([
+    fixtureRecord({ id: 'regular-day', announced_at: '2026-11-13T17:00:00Z' }),
+    fixtureRecord({ id: 'credit-same-day', type: 'banked', announced_at: '2026-11-14T15:00:00Z' }),
+    fixtureRecord({ id: 'next-local-day', announced_at: '2026-11-14T16:00:00Z' }),
+  ])).records
+  const weeks = resetCalendar(rows, Date.parse('2026-11-15T04:00:00Z'))
+  assert.equal(new Date(`${weeks[0]![0]!.date}T00:00:00Z`).getUTCDay(), 1)
+  const days = weeks.flat()
+  const mixedDay = days.find(day => day.date === '2026-11-14')!
+  assert.deepEqual([mixedDay.regular, mixedDay.banked, mixedDay.inCoverage], [1, 1, true])
+  assert.equal(days.find(day => day.date === '2026-11-15')?.regular, 1)
+  assert.equal(days.find(day => day.date === '2026-11-13')?.inCoverage, false)
+  assert.equal(resetCalendar(rows, Date.parse('2026-11-14T04:00:00Z')).flat().find(day => day.date === '2026-11-15')?.future, true)
+})
+
+test('each reset-history filter starts with ten records and expands in ten-record pages', () => {
+  const rows = parseResetFeed(fixtureFeed(Array.from({ length: 45 }, (_, index) => fixtureRecord({ id: `page-${index}`, type: index % 2 ? 'regular' : 'banked' })))).records
+  for (const type of ['all', 'regular', 'banked'] as const) {
+    const first = resetRecordPage(rows, type)
+    const second = resetRecordPage(rows, type, 20)
+    assert.equal(first.records.length, 10)
+    assert.equal(second.records.length, 20)
+    assert.equal(first.remaining - second.remaining, 10)
+    assert.ok(type === 'all' || first.records.every(record => record.type === type))
+  }
 })

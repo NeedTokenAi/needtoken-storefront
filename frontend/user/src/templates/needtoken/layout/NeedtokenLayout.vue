@@ -1,5 +1,5 @@
 <template>
-  <div ref="scopeEl" class="nt-scope">
+  <div ref="scopeEl" class="nt-scope" @pointerover.passive="prefetchLink" @focusin="prefetchLink" @touchstart.passive="prefetchLink">
     <header class="nt-site-header sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
       <div class="nt-header-inner mx-auto flex h-16 w-full max-w-[1320px] items-center gap-2 sm:gap-4">
         <RouterLink to="/" class="nt-brand flex min-w-0 items-center gap-2 text-[15px] font-bold tracking-tight text-foreground sm:shrink-0 sm:text-[17px]" :title="brandName" :aria-label="brandName">
@@ -104,6 +104,7 @@ import NeedtokenFooter from '../components/NeedtokenFooter.vue'
 import GhostFibersBackground from '../components/GhostFibersBackground.vue'
 import SupportWidget from '../components/SupportWidget.vue'
 import { useNeedtokenEffects } from '../composables/useNeedtokenEffects'
+import { prefetchStorefrontRoute } from '../../../router'
 import { normalizeNeedtokenSupport } from '../lib/supportConfig'
 import '../styles/needtoken.css'
 
@@ -116,6 +117,11 @@ const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
 const scopeEl = ref<HTMLElement | null>(null)
 useNeedtokenEffects(scopeEl)
+
+function prefetchLink(event: Event) {
+  const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null
+  if (link && !link.hasAttribute('download') && link.target !== '_blank') prefetchStorefrontRoute(link.href)
+}
 
 const langOpen = ref(false)
 const moreOpen = ref(false)

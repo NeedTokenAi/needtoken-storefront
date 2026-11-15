@@ -43,6 +43,7 @@ type Settings interface {
 // PaymentChannels 公开支付渠道端口。
 type PaymentChannels interface {
 	GetOrderPaymentChannels() ([]map[string]interface{}, error)
+	GetDisplayPaymentChannels() ([]map[string]interface{}, error)
 }
 
 // CaptchaPublic 公开验证码配置端口。
@@ -160,6 +161,12 @@ func (h *Handler) GetConfig(c *gin.Context) {
 		return
 	}
 	data["payment_channels"] = publicChannels
+	displayChannels, err := h.payments.GetDisplayPaymentChannels()
+	if err != nil {
+		ginutil.RespondError(c, response.CodeInternal, "error.config_fetch_failed", err)
+		return
+	}
+	data["display_payment_channels"] = displayChannels
 
 	walletRechargeChannelIDs := h.settings.GetWalletRechargeChannelIDs()
 	if len(walletRechargeChannelIDs) > 0 {

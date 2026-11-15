@@ -39,7 +39,7 @@
       </div>
       <template v-else>
         <div class="nt-service-catalog__grid">
-          <ServiceProductCard v-for="product in products" :key="product.id" :product="product" :kind="serviceKind!" :category-label="categoryLabel(product.category_id)" />
+          <ServiceProductCard v-for="product in products" :key="serviceCardKey(product)" :product="product" :kind="serviceKind!" :category-label="categoryLabel(product.category_id)" />
         </div>
         <PaginationNav :current-page="page" :total-pages="totalPages" :loading="loading" compact @change-page="changePage" />
       </template>
@@ -67,6 +67,7 @@ import ServiceProductCard from './components/ServiceProductCard.vue'
 import CatalogueTools from './components/CatalogueTools.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import { useServiceCatalog } from './composables/useServiceCatalog'
+import { serviceCardKey } from './lib/serviceCatalog'
 
 const { t } = useI18n()
 const route = useRoute()

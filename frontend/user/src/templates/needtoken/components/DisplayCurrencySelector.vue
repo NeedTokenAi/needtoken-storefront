@@ -33,6 +33,10 @@ const currencyOptions = computed(() => availableCurrencies.value.map(code => ({ 
 .nt-display-currency__settlement { flex-basis: 100%; text-align: right; font-size: 11px; overflow-wrap: anywhere; }
 .nt-display-currency--compact { gap: 8px; font-size: 11px; }
 .nt-display-currency__mobile-code { display: none; }
+.nt-display-currency--compact.nt-display-currency--mobile-code .nt-display-currency__leading-icon { display: none; }
+.nt-display-currency--compact.nt-display-currency--mobile-code .nt-display-currency__mobile-code { display: inline; color: var(--ui-text-primary); }
+.nt-display-currency--compact.nt-display-currency--mobile-code :deep(.nt-theme-select__value) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.nt-display-currency--compact.nt-display-currency--mobile-code :deep(.nt-theme-select__trigger) { width: auto; min-width: 72px; min-height: 34px; padding: 7px 10px; gap: 10px; }
 .nt-display-currency :deep(.nt-theme-select__trigger) { border-radius: 10px; box-shadow: none; font-weight: 500; font-variant-numeric: tabular-nums; transition: color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), border-color var(--nt-motion-fast, 120ms), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
 .nt-display-currency :deep(.nt-theme-select__trigger):active:not(:disabled) { transform: translateY(1px); }
 @media (max-width: 640px) {

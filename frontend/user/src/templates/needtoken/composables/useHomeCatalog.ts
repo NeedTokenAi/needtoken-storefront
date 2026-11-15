@@ -1,19 +1,22 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { categoryAPI, productAPI } from '../../../api'
 import type { PublicCategory } from '../../../utils/category'
 import { sortHomeProductsByPrice } from '../lib/homeCardPresentation'
 import {
-  defaultServiceChild,
+  homeServiceSelectionId,
   filterServiceProducts,
   resolveServiceScope,
+  serviceCardProducts,
   type ServiceKind,
-  type ServiceProduct,
+  type ServiceCardProduct,
   type ServiceScope,
 } from '../lib/serviceCatalog'
+import { useCatalogRequests } from './useCatalogRequests'
 
 export function useHomeCatalog() {
   const categories = ref<PublicCategory[]>([])
-  const products = ref<ServiceProduct[]>([])
+  const products = ref<ServiceCardProduct[]>([])
+  const requests = useCatalogRequests()
   const categoriesLoading = ref(true)
   const productsLoading = ref(false)
   const loading = computed(() => categoriesLoading.value || productsLoading.value)
@@ -27,17 +30,22 @@ export function useHomeCatalog() {
   const scope = computed(() => resolveServiceScope(categories.value, kind.value))
   const childCategories = computed(() => scope.value?.categories ?? [])
 
-  const applyDefaultSelection = () => {
-    const current = scope.value
-    if (!current?.root) {
-      selectedId.value = 0
-      return
-    }
-    const child = defaultServiceChild({ ...current, selected: current.root }) || current.categories[0]
-    selectedId.value = child?.id || current.root.id
+  const applySelection = (preserve = false) => {
+    selectedId.value = homeServiceSelectionId(scope.value, preserve ? selectedId.value : 0)
   }
 
-  const loadProducts = async () => {
+  const requestProducts = (id: number, force = false) => requests.read(`products:${id}:1:12`, async () => {
+    const response = await productAPI.list({ category_id: id, page: 1, page_size: 12 })
+    if (!Array.isArray(response.data.data)) throw new Error('invalid public product response')
+    return response
+  }, force)
+
+  const prefetchCategory = (id: number) => {
+    if (categoriesLoading.value || !scope.value?.categories.some(row => row.id === id)) return
+    void requestProducts(id).catch(() => {})
+  }
+
+  const loadProducts = async (force = false) => {
     // A service tab can change before the first category request returns.
     // Keep the catalogue skeleton until that request can resolve its scope.
     if (categoriesLoading.value) return
@@ -58,11 +66,11 @@ export function useHomeCatalog() {
       return
     }
     try {
-      const response = await productAPI.list({ category_id: selected.id, page: 1, page_size: 12 })
+      const response = await requestProducts(selected.id, force)
       if (disposed || ticket !== generation) return
       if (!Array.isArray(response.data.data)) throw new Error('invalid public product response')
       const scoped: ServiceScope = { ...current, selected }
-      products.value = sortHomeProductsByPrice(filterServiceProducts(response.data.data, scoped))
+      products.value = sortHomeProductsByPrice(serviceCardProducts(filterServiceProducts(response.data.data, scoped), kind.value))
     } catch {
       if (!disposed && ticket === generation) error.value = true
     } finally {
@@ -70,7 +78,7 @@ export function useHomeCatalog() {
     }
   }
 
-  const load = async () => {
+  const load = async (force = false) => {
     const ticket = ++categoryGeneration
     generation += 1
     categoriesLoading.value = true
@@ -78,13 +86,17 @@ export function useHomeCatalog() {
     products.value = []
     error.value = false
     try {
-      const response = await categoryAPI.list()
+      const response = await requests.read('categories', async () => {
+        const response = await categoryAPI.list()
+        if (!Array.isArray(response.data.data)) throw new Error('invalid public category response')
+        return response
+      }, force)
       if (disposed || ticket !== categoryGeneration) return
       if (!Array.isArray(response.data.data)) throw new Error('invalid public category response')
       categories.value = response.data.data
-      applyDefaultSelection()
+      applySelection(true)
       categoriesLoading.value = false
-      await loadProducts()
+      await loadProducts(force)
     } catch {
       if (!disposed && ticket === categoryGeneration) {
         error.value = true
@@ -97,7 +109,7 @@ export function useHomeCatalog() {
   const setKind = (next: ServiceKind) => {
     if (kind.value === next) return
     kind.value = next
-    applyDefaultSelection()
+    applySelection()
     void loadProducts()
   }
 
@@ -110,6 +122,7 @@ export function useHomeCatalog() {
   }
 
   onMounted(() => { void load() })
+  watch(requests.scopeKey, () => { if (!disposed) void load() })
   onUnmounted(() => {
     disposed = true
     generation += 1
@@ -127,6 +140,7 @@ export function useHomeCatalog() {
     error,
     setKind,
     selectCategory,
-    reload: load,
+    prefetchCategory,
+    reload: () => load(true),
   }
 }

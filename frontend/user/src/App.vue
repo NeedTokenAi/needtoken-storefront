@@ -24,7 +24,7 @@
             <div v-if="!Component" :class="{ 'nt-home-route-placeholder': route.path === '/' }">
               <NeedtokenSkeleton :kind="route.path === '/' ? 'prices' : 'page'" :count="route.path === '/' ? 4 : 3" />
             </div>
-            <Transition name="page-fade" mode="out-in">
+            <Transition name="nt-page">
               <component :is="Component" v-if="Component" />
             </Transition>
           </RouterView>
@@ -159,6 +159,10 @@ watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(va
 .page-fade-leave-to {
   opacity: 0;
 }
+.nt-page-enter-active { transition: opacity 160ms ease-out, transform 160ms ease-out; }
+.nt-page-enter-from { opacity: .5; transform: translateY(3px); }
+/* The new page mounts immediately: no outgoing fade holding the next page blank. */
+.nt-page-leave-active { display: none; }
 .nt-route-progress { position: fixed; inset: 64px 0 auto; z-index: 45; height: 2px; overflow: hidden; pointer-events: none; background: #2dd4a70c; }
 .nt-route-progress > span:first-child { display: block; width: 35%; height: 100%; background: #2dd4a7; animation: nt-route-travel 1.1s ease-in-out infinite; }
 .nt-route-error { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #e5b96940; color: #e5b969; font-size: 12px; line-height: 1.7; }
@@ -166,5 +170,5 @@ watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(va
 .nt-home-route-placeholder { max-width: 1320px; min-height: 480px; margin: 0 auto; padding: 48px 24px; }
 @media (max-width: 640px) { .nt-home-route-placeholder { padding: 32px 20px; } }
 @keyframes nt-route-travel { from { transform: translateX(-105%); } to { transform: translateX(390%); } }
-@media (prefers-reduced-motion: reduce) { .page-fade-enter-active, .page-fade-leave-active { transition: none; } .nt-route-progress > span:first-child { animation: none; width: 100%; opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .page-fade-enter-active, .page-fade-leave-active, .nt-page-enter-active { transition: none; } .nt-page-enter-from { opacity: 1; transform: none; } .nt-route-progress > span:first-child { animation: none; width: 100%; opacity: .6; } }
 </style>

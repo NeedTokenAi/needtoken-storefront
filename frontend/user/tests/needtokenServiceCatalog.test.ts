@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   activeServiceSkus, defaultServiceChild, filterServiceProducts, resolveServiceScope, serviceAvailability,
-  serviceCategoryIds, serviceDescriptionText, serviceSkuPrice,
+  homeServiceSelectionId, serviceCategoryIds, serviceDescriptionText, serviceSkuPrice,
 } from '../src/templates/needtoken/lib/serviceCatalog.ts'
 
 const categories = [
@@ -51,6 +51,20 @@ test('root without the ChatGPT child stays on ALL', () => {
   ]
   assert.equal(defaultServiceChild(resolveServiceScope(rows, 'recharge')), null)
   assert.equal(defaultServiceChild(resolveServiceScope(rows, 'rental')), null)
+})
+
+test('catalogue refresh retains the chosen brand while removed categories and new service branches choose a valid default', () => {
+  const rows = [...categories,
+    { id: 6, slug: 'meta-recharge', parent_id: 1 },
+    { id: 7, slug: 'gemini-recharge', parent_id: 1 },
+    { id: 8, slug: 'grok-recharge', parent_id: 1 },
+  ]
+  const refreshed = resolveServiceScope([...rows].reverse(), 'recharge')!
+  for (const selectedId of [1, 3, 6, 7, 8]) assert.equal(homeServiceSelectionId(refreshed, selectedId), selectedId)
+  assert.equal(homeServiceSelectionId(refreshed), 2, 'initial visit retains the intended ChatGPT default')
+  assert.equal(homeServiceSelectionId(resolveServiceScope(rows.filter(row => row.id !== 7), 'recharge'), 7), 2)
+  assert.equal(homeServiceSelectionId(resolveServiceScope(rows, 'rental'), 7), 5, 'an old recharge category cannot cross into rental')
+  assert.equal(homeServiceSelectionId(resolveServiceScope([], 'recharge'), 7), 0)
 })
 
 test('direct child category retains its service identity and sibling filters', () => {

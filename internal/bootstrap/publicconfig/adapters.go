@@ -5,6 +5,7 @@ import (
 	"time"
 
 	paymentapp "github.com/dujiao-next/internal/modules/payment/application"
+	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 
 	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
 	settingsintegration "github.com/dujiao-next/internal/modules/settings/schema/integration"
@@ -114,6 +115,28 @@ func (a publicConfigPaymentAdapter) GetOrderPaymentChannels() ([]map[string]inte
 	return a.payments.GetAvailableChannels(paymentapp.AvailablePaymentChannelFilter{
 		PaymentType: constants.PaymentTypeOrder,
 	})
+}
+
+// GetDisplayPaymentChannels exposes configured payment brands, independent of
+// an anonymous visitor's checkout eligibility. Credentials and eligibility rules
+// stay private; the order and wallet endpoints still enforce those rules.
+func (a publicConfigPaymentAdapter) GetDisplayPaymentChannels() ([]map[string]interface{}, error) {
+	channels, _, err := a.payments.ListChannels(paymentcontract.ChannelListFilter{
+		Page: 1, PageSize: 200, ActiveOnly: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	display := make([]map[string]interface{}, 0, len(channels))
+	for _, channel := range channels {
+		if !channel.IsActive || channel.DeletedAt != nil || channel.ChannelType == constants.PaymentChannelTypeBalance {
+			continue
+		}
+		display = append(display, map[string]interface{}{
+			"id": channel.ID, "name": channel.Name, "channel_type": channel.ChannelType,
+		})
+	}
+	return display, nil
 }
 
 type publicConfigCaptchaAdapter struct {

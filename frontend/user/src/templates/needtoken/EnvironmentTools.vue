@@ -1,6 +1,5 @@
 <template>
   <div class="nt-claude-network">
-    <ToolNavigation />
     <header class="network-heading">
       <div><span class="tool-capability"><Network :size="16" :stroke-width="1.5" aria-hidden="true" />{{ t('needtoken.toolsPolish.networkScope') }}</span><h1>{{ t('needtoken.environmentV6.title') }}</h1><p>{{ t('needtoken.environmentV6.subtitle') }}</p></div>
       <div class="network-actions">
@@ -57,7 +56,6 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowUpRight, ChevronDown, Code2, Copy, Download, FileJson, Globe2, Info, LoaderCircle, Monitor, Network, Play, Square, Terminal, Upload } from 'lucide-vue-next'
-import ToolNavigation from './components/ToolNavigation.vue'
 import { usePageSeo } from '../../composables/usePageSeo'
 import { CLAUDE_PROBES, CLAUDE_SERVICES, claudeNetworkReport, collectClaudeLocalChecks, parseCliReport, runClaudeNetworkChecks, timezoneDiffers } from './lib/claudeNetwork'
 import type { ConnectionDiagnostic } from './lib/browserDiagnostics'

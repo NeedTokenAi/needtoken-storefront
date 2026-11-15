@@ -36,45 +36,26 @@ func NewClient(client *http.Client) *Client {
 }
 
 func (c *Client) Fetch(ctx context.Context, provider diagnosticscontract.ServiceStatusProvider) (diagnosticscontract.ServiceStatusSummary, error) {
-	var sourceURL string
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
 	switch provider {
 	case diagnosticscontract.ServiceStatusOpenAI:
-		sourceURL = "https://status.openai.com/"
+		// OpenAI's Atlassian-compatible API drops product groups and incident
+		// component associations. Use the same native source as its public page.
+		body, err := c.read(ctx, openAINativeURL)
+		if err != nil {
+			return diagnosticscontract.ServiceStatusSummary{}, err
+		}
+		return parseIncidentIOSummary(body)
 	case diagnosticscontract.ServiceStatusClaude:
-		sourceURL = "https://status.claude.com/"
+		body, err := c.read(ctx, "https://status.claude.com/api/v2/summary.json")
+		if err != nil {
+			return diagnosticscontract.ServiceStatusSummary{}, err
+		}
+		return parseSummary(body, "https://status.claude.com/")
 	default:
 		return diagnosticscontract.ServiceStatusSummary{}, diagnosticscontract.ErrServiceStatusProvider
 	}
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
-	defer cancel()
-	body, err := c.read(ctx, sourceURL+"api/v2/summary.json")
-	if err != nil {
-		return diagnosticscontract.ServiceStatusSummary{}, err
-	}
-	summary, err := parseSummary(body, sourceURL)
-	if err != nil {
-		return diagnosticscontract.ServiceStatusSummary{}, err
-	}
-	if provider == diagnosticscontract.ServiceStatusOpenAI {
-		// OpenAI's summary currently contains only a subset of its components.
-		// A failed full-list request must not create a fresh partial green result.
-		body, err = c.read(ctx, sourceURL+"api/v2/components.json")
-		if err != nil {
-			return diagnosticscontract.ServiceStatusSummary{}, err
-		}
-		var payload struct {
-			Components json.RawMessage `json:"components"`
-		}
-		if json.Unmarshal(body, &payload) != nil {
-			return diagnosticscontract.ServiceStatusSummary{}, diagnosticscontract.ErrServiceStatusUnavailable
-		}
-		components, err := parseComponents(payload.Components)
-		if err != nil {
-			return diagnosticscontract.ServiceStatusSummary{}, err
-		}
-		summary.Components = mergeComponents(summary.Components, components)
-	}
-	return summary, nil
 }
 
 func (c *Client) read(ctx context.Context, endpoint string) ([]byte, error) {
@@ -172,33 +153,6 @@ func parseComponents(body json.RawMessage) ([]diagnosticscontract.ServiceStatusC
 		}
 	}
 	return rows, nil
-}
-
-func mergeComponents(summary, complete []diagnosticscontract.ServiceStatusComponent) []diagnosticscontract.ServiceStatusComponent {
-	merged := append([]diagnosticscontract.ServiceStatusComponent{}, summary...)
-	positions := make(map[string]int, len(summary))
-	for index, row := range merged {
-		positions[row.ID] = index
-	}
-	for _, row := range complete {
-		if index, found := positions[row.ID]; found {
-			previous := merged[index]
-			// The later complete response supplies status while summary-only group
-			// metadata remains useful for matching services without name guesses.
-			row.Group = row.Group || previous.Group
-			if row.GroupID == "" {
-				row.GroupID = previous.GroupID
-			}
-			if len(row.Components) == 0 {
-				row.Components = previous.Components
-			}
-			merged[index] = row
-		} else {
-			positions[row.ID] = len(merged)
-			merged = append(merged, row)
-		}
-	}
-	return merged
 }
 
 var _ diagnosticscontract.ServiceStatusSource = (*Client)(nil)

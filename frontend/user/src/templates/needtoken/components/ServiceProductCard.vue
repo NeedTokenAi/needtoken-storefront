@@ -76,16 +76,16 @@ import { useUserAuthStore } from '../../../stores/userAuth'
 import { getFirstImageUrl } from '../../../utils/image'
 import { formatServiceMoney } from '../lib/displayMoney'
 import { useDisplayCurrency } from '../composables/useDisplayCurrency'
-import { selectServiceVariant, serviceSkuPresentation, serviceVariantAxes, serviceVariantLabel, type ServiceVariantAxis } from '../lib/serviceVariants'
+import { selectServiceVariant, serviceCardTitle, serviceSkuPresentation, serviceVariantAxes, serviceVariantLabel, type ServiceVariantAxis } from '../lib/serviceVariants'
 import { apiPlanMemberLoginPath } from '../lib/apiPlanCatalog'
 import { homeCardBrand, homeCardPriceSuffix, homeCardTitle } from '../lib/homeCardPresentation'
 import ProductBrandMark from './ProductBrandMark.vue'
 import {
   activeServiceSkus, serviceAvailability, serviceDescriptionText, serviceSkuPrice,
-  type ServiceKind, type ServiceProduct, type ServiceSku,
+  type ServiceKind, type ServiceCardProduct, type ServiceSku,
 } from '../lib/serviceCatalog'
 
-const props = defineProps<{ product: ServiceProduct; kind: ServiceKind; categoryLabel?: string; memberOnly?: boolean; ctaLabel?: string; deliveryText?: string; descriptionFallback?: string }>()
+const props = defineProps<{ product: ServiceCardProduct; kind: ServiceKind; categoryLabel?: string; memberOnly?: boolean; ctaLabel?: string; deliveryText?: string; descriptionFallback?: string }>()
 const { t } = useI18n()
 const appStore = useAppStore()
 const userAuthStore = useUserAuthStore()
@@ -103,7 +103,7 @@ const price = computed(() => serviceSkuPrice(selectedSku.value))
 const image = computed(() => getFirstImageUrl(props.product.images))
 const description = computed(() => serviceDescriptionText(getLocalizedText(props.product.description)))
 const presentation = computed(() => serviceSkuPresentation(selectedSku.value, appStore.locale))
-const titleParts = computed(() => homeCardTitle(presentation.value.title || getLocalizedText(props.product.title)))
+const titleParts = computed(() => homeCardTitle(serviceCardTitle(props.product, selectedSku.value, appStore.locale)))
 const brand = computed(() => homeCardBrand(props.product, selectedSku.value, appStore.locale))
 const priceSuffix = computed(() => homeCardPriceSuffix(presentation.value.priceSuffix))
 const displayDescription = computed(() => presentation.value.description || description.value || props.descriptionFallback || t(`needtoken.catalogServices.${props.kind}.descriptionFallback`))
@@ -135,6 +135,9 @@ watch(image, () => { imageErrored.value = false })
 .nt-service-card__identity { display: flex; flex: 1 1 90px; align-items: center; gap: 8px; min-width: 0; }
 .nt-service-card__icon { --product-brand-ink: #c7e9de; display: grid; width: 28px; height: 28px; flex-shrink: 0; place-items: center; overflow: hidden; color: var(--ui-accent); border: 1px solid var(--ui-border); background: var(--ui-bg-soft); border-radius: 8px; }
 .nt-service-card[data-brand="claude"] .nt-service-card__icon { --product-brand-ink: #dbab91; }
+.nt-service-card[data-brand="meta"] .nt-service-card__icon { --product-brand-ink: #66a0ff; }
+.nt-service-card[data-brand="gemini"] .nt-service-card__icon { --product-brand-ink: #8cabff; }
+.nt-service-card[data-brand="grok"] .nt-service-card__icon { --product-brand-ink: #e9edf1; }
 .nt-service-card__icon > svg { width: 17px; height: 17px; }
 .nt-service-card__icon img { width: 100%; height: 100%; object-fit: contain; }
 .nt-service-card__icon > :is(img, svg, .product-brand-mark) { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }

@@ -64,8 +64,18 @@ export function paymentDisplayState(config: unknown, loading = false): PaymentDi
   if (!config || typeof config !== 'object' || Array.isArray(config)) return 'unavailable'
   const value = config as Record<string, unknown>
   if (value.wallet_only_payment === true) return 'wallet'
-  if (!Array.isArray(value.payment_channels)) return 'unavailable'
-  return publicPaymentMethods(value.payment_channels).length ? 'ready' : 'empty'
+  const channels = displayPaymentChannels(value)
+  if (!Array.isArray(channels)) return 'unavailable'
+  return publicPaymentMethods(channels).length ? 'ready' : 'empty'
+}
+
+/** Brand metadata is separate from the order-specific payment channel list. */
+export function displayPaymentChannels(config: unknown): unknown {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return undefined
+  const value = config as Record<string, unknown>
+  if (value.wallet_only_payment === true) return []
+  // An explicit empty list is authoritative; only older servers lack this field.
+  return Object.prototype.hasOwnProperty.call(value, 'display_payment_channels') ? value.display_payment_channels : value.payment_channels
 }
 
 /** Gateway names (including BEpusdt) do not identify a token or network. */
