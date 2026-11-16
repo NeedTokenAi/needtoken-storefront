@@ -3060,6 +3060,21 @@
         "recentRecords": "檢視最近事件",
         "allUpdates": "查看全部 {count} 則進展",
         "otherIncidents": "另有 {count} 起進行中的事件"
+      },
+      "daily": {
+        "chooseDay": "選擇一天檢視狀態",
+        "keyboardHelp": "使用左右方向鍵切換日期，Home 和 End 跳至首末日期，Escape 關閉日詳情",
+        "detailLabel": "{product} {date} 狀態詳情",
+        "close": "關閉日詳情",
+        "noFaultRecords": "沒有已關聯的故障記錄",
+        "unknownDay": "當天狀態未知",
+        "partialCoverage": "該日歷史涵蓋不完整，不能據此確認全天正常",
+        "historyUnavailable": "官方歷史記錄暫時無法取得，無法確認當天狀態",
+        "currentCheck": "最新檢查 {time}：{status}",
+        "navigate": "切換歷史日期",
+        "previous": "前一天",
+        "next": "後一天",
+        "dayPosition": "{index} / {total}"
       }
     },
     "radar": {
@@ -3481,8 +3496,8 @@
       "averageRemaining": "依歷史平均間隔，還差",
       "averagePassed": "已超過歷史平均間隔",
       "averageEvery": "平均每 {days} 天一次",
-      "averageNote": "依已收錄的額度重置統計，並非下次重置預告。",
-      "elapsedDays": "距上次重置已過 {days} 天",
+      "averageNote": "僅統計本次收錄的額度重置記錄，不含重置卡；不是下次重置預告",
+      "elapsedDays": "距最近額度重置記錄已過 {days} 天",
       "noRegular": "暫無額度重置紀錄",
       "recorded": "收錄紀錄",
       "times": "次",
@@ -3497,7 +3512,35 @@
       "noRecord": "未收錄紀錄",
       "outsideCoverage": "不在已收錄紀錄範圍內",
       "coverage": "依已收錄的 {count} 筆紀錄統計。",
-      "partialCoverage": "依最近 {count} 筆紀錄統計，未涵蓋完整歷史。"
+      "partialCoverage": "依最近 {count} 筆紀錄統計，未涵蓋完整歷史。",
+      "regularElapsed": "距最近額度重置記錄"
+    },
+    "radarLayout": {
+      "description": "追蹤 Codex 額度重置與重置卡公告",
+      "elapsed": "距最近記錄",
+      "latestAt": "最近記錄 {date}",
+      "activityTitle": "近 30 天記錄",
+      "activityScope": "僅統計本次載入記錄",
+      "today": "今天",
+      "dayLabel": "{date} · 額度重置 {regular} 則 · 重置卡 {banked} 則",
+      "loadedCount": "已載入記錄",
+      "regularCount": "額度重置",
+      "bankedCount": "重置卡",
+      "history": "重置記錄",
+      "fullText": "記錄全文",
+      "rules": "重置規則",
+      "dataSource": "資料與來源",
+      "sourceShort": "第三方記錄，個人額度以官方用量頁為準",
+      "fetchedAt": "取得於 {date}",
+      "polling": "每分鐘更新",
+      "recordCount": "{count} 則",
+      "usage": "查看我的額度",
+      "coverage": "已載入 {count} 則，不代表全部歷史",
+      "showMore": "顯示更多",
+      "visibleCount": "{shown} / {count} 則",
+      "statistics": "歷史統計與全年記錄",
+      "scope": "公開記錄追蹤",
+      "pollingDetail": "每分鐘取得 · 頁面切至背景時暫停"
     }
   }
 }

@@ -98,7 +98,19 @@ const target = computed(() => ({ path: `/products/${props.product.slug}`, query:
 }
 a.home-price-card:active { transform: translateY(1px); box-shadow: 0 1px 4px #00000012; }
 a.home-price-card:active .home-price-mark, a.home-price-card:active .home-price-art img { transform: translateY(0); }
-@media (min-width: 1440px) { .home-price-topline { gap: 6px; } .home-price-name { font-size: 15px; } }
+@media (min-width: 1440px) {
+  .home-price-topline { gap: 6px; }
+  .home-price-name { font-size: 15px; }
+  .home-price-amount { display: grid; grid-template-columns: minmax(0, 1fr); align-content: end; min-height: 76px; line-height: 32px; }
+  .home-price-amount > span { min-width: 0; }
+  .home-price-amount small { line-height: 16px; }
+}
+@media (min-width: 1440px) and (max-width: 1599px) {
+  .home-price-amount { padding-right: 84px; }
+  .home-price-state { max-width: calc(100% - 84px); }
+  .home-price-art { width: 96px; height: 76px; }
+  .home-price-art img { width: 72px; height: 68px; }
+}
 @media (max-width: 640px) { .home-price-card { min-height: 176px; } .home-price-name { font-size: 17px; } }
 @media (max-width: 359px) {
   .home-price-card { min-height: 204px; }

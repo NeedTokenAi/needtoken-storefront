@@ -3060,6 +3060,21 @@
         "recentRecords": "Recent incidents",
         "allUpdates": "All {count} updates",
         "otherIncidents": "{count} other active incidents"
+      },
+      "daily": {
+        "chooseDay": "Choose a day to inspect status",
+        "keyboardHelp": "Use Left and Right to change dates, Home and End for the first and last day, and Escape to close day details",
+        "detailLabel": "{product} status details for {date}",
+        "close": "Close day details",
+        "noFaultRecords": "No linked fault records",
+        "unknownDay": "Daily status is unknown",
+        "partialCoverage": "Daily coverage is incomplete; this does not confirm a healthy full day",
+        "historyUnavailable": "Official incident history is unavailable; daily status cannot be confirmed",
+        "currentCheck": "Latest check at {time}: {status}",
+        "navigate": "Change history date",
+        "previous": "Previous day",
+        "next": "Next day",
+        "dayPosition": "{index} / {total}"
       }
     },
     "radar": {
@@ -3481,8 +3496,8 @@
       "averageRemaining": "Until the historical average interval",
       "averagePassed": "Past the historical average interval",
       "averageEvery": "Every {days} days on average",
-      "averageNote": "Based on collected usage resets; not a forecast.",
-      "elapsedDays": "{days} days since the last reset",
+      "averageNote": "Uses loaded quota reset records only, excluding reset cards. This is not a forecast",
+      "elapsedDays": "{days} days since the latest quota reset record",
       "noRegular": "No usage resets collected yet",
       "recorded": "Collected records",
       "times": "times",
@@ -3497,7 +3512,35 @@
       "noRecord": "No record collected",
       "outsideCoverage": "Outside collected record coverage",
       "coverage": "Based on {count} collected records.",
-      "partialCoverage": "Based on {count} recent records; history is incomplete."
+      "partialCoverage": "Based on {count} recent records; history is incomplete.",
+      "regularElapsed": "Since latest quota reset record"
+    },
+    "radarLayout": {
+      "description": "Track Codex quota reset and reset card announcements",
+      "elapsed": "Since latest record",
+      "latestAt": "Latest record {date}",
+      "activityTitle": "Records in the last 30 days",
+      "activityScope": "Counts loaded records only",
+      "today": "Today",
+      "dayLabel": "{date} · Quota resets: {regular} · Reset cards: {banked}",
+      "loadedCount": "Loaded records",
+      "regularCount": "Quota resets",
+      "bankedCount": "Reset cards",
+      "history": "Reset records",
+      "fullText": "Full record",
+      "rules": "Reset rules",
+      "dataSource": "Data and sources",
+      "sourceShort": "Third-party records. Check the official usage page for your quota",
+      "fetchedAt": "Fetched {date}",
+      "polling": "Updates every minute",
+      "recordCount": "{count} records",
+      "usage": "View my quota",
+      "coverage": "{count} records loaded; does not cover all history",
+      "showMore": "Show more",
+      "visibleCount": "{shown} / {count} records",
+      "statistics": "Historical statistics and yearly records",
+      "scope": "Public record tracking",
+      "pollingDetail": "Fetches every minute · pauses in background tabs"
     }
   }
 }

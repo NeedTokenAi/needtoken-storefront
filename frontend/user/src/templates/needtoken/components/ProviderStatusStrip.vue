@@ -1,7 +1,7 @@
 <template>
   <div ref="rootEl" class="status-pills" :aria-label="t('needtoken.statusStrip.label')" @keydown.esc.stop.prevent="close(true)">
     <div v-for="provider in providers" :key="provider.id" class="status-pill-wrap" @mouseenter="hoverOpen(provider.id)" @mouseleave="hoverClose(provider.id)" @focusin="focusOpen(provider.id)" @focusout="onFocusOut($event, provider.id)">
-      <button type="button" class="status-pill" :data-provider="provider.id" :aria-expanded="opened === provider.id" :aria-controls="`nt-status-${provider.id}`" :aria-label="`${t(`needtoken.statusStrip.${provider.id}`)} · ${t(`needtoken.statusStrip.component.${provider.tone}`)}`" @click="toggle(provider.id)">
+      <button type="button" class="status-pill" :data-provider="provider.id" :data-color="publicStatusColor(provider.tone)" :aria-expanded="opened === provider.id" :aria-controls="`nt-status-${provider.id}`" :aria-label="`${t(`needtoken.statusStrip.${provider.id}`)} · ${t(`needtoken.statusStrip.component.${provider.tone}`)}`" @click="toggle(provider.id)">
         <span :key="`${provider.id}-${provider.source.sequence}`" class="status-bars" :class="[`is-${provider.tone}`, { 'is-checking': provider.source.refreshing && pageVisible, 'is-received': provider.fresh && provider.source.sequence > 0 }]" aria-hidden="true"><i v-for="index in 5" :key="index" :style="{ '--bar-index': index - 1 }"></i></span>
         {{ t(`needtoken.statusStrip.${provider.id}`) }}
       </button>
@@ -36,7 +36,7 @@
         </article>
         <section class="status-history-region" :aria-label="t('needtoken.statusStrip.compact.historyTitle')">
           <div class="status-history-head"><h3>{{ t('needtoken.statusStrip.compact.historyTitle') }}</h3><span>{{ t(provider.historyReady ? 'needtoken.statusStrip.compact.incidentCount' : 'needtoken.statusStrip.compact.historyUnknown', { count: provider.historyIncidents.length }) }}</span></div>
-          <div class="status-history-bars" role="img" :aria-label="provider.historyReady ? t('needtoken.statusStrip.compact.historyAlternative', { count: provider.historyIncidents.length }) : t('needtoken.statusStrip.compact.historyUnavailable')"><i v-for="day in provider.historyDays" :key="day.date" :class="{ 'has-incident': day.incidents.length > 0 }" :title="`${day.date} UTC · ${day.incidents.length ? day.incidents.join(' / ') : t('needtoken.statusStrip.compact.unknownDay')}`"></i></div>
+          <StatusHistoryChart :days="provider.historyDays" :product-label="t(`needtoken.statusStrip.scopeTitle.${provider.id}`)" :history-ready="provider.historyReady" :source-url="provider.source.history.sourceUrl" :current-tone="provider.tone" :current-fresh="provider.fresh" :checked-at="provider.source.fetchedAt" />
           <div class="status-history-axis"><time :datetime="provider.historyDays[0]?.date">{{ provider.historyDays[0]?.date }}</time><span>UTC</span><time :datetime="provider.historyDays[89]?.date">{{ t('needtoken.statusStrip.compact.today') }}</time></div>
           <p class="status-history-note">{{ t(provider.historyReady ? provider.historyIncidents.length ? 'needtoken.statusStrip.compact.partialHistory' : 'needtoken.statusStrip.compact.noScopedHistory' : 'needtoken.statusStrip.compact.historyUnavailable') }}</p>
           <details v-if="provider.historyIncidents.length" class="status-history-events"><summary>{{ t('needtoken.statusStrip.compact.recentRecords') }}</summary><ul><li v-for="incident in provider.historyIncidents.slice(0, 3)" :key="incident.id || incident.name"><time v-if="incident.startedAt || incident.createdAt" :datetime="incident.startedAt || incident.createdAt || undefined">{{ renderDate(incident.startedAt || incident.createdAt || '') }}</time><a :href="incident.url || provider.source.history.sourceUrl" target="_blank" rel="noopener noreferrer">{{ incident.name }}<ArrowUpRight :size="12" aria-hidden="true" /></a></li></ul></details>
@@ -52,7 +52,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowUpRight } from 'lucide-vue-next'
-import { incidentActive, incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusFresh, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone, PUBLIC_STATUS_MAX_AGE_MS, type PublicStatusHistory, type PublicStatusIncident, type PublicStatusService, type PublicStatusSnapshot } from '../lib/publicStatus'
+import StatusHistoryChart from './StatusHistoryChart.vue'
+import { incidentActive, incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusColor, publicStatusFresh, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone, PUBLIC_STATUS_MAX_AGE_MS, type PublicStatusHistory, type PublicStatusIncident, type PublicStatusService, type PublicStatusSnapshot } from '../lib/publicStatus'
 
 type Provider = PublicStatusService
 interface StatusSource {
@@ -300,9 +301,6 @@ onUnmounted(() => {
 .status-history-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 11px; line-height: 18px; }
 .status-history-head h3 { color: var(--ui-text-secondary); font-weight: 400; }
 .status-history-head > span { color: var(--ui-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.status-history-bars { display: grid; grid-template-columns: repeat(90, minmax(0, 1fr)); gap: 2px; height: 28px; margin-top: 12px; }
-.status-history-bars i { display: block; min-width: 0; border-radius: 1px; background: rgba(148,163,184,.18); }
-.status-history-bars i.has-incident { background: #c5a65e; }
 .status-history-axis { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: var(--ui-text-muted); font-size: 10px; line-height: 16px; font-variant-numeric: tabular-nums; }
 .status-history-note { margin-top: 8px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
 .status-history-events { margin-top: 12px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
@@ -324,6 +322,6 @@ onUnmounted(() => {
 .status-bars.is-degraded_performance, .status-bars.is-under_maintenance { color: #c5a65e; }
 .status-dot.is-partial_outage, .status-dot.is-major_outage { background: #e06a5c; }
 .status-bars.is-partial_outage, .status-bars.is-major_outage { color: #e06a5c; }
-@media (max-width: 640px) { .status-pills { justify-content: flex-start; width: 100%; }.status-pill { min-height: 36px; }.status-popover { left: 0; right: auto; padding: 16px; border-radius: 16px; }.status-history-bars { gap: 1px; }.status-refresh-row { gap: 8px; } }
+@media (max-width: 640px) { .status-pills { justify-content: flex-start; width: 100%; }.status-pill { min-height: 36px; }.status-popover { left: 0; right: auto; padding: 16px; border-radius: 16px; }.status-refresh-row { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .status-bars:is(.is-checking, .is-received) i, .status-phase.is-reached .status-phase-track i { animation: none; }.status-pill { transition: none; }.status-popover-enter-from { transform: none; } }
 </style>

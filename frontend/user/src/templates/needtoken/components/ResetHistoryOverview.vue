@@ -2,7 +2,7 @@
   <section class="reset-overview" :aria-label="t('needtoken.radarStats.title')">
     <div class="reset-stats">
       <article class="reset-stat interval-stat">
-        <div class="stat-heading"><h2>{{ t(stats.averageRemainingDays === null ? 'needtoken.radarLive.elapsed' : stats.averageRemainingDays > 0 ? 'needtoken.radarStats.averageRemaining' : 'needtoken.radarStats.averagePassed') }}</h2><span v-if="stats.averageIntervalDays !== null">{{ t('needtoken.radarStats.averageEvery', { days: number(stats.averageIntervalDays) }) }}</span></div>
+        <div class="stat-heading"><h2>{{ t(stats.averageRemainingDays === null ? 'needtoken.radarStats.regularElapsed' : stats.averageRemainingDays > 0 ? 'needtoken.radarStats.averageRemaining' : 'needtoken.radarStats.averagePassed') }}</h2><span v-if="stats.averageIntervalDays !== null">{{ t('needtoken.radarStats.averageEvery', { days: number(stats.averageIntervalDays) }) }}</span></div>
         <p class="stat-value"><strong>{{ intervalValue }}</strong><span>{{ t('needtoken.radarLive.units.days') }}</span></p>
         <div class="interval-track" :title="t('needtoken.radarStats.averageNote')"><span :style="{ width: `${intervalProgress}%` }" /><i aria-hidden="true" /></div>
         <p class="stat-note">{{ stats.elapsedDays === null ? t('needtoken.radarStats.noRegular') : t('needtoken.radarStats.elapsedDays', { days: number(stats.elapsedDays) }) }}</p>

@@ -168,6 +168,7 @@ watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(va
 .nt-route-error { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #e5b96940; color: #e5b969; font-size: 12px; line-height: 1.7; }
 .nt-route-error button { flex-shrink: 0; border-bottom: 1px solid currentColor; cursor: pointer; }
 .nt-home-route-placeholder { max-width: 1320px; min-height: 480px; margin: 0 auto; padding: 48px 24px; }
+@media (min-width: 1440px) { .nt-home-route-placeholder { max-width: 1540px; } }
 @media (max-width: 640px) { .nt-home-route-placeholder { padding: 32px 20px; } }
 @keyframes nt-route-travel { from { transform: translateX(-105%); } to { transform: translateX(390%); } }
 @media (prefers-reduced-motion: reduce) { .page-fade-enter-active, .page-fade-leave-active, .nt-page-enter-active { transition: none; } .nt-page-enter-from { opacity: 1; transform: none; } .nt-route-progress > span:first-child { animation: none; width: 100%; opacity: .6; } }

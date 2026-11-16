@@ -3060,6 +3060,21 @@
         "recentRecords": "查看最近事件",
         "allUpdates": "查看全部 {count} 条进展",
         "otherIncidents": "另有 {count} 起进行中的事件"
+      },
+      "daily": {
+        "chooseDay": "选择一天查看状态",
+        "keyboardHelp": "使用左右方向键切换日期，Home 和 End 跳至首末日期，Escape 关闭日详情",
+        "detailLabel": "{product} {date} 状态详情",
+        "close": "关闭日详情",
+        "noFaultRecords": "没有已关联的故障记录",
+        "unknownDay": "当天状态未知",
+        "partialCoverage": "该日历史覆盖不完整，不能据此确认全天正常",
+        "historyUnavailable": "官方历史记录暂不可用，无法确认当天状态",
+        "currentCheck": "最新检查 {time}：{status}",
+        "navigate": "切换历史日期",
+        "previous": "前一天",
+        "next": "后一天",
+        "dayPosition": "{index} / {total}"
       }
     },
     "radar": {
@@ -3481,8 +3496,8 @@
       "averageRemaining": "按历史平均间隔，还差",
       "averagePassed": "已超过历史平均间隔",
       "averageEvery": "平均每 {days} 天一次",
-      "averageNote": "按已收录的额度重置统计，不是下次重置预告。",
-      "elapsedDays": "距上次重置已过 {days} 天",
+      "averageNote": "仅统计本次收录的额度重置记录，不含重置卡；不是下次重置预告",
+      "elapsedDays": "距最近额度重置记录已过 {days} 天",
       "noRegular": "暂无额度重置记录",
       "recorded": "收录记录",
       "times": "次",
@@ -3497,7 +3512,35 @@
       "noRecord": "未收录记录",
       "outsideCoverage": "不在已收录记录范围内",
       "coverage": "按已收录的 {count} 条记录统计。",
-      "partialCoverage": "按最近 {count} 条记录统计，未覆盖完整历史。"
+      "partialCoverage": "按最近 {count} 条记录统计，未覆盖完整历史。",
+      "regularElapsed": "距最近额度重置记录"
+    },
+    "radarLayout": {
+      "description": "追踪 Codex 额度重置与重置卡公告",
+      "elapsed": "距最近记录",
+      "latestAt": "最近记录 {date}",
+      "activityTitle": "近 30 天记录",
+      "activityScope": "仅统计本次载入记录",
+      "today": "今天",
+      "dayLabel": "{date} · 额度重置 {regular} 条 · 重置卡 {banked} 条",
+      "loadedCount": "已载入记录",
+      "regularCount": "额度重置",
+      "bankedCount": "重置卡",
+      "history": "重置记录",
+      "fullText": "记录全文",
+      "rules": "重置规则",
+      "dataSource": "数据与来源",
+      "sourceShort": "第三方记录，个人额度以官方用量页为准",
+      "fetchedAt": "获取于 {date}",
+      "polling": "每分钟更新",
+      "recordCount": "{count} 条",
+      "usage": "查看我的额度",
+      "coverage": "已载入 {count} 条，不代表全部历史",
+      "showMore": "显示更多",
+      "visibleCount": "{shown} / {count} 条",
+      "statistics": "历史统计与全年记录",
+      "scope": "公开记录追踪",
+      "pollingDetail": "每分钟获取 · 页面切至后台时暂停"
     }
   }
 }

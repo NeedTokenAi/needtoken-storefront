@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, matchesTerms, operationalCount, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicStatusFresh, publicStatusTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone } from '../src/templates/needtoken/lib/publicStatus.ts'
+import { incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, matchesTerms, operationalCount, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicIncidentTone, publicStatusColor, publicStatusFresh, publicStatusTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone } from '../src/templates/needtoken/lib/publicStatus.ts'
 
 test('parsePublicStatus keeps component states and does not invent uptime', () => {
   const view = parsePublicStatus({
@@ -264,4 +264,31 @@ test('native incident linkage cannot fall back to a similarly named component fr
     { id: 'gpt-login-incident', name: 'Login incident', status: 'investigating', components: [{ id: 'gpt-login', name: 'Login' }] },
   ] })!
   assert.deepEqual(serviceStatusIncidents(rows, components, 'gpt').map(row => row.id), ['gpt-login-incident'])
+})
+
+test('current status colors distinguish normal, maintenance or degradation, failures, and unknown', () => {
+  assert.equal(publicStatusColor('operational'), 'green')
+  for (const status of ['under_maintenance', 'degraded_performance'] as const) assert.equal(publicStatusColor(status), 'yellow')
+  for (const status of ['partial_outage', 'major_outage'] as const) assert.equal(publicStatusColor(status), 'red')
+  assert.equal(publicStatusColor('unknown'), 'gray')
+  assert.equal(publicStatusColor(publicStatusTone([{ name: 'ChatGPT', status: 'operational' }], false)), 'gray')
+  assert.equal(publicStatusColor(publicIncidentTone({ impact: 'none' })), 'gray')
+})
+
+test('daily records keep real incident details and severity while uncovered days remain gray', () => {
+  const now = Date.parse('2026-11-16T12:00:00Z')
+  const incidents = parsePublicIncidents({ incidents: [
+    { id: 'minor-issue', name: 'Degraded service', status: 'resolved', impact: 'minor', started_at: '2026-11-13T10:00:00Z', resolved_at: '2026-11-13T11:00:00Z' },
+    { id: 'major-issue', name: 'Service outage', status: 'resolved', impact: 'major', started_at: '2026-11-14T10:00:00Z', resolved_at: '2026-11-14T11:00:00Z' },
+    { id: 'maintenance', name: 'Scheduled work', status: 'resolved', impact: 'maintenance', started_at: '2026-11-15T10:00:00Z', resolved_at: '2026-11-15T11:00:00Z' },
+  ] })!
+  const days = publicHistoryDays(incidents, now)
+  assert.equal(publicStatusColor(days.find(day => day.date === '2026-11-13')!.tone), 'yellow')
+  const failedDay = days.find(day => day.date === '2026-11-14')!
+  assert.equal(publicStatusColor(failedDay.tone), 'red')
+  assert.equal(failedDay.records[0], incidents[1])
+  assert.equal(failedDay.records[0]!.name, 'Service outage')
+  assert.equal(publicStatusColor(days.find(day => day.date === '2026-11-15')!.tone), 'yellow')
+  assert.equal(publicStatusColor(days.find(day => day.date === '2026-11-16')!.tone), 'gray')
+  assert.equal(days.filter(day => !day.records.length).every(day => day.tone === 'unknown'), true)
 })

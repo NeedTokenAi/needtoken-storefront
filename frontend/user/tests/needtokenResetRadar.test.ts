@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fetchResetFeed, parseResetFeed, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetCalendar, resetElapsedTime, resetFeedIsExpired, resetRecordPage, resetSourceUrl, resetStatistics } from '../src/templates/needtoken/lib/resetRadar.ts'
+import { fetchResetFeed, parseResetFeed, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetActivityDays, resetCalendar, resetElapsedTime, resetFeedIsExpired, resetRecordPage, resetSourceUrl, resetStatistics, type ResetRecord } from '../src/templates/needtoken/lib/resetRadar.ts'
 
 // Synthetic contract fixtures. These do not verify a live upstream or account delivery.
 const fixtureRecord = (overrides: Record<string, unknown> = {}) => ({
@@ -82,6 +82,22 @@ test('elapsed display is since the record, clamps future timestamps, and does no
   assert.deepEqual(resetElapsedTime('invalid'), { days: 0, hours: 0, minutes: 0 })
 })
 
+test('a newer reset card anchors the latest record clock while quota-only averages remain separately scoped', () => {
+  const now = Date.parse('2026-11-16T02:00:00Z')
+  const records = parseResetFeed(fixtureFeed([
+    fixtureRecord({ id: 'regular-oct28', announced_at: '2026-10-28T06:29:38Z' }),
+    fixtureRecord({ id: 'banked-nov13', type: 'banked', announced_at: '2026-11-12T21:59:39Z', text: 'Synthetic November reset card' }),
+  ])).records
+  const latest = records[0]!
+  assert.equal(latest.id, 'banked-nov13')
+  assert.equal(latest.text, 'Synthetic November reset card')
+  assert.equal(latest.announced_at, '2026-11-12T21:59:39.000Z')
+  assert.deepEqual(resetElapsedTime(latest.announced_at, now), { days: 3, hours: 4, minutes: 0 })
+  const stats = resetStatistics(records, now)
+  assert.deepEqual([stats.total, stats.regular, stats.banked, stats.recent30], [2, 1, 1, 2])
+  assert.equal(stats.lastResetAt, Date.parse('2026-10-28T06:29:38Z'))
+})
+
 test('public feed requests stay same-origin, omit credentials, reject redirects and pass cancellation', async () => {
   const controller = new AbortController()
   const fetcher: typeof fetch = async (url, options) => {
@@ -159,4 +175,34 @@ test('each reset-history filter starts with ten records and expands in ten-recor
     assert.equal(first.remaining - second.remaining, 10)
     assert.ok(type === 'all' || first.records.every(record => record.type === type))
   }
+})
+
+test('activity days follow Beijing midnight rather than UTC midnight and include today', () => {
+  const days = resetActivityDays([
+    { type: 'regular', announced_at: '2026-11-14T15:59:59.999Z' },
+    { type: 'regular', announced_at: '2026-11-14T16:00:00Z' },
+    { type: 'banked', announced_at: '2026-11-15T00:01:00+08:00' },
+  ], Date.parse('2026-11-14T16:05:00Z'))
+  assert.equal(days.length, 30)
+  assert.deepEqual(days[0], { date: '2026-10-16T16:00:00.000Z', regular: 0, banked: 0 })
+  assert.deepEqual(days.at(-2), { date: '2026-11-13T16:00:00.000Z', regular: 1, banked: 0 })
+  assert.deepEqual(days.at(-1), { date: '2026-11-14T16:00:00.000Z', regular: 1, banked: 1 })
+})
+
+test('activity includes the exact 30-day boundary, ignores invalid and future times, and is order independent', () => {
+  const rows: Pick<ResetRecord, 'type' | 'announced_at'>[] = [
+    { type: 'banked', announced_at: '2026-10-16T16:00:00Z' },
+    { type: 'regular', announced_at: '2026-10-16T15:59:59.999Z' },
+    { type: 'regular', announced_at: '2026-11-14T16:05:00Z' },
+    { type: 'banked', announced_at: '2026-11-14T16:05:00.001Z' },
+    { type: 'regular', announced_at: 'invalid' },
+    { type: 'regular', announced_at: '2026-11-14T00:00:00' },
+  ]
+  const now = Date.parse('2026-11-14T16:05:00Z')
+  const days = resetActivityDays(rows, now)
+  assert.deepEqual(days, resetActivityDays([...rows].reverse(), now))
+  assert.deepEqual(days[0], { date: '2026-10-16T16:00:00.000Z', regular: 0, banked: 1 })
+  assert.deepEqual(days.at(-1), { date: '2026-11-14T16:00:00.000Z', regular: 1, banked: 0 })
+  assert.equal(days.reduce((total, day) => total + day.regular + day.banked, 0), 2)
+  assert.equal(rows[0]?.announced_at, '2026-10-16T16:00:00Z', 'input remains in its original order')
 })

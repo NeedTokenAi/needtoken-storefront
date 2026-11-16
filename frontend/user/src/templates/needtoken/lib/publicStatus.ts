@@ -56,6 +56,8 @@ export interface PublicStatusHistory {
 export interface PublicHistoryDay {
   date: string
   incidents: string[]
+  records: PublicStatusIncident[]
+  tone: PublicComponentStatus
 }
 
 export interface PublicStatusSnapshot {
@@ -345,9 +347,23 @@ export function incidentElapsedMinutes(incident: PublicStatusIncident, now: numb
 export function serviceStatusTone(components: PublicStatusComponent[], incidents: PublicStatusIncident[], fresh: boolean): PublicComponentStatus {
   const componentTone = publicStatusTone(components, fresh)
   if (!fresh || !incidents.some(incidentActive)) return componentTone
-  const impactTones: Record<string, PublicComponentStatus> = { minor: 'degraded_performance', major: 'partial_outage', critical: 'major_outage', maintenance: 'under_maintenance' }
-  const incidentComponents = incidents.filter(incidentActive).map(incident => ({ name: incident.name, status: impactTones[incident.impact] ?? 'unknown' }))
+  const incidentComponents = incidents.filter(incidentActive).map(incident => ({ name: incident.name, status: publicIncidentTone(incident) }))
   return publicStatusTone([...components, ...incidentComponents], fresh)
+}
+
+export function publicIncidentTone(incident: Pick<PublicStatusIncident, 'impact'>): PublicComponentStatus {
+  const impacts: Record<string, PublicComponentStatus> = { minor: 'degraded_performance', major: 'partial_outage', critical: 'major_outage', maintenance: 'under_maintenance' }
+  return impacts[incident.impact] ?? 'unknown'
+}
+
+export type PublicStatusColor = 'green' | 'yellow' | 'red' | 'gray'
+
+/** The same severity colors apply to current checks and documented day records. */
+export function publicStatusColor(status: PublicComponentStatus): PublicStatusColor {
+  if (status === 'operational') return 'green'
+  if (status === 'degraded_performance' || status === 'under_maintenance') return 'yellow'
+  if (status === 'partial_outage' || status === 'major_outage') return 'red'
+  return 'gray'
 }
 
 const incidentRecordBounds = (incident: PublicStatusIncident, now: number): [number, number] | null => {
@@ -372,7 +388,7 @@ export function publicHistoryIncidents(incidents: PublicStatusIncident[], now: n
 export function publicHistoryDays(incidents: PublicStatusIncident[], now: number): PublicHistoryDay[] {
   const dayMs = 24 * 60 * 60 * 1000
   const today = Math.floor(now / dayMs) * dayMs
-  const days = Array.from({ length: 90 }, (_, index): PublicHistoryDay => ({ date: new Date(today - (89 - index) * dayMs).toISOString().slice(0, 10), incidents: [] }))
+  const days = Array.from({ length: 90 }, (_, index): PublicHistoryDay => ({ date: new Date(today - (89 - index) * dayMs).toISOString().slice(0, 10), incidents: [], records: [], tone: 'unknown' }))
   for (const incident of incidents) {
     const bounds = incidentRecordBounds(incident, now)
     if (!bounds) continue
@@ -381,7 +397,11 @@ export function publicHistoryDays(incidents: PublicStatusIncident[], now: number
     const lastDay = Math.floor(end / dayMs) * dayMs
     for (const day of days) {
       const date = Date.parse(`${day.date}T00:00:00Z`)
-      if (date >= firstDay && date <= lastDay && !day.incidents.includes(incident.name)) day.incidents.push(incident.name)
+      if (date >= firstDay && date <= lastDay) {
+        if (!day.incidents.includes(incident.name)) day.incidents.push(incident.name)
+        if (!day.records.some(record => record.id && incident.id ? record.id === incident.id : record === incident)) day.records.push(incident)
+        day.tone = publicStatusTone(day.records.map(record => ({ name: record.name, status: publicIncidentTone(record) })), true)
+      }
     }
   }
   return days

@@ -283,7 +283,7 @@ onUnmounted(() => {
 .question[open] .question-toggle { transform: rotate(45deg); color: var(--ui-accent); }
 .question > p { padding: 0 32px 20px 0; color: var(--home-muted); font-size: 13px; line-height: 1.9; }
 .nt-home a:focus-visible, .nt-home button:focus-visible, .question summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 4px; }
-@media (min-width: 1440px) { .price-rail { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1440px) { .hero-content { max-width: 1540px; } .price-rail { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .price-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .library-toolbar { grid-template-columns: 1fr; gap: 16px; } .library-payment-controls { justify-content: flex-end; } }
 @media (max-width: 900px) {

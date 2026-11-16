@@ -156,3 +156,21 @@ export function resetUpdates(value: unknown): ResetUpdate[] {
     return ['zh-CN', 'zh-TW', 'en-US'].some(locale => typeof row.title[locale] === 'string' && row.title[locale].trim())
   }).map(row => ({ id: row.id, slug: row.slug, title: row.title, published_at: typeof row.published_at === 'string' && Number.isFinite(Date.parse(row.published_at)) ? row.published_at : '' })).slice(0, 10)
 }
+
+/** Count only supplied public records in the last 30 Beijing calendar days.
+ * Empty days are sample counts, not a forecast or a claim of complete history. */
+export function resetActivityDays(records: Pick<ResetRecord, 'type' | 'announced_at'>[], now = Date.now()): { date: string; regular: number; banked: number }[] {
+  if (!Number.isFinite(now)) return []
+  const dayMs = 24 * 60 * 60 * 1000
+  const beijingOffset = 8 * 60 * 60 * 1000
+  const today = Math.floor((now + beijingOffset) / dayMs) * dayMs - beijingOffset
+  const firstDay = today - 29 * dayMs
+  const days = Array.from({ length: 30 }, (_, index) => ({ date: new Date(firstDay + index * dayMs).toISOString(), regular: 0, banked: 0 }))
+  for (const record of records) {
+    const announced = Date.parse(timestamp(record.announced_at))
+    if (!Number.isFinite(announced) || announced < firstDay || announced > now || !['regular', 'banked'].includes(record.type)) continue
+    const day = days[Math.floor((announced - firstDay) / dayMs)]
+    if (day) day[record.type] += 1
+  }
+  return days
+}
