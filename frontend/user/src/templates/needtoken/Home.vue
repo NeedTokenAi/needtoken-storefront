@@ -228,7 +228,7 @@ onUnmounted(() => {
 .library-filters button:hover { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
 .library-tabs :is(button, a):active, .library-filters button:active { transform: translateY(1px); }
 .library-filters button.active { color: var(--ui-accent); border-color: rgba(45, 212, 167, .22); background: var(--ui-accent-soft); }
-.price-rail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-height: 188px; gap: 16px; margin-top: 24px; padding-bottom: 8px; }
+.price-rail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-height: 132px; gap: 16px; margin-top: 24px; padding-bottom: 8px; }
 .price-rail.is-ready { animation: catalogue-ready var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out) both; }
 @keyframes catalogue-ready { from { opacity: .55; } to { opacity: 1; } }
 .price-rail-state { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; min-height: 180px; padding: 24px; border: 1px dashed var(--ui-border-strong); border-radius: 20px; color: var(--home-muted); font-size: 14px; text-align: center; }

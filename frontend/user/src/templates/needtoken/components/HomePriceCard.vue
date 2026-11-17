@@ -5,20 +5,22 @@
         <span class="home-price-mark" aria-hidden="true">
           <ProductBrandMark :brand="brand" />
         </span>
-        <span class="home-price-name">{{ titleParts.before }}<span v-if="titleParts.tier" class="home-price-tier" :data-tier="titleParts.plan">{{ titleParts.tier }}</span>{{ titleParts.after }}</span>
-        <span class="home-price-invoice" :title="t('needtoken.homeLibrary.invoice')"><ReceiptText :size="13" aria-hidden="true" />{{ t('needtoken.homeLibrary.invoice') }}</span>
+        <span class="home-price-name" :title="title">{{ titleParts.before }}<span v-if="titleParts.tier" class="home-price-tier" :data-tier="titleParts.plan">{{ titleParts.tier }}</span>{{ titleParts.after }}</span>
+        <span class="home-price-invoice" :title="t('needtoken.homeLibrary.invoice')"><ReceiptText :size="13" aria-hidden="true" /><span class="home-price-invoice-label">{{ t('needtoken.homeLibrary.invoice') }}</span></span>
       </div>
-      <p v-if="variantLabel" class="home-price-variant">{{ variantLabel }}</p>
-      <p v-if="officialReference" class="home-price-official">{{ t('needtoken.homeLibrary.officialChip', { price: officialChip }) }}</p>
+      <div class="home-price-meta">
+        <span v-if="officialReference" class="home-price-official">{{ t('needtoken.homeLibrary.officialChip', { price: officialChip }) }}</span>
+        <span v-if="variantLabel" class="home-price-variant">{{ variantLabel }}</span>
+        <span v-if="!available" class="home-price-state">{{ availability === 'sold_out' ? t('products.stockStatus.outOfStock') : t('needtoken.catalogServices.availabilityPending') }}</span>
+        <div class="home-price-art" aria-hidden="true">
+          <span class="home-price-art__fallback" :class="{ 'is-hidden': imageLoaded && !imageFailed }"><PlanArtwork :plan="plan" :brand="brand" /></span>
+          <img v-if="image && !imageFailed" :src="image" :class="{ 'is-loaded': imageLoaded }" width="88" height="80" decoding="async" alt="" @load="imageLoaded = true" @error="imageFailed = true" />
+        </div>
+      </div>
       <p class="home-price-amount">
-        <span>{{ priceText }}</span>
+        <span class="home-price-value"><small v-if="priceParts.prefix" class="home-price-currency">{{ priceParts.prefix }}</small>{{ priceParts.value }}</span>
         <small v-if="priceSuffix && price">/ {{ priceSuffix }}</small>
       </p>
-      <p v-if="!available" class="home-price-state">{{ availability === 'sold_out' ? t('products.stockStatus.outOfStock') : t('needtoken.catalogServices.availabilityPending') }}</p>
-    </div>
-    <div class="home-price-art" aria-hidden="true">
-      <span class="home-price-art__fallback" :class="{ 'is-hidden': imageLoaded && !imageFailed }"><PlanArtwork :plan="plan" :brand="brand" /></span>
-      <img v-if="image && !imageFailed" :src="image" :class="{ 'is-loaded': imageLoaded }" width="88" height="80" decoding="async" alt="" @load="imageLoaded = true" @error="imageFailed = true" />
     </div>
   </component>
 </template>
@@ -56,6 +58,10 @@ const brand = computed(() => homeCardBrand(props.product, sku.value, appStore.lo
 const plan = computed(() => homeCardPlan(title.value, sku.value, appStore.locale))
 const priceSuffix = computed(() => homeCardPriceSuffix(presentation.value.priceSuffix))
 const priceText = computed(() => price.value ? format(price.value.amount) || t('needtoken.catalogServices.pricePending') : t('needtoken.catalogServices.pricePending'))
+const priceParts = computed(() => {
+  const match = /^(\D*?)(\d[\s\S]*)$/.exec(priceText.value)
+  return match ? { prefix: match[1]!, value: match[2]! } : { prefix: '', value: priceText.value }
+})
 const officialReference = computed(() => presentation.value.officialPriceUsd ? formatServiceMoney(presentation.value.officialPriceUsd, 'USD', appStore.locale) : '')
 const officialChip = computed(() => priceSuffix.value && officialReference.value ? `${officialReference.value}/${priceSuffix.value}` : officialReference.value)
 const image = computed(() => getFirstImageUrl(props.product.images))
@@ -64,66 +70,67 @@ const target = computed(() => ({ path: `/products/${props.product.slug}`, query:
 </script>
 
 <style scoped>
-.home-price-card { position: relative; display: flex; min-width: 0; min-height: 180px; padding: 20px; border: 1px solid #dde8e3; border-radius: 20px; background: #f8fbf9; color: #18251f; box-shadow: 0 2px 8px #00000012; transition: transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out), border-color var(--nt-motion-enter, 180ms), box-shadow var(--nt-motion-enter, 180ms); }
-.home-price-card.is-unavailable { border-color: #d4ddd7; }
-.home-price-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; width: 100%; }
-.home-price-topline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; min-width: 0; }
-.home-price-mark { display: grid; width: 24px; height: 24px; flex: none; place-items: center; color: #198266; transition: color var(--nt-motion-enter, 180ms), transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
-.home-price-name { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; line-height: 1.4; letter-spacing: 0; overflow-wrap: anywhere; transition: color var(--nt-motion-enter, 180ms); }
-.home-price-tier { color: #62736a; font-size: .9em; font-weight: 500; white-space: nowrap; transition: color var(--nt-motion-enter, 180ms); }
-.home-price-tier[data-tier="5x"] { color: #5e7085; }
-.home-price-tier[data-tier="20x"] { color: #8c601a; }
-.home-price-tier[data-tier="50x"] { color: #805596; }
-.home-price-invoice { display: inline-flex; align-items: center; gap: 4px; color: #62736b; font-size: 11px; white-space: nowrap; }
-.home-price-official { margin-top: 12px; padding: 4px 8px; border: 1px solid #d8e1dc; border-radius: 999px; color: #5e6e65; font-size: 11px; line-height: 1.4; }
-.home-price-variant { margin-top: 8px; color: #5e6e65; font-size: 12px; line-height: 1.4; }
-.home-price-amount { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; max-width: 100%; margin-top: auto; padding-top: 24px; padding-right: 100px; color: #18251f; font-size: 28px; font-weight: 600; letter-spacing: 0; line-height: 1.15; font-variant-numeric: tabular-nums lining-nums; }
-.home-price-amount > span { overflow-wrap: anywhere; }
-.home-price-amount small { color: #62736b; font-size: 12px; font-weight: 400; letter-spacing: 0; }
-.home-price-state { position: relative; z-index: 1; max-width: calc(100% - 100px); margin-top: 8px; padding: 2px 6px; border: 1px solid #ded6c6; border-radius: 4px; color: #6b5739; background: #f3efe5; font-size: 11px; line-height: 1.4; }
-.home-price-art { position: absolute; right: 16px; bottom: 16px; display: flex; align-items: flex-end; justify-content: flex-end; width: 112px; height: 88px; pointer-events: none; }
+.home-price-card { position: relative; display: flex; min-width: 0; min-height: 156px; padding: 16px; border: 1px solid #e0e7e2; border-radius: 18px; background: #fbfcfb; color: #18251f; box-shadow: 0 2px 6px #0000000d; transition: transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out), border-color var(--nt-motion-enter, 180ms), box-shadow var(--nt-motion-enter, 180ms); }
+.home-price-card.is-unavailable { border-color: #dce3de; }
+.home-price-copy { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; width: 100%; }
+.home-price-topline { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.home-price-mark { display: grid; width: 22px; height: 22px; place-items: center; transition: transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
+.home-price-mark :deep(.product-brand-mark), .home-price-mark :deep(.product-brand-symbol) { width: 100%; height: 100%; }
+.home-price-name { min-width: 0; color: #1e2b24; font-size: 16px; font-weight: 600; line-height: 20px; letter-spacing: 0; overflow-wrap: anywhere; transition: color var(--nt-motion-enter, 180ms); }
+.home-price-tier { color: #62736a; font-size: .9em; font-weight: 500; white-space: nowrap; }
+.home-price-tier[data-tier="5x"] { color: #65758b; }
+.home-price-tier[data-tier="20x"] { color: #966622; }
+.home-price-tier[data-tier="50x"] { color: #85579a; }
+.home-price-invoice { display: inline-flex; align-items: center; gap: 4px; color: #718078; font-size: 11px; line-height: 16px; white-space: nowrap; }
+.home-price-invoice svg { flex: none; }
+.home-price-meta { position: relative; display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 4px 6px; width: 100%; min-height: 56px; max-width: 100%; margin-top: 8px; padding-right: 76px; }
+.home-price-official { padding: 1px 6px; border: 1px solid #dce5df; border-radius: 999px; color: #64746b; font-size: 11px; line-height: 16px; overflow-wrap: anywhere; }
+.home-price-variant { color: #64746b; font-size: 11px; line-height: 18px; overflow-wrap: anywhere; }
+.home-price-state { display: inline-flex; align-items: center; gap: 4px; color: #8c7146; font-size: 11px; line-height: 18px; }
+.home-price-state::before { content: ''; width: 4px; height: 4px; flex: none; border-radius: 50%; background: #b99b65; }
+.home-price-amount { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; max-width: 100%; margin-top: auto; padding-top: 4px; color: #18251f; font-size: 28px; font-weight: 600; line-height: 32px; font-variant-numeric: tabular-nums lining-nums; }
+.home-price-value { min-width: 0; overflow-wrap: anywhere; }
+.home-price-amount > small { color: #718078; font-size: 12px; line-height: 16px; font-weight: 400; }
+.home-price-currency { margin-right: 2px; font-size: .58em; font-weight: 500; line-height: 1; white-space: pre; }
+.home-price-art { position: absolute; right: 0; top: 0; width: 72px; height: 56px; pointer-events: none; }
 .home-price-art__fallback { position: absolute; inset: 0; transition: opacity var(--nt-motion-enter, 180ms); }
 .home-price-art__fallback.is-hidden { opacity: 0; }
-.home-price-art img { position: relative; width: 88px; height: 80px; opacity: 0; object-fit: contain; filter: drop-shadow(0 4px 8px #00000012); transform-origin: 50% 75%; transition: opacity var(--nt-motion-enter, 180ms), transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
+.home-price-art img { position: absolute; right: 0; bottom: 0; width: 64px; height: 52px; opacity: 0; object-fit: contain; filter: drop-shadow(0 3px 6px #0000000c); transform-origin: 50% 75%; transition: opacity var(--nt-motion-enter, 180ms), transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
 .home-price-art img.is-loaded { opacity: 1; }
-.home-price-card:focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 4px; transform: translateY(-2px); border-color: #b7cec1; box-shadow: 0 6px 16px #0000001c; }
-.home-price-card:focus-visible .home-price-mark { transform: translateY(-1px) rotate(-6deg); }
-.home-price-card:focus-visible .home-price-name { color: #164d39; }
-.home-price-card:focus-visible .home-price-art img { transform: translateY(-4px) rotate(-2deg); }
+.home-price-card:focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 4px; transform: translateY(-2px); border-color: #b8cec0; box-shadow: 0 5px 14px #00000012; }
+.home-price-card:focus-visible .home-price-mark { transform: translateY(-1px) rotate(-4deg); }
+.home-price-card:focus-visible .home-price-name { color: #23583e; }
+.home-price-card:focus-visible .home-price-art img { transform: translateY(-2px) rotate(-2deg); }
 @media (hover: hover) {
-  .home-price-card:hover { transform: translateY(-2px); border-color: #b7cec1; box-shadow: 0 6px 16px #0000001c; }
-  .home-price-card:hover .home-price-mark { transform: translateY(-1px) rotate(-6deg); }
-  .home-price-card:hover .home-price-name { color: #164d39; }
-  .home-price-card:hover .home-price-art img { transform: translateY(-4px) rotate(-2deg); }
+  .home-price-card:hover { transform: translateY(-2px); border-color: #b8cec0; box-shadow: 0 5px 14px #00000012; }
+  .home-price-card:hover .home-price-mark { transform: translateY(-1px) rotate(-4deg); }
+  .home-price-card:hover .home-price-name { color: #23583e; }
+  .home-price-card:hover .home-price-art img { transform: translateY(-2px) rotate(-2deg); }
 }
-a.home-price-card:active { transform: translateY(1px); box-shadow: 0 1px 4px #00000012; }
+a.home-price-card:active { transform: translateY(1px); box-shadow: 0 1px 3px #0000000d; }
 a.home-price-card:active .home-price-mark, a.home-price-card:active .home-price-art img { transform: translateY(0); }
 @media (min-width: 1440px) {
-  .home-price-card { min-height: 184px; padding: 12px; border-radius: 16px; }
-  .home-price-topline { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 4px 8px; }
-  .home-price-name { font-size: 15px; }
-  .home-price-invoice { grid-column: 2; }
-  .home-price-amount { display: grid; grid-template-columns: minmax(0, 1fr); align-content: end; min-height: 76px; padding-right: 56px; line-height: 32px; }
-  .home-price-amount > span { min-width: 0; }
-  .home-price-amount small { line-height: 16px; }
-  .home-price-state { max-width: calc(100% - 56px); }
-  .home-price-art { right: 8px; bottom: 12px; width: 64px; height: 52px; }
-  .home-price-art img { width: 52px; height: 48px; }
+  .home-price-card { min-height: 132px; padding: 12px; border-radius: 16px; }
+  .home-price-topline { grid-template-columns: 20px minmax(0, 1fr) 13px; gap: 6px; }
+  .home-price-mark { width: 20px; height: 20px; }
+  .home-price-name { font-size: 14px; }
+  .home-price-invoice-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .home-price-meta { min-height: 44px; gap: 4px; padding-right: 60px; }
+  .home-price-official { padding-inline: 5px; }
+  .home-price-amount { padding-top: 4px; font-size: 24px; line-height: 28px; gap: 2px 4px; }
+  .home-price-amount > small { font-size: 11px; }
+  .home-price-art { right: 0; top: 0; width: 56px; height: 44px; }
+  .home-price-art img { width: 52px; height: 42px; }
 }
-@media (max-width: 640px) { .home-price-card { min-height: 176px; } .home-price-name { font-size: 17px; } }
+@media (max-width: 640px) { .home-price-card { min-height: 156px; } }
 @media (max-width: 359px) {
-  .home-price-card { min-height: 204px; }
-  .home-price-invoice { flex-basis: 100%; margin-left: 32px; }
-  .home-price-name { font-size: 16px; }
-  .home-price-amount { display: grid; grid-template-columns: minmax(0, 1fr); align-content: end; min-height: 76px; padding-right: 84px; font-size: 26px; line-height: 30px; }
-  .home-price-amount > span { min-width: 0; }
-  .home-price-amount small { line-height: 16px; }
-  .home-price-state { max-width: calc(100% - 84px); }
-  .home-price-art { width: 96px; height: 76px; }
-  .home-price-art img { width: 72px; height: 68px; }
+  .home-price-card { padding: 14px; }
+  .home-price-name { font-size: 15px; }
+  .home-price-invoice-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .home-price-amount { font-size: 26px; line-height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-price-card, .home-price-name, .home-price-tier, .home-price-mark, .home-price-art img, .home-price-art__fallback { transition: none; }
+  .home-price-card, .home-price-name, .home-price-mark, .home-price-art img, .home-price-art__fallback { transition: none; }
   .home-price-card:is(:hover, :focus-visible, :active), .home-price-card:is(:hover, :focus-visible, :active) :is(.home-price-mark, .home-price-art img) { transform: none; }
 }
 </style>
