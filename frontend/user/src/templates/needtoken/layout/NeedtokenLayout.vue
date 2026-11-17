@@ -80,7 +80,7 @@
 
     <main class="relative isolate flex-1">
       <GhostFibersBackground v-if="route.path !== '/' && !route.path.startsWith('/tools/')" variant="subtle" />
-      <div class="relative z-[1]"><slot /></div>
+      <div class="nt-page-content relative z-[1]"><slot /></div>
     </main>
 
     <NeedtokenFooter :brand-name="brandName" :reseller-logo="resellerLogo" :support="support" />

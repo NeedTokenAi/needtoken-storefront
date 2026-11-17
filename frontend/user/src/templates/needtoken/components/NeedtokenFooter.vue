@@ -55,7 +55,7 @@ const columns = computed(() => [
 
 <style scoped>
 .nt-footer-next { width: 100%; margin-top: clamp(64px, 7vw, 112px); padding: 0 24px 24px; color: var(--ui-text-muted); }
-.nt-footer-card { max-width: 1200px; margin: 0 auto; overflow: visible; isolation: isolate; border: 1px solid rgba(160,190,185,.13); border-radius: 22px; background: #0d1319; }
+.nt-footer-card { max-width: var(--nt-content-max-width, 1200px); margin: 0 auto; overflow: visible; isolation: isolate; border: 1px solid rgba(160,190,185,.13); border-radius: 22px; background: #0d1319; }
 .nt-footer-top { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.7fr); gap: 56px; padding: 42px 42px 36px; }
 .nt-footer-brand { display: inline-flex; align-items: center; gap: 11px; max-width: 100%; color: var(--ui-text-primary); font-size: 21px; font-weight: 700; letter-spacing: -.04em; }
 .nt-footer-brand > img { flex-shrink: 0; border-radius: 9px; object-fit: contain; }.nt-footer-brand > span { min-width: 0; overflow-wrap: anywhere; }

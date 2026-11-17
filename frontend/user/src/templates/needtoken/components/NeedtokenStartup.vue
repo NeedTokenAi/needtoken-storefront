@@ -36,8 +36,7 @@ const { t } = useI18n()
 .nt-startup-identity > i { width: 135px; height: 24px; border-radius: 8px; background: color-mix(in srgb, var(--ui-text-muted, #7d8a99) 12%, transparent); }
 .nt-startup-nav { display: flex; gap: 20px; }
 .nt-startup-nav i { width: 60px; height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--ui-text-muted, #7d8a99) 10%, transparent); }
-.nt-startup-catalogue { max-width: 1320px; margin: auto; padding: 48px 24px 24px; }
-@media (min-width: 1440px) { .nt-startup-catalogue { max-width: 1540px; } }
+.nt-startup-catalogue { max-width: var(--nt-content-max-width, 1200px); margin: auto; padding: 48px 24px 24px; }
 .nt-startup-catalogue i { display: block; border-radius: 8px; background: #182028; }
 .nt-startup-catalogue-heading, .nt-startup-catalogue-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .nt-startup-catalogue-heading { min-height: 56px; }

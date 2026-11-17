@@ -7,6 +7,7 @@
 
 .nt-scope,
 body.nt-tokens {
+  --nt-content-max-width: 1200px;
   --nt-font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
   --nt-motion-fast: 120ms;
   --nt-motion-enter: 180ms;
@@ -36,6 +37,12 @@ body.nt-tokens {
   color: var(--ui-text-primary);
 }
 
+.nt-scope .nt-page-content {
+  width: 100%;
+  max-width: var(--nt-content-max-width);
+  margin-inline: auto;
+}
+
 /* Quiet feedback is shared by native and template controls; never animate layout. */
 :is(.nt-scope, body.nt-tokens) :where(button, a, summary, [role="tab"]) {
   -webkit-tap-highlight-color: transparent;
@@ -49,7 +56,7 @@ body.nt-tokens {
   .nt-scope details > summary > svg { transition: none; }
 }
 
-/* Match the native cart/order views to the header's 1200px outer container.
+/* Match native cart/order views to the storefront content width.
    Only these NeedToken wrappers opt in; classic and vault retain their layout. */
 .nt-scope .nt-native-page > div {
   min-height: 0;
@@ -58,7 +65,7 @@ body.nt-tokens {
 }
 .nt-scope .nt-native-page > div > .container {
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--nt-content-max-width);
   margin-inline: auto;
   padding-inline: 24px;
 }

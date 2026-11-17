@@ -54,7 +54,15 @@ const { t } = useI18n()
 .nt-skeleton-price-bottom { display: flex; align-items: flex-end; margin-top: auto; padding-top: 24px; padding-right: 76px; }
 .nt-skeleton-price-value { width: min(112px, 100%); height: 32px; }
 .nt-page-skeleton--prices .nt-skeleton-price-art { position: absolute; right: 20px; bottom: 20px; width: 68px; height: 68px; border-radius: 12px; }
-@media (min-width: 1440px) { .nt-page-skeleton--prices .nt-skeleton-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); } .nt-page-skeleton--prices .nt-skeleton-price-extra { display: flex; } }
+@media (min-width: 1440px) {
+  .nt-page-skeleton--prices .nt-skeleton-cards { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .nt-page-skeleton--prices article { min-height: 184px; padding: 12px; border-radius: 16px; }
+  .nt-page-skeleton--prices .nt-skeleton-price-extra { display: flex; }
+  .nt-page-skeleton--prices .nt-skeleton-price-heading { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 4px 8px; }
+  .nt-page-skeleton--prices .nt-skeleton-price-invoice { grid-column: 2; }
+  .nt-page-skeleton--prices .nt-skeleton-price-bottom { min-height: 76px; padding-right: 56px; }
+  .nt-page-skeleton--prices .nt-skeleton-price-art { right: 8px; bottom: 12px; width: 52px; height: 48px; border-radius: 8px; }
+}
 @media (max-width: 1100px) { .nt-page-skeleton--prices .nt-skeleton-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @keyframes nt-skeleton-shimmer { to { transform: translateX(100%); } }
 @media (max-width: 640px) {
