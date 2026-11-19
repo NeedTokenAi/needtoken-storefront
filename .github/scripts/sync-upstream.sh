@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # 把上游一个固定提交用普通 merge commit 合到分支上，并开 PR。
-# 不编译、不测试、不执行合并进来的代码。没有 GCP 凭证。
+# 不编译、不测试、不执行合并进来的代码。没有生产云凭证。
 # 冲突时不推送，避免把冲突标记送上 fork，更不会推到 main。
 set -euo pipefail
 
 REPO=${GITHUB_REPOSITORY:?}
 UPSTREAM_REPO=${UPSTREAM_REPO:-dujiao-next/dujiao-next}
 SYNC_AUTH_MODE=${SYNC_AUTH_MODE:-github_token}
+CI_DISPATCH_WORKFLOW=${CI_DISPATCH_WORKFLOW:-ci.yml}
+CI_SUMMARY_TEXT=${CI_SUMMARY_TEXT:-ci（installer / api / release-config / fullstack）}
+MAX_AUTO_MERGE_FILES=${UPSTREAM_AUTO_MERGE_MAX_FILES:-300}
 
 [[ $UPSTREAM_REPO =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || {
   echo "unexpected UPSTREAM_REPO" >&2
@@ -16,14 +19,42 @@ SYNC_AUTH_MODE=${SYNC_AUTH_MODE:-github_token}
   echo "unexpected SYNC_AUTH_MODE" >&2
   exit 1
 }
+[[ $MAX_AUTO_MERGE_FILES =~ ^[0-9]+$ && $MAX_AUTO_MERGE_FILES -gt 0 ]] || {
+  echo "unexpected UPSTREAM_AUTO_MERGE_MAX_FILES" >&2
+  exit 1
+}
 
 cd "$(git rev-parse --show-toplevel)"
 upstream_url=${UPSTREAM_URL:-https://github.com/${UPSTREAM_REPO}.git}
 script_dir=$(cd "$(dirname "$0")" && pwd)
 resolver=${RESOLVE_UPSTREAM:-$script_dir/resolve-upstream.sh}
+# shellcheck source=lib/high-risk-paths.sh
+source "$script_dir/lib/high-risk-paths.sh"
+
+log() { printf '%s\n' "$*"; }
+note() {
+  [[ -n ${GITHUB_STEP_SUMMARY:-} ]] || return 0
+  printf '%s\n' "$1" >>"$GITHUB_STEP_SUMMARY"
+}
 
 resolved=$("$resolver")
+status=$(printf '%s\n' "$resolved" | sed -n 's/^status=//p')
+status=${status:-ok}
 channel=$(printf '%s\n' "$resolved" | sed -n 's/^channel=//p')
+min_tag=$(printf '%s\n' "$resolved" | sed -n 's/^min_tag=//p')
+
+if [[ $status == no_eligible_tag ]]; then
+  log "no eligible upstream stable tag for ${UPSTREAM_REPO} >= ${min_tag:-none} via ${channel}"
+  note "### 上游同步"
+  note ""
+  note "- 上游: \`${UPSTREAM_REPO}\`"
+  note "- 通道: \`${channel}\`"
+  note "- 最低版本底线: \`${min_tag}\`"
+  note ""
+  note "上游目前尚无满足 \`>= ${min_tag}\` 的稳定版 tag，本次跳过。"
+  exit 0
+fi
+
 tag=$(printf '%s\n' "$resolved" | sed -n 's/^tag=//p')
 upstream_sha=$(printf '%s\n' "$resolved" | sed -n 's/^sha=//p')
 
@@ -38,12 +69,6 @@ upstream_sha=$(printf '%s\n' "$resolved" | sed -n 's/^sha=//p')
 [[ $upstream_sha =~ ^[0-9a-f]{40}$ ]] || {
   echo "resolver returned unexpected sha" >&2
   exit 1
-}
-
-log() { printf '%s\n' "$*"; }
-note() {
-  [[ -n ${GITHUB_STEP_SUMMARY:-} ]] || return 0
-  printf '%s\n' "$1" >>"$GITHUB_STEP_SUMMARY"
 }
 
 git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
@@ -104,7 +129,7 @@ open_conflict_issue() {
   fi
   body=$(mktemp)
   {
-    printf '%s\n' "上游同步无法自动合并，需要 Codex 解决冲突。"
+    printf '%s\n' "上游同步无法自动合并，需要人工 / Codex 解决冲突。"
     printf '%s\n' ""
     printf '%s\n' "- 我们的 main: \`${our_sha}\`"
     printf '%s\n' "- 上游: \`${UPSTREAM_REPO}\` \`${tag}\` \`${upstream_sha}\`"
@@ -134,17 +159,53 @@ ensure_ci() {
   if [[ $SYNC_AUTH_MODE == pat ]]; then
     log "PR opened with SYNC_GITHUB_TOKEN; pull_request should start ci"
     note ""
-    note "使用 SYNC_GITHUB_TOKEN 开了 PR，\`pull_request\` 会触发 ci。"
+    note "使用 SYNC_GITHUB_TOKEN 开了 PR，\`pull_request\` 会自动触发 CI。"
     return 0
   fi
-  gh workflow run ci.yml --ref "$head"
-  log "GITHUB_TOKEN cannot trigger pull_request workflows; dispatched ci on ${head}"
+  if [[ -n $CI_DISPATCH_WORKFLOW ]]; then
+    gh workflow run "$CI_DISPATCH_WORKFLOW" --ref "$head"
+    log "GITHUB_TOKEN cannot trigger pull_request workflows; dispatched ${CI_DISPATCH_WORKFLOW} on ${head}"
+    note ""
+    note "没有 SYNC_GITHUB_TOKEN。已对 \`${head}\` 执行 \`workflow_dispatch\` 触发 \`${CI_DISPATCH_WORKFLOW}\`。"
+    return 0
+  fi
+  log "GITHUB_TOKEN cannot trigger pull_request workflows and no CI_DISPATCH_WORKFLOW is configured"
   note ""
-  note "没有 SYNC_GITHUB_TOKEN。已对 \`${head}\` 执行 \`workflow_dispatch\` 触发 ci。默认 GITHUB_TOKEN 开的 PR 不会自动跑其他工作流。"
+  note "未配置 \`SYNC_GITHUB_TOKEN\`，默认 \`GITHUB_TOKEN\` 开出的 PR 不会自动触发 \`pull_request\` 工作流。请在仓库 Secrets 配置 \`SYNC_GITHUB_TOKEN\` 后重新运行或手动触发 CI。"
+}
+
+build_risk_preview() {
+  local base_ref=$1 head_ref=$2
+  local changed_file_list high_risk_list total_count high_count
+  changed_file_list=$(git diff --name-only "$base_ref" "$head_ref")
+  total_count=$(printf '%s\n' "$changed_file_list" | awk 'NF{c++} END{print c+0}')
+  high_risk_list=$(printf '%s\n' "$changed_file_list" | filter_high_risk_paths || true)
+  high_count=$(printf '%s\n' "$high_risk_list" | awk 'NF{c++} END{print c+0}')
+
+  if [[ $total_count -eq 0 ]]; then
+    printf '%s\n' "- 预检结果：**需人工审阅**（未检测到文件差异，fail-closed）"
+    return 0
+  fi
+  if [[ $total_count -gt $MAX_AUTO_MERGE_FILES ]]; then
+    printf '%s\n' "- 预检结果：**高危（需人工审阅）** — 变更文件数 \`${total_count}\` 超过自动合并阈值 \`${MAX_AUTO_MERGE_FILES}\`"
+    return 0
+  fi
+  if [[ $high_count -gt 0 ]]; then
+    printf '%s\n' "- 预检结果：**高危（需人工审阅）** — 命中 \`${high_count}\` 个高危路径（总变更 \`${total_count}\` 个文件），CI 通过后也不会自动合并："
+    printf '%s\n' ""
+    printf '%s\n' '```'
+    printf '%s\n' "$high_risk_list" | head -n 30
+    if [[ $high_count -gt 30 ]]; then
+      printf '...（共 %d 个高危文件）\n' "$high_count"
+    fi
+    printf '%s\n' '```'
+    return 0
+  fi
+  printf '%s\n' "- 预检结果：**低风险（可自动合并）** — 变更 \`${total_count}\` 个文件，未命中高危路径。待全部必需 CI 通过后，\`auto-merge-upstream\` 将在 \`main\` 上重新校验并以 **Merge Commit** 自动合并（随后触发 Cloudflare Workers Builds）。"
 }
 
 create_pr() {
-  local head=$1
+  local head=$1 risk_summary=$2
   local existing body url
   existing=$(gh pr list --repo "$REPO" --base main --head "$head" --state open --json url \
     --jq '.[0].url // empty')
@@ -167,11 +228,17 @@ create_pr() {
 
 请使用 **Create a merge commit**。不要 Squash，不要 Rebase。Squash 会丢掉这次合并的两个父提交，下一次同步无法判断上游提交是否已经在 main 里。
 
+## 风险门禁与自动构建
+
+${risk_summary}
+
+（注：PR 描述里的预检结果仅供参考，\`auto-merge-upstream\` 会在 CI 全部成功后基于 GitHub API 重新计算全部变更路径与提交结构，fail-closed 判定。）
+
 ## CI
 
-同步任务本身不编译、不执行合并进来的代码。请等 ci（installer / api / release-config / fullstack）在这个 SHA 上通过后再合并。
+同步任务本身不编译、不执行合并进来的代码。请等 ${CI_SUMMARY_TEXT} 在这个 SHA 上通过后再合并。
 
-生产部署只在该提交进入 main 且 push 触发的 ci 成功之后才会发生。合并前请确认 Cloud Build 触发器 \`needtoken-storefront-asia-southeast1-NeedTokenAi\` 不会和 Actions 抢着切 100% 流量。涉及资金或数据库迁移时，先在隔离数据库演练。
+合入 \`main\` 后将由 Cloudflare Workers Builds 自动构建并发布；涉及资金、鉴权或数据库迁移时，请先在隔离数据库演练。
 EOF
   url=$(gh pr create --repo "$REPO" --base main --head "$head" --title "sync: upstream ${UPSTREAM_REPO} ${tag}" --body-file "$body")
   rm -f "$body"
@@ -186,7 +253,8 @@ if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
   if git merge-base --is-ancestor "$our_sha" "origin/${branch}" \
     && git merge-base --is-ancestor "$upstream_sha" "origin/${branch}"; then
     log "remote ${branch} already contains main and upstream; opening a PR without pushing"
-    create_pr "$branch"
+    risk_summary=$(build_risk_preview "$our_sha" "origin/${branch}")
+    create_pr "$branch" "$risk_summary"
     exit 0
   fi
   echo "remote ${branch} exists but is not a merge of current main and ${upstream_sha}; refusing to force-push" >&2
@@ -213,7 +281,7 @@ if [[ $merge_rc -ne 0 ]]; then
   open_conflict_issue "$files" "$(cat "$merge_log")"
   rm -f "$merge_log"
   note ""
-  note "合并冲突，没有推送分支。Codex 需要按 issue 里的文件列表解决。"
+  note "合并冲突，没有推送分支。需要按 issue 里的文件列表在本地解决。"
   exit 1
 fi
 rm -f "$merge_log"
@@ -236,6 +304,8 @@ if [[ $(git rev-parse origin/main) != "$our_sha" ]]; then
   exit 0
 fi
 
+risk_summary=$(build_risk_preview "$our_sha" HEAD)
+
 # 只推这个分支，不推 tag，也不推其它 ref。
 git push origin "refs/heads/${branch}:refs/heads/${branch}"
-create_pr "$branch"
+create_pr "$branch" "$risk_summary"
