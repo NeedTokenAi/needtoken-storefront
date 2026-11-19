@@ -196,8 +196,8 @@ onMounted(() => { void pricing.ensureLoaded(); void pool.ensureLoaded() })
 
 <style scoped>
 .nt-model-card { transition: background-color var(--nt-motion-fast) var(--nt-motion-ease); }
-.nt-model-card:is(:hover, :focus-within) { background: #11171e; }
+.nt-model-card:is(:hover, :focus-within) { background: var(--nt-surface-hover); }
 .nt-model-name { transition: color var(--nt-motion-fast) var(--nt-motion-ease); }
-.nt-model-card:is(:hover, :focus-within) .nt-model-name { color: #c4f3e5; }
+.nt-model-card:is(:hover, :focus-within) .nt-model-name { color: var(--nt-accent-ink-hover); }
 @media (prefers-reduced-motion: reduce) { .nt-model-card, .nt-model-name { transition: none; } }
 </style>

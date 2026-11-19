@@ -153,19 +153,26 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
-.nt-fiber-background { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; contain: paint; background: #07090d; }
-.nt-fiber-haze { position: absolute; inset: 0; background: radial-gradient(ellipse at 17% 88%, #8067d31a, transparent 45%), radial-gradient(ellipse at 89% 6%, #27aea11c, transparent 43%); }
+<style>
+.nt-fiber-background { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; contain: paint; background: var(--ui-bg-page); }
+.nt-fiber-haze { position: absolute; inset: 0; background: radial-gradient(ellipse at 14% 18%, rgba(13, 148, 115, 0.08), transparent 48%), radial-gradient(ellipse at 88% 8%, rgba(114, 92, 212, 0.06), transparent 44%); }
 .nt-fiber-poster, .nt-fiber-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-.nt-fiber-poster { object-fit: cover; opacity: .9; transition: opacity 800ms ease; }
+.nt-fiber-poster { object-fit: cover; opacity: 0; transition: opacity 800ms ease; }
 .nt-fiber-canvas { opacity: 0; transition: opacity 1100ms ease; }
-.nt-fiber--ready .nt-fiber-canvas { opacity: 1; }
-.nt-fiber--ready .nt-fiber-poster, .nt-fiber--ready .nt-fiber-layer { opacity: 0; }
-.nt-fiber-layer { position: absolute; inset: -7%; opacity: .65; }
+.nt-fiber-layer { position: absolute; inset: -7%; opacity: 0; }
 .nt-fiber-layer svg { display: block; width: 100%; height: 100%; }
-.nt-fiber-layer--1 { opacity: .4; }
-.nt-fiber-layer--2 { opacity: .24; }
-.nt-fiber-background::after { position: absolute; inset: 0; content: ''; background: linear-gradient(180deg, #07090d08, #07090d18 32%, #07090d08 68%, #07090d); }
-.nt-fiber--subtle { max-height: 1100px; opacity: .36; }
+.nt-fiber-background::after { position: absolute; inset: 0; content: ''; background: linear-gradient(180deg, transparent, transparent 62%, var(--ui-bg-page)); }
+.nt-fiber--subtle { max-height: 1100px; opacity: .55; }
+
+html.dark .nt-fiber-background { background: #07090d; }
+html.dark .nt-fiber-haze { background: radial-gradient(ellipse at 17% 88%, #8067d31a, transparent 45%), radial-gradient(ellipse at 89% 6%, #27aea11c, transparent 43%); }
+html.dark .nt-fiber-poster { opacity: .9; }
+html.dark .nt-fiber--ready .nt-fiber-canvas { opacity: 1; }
+html.dark .nt-fiber--ready .nt-fiber-poster, html.dark .nt-fiber--ready .nt-fiber-layer { opacity: 0; }
+html.dark .nt-fiber-layer { opacity: .65; }
+html.dark .nt-fiber-layer--1 { opacity: .4; }
+html.dark .nt-fiber-layer--2 { opacity: .24; }
+html.dark .nt-fiber-background::after { background: linear-gradient(180deg, #07090d08, #07090d18 32%, #07090d08 68%, #07090d); }
+html.dark .nt-fiber--subtle { opacity: .36; }
 @media (prefers-reduced-motion: reduce) { .nt-fiber-canvas, .nt-fiber-poster { transition: none; } }
 </style>

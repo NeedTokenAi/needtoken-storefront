@@ -187,7 +187,7 @@ onUnmounted(() => { disposed = true; if (copyTimer) clearTimeout(copyTimer) })
 .integration-fields > input { max-width: 420px; border: 1px solid var(--ui-border-strong); border-radius: 10px; }
 .field-hint, .copy-feedback { color: var(--ui-text-muted); font-size: 12px; line-height: 1.75; }
 .field-hint a { display: inline-flex; align-items: center; gap: 4px; color: var(--ui-accent); }
-.field-hint.is-invalid, .copy-feedback { color: #d5b37a; }
+.field-hint.is-invalid, .copy-feedback { color: var(--nt-warning-ink); }
 .template-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; margin-bottom: 12px; }
 .template-heading h4 { color: var(--ui-text-secondary); font-size: 13px; font-weight: 500; }
 .template-heading button { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 12px; border: 1px solid var(--ui-border-strong); border-radius: 8px; color: var(--ui-text-secondary); font-size: 12px; transition: color 160ms, background 160ms; }

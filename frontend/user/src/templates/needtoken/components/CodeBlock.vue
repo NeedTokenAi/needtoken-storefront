@@ -58,6 +58,6 @@ const copy = async () => {
 .code-copy:hover:not(:disabled), .code-copy:focus-visible { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
 .code-copy:active:not(:disabled) { transform: translateY(1px); }
 .code-copy:disabled { cursor: wait; opacity: .65; }
-.code-copy-feedback { padding: 12px 16px; border-top: 1px solid var(--ui-border); color: #e5b969; font-size: 12px; line-height: 1.7; }
+.code-copy-feedback { padding: 12px 16px; border-top: 1px solid var(--ui-border); color: var(--nt-warning-ink); font-size: 12px; line-height: 1.7; }
 @media (prefers-reduced-motion: reduce) { .code-copy { transition: none; }.code-copy:active:not(:disabled) { transform: none; } }
 </style>

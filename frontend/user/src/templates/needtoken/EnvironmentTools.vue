@@ -164,7 +164,7 @@ onBeforeUnmount(() => { disposed = true; generation++; importGeneration++; activ
 .network-service-state { display:inline-flex; align-items:center; gap:8px; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
 .network-service-state.is-observed { color:var(--ui-text-secondary); }
 .network-service-state.is-readable { color:var(--ui-accent); }
-.network-service-state.is-warning { color:#e5b969; }
+.network-service-state.is-warning { color:var(--nt-warning-ink); }
 .network-latency { justify-self:end; color:var(--ui-text-secondary); font-family:var(--nt-font-mono); font-size:12px; line-height:20px; font-variant-numeric:tabular-nums; }
 .network-service-detail { grid-column:1/-1; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
 .network-service-detail summary, .network-scope summary { display:flex; width:fit-content; max-width:100%; align-items:center; gap:8px; cursor:pointer; list-style:none; }
@@ -201,7 +201,7 @@ onBeforeUnmount(() => { disposed = true; generation++; importGeneration++; activ
 .network-import { position:relative; display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:12px 16px; margin-top:20px; border:1px solid var(--ui-border); border-radius:8px; color:var(--ui-text-secondary); font-size:13px; line-height:20px; cursor:pointer; }
 .network-import input { position:absolute; inset:0; width:100%; opacity:0; cursor:pointer; }
 #network-terminal .network-facts { margin-top:24px; }
-.network-review-note { margin-top:16px; color:#e5b969; font-size:13px; line-height:20px; }
+.network-review-note { margin-top:16px; color:var(--nt-warning-ink); font-size:13px; line-height:20px; }
 .network-review-note>svg { display:inline; vertical-align:middle; margin-right:4px; }
 .network-import-label { margin:20px 0; color:var(--ui-text-muted); font-size:12px; line-height:20px; }
 .network-report .network-button { margin-top:16px; }

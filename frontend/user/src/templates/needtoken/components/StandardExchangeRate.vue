@@ -49,7 +49,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', onPointerDown))
 .nt-standard-rate__trigger { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 100%; color: inherit; cursor: pointer; font: inherit; text-align: center; }
 .nt-standard-rate__trigger > svg { flex: none; opacity: .85; }
 .nt-standard-rate__trigger > span { min-width: 0; overflow-wrap: anywhere; }
-.nt-standard-rate__panel { position: absolute; right: -6px; bottom: calc(100% + 18px); z-index: 40; width: 330px; max-width: calc(100vw - 40px); padding: 18px; border: 1px solid rgba(94,234,192,.28); border-radius: 15px; background: #0e1218; color: var(--ui-text-secondary); box-shadow: 0 18px 55px #0009; font-size: 12px; font-weight: 400; line-height: 1.75; text-align: left; }
+.nt-standard-rate__panel { position: absolute; right: -6px; bottom: calc(100% + 18px); z-index: 40; width: 330px; max-width: calc(100vw - 40px); padding: 18px; border: 1px solid var(--nt-accent-border); border-radius: 15px; background: var(--ui-bg-elevated); color: var(--ui-text-secondary); box-shadow: var(--nt-popover-shadow); font-size: 12px; font-weight: 400; line-height: 1.75; text-align: left; }
 .nt-standard-rate--below .nt-standard-rate__panel { top: calc(100% + 18px); bottom: auto; }
 .nt-standard-rate__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .nt-standard-rate__heading h2 { color: var(--ui-text-primary); font-size: 14px; font-weight: 650; line-height: 1.5; }
@@ -57,6 +57,6 @@ onUnmounted(() => document.removeEventListener('pointerdown', onPointerDown))
 .nt-standard-rate__heading button:hover { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
 .nt-standard-rate__panel p { margin-top: 8px; overflow-wrap: anywhere; }
 .nt-standard-rate__panel .nt-standard-rate__value { margin: 13px 0 10px; color: var(--ui-accent); font-family: var(--nt-font-mono); font-size: 18px; font-weight: 600; line-height: 1.45; }
-.nt-standard-rate__pending { color: #e5b969; }
+.nt-standard-rate__pending { color: var(--nt-warning-ink); }
 .nt-standard-rate__panel .nt-standard-rate__note { margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--ui-border); color: var(--ui-text-muted); font-size: 11px; }
 </style>

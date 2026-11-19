@@ -13,10 +13,11 @@ defineProps<{ brand: ProductBrand }>()
 </script>
 
 <style scoped>
-.product-brand-mark { display: inline-grid; width: 24px; height: 24px; flex: none; place-items: center; color: var(--product-brand-ink, #263c32); }
-.product-brand-mark[data-brand="claude"] { color: var(--product-brand-ink, #a9553b); }
-.product-brand-mark[data-brand="meta"] { color: var(--product-brand-ink, #0866ff); }
-.product-brand-mark[data-brand="gemini"] { color: var(--product-brand-ink, #4489f7); }
-.product-brand-mark[data-brand="unknown"] { color: var(--product-brand-ink, #65766d); }
+.product-brand-mark { display: inline-grid; width: 24px; height: 24px; flex: none; place-items: center; color: var(--product-brand-ink, var(--nt-brand-openai, #173026)); }
+.product-brand-mark[data-brand="claude"] { color: var(--product-brand-ink, var(--nt-brand-claude, #c25d3f)); }
+.product-brand-mark[data-brand="meta"] { color: var(--product-brand-ink, var(--nt-brand-meta, #0866ff)); }
+.product-brand-mark[data-brand="gemini"] { color: var(--product-brand-ink, var(--nt-brand-gemini, #3b7ef0)); }
+.product-brand-mark[data-brand="grok"] { color: var(--product-brand-ink, var(--nt-brand-grok, #18231f)); }
+.product-brand-mark[data-brand="unknown"] { color: var(--product-brand-ink, var(--nt-brand-unknown, #65766d)); }
 .product-brand-symbol { display: block; width: 22px; height: 22px; }
 </style>

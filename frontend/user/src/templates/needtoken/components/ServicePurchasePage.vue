@@ -402,7 +402,7 @@ const submitCart = () => {
 .option-top > span:first-child, .summary-option { min-width: 0; overflow-wrap: anywhere; }
 .purchase-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .purchase-option { padding: 16px; border-radius: 12px; border: 1px solid var(--ui-border); background: transparent; color: var(--ui-text-primary); text-align: left; min-width: 0; transition: border-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.purchase-option:not(.selected):hover { border-color: var(--ui-border-strong); background: rgba(255,255,255,.025); }
+.purchase-option:not(.selected):hover { border-color: var(--ui-border-strong); background: var(--nt-surface-subtle); }
 .purchase-option.selected { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
 .purchase-option:active { transform: translateY(1px); }
 .purchase-option.unavailable { border-style: dashed; }
@@ -453,7 +453,7 @@ const submitCart = () => {
 .summary-secure { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px; color: var(--ui-text-muted); }
 .purchase-message { display: flex; gap: 8px; align-items: start; padding: 12px; border-radius: 8px; border: 1px solid var(--ui-border); font-size: 12px; line-height: 1.8; margin: 16px 0; color: var(--ui-text-muted); }
 .purchase-message svg { flex: none; margin-top: 4px; }
-.purchase-message.warning { color: #e0bd88; background: rgba(230,180,80,.04); border-color: rgba(230,180,80,.2); }
+.purchase-message.warning { color: var(--nt-warning-ink); background: var(--nt-warning-bg); border-color: var(--nt-warning-border); }
 .purchase-content, .purchase-related { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--ui-border); }
 .purchase-content :deep(.prose) { font-size: 14px; line-height: 1.8; }
 .purchase-content :deep(img) { max-width: 100%; height: auto; border-radius: 8px; }

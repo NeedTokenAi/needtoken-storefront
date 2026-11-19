@@ -1,6 +1,6 @@
 <template>
   <div ref="scopeEl" class="nt-scope" @pointerover.passive="prefetchLink" @focusin="prefetchLink" @touchstart.passive="prefetchLink">
-    <header class="nt-site-header sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
+    <header class="nt-site-header sticky top-0 z-50 border-b border-border backdrop-blur">
       <div class="nt-header-inner mx-auto flex h-16 w-full max-w-[1320px] items-center gap-2 sm:gap-4">
         <RouterLink to="/" class="nt-brand flex min-w-0 items-center gap-2 text-[15px] font-bold tracking-tight text-foreground sm:shrink-0 sm:text-[17px]" :title="brandName" :aria-label="brandName">
           <BrandMark v-if="!appStore.isResellerTenant" class="h-7 w-7 shrink-0" />
@@ -45,6 +45,7 @@
             </div>
             </Transition>
           </div>
+          <ThemeToggle class="max-[479px]:hidden" />
           <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('navbar.personalCenter') }}</RouterLink>
           <RouterLink v-else :to="loginTarget" class="nt-auth-entry inline-flex min-h-9 items-center whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.nav.authEntry') }}</RouterLink>
 
@@ -61,7 +62,7 @@
                   <button type="button" class="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-expanded="mobileGroup === node.key" :aria-controls="`nt-mobile-${node.key}`" @click="mobileGroup = mobileGroup === node.key ? null : node.key">{{ node.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="mobileGroup === node.key ? 'rotate-180' : ''" /></button>
                   <div v-if="mobileGroup === node.key" :id="`nt-mobile-${node.key}`" class="ml-3 border-l border-border pl-2">
                     <template v-for="item in node.items" :key="`m-${item.key}`">
-                      <span v-if="item.disabled" class="flex items-center justify-between rounded px-3 py-2 text-sm text-muted-foreground" aria-disabled="true">{{ item.label }}<em class="text-[11px] not-italic text-amber-200/80">{{ item.badge }}</em></span>
+                      <span v-if="item.disabled" class="nt-mobile-disabled flex items-center justify-between rounded px-3 py-2 text-sm text-muted-foreground" aria-disabled="true">{{ item.label }}<em class="text-[11px] not-italic">{{ item.badge }}</em></span>
                       <RouterLink v-else :to="item.path" class="block rounded px-3 py-2 text-sm hover:bg-secondary" :class="isActive(item) ? 'text-primary' : 'text-muted-foreground'" :aria-current="isActive(item) ? 'page' : undefined" @click="closeMenus">{{ item.label }}</RouterLink>
                     </template>
                   </div>
@@ -69,6 +70,8 @@
               </template>
               <RouterLink to="/guest/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ t('navbar.guestOrders') }}</RouterLink>
               <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
+              <span class="px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('needtoken.theme.label') }}</span>
+              <div class="px-2 pb-1"><ThemeToggle variant="menu" /></div>
               <span class="px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('navbar.selectLanguage') }}</span>
               <button v-for="lang in languages" :key="`ml-${lang.code}`" type="button" class="rounded px-3 py-2 text-left text-sm hover:bg-secondary" :class="appStore.locale === lang.code ? 'text-primary' : 'text-muted-foreground'" @click="changeLanguage(lang.code); moreOpen = false">{{ lang.name }}</button>
             </nav>
@@ -103,9 +106,11 @@ import BrandMark from '../components/BrandMark.vue'
 import NeedtokenFooter from '../components/NeedtokenFooter.vue'
 import GhostFibersBackground from '../components/GhostFibersBackground.vue'
 import SupportWidget from '../components/SupportWidget.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 import { useNeedtokenEffects } from '../composables/useNeedtokenEffects'
 import { prefetchStorefrontRoute } from '../../../router'
 import { normalizeNeedtokenSupport } from '../lib/supportConfig'
+import { useTheme } from '../../../utils/theme'
 import '../styles/needtoken.css'
 
 const { t } = useI18n()
@@ -257,36 +262,34 @@ const onDocClick = (e: MouseEvent) => {
   if (openGroup.value && !groupEls.get(openGroup.value)?.contains(target)) openGroup.value = null
 }
 
-// 深色是本模板的固定风格：挂载时打上 .dark，卸载（切回其他模板）时恢复原状，不写入用户主题偏好
-let hadDark = false
+// 跟随系统明暗并支持用户手动切换；挂载/卸载时仅维护 body.nt-tokens 令牌作用域
+useTheme()
 onMounted(() => {
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocumentKeydown)
-  hadDark = document.documentElement.classList.contains('dark')
-  document.documentElement.classList.add('dark')
   document.body.classList.add('nt-tokens')
 })
 onUnmounted(() => {
   appStore.setStorefrontBrandOverride(previousBrandOverride)
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onDocumentKeydown)
-  if (!hadDark) document.documentElement.classList.remove('dark')
   document.body.classList.remove('nt-tokens')
 })
 </script>
 
 <style scoped>
-.nt-site-header { padding-inline: 24px; }
+.nt-site-header { padding-inline: 24px; background: var(--nt-header-bg); }
 @media (min-width: 1240px) { .nt-header-inner { padding-inline: 24px; } }
 @media (max-width: 640px) { .nt-site-header { padding-inline: 14px; } }
 .nt-site-header :where(a, button) { transition: color var(--nt-motion-fast) var(--nt-motion-ease), background-color var(--nt-motion-fast) var(--nt-motion-ease); }
 .nt-nav-group-button { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 8px 12px; white-space: nowrap; font-size: 14px; font-weight: 500; }
 .nt-nav-group-button:hover, .nt-nav-group-button[aria-expanded="true"] { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
-.nt-nav-dropdown { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: max-content; min-width: 192px; max-width: min(320px, 70vw); padding: 8px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); box-shadow: 0 12px 32px #0005; }
+.nt-nav-dropdown { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: max-content; min-width: 192px; max-width: min(320px, 70vw); padding: 8px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); box-shadow: var(--nt-popover-shadow); }
 .nt-nav-dropdown-link { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 40px; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
 .nt-nav-dropdown-link:hover { color: var(--ui-accent); background: var(--ui-bg-soft); }
 .nt-nav-dropdown-link.is-disabled { color: var(--ui-text-muted); cursor: default; }
-.nt-nav-dropdown-link.is-disabled em { font-style: normal; font-size: 11px; color: #e7c56a; }
+.nt-nav-dropdown-link.is-disabled em, .nt-mobile-disabled em { font-style: normal; font-size: 11px; color: var(--nt-warning-ink); }
+.nt-language-options, .nt-mobile-navigation { box-shadow: var(--nt-popover-shadow); }
 .nt-mobile-navigation { max-height: calc(100dvh - 90px); overflow-y: auto; overscroll-behavior: contain; }
 .nt-menu-enter-active { transition: opacity var(--nt-motion-enter) var(--nt-motion-ease), transform var(--nt-motion-enter) var(--nt-motion-ease); }
 .nt-menu-leave-active { transition: opacity var(--nt-motion-fast) var(--nt-motion-ease), transform var(--nt-motion-fast) var(--nt-motion-ease); pointer-events: none; }

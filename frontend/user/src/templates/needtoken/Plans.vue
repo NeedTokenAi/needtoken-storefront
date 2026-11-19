@@ -65,17 +65,17 @@ usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('need
 .api-plans-heading h1 { font-size: clamp(27px, 2.5vw, 34px); font-weight: 750; letter-spacing: -.045em; line-height: 1.25; text-wrap: balance; }
 .api-plans-heading h1 span { color: var(--ui-accent); }
 .api-plans-promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; font-size: 12px; }
-.api-plans-promises li { display: flex; min-width: 0; min-height: 34px; justify-content: center; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid #ffe07e73; border-radius: 9px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; }
-.api-plans-promises svg { flex: none; opacity: .85; }
+.api-plans-promises li { display: flex; min-width: 0; min-height: 34px; justify-content: center; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid var(--nt-benefit-border); border-radius: 9px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); box-shadow: var(--nt-card-shadow); font-weight: 550; line-height: 1.5; }
+.api-plans-promises svg { flex: none; color: var(--nt-benefit-icon); }
 .api-plans-rate { position: relative; z-index: 3; }
 .api-plan-catalog { scroll-margin-top: 85px; }
 .api-plan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 12px; border-top: 1px solid var(--ui-border); }
 .api-plan-console { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 40px; color: var(--ui-accent); font-size: 12px; }
 .api-plan-tabs { display: flex; flex: 1; gap: 9px; min-width: 0; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
-.api-plan-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: linear-gradient(135deg, #ffffff11, #ffffff04); color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; }
-.api-plan-tabs button.active { color: var(--ui-accent); border-color: #2dd4a770; background: linear-gradient(135deg, #2dd4a725, #2dd4a709); }
+.api-plan-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-bg-elevated); color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; }
+.api-plan-tabs button.active { color: var(--ui-accent); border-color: var(--nt-accent-border-strong); background: var(--ui-accent-soft); }
 .api-plan-tabs button:focus-visible, .api-plan-console:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-.api-plan-member-note { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; border: 1px solid #2dd4a733; border-radius: 11px; background: #2dd4a709; }
+.api-plan-member-note { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; border: 1px solid var(--nt-accent-border); border-radius: 11px; background: var(--nt-accent-subtle); }
 .api-plan-member-note > svg { flex: none; color: var(--ui-accent); margin-top: 3px; }
 .api-plan-member-note > details { min-width: 0; flex: 1; }
 .api-plan-member-note summary { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 12px; list-style: none; cursor: pointer; }
@@ -89,7 +89,7 @@ usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('need
 .api-plan-member-note > a { display: inline-flex; flex: none; align-items: center; gap: 5px; color: var(--ui-accent); font-size: 12px; margin-top: 3px; }
 .api-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 17px; }
 .api-plan-skeleton { min-height: 330px; padding: 18px; border: 1px solid var(--ui-border); border-radius: 20px; }
-.api-plan-skeleton div { height: 25px; width: 70%; margin-bottom: 22px; border-radius: 8px; background: #ffffff09; }
+.api-plan-skeleton div { height: 25px; width: 70%; margin-bottom: 22px; border-radius: 8px; background: var(--nt-skeleton-base); }
 .api-plan-skeleton div:nth-child(3) { height: 85px; width: 100%; }
 .api-plan-state { display: grid; align-content: center; justify-items: center; gap: 14px; min-height: 310px; padding: 25px; border: 1px solid var(--ui-border); border-radius: 22px; text-align: center; color: var(--ui-text-muted); }
 .api-plan-state h3 { color: var(--ui-text-primary); font-size: 17px; font-weight: 650; }

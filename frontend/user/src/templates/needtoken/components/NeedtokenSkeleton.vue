@@ -24,13 +24,13 @@ const { t } = useI18n()
 <style scoped>
 .nt-page-skeleton { box-sizing: border-box; min-width: 0; width: 100%; max-width: 1200px; margin: 0 auto; padding: 48px 24px; }
 .nt-skeleton-heading { display: grid; justify-items: center; gap: 16px; margin: 0 auto 34px; }
-.nt-page-skeleton i { display: block; position: relative; overflow: hidden; border-radius: 8px; background: color-mix(in srgb, var(--ui-text-muted, #7d8a99) 12%, transparent); }
-.nt-page-skeleton i::after { position: absolute; inset: 0; content: ''; background: linear-gradient(100deg, transparent 20%, #ffffff09 45%, transparent 70%); transform: translateX(-100%); animation: nt-skeleton-shimmer 2s ease-in-out infinite; }
+.nt-page-skeleton i { display: block; position: relative; overflow: hidden; border-radius: 8px; background: var(--nt-skeleton-base, color-mix(in srgb, var(--ui-text-muted, #7d8a99) 12%, transparent)); }
+.nt-page-skeleton i::after { position: absolute; inset: 0; content: ''; background: linear-gradient(100deg, transparent 20%, var(--nt-skeleton-sheen, rgba(255, 255, 255, 0.12)) 45%, transparent 70%); transform: translateX(-100%); animation: nt-skeleton-shimmer 2s ease-in-out infinite; }
 .nt-skeleton-heading i:first-child { width: 100px; height: 12px; }
 .nt-skeleton-heading i:nth-child(2) { width: min(70%, 520px); height: 37px; }
 .nt-skeleton-heading i:nth-child(3) { width: min(55%, 390px); height: 14px; }
 .nt-skeleton-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.nt-skeleton-cards article { box-sizing: border-box; min-width: 0; min-height: 260px; padding: 24px; border: 1px solid var(--ui-border, #7d8a9929); border-radius: 22px; background: color-mix(in srgb, var(--ui-bg-elevated, #0e1218) 55%, transparent); }
+.nt-skeleton-cards article { box-sizing: border-box; min-width: 0; min-height: 260px; padding: 24px; border: 1px solid var(--ui-border, #7d8a9929); border-radius: 22px; background: color-mix(in srgb, var(--ui-bg-elevated, #ffffff) 75%, transparent); }
 .nt-page-skeleton:not(.nt-page-skeleton--prices) article > i:first-child { width: 38px; height: 38px; margin-bottom: 28px; border-radius: 12px; }
 .nt-page-skeleton:not(.nt-page-skeleton--prices) article > i:nth-child(2) { width: 65%; height: 24px; margin-bottom: 16px; }
 .nt-page-skeleton:not(.nt-page-skeleton--prices) article > i:nth-child(3) { width: 88%; height: 40px; margin-bottom: 32px; }
@@ -42,10 +42,10 @@ const { t } = useI18n()
 .nt-page-skeleton--prices { grid-column: 1 / -1; max-width: none; padding: 0; }
 .nt-page-skeleton--prices .nt-skeleton-heading { display: none; }
 .nt-page-skeleton--prices .nt-skeleton-cards { gap: 16px; }
-.nt-page-skeleton--prices article { position: relative; display: flex; flex-direction: column; min-height: 156px; padding: 16px; border-color: #e0e7e2; border-radius: 18px; background: #fbfcfb; }
+.nt-page-skeleton--prices article { position: relative; display: flex; flex-direction: column; min-height: 156px; padding: 16px; border-color: var(--nt-card-border, var(--ui-border)); border-radius: 18px; background: var(--ui-bg-elevated); }
 .nt-page-skeleton--prices .nt-skeleton-price-extra { display: none; }
-.nt-page-skeleton--prices article i { flex: none; margin: 0; border-radius: 4px; background: #dce5df; }
-.nt-page-skeleton--prices article i::after { background: linear-gradient(100deg, transparent 20%, #ffffff70 45%, transparent 70%); }
+.nt-page-skeleton--prices article i { flex: none; margin: 0; border-radius: 4px; background: var(--nt-skeleton-base, #e4ebe7); }
+.nt-page-skeleton--prices article i::after { background: linear-gradient(100deg, transparent 20%, var(--nt-skeleton-sheen, rgba(255, 255, 255, 0.7)) 45%, transparent 70%); }
 .nt-skeleton-price-heading { display: grid; grid-template-columns: 22px minmax(0, 1fr) 52px; align-items: center; gap: 8px; }
 .nt-skeleton-price-mark { width: 22px; height: 22px; }
 .nt-page-skeleton--prices .nt-skeleton-price-name { width: 100%; max-width: 144px; height: 16px; }

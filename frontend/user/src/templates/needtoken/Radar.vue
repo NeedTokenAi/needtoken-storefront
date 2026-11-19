@@ -257,8 +257,8 @@ onUnmounted(() => { disposed = true; generation++; updatesGeneration++; controll
 .radar-freshness { flex-wrap: wrap; gap: 8px; }
 .freshness-mark { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--ui-accent); }
 .poll-note { padding-left: 8px; border-left: 1px solid var(--ui-border); color: var(--ui-text-muted); }
-.radar-freshness[data-stale="true"] { color: #d9b56f; }
-.radar-freshness[data-stale="true"] .freshness-mark { background: #d9b56f; }
+.radar-freshness[data-stale="true"] { color: var(--nt-warning-ink); }
+.radar-freshness[data-stale="true"] .freshness-mark { background: var(--nt-warning-ink); }
 .radar-heading h1 { color: var(--ui-text-primary); font-size: clamp(28px, 3.2vw, 40px); line-height: 1.2; font-weight: 500; }
 .radar-heading > p { margin-top: 12px; color: var(--ui-text-secondary); font-size: 14px; line-height: 1.6; }
 .radar-action { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--ui-border-strong); border-radius: 8px; color: var(--ui-text-primary); font-size: 12px; line-height: 20px; transition: background-color 160ms var(--nt-motion-ease, ease-out), border-color 160ms var(--nt-motion-ease, ease-out); }
@@ -278,7 +278,7 @@ button[aria-disabled="true"] { opacity: .5; cursor: wait; }
 .latest-record { margin-top: 24px; padding: 16px 20px 12px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-bg-elevated); }
 .record-label { flex-wrap: wrap; gap: 8px 12px; margin-bottom: 8px; }
 .record-kind { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 4px; color: var(--ui-accent); background: color-mix(in srgb, var(--ui-accent) 8%, transparent); font-size: 12px; line-height: 20px; }
-.record-kind[data-type="banked"] { color: #d9b56f; background: #d9b56f0e; }
+.record-kind[data-type="banked"] { color: var(--nt-warning-ink); background: var(--nt-warning-bg); }
 .record-origin, .missing-source { color: var(--ui-text-muted); font-size: 12px; overflow-wrap: anywhere; }
 .record-label > a { margin-left: auto; }
 a:not(.radar-action) { display: inline-flex; align-items: center; gap: 4px; color: var(--ui-text-secondary); font-size: 12px; line-height: 20px; transition: color 160ms var(--nt-motion-ease, ease-out); }
@@ -296,7 +296,7 @@ a svg { flex: none; }
 .activity-grid > li:hover { border-color: var(--ui-text-muted); }
 .day-marks { display: flex; align-items: center; justify-content: center; gap: 4px; height: 12px; font-size: 11px; }
 .regular-mark, .banked-mark { display: inline-block; flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--ui-accent); }
-.banked-mark { background: #d9b56f; }
+.banked-mark { background: var(--nt-warning-ink); }
 .activity-range { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--ui-text-muted); font-size: 11px; line-height: 16px; }
 .activity-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 16px; }
 .activity-legend > span { display: inline-flex; align-items: center; gap: 6px; color: var(--ui-text-secondary); font-size: 12px; }
@@ -351,7 +351,7 @@ h3 { color: var(--ui-text-primary); font-size: 14px; line-height: 22px; font-wei
 .updates-skeleton { display: grid; gap: 12px; margin-bottom: 24px; }
 .updates-skeleton span { width: 80%; height: 16px; border-radius: 4px; background: var(--ui-bg-soft); }
 .updates-skeleton span + span { width: 60%; }
-.stale-note { margin-top: 20px; padding: 12px 16px; border-left: 2px solid #d9b56f; color: var(--ui-text-secondary); background: #d9b56f08; font-size: 13px; line-height: 1.7; }
+.stale-note { margin-top: 20px; padding: 12px 16px; border-left: 2px solid var(--nt-warning-ink); color: var(--ui-text-secondary); background: var(--nt-warning-bg); font-size: 13px; line-height: 1.7; }
 .radar-load-error { display: flex; gap: 16px; padding: 24px 0; margin-top: 24px; }
 .radar-load-error > svg { flex: none; margin-top: 4px; color: var(--ui-text-muted); }
 .radar-load-error h2, .radar-empty h2 { font-size: 16px; line-height: 24px; }
