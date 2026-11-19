@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fetchResetFeed, parseResetFeed, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetActivityDays, resetCalendar, resetElapsedTime, resetFeedIsExpired, resetRecordPage, resetSourceUrl, resetStatistics, type ResetRecord } from '../src/templates/needtoken/lib/resetRadar.ts'
+import { fetchResetFeed, parseResetFeed, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetActivityDays, resetCalendar, resetCalendarWithRecords, resetElapsedTime, resetFeedIsExpired, resetGapDays, resetRecordPage, resetSourceUrl, resetStatistics, type ResetRecord } from '../src/templates/needtoken/lib/resetRadar.ts'
 
 // Synthetic contract fixtures. These do not verify a live upstream or account delivery.
 const fixtureRecord = (overrides: Record<string, unknown> = {}) => ({
@@ -205,4 +205,20 @@ test('activity includes the exact 30-day boundary, ignores invalid and future ti
   assert.deepEqual(days.at(-1), { date: '2026-11-14T16:00:00.000Z', regular: 1, banked: 0 })
   assert.equal(days.reduce((total, day) => total + day.regular + day.banked, 0), 2)
   assert.equal(rows[0]?.announced_at, '2026-10-16T16:00:00Z', 'input remains in its original order')
+})
+
+test('rich reset calendar attaches day records, marks today, and calculates inter-record day gaps', () => {
+  const rows = parseResetFeed(fixtureFeed([
+    fixtureRecord({ id: 'latest', type: 'banked', announced_at: '2026-11-12T21:59:00Z', text: 'Banked reset activated' }),
+    fixtureRecord({ id: 'prev', type: 'regular', announced_at: '2026-11-01T23:27:00Z', text: 'Full reset' }),
+  ])).records
+  const now = Date.parse('2026-11-19T12:00:00Z')
+  const weeks = resetCalendarWithRecords(rows, now)
+  const flat = weeks.flat()
+  const nov13 = flat.find(day => day.date === '2026-11-13')!
+  assert.equal(nov13.banked, 1)
+  assert.equal(nov13.records[0]?.text, 'Banked reset activated')
+  assert.equal(flat.find(day => day.date === '2026-11-19')?.isToday, true)
+  assert.equal(resetGapDays(rows[0]!.announced_at, rows[1]!.announced_at), 11)
+  assert.equal(resetGapDays(rows[0]!.announced_at, undefined), null)
 })

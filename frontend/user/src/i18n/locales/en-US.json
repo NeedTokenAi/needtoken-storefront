@@ -3577,6 +3577,146 @@
       "statistics": "Historical statistics and yearly records",
       "scope": "Public record tracking",
       "pollingDetail": "Fetches every minute · pauses in background tabs"
+    },
+    "radarV2": {
+      "tabListLabel": "Choose reset radar",
+      "tabs": {
+        "codex": "Codex Radar",
+        "claude": "Claude Radar",
+        "grok": "Grok Radar",
+        "gemini": "Gemini Radar"
+      },
+      "elapsedTitle": "Since last reset",
+      "lastReset": "Last reset {date}",
+      "calendarTitle": "Reset calendar",
+      "calendarSubtitle": "Days with recorded resets since tracking began",
+      "calendarTotal": "{count} resets recorded in this period",
+      "weekdays": {
+        "mon": "Mon",
+        "wed": "Wed",
+        "fri": "Fri"
+      },
+      "types": {
+        "regular": "Global reset",
+        "banked": "Reset card"
+      },
+      "noResetDay": "No reset recorded on this day",
+      "recordsTitle": "Reset records",
+      "recordsSubtitle": "Sorted by announcement time, newest first",
+      "daysAgo": "{count}d ago",
+      "hoursAgo": "{count}h ago",
+      "justNow": "Just now",
+      "gapDays": "{count}d gap",
+      "gapSameDay": "Same day",
+      "showMore": "Load more records ({count} remaining)",
+      "guideTitle": "How to read these records",
+      "guide": {
+        "regularTitle": "Global reset",
+        "regularBody": "Paid users have their Codex usage limits restored automatically—no action required.",
+        "bankedTitle": "Reset card",
+        "bankedBody": "A banked reset credit stored on your account that you can activate inside Codex whenever needed.",
+        "timeTitle": "Timestamps",
+        "timeBody": "Times reflect when the announcement was posted. Quota delivery may lag by a few hours or shift from estimates."
+      },
+      "comingSoonBadge": "Live tracking coming soon",
+      "placeholder": {
+        "claude": {
+          "title": "Claude Radar",
+          "subtitle": "Track Claude Pro / Max quota windows and official credit announcements (live feed coming soon)",
+          "rulesTitle": "Official quota refresh rules",
+          "rule1Title": "5-hour rolling window",
+          "rule1Body": "Chat and Claude Code session allowances refresh on a rolling 5-hour cycle from your first message rather than a single global reset time.",
+          "rule2Title": "Weekly usage limits",
+          "rule2Body": "Heavy usage is also governed by rolling weekly limits that recover automatically per account schedule.",
+          "rule3Title": "Live radar status",
+          "rule3Body": "No public global-reset feed is connected yet. Real-time tracking will go live once a reliable official source is available."
+        },
+        "grok": {
+          "title": "Grok Radar",
+          "subtitle": "Track SuperGrok / X Premium+ quota refreshes and official announcements (live feed coming soon)",
+          "rulesTitle": "Official quota refresh rules",
+          "rule1Title": "2-hour rolling window",
+          "rule1Body": "Grok chat, DeepSearch, and Think quotas replenish independently on rolling 2-hour windows.",
+          "rule2Title": "Tiered allowances",
+          "rule2Body": "SuperGrok and SuperGrok Heavy provide higher rate limits; check the Grok client for live remaining quota.",
+          "rule3Title": "Live radar status",
+          "rule3Body": "Displayed as a placeholder without fabricated records. Full calendar and timeline will activate once a public feed is integrated."
+        }
+      }
+    },
+    "checkCenter": {
+      "navLabel": "Account check navigation",
+      "tabs": {
+        "gpt": "GPT Account Check",
+        "claude": "Claude Environment Check"
+      },
+      "gpt": {
+        "title": "GPT Account Check",
+        "subtitle": "Paste a ChatGPT Session to verify subscription tier, expiration, and Codex usage windows. Credentials stay in memory only."
+      },
+      "claude": {
+        "title": "Claude Environment Check",
+        "subtitle": "Score 10 local China-environment fingerprint signals in-browser alongside independent exit IP region, WebRTC leak, and Anthropic connectivity checks.",
+        "scoreTitle": "China Environment Risk Score",
+        "scoreSub": "All 10 signals are evaluated locally; raw system details never leave your device",
+        "scoreUnit": "pts",
+        "band": {
+          "low": "Low risk · Clean environment",
+          "medium": "Medium risk · Partial CN signals",
+          "high": "High risk · Strong CN environment footprint"
+        },
+        "bandDesc": {
+          "low": "No major China-environment signals detected locally. Pair with a clean supported-region exit IP.",
+          "medium": "Some China-environment signals were detected. Address the highest-weight items below first.",
+          "high": "Multiple strong China-environment signals detected, increasing risk of Anthropic access restrictions."
+        },
+        "triggeredSummary": "{count} / 10 signals triggered",
+        "claudeUsedBadge": "Read by Claude Code",
+        "weightPts": "+{points} / {weight}",
+        "safeTag": "Clean",
+        "notDetected": "None",
+        "notChecked": "Not checked",
+        "signals": {
+          "timezone": "System timezone",
+          "language": "Browser languages",
+          "fonts": "Chinese fonts",
+          "vendorFonts": "CN vendor fonts",
+          "webrtcLeak": "WebRTC IP leak",
+          "cnBrowser": "CN browser / WebView",
+          "deviceVendor": "CN device vendor",
+          "intlLocale": "Intl locale",
+          "timezoneOffset": "UTC+8 offset",
+          "emoji": "System emoji style"
+        },
+        "fixesTitle": "Recommended fixes",
+        "fixesClean": "Local fingerprint looks clean. Keep your exit IP in a supported region matching your timezone.",
+        "fixes": {
+          "timezone": "Switch your OS or browser timezone to match your overseas proxy exit (e.g. America/Los_Angeles or Asia/Tokyo). This is the highest-weight signal and is read by Claude Code.",
+          "language": "Set en-US as your primary browser language instead of zh-CN.",
+          "fonts": "Simplified Chinese system fonts were detected. For full isolation, use an English OS profile or clean VM.",
+          "vendorFonts": "Domestic device vendor fonts were detected. Prefer a standard desktop OS browser profile.",
+          "webrtcLeak": "WebRTC exposed a public IP differing from your proxy exit. Disable non-proxied WebRTC UDP in browser settings.",
+          "cnBrowser": "A domestic browser or in-app WebView was detected. Switch to standard Chrome, Firefox, Arc, or Safari.",
+          "deviceVendor": "Domestic device brand identifiers appear in the User-Agent. Use a standard desktop browser environment.",
+          "intlLocale": "Intl formatting locale is Simplified Chinese. Switch system regional formatting to en-US.",
+          "timezoneOffset": "Clock offset is UTC+8; this clears automatically once you update the system timezone.",
+          "emoji": "Domestic customized OS emoji footprint detected. Prefer a standard desktop OS."
+        },
+        "region": {
+          "supported": "Anthropic supported region",
+          "restricted": "Anthropic restricted region",
+          "unknown": "Region unconfirmed"
+        },
+        "timezoneMatch": "Browser timezone matches exit IP",
+        "timezoneMismatch": "Browser ({browser}) differs from exit ({exit})",
+        "webrtcClean": "No mismatched public IP leak detected",
+        "webrtcLeak": "Mismatched public IP exposed via WebRTC",
+        "recheck": "Run again",
+        "includeRtc": "Check WebRTC leak",
+        "exitCardTitle": "Exit IP & Region Support",
+        "connectCardTitle": "Anthropic Connectivity",
+        "advancedTitle": "CLI Verification & Redacted Report"
+      }
     }
   }
 }
