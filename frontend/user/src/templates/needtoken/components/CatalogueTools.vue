@@ -75,11 +75,11 @@ function onInteractOutside(event: Event) {
 <style>
 .nt-catalogue-tools { display: flex; align-items: center; flex: none; gap: 8px; }
 .nt-catalogue-tools__trigger { position: relative; display: grid; place-items: center; width: 40px; height: 40px; flex: none; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-bg-elevated); color: var(--ui-text-secondary); transition: border-color .15s, color .15s, background .15s; }
-.nt-catalogue-tools__trigger:hover, .nt-catalogue-tools__trigger.active { color: var(--ui-accent); border-color: #2dd4a766; background: #2dd4a70d; }
+.nt-catalogue-tools__trigger:hover, .nt-catalogue-tools__trigger.active { color: var(--ui-accent); border-color: var(--nt-accent-border-strong); background: var(--nt-accent-subtle); }
 .nt-catalogue-tools__trigger:focus-visible, .nt-catalogue-tools__close:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
 .nt-catalogue-tools__currency { font-family: var(--nt-font-mono); font-size: 19px; font-weight: 600; }
 .nt-catalogue-tools__dot { position: absolute; right: 7px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--ui-accent); }
-.nt-catalogue-tools__panel { z-index: 80; width: 330px; max-width: calc(100vw - 24px); max-height: min(480px, calc(100dvh - 100px)); overflow-y: auto; padding: 16px; border: 1px solid #2dd4a73d; border-radius: 16px; background: var(--ui-bg-elevated); color: var(--ui-text-primary); box-shadow: 0 18px 60px #0008, inset 0 1px 0 #ffffff08; outline: none; }
+.nt-catalogue-tools__panel { z-index: 80; width: 330px; max-width: calc(100vw - 24px); max-height: min(480px, calc(100dvh - 100px)); overflow-y: auto; padding: 16px; border: 1px solid var(--nt-accent-border); border-radius: 16px; background: var(--ui-bg-elevated); color: var(--ui-text-primary); box-shadow: var(--nt-popover-shadow); outline: none; }
 .nt-catalogue-tools__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .nt-catalogue-tools__heading h2 { font-size: 14px; font-weight: 650; line-height: 1.5; }
 .nt-catalogue-tools__heading span { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--ui-text-muted); }

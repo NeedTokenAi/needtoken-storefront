@@ -1800,6 +1800,13 @@
       "appleIds": "免费苹果 ID",
       "authEntry": "登录 / 注册"
     },
+    "theme": {
+      "label": "外观主题",
+      "light": "切换到浅色模式",
+      "dark": "切换到深色模式",
+      "lightShort": "浅色",
+      "darkShort": "深色"
+    },
     "footer": {
       "tagline": "充值服务、成品订购与 API 套餐，一站选购，订单随时可查。",
       "products": "产品与服务",

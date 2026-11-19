@@ -249,16 +249,16 @@ onUnmounted(() => {
 <style scoped>
 .status-pills { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .status-pill-wrap { position: static; }
-.status-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 5px 11px; border: 1px solid rgba(168,188,185,.14); border-radius: 999px; background: rgba(168,188,185,.045); color: var(--ui-text-secondary); font-size: 11px; font-weight: 500; line-height: 1.4; transition: color 160ms ease, background 160ms ease; }
-.status-pill:hover, .status-pill[aria-expanded="true"] { color: var(--ui-text-primary); background: rgba(168,188,185,.09); }
+.status-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 5px 11px; border: 1px solid var(--ui-border); border-radius: 999px; background: var(--nt-surface-subtle); color: var(--ui-text-secondary); font-size: 11px; font-weight: 500; line-height: 1.4; transition: color 160ms ease, background 160ms ease, border-color 160ms ease; }
+.status-pill:hover, .status-pill[aria-expanded="true"] { color: var(--ui-text-primary); border-color: var(--ui-border-strong); background: var(--ui-bg-soft); }
 .status-pill:focus-visible, .status-popover a:focus-visible, .status-popover button:focus-visible, .status-popover summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
-.status-bars { display: inline-flex; align-items: center; gap: 2px; height: 13px; color: #77848c; }
+.status-bars { display: inline-flex; align-items: center; gap: 2px; height: 13px; color: var(--nt-status-gray, #77848c); }
 .status-bars i { display: block; width: 2px; height: 12px; border-radius: 1px; background: currentColor; transform-origin: center bottom; }
 .status-bars.is-received i { animation: status-received 800ms var(--nt-motion-ease, ease-out) calc(var(--bar-index) * 60ms) 1; }
 .status-bars.is-checking i { animation: status-checking 700ms var(--nt-motion-ease, ease-in-out) calc(var(--bar-index) * -100ms) infinite; }
 @keyframes status-checking { 0%, 100% { transform: scaleY(.45); opacity: .5; } 50% { transform: scaleY(1); opacity: 1; } }
 @keyframes status-received { 0% { transform: scaleY(.4); opacity: .4; } 100% { transform: scaleY(1); opacity: 1; } }
-.status-popover { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 50; width: min(424px, calc(100vw - 72px)); max-height: min(620px, calc(100dvh - 80px)); overflow-y: auto; padding: 20px; border: 1px solid var(--ui-border-strong); border-radius: 20px; background: var(--ui-bg-elevated); box-shadow: 0 16px 40px rgba(0,0,0,.3); color: var(--ui-text-secondary); text-align: left; }
+.status-popover { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 50; width: min(424px, calc(100vw - 72px)); max-height: min(620px, calc(100dvh - 80px)); overflow-y: auto; padding: 20px; border: 1px solid var(--ui-border-strong); border-radius: 20px; background: var(--ui-bg-elevated); box-shadow: var(--nt-popover-shadow); color: var(--ui-text-secondary); text-align: left; }
 .status-popover-enter-active { transition: opacity var(--nt-motion-enter) var(--nt-motion-ease), transform var(--nt-motion-enter) var(--nt-motion-ease); }
 .status-popover-leave-active { transition: opacity var(--nt-motion-fast) var(--nt-motion-ease); pointer-events: none; }
 .status-popover-enter-from, .status-popover-leave-to { opacity: 0; }
@@ -270,7 +270,7 @@ onUnmounted(() => {
 .status-health { margin-left: auto; font-size: 12px; line-height: 20px; }
 .status-scope-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 4px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
 .status-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.status-warning { margin-top: 12px; color: #c7ad70; font-size: 12px; line-height: 20px; }
+.status-warning { margin-top: 12px; color: var(--nt-warning-ink); font-size: 12px; line-height: 20px; }
 .status-incident { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ui-border); }
 .status-incident.is-old { opacity: .65; }
 .status-incident-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--ui-text-muted); font-size: 11px; line-height: 16px; }
@@ -288,10 +288,10 @@ onUnmounted(() => {
 .status-phase { min-width: 0; color: var(--ui-text-muted); font-size: 11px; line-height: 16px; }
 .status-phase > span:last-child { display: block; overflow-wrap: anywhere; }
 .status-phase-track { display: block; height: 4px; margin-bottom: 8px; overflow: hidden; border-radius: 2px; background: var(--ui-border-strong); }
-.status-phase-track i { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left center; background: #c5a65e; }
+.status-phase-track i { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left center; background: var(--nt-status-yellow, #c5a65e); }
 .status-phase.is-reached .status-phase-track i { transform: scaleX(1); animation: status-phase-reveal 400ms var(--nt-motion-ease, ease-out) calc(var(--phase-index) * 60ms) 1 both; }
 .status-phase.is-current { color: var(--ui-text-primary); }
-.status-incident[data-phase="resolved"] .status-phase-track i { background: #3bcba0; }
+.status-incident[data-phase="resolved"] .status-phase-track i { background: var(--nt-status-green, #3bcba0); }
 @keyframes status-phase-reveal { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .status-incident-footer { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; color: var(--ui-text-muted); font-size: 11px; line-height: 18px; }
 .status-popover a { display: inline-flex; align-items: center; gap: 4px; }
@@ -315,13 +315,13 @@ onUnmounted(() => {
 .status-refresh-row > time { white-space: nowrap; }
 .status-refresh-row button { color: var(--ui-accent); padding: 4px 0; white-space: nowrap; }
 .status-refresh-row button[aria-disabled="true"] { opacity: .5; }
-.status-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: #77848c; }
-.status-dot.is-operational { background: #3bcba0; }
-.status-bars.is-operational { color: #3bcba0; }
-.status-dot.is-degraded_performance, .status-dot.is-under_maintenance { background: #c5a65e; }
-.status-bars.is-degraded_performance, .status-bars.is-under_maintenance { color: #c5a65e; }
-.status-dot.is-partial_outage, .status-dot.is-major_outage { background: #e06a5c; }
-.status-bars.is-partial_outage, .status-bars.is-major_outage { color: #e06a5c; }
+.status-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--nt-status-gray, #77848c); }
+.status-dot.is-operational { background: var(--nt-status-green, #3bcba0); }
+.status-bars.is-operational { color: var(--nt-status-green, #3bcba0); }
+.status-dot.is-degraded_performance, .status-dot.is-under_maintenance { background: var(--nt-status-yellow, #c5a65e); }
+.status-bars.is-degraded_performance, .status-bars.is-under_maintenance { color: var(--nt-status-yellow, #c5a65e); }
+.status-dot.is-partial_outage, .status-dot.is-major_outage { background: var(--nt-status-red, #e06a5c); }
+.status-bars.is-partial_outage, .status-bars.is-major_outage { color: var(--nt-status-red, #e06a5c); }
 @media (max-width: 640px) { .status-pills { justify-content: flex-start; width: 100%; }.status-pill { min-height: 36px; }.status-popover { left: 0; right: auto; padding: 16px; border-radius: 16px; }.status-refresh-row { gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .status-bars:is(.is-checking, .is-received) i, .status-phase.is-reached .status-phase-track i { animation: none; }.status-pill { transition: none; }.status-popover-enter-from { transform: none; } }
 </style>

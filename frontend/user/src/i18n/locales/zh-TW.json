@@ -1800,6 +1800,13 @@
       "appleIds": "免費 Apple ID",
       "authEntry": "登入 / 註冊"
     },
+    "theme": {
+      "label": "外觀主題",
+      "light": "切換至淺色模式",
+      "dark": "切換至深色模式",
+      "lightShort": "淺色",
+      "darkShort": "深色"
+    },
     "footer": {
       "tagline": "儲值服務、成品訂購與 API 套餐，一站選購，隨時查詢訂單。",
       "products": "產品與服務",

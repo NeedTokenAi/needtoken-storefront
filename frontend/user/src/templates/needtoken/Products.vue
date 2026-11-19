@@ -97,18 +97,18 @@ usePageSeo({
 h1 { font-size: clamp(27px, 2.5vw, 34px); font-weight: 750; letter-spacing: -.045em; line-height: 1.25; text-wrap: balance; }
 .nt-service-catalog__title-subject { color: var(--ui-accent); }
 .nt-service-catalog__promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; font-size: 12px; }
-.nt-service-catalog__promises li { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid rgba(255, 224, 126, .45); border-radius: 9px; background: linear-gradient(135deg, #f3cb57, #e8b83b); color: #172330; font-weight: 650; line-height: 1.5; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24); }
-.nt-service-catalog__promises svg { flex: none; color: currentColor; opacity: .85; }
+.nt-service-catalog__promises li { min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; max-width: 100%; min-height: 34px; padding: 6px 11px; border: 1px solid var(--nt-benefit-border); border-radius: 9px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); font-weight: 550; line-height: 1.5; box-shadow: var(--nt-card-shadow); }
+.nt-service-catalog__promises svg { flex: none; color: var(--nt-benefit-icon); }
 .nt-service-catalog__rate { position: relative; z-index: 3; }
 .nt-service-catalog__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0 16px; border-top: 1px solid var(--ui-border); }
 .nt-service-catalog__filters { min-width: 0; flex: 1; display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
-.nt-service-catalog__filter { min-height: 40px; flex-shrink: 0; border: 1px solid rgba(204, 219, 235, .17); border-radius: 10px; background: linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,255,255,.018)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 4px 16px rgba(0,0,0,.08); padding: 8px 14px; color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; cursor: pointer; transition: .15s; }
-.nt-service-catalog__filter:hover { color: var(--ui-text-primary); border-color: rgba(204,219,235,.35); }
-.nt-service-catalog__filter.is-active { color: var(--ui-accent); border-color: rgba(45,212,167,.44); background: linear-gradient(135deg, rgba(45,212,167,.15), rgba(45,212,167,.04)); box-shadow: inset 0 1px 0 rgba(153,255,223,.13), 0 0 18px rgba(45,212,167,.035); }
+.nt-service-catalog__filter { min-height: 40px; flex-shrink: 0; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-bg-elevated); box-shadow: var(--nt-inner-highlight), var(--nt-card-shadow); padding: 8px 14px; color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; cursor: pointer; transition: .15s; }
+.nt-service-catalog__filter:hover { color: var(--ui-text-primary); border-color: var(--ui-border-strong); background: var(--ui-bg-soft); }
+.nt-service-catalog__filter.is-active { color: var(--ui-accent); border-color: var(--nt-accent-border-strong); background: var(--ui-accent-soft); box-shadow: var(--nt-inner-highlight); }
 .nt-service-catalog__filter:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
 .nt-service-catalog__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .nt-service-catalog__skeleton { min-height: 406px; border: 1px solid var(--ui-border); border-radius: 24px; padding: 24px; }
-.nt-service-catalog__skeleton > div { width: 80%; height: 20px; margin-bottom: 20px; border-radius: 7px; background: rgba(255,255,255,.045); }
+.nt-service-catalog__skeleton > div { width: 80%; height: 20px; margin-bottom: 20px; border-radius: 7px; background: var(--nt-skeleton-base); }
 .nt-service-catalog__skeleton > div:first-child { width: 42px; height: 42px; }
 .nt-service-catalog__skeleton > div:nth-child(3) { width: 100%; height: 70px; }
 .nt-service-catalog__state { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; border: 1px solid var(--ui-border); border-radius: 24px; color: var(--ui-text-muted); }

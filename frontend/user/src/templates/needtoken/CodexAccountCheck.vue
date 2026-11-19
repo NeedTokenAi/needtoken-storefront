@@ -259,7 +259,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-he
 textarea { display: block; width: 100%; min-height: 128px; margin-top: 12px; padding: 16px; resize: vertical; border: 1px solid var(--ui-border-strong); border-radius: 12px; background: var(--ui-bg-page); color: var(--ui-text-primary); font-family: var(--nt-font-mono); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; transition: border-color 160ms ease; }
 textarea:hover:not(:disabled):not(:focus-visible) { border-color: var(--ui-text-muted); }
 textarea::placeholder { color: var(--ui-text-muted); }
-textarea[aria-invalid="true"] { border-color: #c9a36b; }
+textarea[aria-invalid="true"] { border-color: var(--nt-warning-ink); }
 .privacy-note { text-align: center; color: var(--ui-text-muted); }
 .privacy-note p:first-child { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--ui-text-secondary); font-size: 13px; }
 .privacy-note p + p { max-width: 680px; margin: 10px auto 0; font-size: 12px; line-height: 1.8; }
@@ -278,7 +278,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .credential-body { padding: 24px 28px; }
 .credential-ready { display: flex; align-items: flex-start; gap: 8px; color: var(--ui-text-secondary); font-size: 13px; line-height: 1.8; }
 .credential-ready svg { flex: none; margin-top: 3px; color: var(--ui-accent); }
-.inline-error { margin-top: 12px; color: #e5bb83; font-size: 12px; line-height: 1.7; }
+.inline-error { margin-top: 12px; color: var(--nt-warning-ink); font-size: 12px; line-height: 1.7; }
 .clipboard-note { margin-top: 12px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.7; }
 .account-results { padding: 28px; }
 .account-results { min-height: 320px; }
@@ -300,7 +300,7 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .results-empty h3 { color: var(--ui-text-secondary); font-size: 16px; font-weight: 400; }
 .results-empty p, .result-loading p { max-width: 32ch; font-size: 13px; line-height: 1.8; }
 .loading-icon { animation: check-spin .8s linear infinite; }
-.request-error { display: flex; align-items: flex-start; gap: 12px; margin-top: 24px; padding: 16px; border: 1px solid #a27d4340; border-radius: 8px; color: #e5bb83; background: #a27d430a; }
+.request-error { display: flex; align-items: flex-start; gap: 12px; margin-top: 24px; padding: 16px; border: 1px solid var(--nt-warning-border); border-radius: 8px; color: var(--nt-warning-ink); background: var(--nt-warning-bg); }
 .request-error > svg { flex: none; margin-top: 2px; }
 .request-error h3 { font-size: 14px; font-weight: 500; }
 .request-error p { margin-top: 8px; font-size: 13px; line-height: 1.7; }

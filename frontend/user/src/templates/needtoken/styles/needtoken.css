@@ -1,10 +1,22 @@
 /* =========================================================================
-   NeedToken.AI 模板设计令牌
-   方向: 深色科技风 · 等宽代码块 · 单一青绿高亮
-   作用域: .nt-scope 与 body.nt-tokens（浮层 Teleport 到 body，令牌双挂，同 vault 做法）。
-           只覆盖 --ui-* 令牌，classic 回落页面（结算、支付、查单）自动换成同一套深色配色。
+   NeedToken.AI 模板设计令牌（明暗双主题）
+   方向: 极简科技风 · 精细发丝边框 · 单一翠绿高亮
+   作用域: .nt-scope 与 body.nt-tokens（浮层 Teleport 到 body，令牌双挂）。
+           暗色跟随 html.dark，同时与 <meta name="color-scheme"> 保持同步，
+           classic 回落页面（结算、支付、查单）自动继承同一套明暗配色。
    ========================================================================= */
 
+:root {
+  color-scheme: light dark;
+}
+:root:has(> head > meta[name="color-scheme"][content="dark"]) {
+  color-scheme: dark;
+}
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
+  color-scheme: light;
+}
+
+/* ---------- 浅色主题令牌（默认） ---------- */
 .nt-scope,
 body.nt-tokens {
   --nt-content-max-width: 1200px;
@@ -12,11 +24,113 @@ body.nt-tokens {
   --nt-motion-fast: 120ms;
   --nt-motion-enter: 180ms;
   --nt-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --nt-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
+  --ui-bg-page: #f5f7f6;
+  --ui-bg-elevated: #ffffff;
+  --ui-bg-soft: #eef2f0;
+  --ui-bg-muted: #e3e9e6;
+  --ui-bg-overlay: rgba(255, 255, 255, 0.84);
+  --ui-bg-overlay-strong: rgba(255, 255, 255, 0.94);
+  --ui-text-primary: #0f1714;
+  --ui-text-secondary: #43524c;
+  --ui-text-muted: #667770;
+  --ui-text-on-accent: #ffffff;
+  --ui-border: rgba(15, 23, 20, 0.1);
+  --ui-border-strong: rgba(15, 23, 20, 0.2);
+  --ui-accent: #0d9473;
+  --ui-accent-hover: #0a7a5e;
+  --ui-accent-soft: rgba(13, 148, 115, 0.1);
+  --ui-focus-ring: rgba(13, 148, 115, 0.36);
+
+  /* NeedToken 语义扩展令牌（浅色） */
+  --nt-header-bg: rgba(245, 247, 246, 0.84);
+  --nt-surface-hover: #f7faf9;
+  --nt-surface-subtle: rgba(15, 23, 20, 0.035);
+  --nt-surface-translucent: rgba(255, 255, 255, 0.78);
+  --nt-surface-input: #f8faf9;
+  --nt-surface-footer: #ffffff;
+  --nt-card-border: rgba(15, 23, 20, 0.1);
+  --nt-card-border-hover: rgba(13, 148, 115, 0.36);
+  --nt-card-shadow: 0 1px 2px rgba(15, 23, 20, 0.04), 0 6px 20px -12px rgba(15, 23, 20, 0.12);
+  --nt-card-shadow-hover: 0 2px 6px rgba(15, 23, 20, 0.06), 0 14px 30px -14px rgba(13, 148, 115, 0.18);
+  --nt-popover-shadow: 0 14px 40px -10px rgba(15, 23, 20, 0.14), 0 0 0 1px rgba(15, 23, 20, 0.05);
+  --nt-overlay-scrim: rgba(15, 23, 20, 0.42);
+  --nt-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  --nt-grid-line: rgba(15, 23, 20, 0.055);
+
+  --nt-accent-ink-hover: #0a7358;
+  --nt-accent-border: rgba(13, 148, 115, 0.28);
+  --nt-accent-border-strong: rgba(13, 148, 115, 0.48);
+  --nt-accent-subtle: rgba(13, 148, 115, 0.07);
+
+  --nt-purchase-bg: #0d9473;
+  --nt-purchase-bg-hover: #0a7a5e;
+  --nt-purchase-border: #0b8567;
+  --nt-purchase-fg: #ffffff;
+  --nt-purchase-disabled-bg: #e5eae8;
+  --nt-purchase-disabled-border: rgba(15, 23, 20, 0.12);
+  --nt-purchase-disabled-fg: #7c8c85;
+
+  --nt-warning-ink: #9a6510;
+  --nt-warning-bg: rgba(180, 118, 18, 0.08);
+  --nt-warning-border: rgba(180, 118, 18, 0.28);
+  --nt-danger-ink: #c2362d;
+  --nt-danger-bg: rgba(220, 38, 38, 0.08);
+  --nt-danger-border: rgba(220, 38, 38, 0.26);
+
+  --nt-tier-default: #52645c;
+  --nt-tier-5x: #475b74;
+  --nt-tier-20x: #966622;
+  --nt-tier-50x: #7c4d93;
+
+  --nt-benefit-bg: #ffffff;
+  --nt-benefit-border: rgba(15, 23, 20, 0.1);
+  --nt-benefit-fg: #1c2b25;
+  --nt-benefit-icon: #0d9473;
+
+  --nt-pill-bg: linear-gradient(165deg, #ffffff, #f2f6f4);
+  --nt-pill-bg-hover: linear-gradient(165deg, #f0f9f5, #e4f3ec);
+  --nt-pill-border: rgba(15, 23, 20, 0.14);
+  --nt-pill-active-bg: linear-gradient(155deg, #0e9f7b, #0a7d60);
+  --nt-pill-active-border: #0a7d60;
+  --nt-pill-active-fg: #ffffff;
+
+  --nt-code-bg: #0c1117;
+  --nt-code-border: rgba(15, 23, 20, 0.14);
+  --nt-code-bar-bg: rgba(255, 255, 255, 0.03);
+  --nt-code-bar-fg: #93a3b1;
+  --nt-code-dot: #27323f;
+  --nt-code-fg: #d2ece2;
+
+  --nt-skeleton-base: #e4ebe7;
+  --nt-skeleton-sheen: rgba(255, 255, 255, 0.72);
+  --nt-specular-edge: rgba(15, 23, 20, 0.1);
+  --nt-specular-border: rgba(15, 23, 20, 0.06);
+  --nt-specular-glow: rgba(13, 148, 115, 0.09);
+  --nt-wordmark-color: #9cb4ac;
+  --nt-status-green: #0d9473;
+  --nt-status-yellow: #b07a1a;
+  --nt-status-red: #c9463c;
+  --nt-status-gray: #7c8b85;
+
+  --nt-brand-openai: #173026;
+  --nt-brand-claude: #c25d3f;
+  --nt-brand-meta: #0866ff;
+  --nt-brand-gemini: #3b7ef0;
+  --nt-brand-grok: #18231f;
+  --nt-brand-unknown: #65766d;
+}
+
+/* ---------- 深色主题令牌 ---------- */
+.dark .nt-scope,
+.dark body.nt-tokens {
   --ui-bg-page: #07090d;
   --ui-bg-elevated: #0e1218;
   --ui-bg-soft: #141a22;
   --ui-bg-muted: #1a212b;
+  --ui-bg-overlay: rgba(14, 18, 24, 0.84);
+  --ui-bg-overlay-strong: rgba(14, 18, 24, 0.94);
   --ui-text-primary: #e8edf3;
   --ui-text-secondary: #b4bfcc;
   --ui-text-muted: #7d8a99;
@@ -27,6 +141,83 @@ body.nt-tokens {
   --ui-accent-hover: #5eead4;
   --ui-accent-soft: rgba(45, 212, 167, 0.12);
   --ui-focus-ring: rgba(45, 212, 167, 0.45);
+
+  --nt-header-bg: rgba(7, 9, 13, 0.86);
+  --nt-surface-hover: #121820;
+  --nt-surface-subtle: rgba(255, 255, 255, 0.035);
+  --nt-surface-translucent: rgba(14, 18, 24, 0.56);
+  --nt-surface-input: #080d12;
+  --nt-surface-footer: #0c1117;
+  --nt-card-border: rgba(148, 163, 184, 0.16);
+  --nt-card-border-hover: rgba(45, 212, 167, 0.4);
+  --nt-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  --nt-card-shadow-hover: 0 12px 32px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(45, 212, 167, 0.12);
+  --nt-popover-shadow: 0 18px 56px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --nt-overlay-scrim: rgba(3, 6, 10, 0.78);
+  --nt-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --nt-grid-line: rgba(148, 163, 184, 0.06);
+
+  --nt-accent-ink-hover: #c4f3e5;
+  --nt-accent-border: rgba(45, 212, 167, 0.28);
+  --nt-accent-border-strong: rgba(94, 234, 212, 0.45);
+  --nt-accent-subtle: rgba(45, 212, 167, 0.07);
+
+  --nt-purchase-bg: #2dd4a7;
+  --nt-purchase-bg-hover: #5eead4;
+  --nt-purchase-border: #40d8b0;
+  --nt-purchase-fg: #04110d;
+  --nt-purchase-disabled-bg: #252b33;
+  --nt-purchase-disabled-border: #4c525c;
+  --nt-purchase-disabled-fg: #aeb8c5;
+
+  --nt-warning-ink: #e5b969;
+  --nt-warning-bg: rgba(229, 185, 105, 0.07);
+  --nt-warning-border: rgba(229, 185, 105, 0.28);
+  --nt-danger-ink: #ffb2ad;
+  --nt-danger-bg: rgba(239, 68, 68, 0.1);
+  --nt-danger-border: rgba(239, 68, 68, 0.28);
+
+  --nt-tier-default: #a8b7cb;
+  --nt-tier-5x: #9cb4d4;
+  --nt-tier-20x: #e4bd6b;
+  --nt-tier-50x: #c6a7e2;
+
+  --nt-benefit-bg: rgba(14, 18, 24, 0.8);
+  --nt-benefit-border: rgba(148, 163, 184, 0.16);
+  --nt-benefit-fg: #d7e1ec;
+  --nt-benefit-icon: #2dd4a7;
+
+  --nt-pill-bg: linear-gradient(165deg, #253239, #182329 68%, #162126);
+  --nt-pill-bg-hover: linear-gradient(165deg, #324a49, #203735);
+  --nt-pill-border: rgba(180, 205, 201, 0.16);
+  --nt-pill-active-bg: linear-gradient(155deg, #3c6a5f, #244c43);
+  --nt-pill-active-border: #75ebc8;
+  --nt-pill-active-fg: #d8ffef;
+
+  --nt-code-bg: #05070a;
+  --nt-code-border: rgba(148, 163, 184, 0.16);
+  --nt-code-bar-bg: transparent;
+  --nt-code-bar-fg: #7d8a99;
+  --nt-code-dot: #1a212b;
+  --nt-code-fg: #cfe9df;
+
+  --nt-skeleton-base: #182028;
+  --nt-skeleton-sheen: rgba(255, 255, 255, 0.08);
+  --nt-specular-edge: rgba(232, 237, 243, 0.15);
+  --nt-specular-border: rgba(232, 237, 243, 0.08);
+  --nt-specular-glow: rgba(255, 255, 255, 0.045);
+  --nt-wordmark-color: #789e94;
+  --nt-status-green: #3bcba0;
+  --nt-status-yellow: #c5a65e;
+  --nt-status-red: #e06a5c;
+  --nt-status-gray: #67737c;
+
+  --nt-brand-openai: #d4efe5;
+  --nt-brand-claude: #e4a686;
+  --nt-brand-meta: #6ca6ff;
+  --nt-brand-gemini: #8cabff;
+  --nt-brand-grok: #eef2f6;
+  --nt-brand-unknown: #97a8b5;
 }
 
 .nt-scope {
@@ -43,6 +234,33 @@ body.nt-tokens {
   margin-inline: auto;
 }
 
+/* ---------- 主题切换 View Transition 圆形揭示转场 ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  html.nt-theme-transitioning::view-transition-old(root),
+  html.nt-theme-transitioning::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  html.nt-theme-transitioning::view-transition-old(root) {
+    z-index: 1;
+  }
+
+  html.nt-theme-transitioning::view-transition-new(root) {
+    z-index: 2;
+    animation: nt-theme-reveal 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes nt-theme-reveal {
+    from {
+      clip-path: circle(0px at var(--nt-theme-x, 50%) var(--nt-theme-y, 32px));
+    }
+    to {
+      clip-path: circle(var(--nt-theme-r, 150vmax) at var(--nt-theme-x, 50%) var(--nt-theme-y, 32px));
+    }
+  }
+}
+
 /* Quiet feedback is shared by native and template controls; never animate layout. */
 :is(.nt-scope, body.nt-tokens) :where(button, a, summary, [role="tab"]) {
   -webkit-tap-highlight-color: transparent;
@@ -52,7 +270,6 @@ body.nt-tokens {
 .nt-scope details > summary { border-radius: var(--nt-disclosure-radius, 0); }
 .nt-scope details > summary > svg { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }
 @media (prefers-reduced-motion: reduce) {
-  :is(.nt-scope, body.nt-tokens) :where(button, a, summary, [role="tab"]) { transition: none; }
   .nt-scope details > summary > svg { transition: none; }
 }
 
@@ -77,34 +294,34 @@ body.nt-tokens {
   .nt-scope .nt-native-page > div > .container { padding-inline: 16px; }
 }
 
-/* Primary purchase actions keep a visible face and edge without GPU effects. */
+/* Primary purchase actions adapt cleanly to both light and dark themes. */
 .nt-scope :is(a, button).nt-button-purchase,
 body.nt-tokens :is(a, button).nt-button-purchase,
 .nt-scope .nt-native-cart a[href="/checkout"] {
-  border: 1px solid #40d8b0;
-  background: #2dd4a7;
-  color: #04110d;
+  border: 1px solid var(--nt-purchase-border);
+  background: var(--nt-purchase-bg);
+  color: var(--nt-purchase-fg);
   font-weight: 600;
-  box-shadow: inset 0 1px 0 #ffffff14;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   text-shadow: none;
   transition: background-color var(--nt-motion-fast) var(--nt-motion-ease), border-color var(--nt-motion-fast) var(--nt-motion-ease), transform var(--nt-motion-fast) var(--nt-motion-ease);
 }
 .nt-scope :is(a, button).nt-button-purchase:hover,
 body.nt-tokens :is(a, button).nt-button-purchase:hover,
 .nt-scope .nt-native-cart a[href="/checkout"]:hover {
-  background-color: #5eead4;
-  color: #04110d;
-  border-color: #5eead4;
+  background-color: var(--nt-purchase-bg-hover);
+  color: var(--nt-purchase-fg);
+  border-color: var(--nt-purchase-bg-hover);
 }
 .nt-scope :is(a, button).nt-button-purchase:not(:disabled, [aria-disabled="true"]):active,
 body.nt-tokens :is(a, button).nt-button-purchase:not(:disabled, [aria-disabled="true"]):active,
 .nt-scope .nt-native-cart a[href="/checkout"]:active { transform: translateY(1px); }
 .nt-scope :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="true"]),
 body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="true"]) {
-  border-color: #4c525c;
-  background: #252b33;
-  color: #aeb8c5;
-  box-shadow: inset 0 1px 0 #ffffff0a;
+  border-color: var(--nt-purchase-disabled-border);
+  background: var(--nt-purchase-disabled-bg);
+  color: var(--nt-purchase-disabled-fg);
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -116,6 +333,9 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
 .nt-scope :is(.nt-brand, .nt-footer-brand):is(:hover, :focus-visible) > img { transform: translateY(-1px) rotate(-3deg); }
 @media (prefers-reduced-motion: reduce) {
   .nt-scope :is(.nt-brand, .nt-footer-brand):is(:hover, :focus-visible) > img { transform: none; }
+  .nt-scope :is(a, button).nt-button-purchase:active,
+  body.nt-tokens :is(a, button).nt-button-purchase:active,
+  .nt-scope .nt-native-cart a[href="/checkout"]:active { transform: none; }
 }
 
 /* A painted gradient supplies the glass face even with compositor effects off. */
@@ -125,11 +345,11 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   justify-content: center;
   flex-shrink: 0;
   min-height: 42px;
-  border: 1px solid rgba(180, 205, 201, 0.16);
+  border: 1px solid var(--nt-pill-border);
   border-radius: 999px;
   padding: 9px 18px;
-  background: linear-gradient(165deg, #253239, #182329 68%, #162126);
-  box-shadow: inset 0 1px 0 #ffffff21, inset 0 -1px 0 #00000030, 0 0 0 1px #b6e9dc08, 0 4px 16px #0000001a;
+  background: var(--nt-pill-bg);
+  box-shadow: var(--nt-inner-highlight), var(--nt-card-shadow);
   color: var(--ui-text-secondary);
   font-size: 13px;
   font-weight: 600;
@@ -138,33 +358,22 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
 }
 
 .nt-scope .nt-glass-pill:hover {
-  border-color: rgba(94, 234, 192, 0.38);
-  background: linear-gradient(165deg, #324a49, #203735);
+  border-color: var(--nt-accent-border-strong);
+  background: var(--nt-pill-bg-hover);
   color: var(--ui-text-primary);
 }
 
 .nt-scope .nt-glass-pill[aria-pressed="true"],
 .nt-scope .nt-glass-pill[aria-selected="true"] {
-  border-color: #75ebc8;
-  background: linear-gradient(155deg, #3c6a5f, #244c43);
-  box-shadow: inset 0 1px 0 #b5ffe340, 0 0 0 1px #61e6b927, 0 3px 16px #2dd4a718;
-  color: #d8ffef;
+  border-color: var(--nt-pill-active-border);
+  background: var(--nt-pill-active-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 3px 16px var(--ui-accent-soft);
+  color: var(--nt-pill-active-fg);
 }
 
 :is(.nt-scope, body.nt-tokens) :where(a, button, input, select, textarea, summary):focus-visible {
   outline: 2px solid var(--ui-accent);
   outline-offset: 4px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  :is(.nt-scope, body.nt-tokens) *,
-  :is(.nt-scope, body.nt-tokens) *::before,
-  :is(.nt-scope, body.nt-tokens) *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
 }
 
 .nt-scope .nt-mono,
@@ -173,11 +382,12 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   font-family: var(--nt-font-mono);
 }
 
-/* 终端代码块 */
+/* 终端代码块（独立深色面板，明暗主题下均保持代码可读性） */
 .nt-scope .nt-code {
-  border: 1px solid var(--ui-border);
+  color-scheme: dark;
+  border: 1px solid var(--nt-code-border);
   border-radius: 12px;
-  background: #05070a;
+  background: var(--nt-code-bg);
   overflow: hidden;
 }
 .nt-scope .nt-code-bar {
@@ -185,15 +395,16 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   align-items: center;
   gap: 6px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--ui-border);
-  color: var(--ui-text-muted);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background: var(--nt-code-bar-bg);
+  color: var(--nt-code-bar-fg);
   font-size: 12px;
 }
 .nt-scope .nt-code-bar i {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: var(--ui-bg-muted);
+  background: var(--nt-code-dot);
 }
 .nt-scope .nt-code pre {
   margin: 0;
@@ -201,35 +412,35 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   overflow-x: auto;
   font-size: 13px;
   line-height: 1.65;
-  color: #cfe9df;
+  color: var(--nt-code-fg);
   white-space: pre;
 }
 
 /* 背景网格（仅装饰） */
 .nt-scope .nt-grid-bg {
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+    linear-gradient(var(--nt-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--nt-grid-line) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 /* Pointer feedback stays inside the active control, without an outer glow. */
 :is(.nt-scope, body.nt-tokens) .nt-specular-position { position: relative; }
 :is(.nt-scope, body.nt-tokens) :is(a, button, label, summary, [role="button"], [role="tab"]).nt-specular {
-  box-shadow: inset 0 0 0 1px #e8edf326;
+  box-shadow: inset 0 0 0 1px var(--nt-specular-edge);
 }
 :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after {
   content: '';
   position: absolute;
   inset: 0;
-  border: 1px solid #e8edf314;
+  border: 1px solid var(--nt-specular-border);
   border-radius: inherit;
-  background: radial-gradient(120px circle at var(--nt-pointer-x, 50%) var(--nt-pointer-y, 0%), #ffffff0a, transparent 78%);
+  background: radial-gradient(120px circle at var(--nt-pointer-x, 50%) var(--nt-pointer-y, 0%), var(--nt-specular-glow), transparent 78%);
   pointer-events: none;
 }
 :is(.nt-scope, body.nt-tokens) .nt-specular:active { filter: brightness(1.03); }
 @media (prefers-reduced-motion: reduce) {
-  :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after { background: #ffffff04; }
+  :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after { background: var(--nt-surface-subtle); }
 }
 @media (forced-colors: active) {
   .nt-scope .nt-glass-pill,

@@ -78,7 +78,7 @@ function moveFocus(event: KeyboardEvent) {
 </script>
 
 <style scoped>
-.reset-overview { margin-top: 24px; --reset-regular: var(--ui-accent); --reset-banked: #dca342; }
+.reset-overview { margin-top: 24px; --reset-regular: var(--ui-accent); --reset-banked: var(--nt-warning-ink); }
 .reset-stats { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 16px; }
 .reset-stat, .reset-calendar { min-width: 0; padding: 24px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); }
 .stat-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }

@@ -1800,6 +1800,13 @@
       "appleIds": "Free Apple IDs",
       "authEntry": "Sign in / Sign up"
     },
+    "theme": {
+      "label": "Appearance",
+      "light": "Switch to light mode",
+      "dark": "Switch to dark mode",
+      "lightShort": "Light",
+      "darkShort": "Dark"
+    },
     "footer": {
       "tagline": "Top-ups, ready-made accounts and API plans. Shop in one place and track your orders.",
       "products": "Products & services",

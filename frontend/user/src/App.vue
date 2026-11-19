@@ -163,9 +163,9 @@ watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(va
 .nt-page-enter-from { opacity: .5; transform: translateY(3px); }
 /* The new page mounts immediately: no outgoing fade holding the next page blank. */
 .nt-page-leave-active { display: none; }
-.nt-route-progress { position: fixed; inset: 64px 0 auto; z-index: 45; height: 2px; overflow: hidden; pointer-events: none; background: #2dd4a70c; }
-.nt-route-progress > span:first-child { display: block; width: 35%; height: 100%; background: #2dd4a7; animation: nt-route-travel 1.1s ease-in-out infinite; }
-.nt-route-error { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #e5b96940; color: #e5b969; font-size: 12px; line-height: 1.7; }
+.nt-route-progress { position: fixed; inset: 64px 0 auto; z-index: 45; height: 2px; overflow: hidden; pointer-events: none; background: color-mix(in srgb, var(--ui-accent, #2dd4a7) 10%, transparent); }
+.nt-route-progress > span:first-child { display: block; width: 35%; height: 100%; background: var(--ui-accent, #2dd4a7); animation: nt-route-travel 1.1s ease-in-out infinite; }
+.nt-route-error { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--nt-warning-border, #e5b96940); color: var(--nt-warning-ink, #e5b969); font-size: 12px; line-height: 1.7; }
 .nt-route-error button { flex-shrink: 0; border-bottom: 1px solid currentColor; cursor: pointer; }
 .nt-home-route-placeholder { max-width: var(--nt-content-max-width, 1200px); min-height: 480px; margin: 0 auto; padding: 48px 24px; }
 @media (max-width: 640px) { .nt-home-route-placeholder { padding: 32px 20px; } }

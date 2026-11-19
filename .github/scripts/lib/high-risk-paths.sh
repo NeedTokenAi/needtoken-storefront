@@ -25,6 +25,10 @@ is_high_risk_path() {
       internal/bootstrap/* | internal/workflows/* | */gormstore/*)
       return 0
       ;;
+    # NeedToken 二开保护区
+    frontend/user/src/templates/needtoken/* | frontend/user/index.html | frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts)
+      return 0
+      ;;
     *)
       return 1
       ;;

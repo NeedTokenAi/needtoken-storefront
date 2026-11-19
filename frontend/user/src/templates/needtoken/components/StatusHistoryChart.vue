@@ -147,7 +147,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.status-history-widget { position: relative; margin-top: 8px; --status-green: #3bcba0; --status-yellow: #c5a65e; --status-red: #e06a5c; --status-gray: #67737c; }
+.status-history-widget { position: relative; margin-top: 8px; --status-green: var(--nt-status-green, #3bcba0); --status-yellow: var(--nt-status-yellow, #c5a65e); --status-red: var(--nt-status-red, #e06a5c); --status-gray: var(--nt-status-gray, #67737c); }
 .status-history-bars { display: grid; grid-template-columns: repeat(90, minmax(0, 1fr)); gap: 2px; min-height: 36px; }
 .status-history-day { display: flex; align-items: center; min-width: 0; height: 36px; padding: 4px 0; border: 0; border-radius: 2px; background: transparent; --day-color: var(--status-gray); }
 .status-history-day i { display: block; width: 100%; height: 28px; border-radius: 1px; background: var(--day-color); opacity: .5; transition: opacity 120ms ease; }
@@ -158,7 +158,7 @@ onUnmounted(() => {
 .status-history-day[data-color="green"] i, .status-history-day[data-color="yellow"] i, .status-history-day[data-color="red"] i, .status-history-day:hover i, .status-history-day[aria-expanded="true"] i { opacity: 1; }
 .status-history-day:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 .status-day-bridge { position: absolute; z-index: 4; }
-.status-day-detail { position: absolute; z-index: 5; width: min(300px, calc(100vw - 96px)); overflow-y: auto; padding: 16px; border: 1px solid var(--ui-border-strong); border-radius: 12px; background: var(--ui-bg-elevated); box-shadow: 0 8px 28px rgba(0,0,0,.3); color: var(--ui-text-secondary); }
+.status-day-detail { position: absolute; z-index: 5; width: min(300px, calc(100vw - 96px)); overflow-y: auto; padding: 16px; border: 1px solid var(--ui-border-strong); border-radius: 12px; background: var(--ui-bg-elevated); box-shadow: var(--nt-popover-shadow); color: var(--ui-text-secondary); }
 .status-day-detail header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .status-day-detail header time { display: flex; align-items: center; gap: 12px; color: var(--ui-text-primary); }
 .status-day-detail header time > strong { font-size: 44px; line-height: 1; font-weight: 500; font-variant-numeric: tabular-nums; }
