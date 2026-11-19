@@ -3577,6 +3577,146 @@
       "statistics": "历史统计与全年记录",
       "scope": "公开记录追踪",
       "pollingDetail": "每分钟获取 · 页面切至后台时暂停"
+    },
+    "radarV2": {
+      "tabListLabel": "选择重置雷达",
+      "tabs": {
+        "codex": "Codex 雷达",
+        "claude": "Claude 雷达",
+        "grok": "Grok 雷达",
+        "gemini": "Gemini 雷达"
+      },
+      "elapsedTitle": "上次重置已过",
+      "lastReset": "上次重置 {date}",
+      "calendarTitle": "重置日历",
+      "calendarSubtitle": "有记录以来，哪些天有重置",
+      "calendarTotal": "这段时间重置了 {count} 次",
+      "weekdays": {
+        "mon": "一",
+        "wed": "三",
+        "fri": "五"
+      },
+      "types": {
+        "regular": "全员重置",
+        "banked": "重置卡"
+      },
+      "noResetDay": "当天无重置记录",
+      "recordsTitle": "重置记录",
+      "recordsSubtitle": "按公告发出的时间排，新的在前",
+      "daysAgo": "{count}天前",
+      "hoursAgo": "{count}小时前",
+      "justNow": "刚刚",
+      "gapDays": "隔 {count} 天",
+      "gapSameDay": "同日",
+      "showMore": "查看更多记录（还有 {count} 条）",
+      "guideTitle": "怎么看这些记录",
+      "guide": {
+        "regularTitle": "全员重置",
+        "regularBody": "所有付费用户的 Codex 额度直接回满，什么都不用做。",
+        "bankedTitle": "重置卡",
+        "bankedBody": "存进账号的一次重置机会，不会马上回满额度，想用的时候自己在 Codex 里用掉。",
+        "timeTitle": "时间",
+        "timeBody": "记的是公告发出的时间。额度实际到账可能晚几个小时，预告的时间也可能推迟。"
+      },
+      "comingSoonBadge": "即将支持实时追踪",
+      "placeholder": {
+        "claude": {
+          "title": "Claude 雷达",
+          "subtitle": "追踪 Claude Pro / Max 额度窗口与官方异常补偿动态（实时追踪接入中）",
+          "rulesTitle": "官方额度刷新规则参考",
+          "rule1Title": "5 小时滚动窗口",
+          "rule1Body": "对话与 Claude Code 会话额度按首次发消息起每 5 小时自动刷新，并非全员固定时间点统一清零。",
+          "rule2Title": "每周使用上限",
+          "rule2Body": "高强度使用受每周配额（Weekly Limit）约束，各账号按各自周期自动滚动恢复。",
+          "rule3Title": "实时雷达状态",
+          "rule3Body": "当前暂未接入第三方公开全员重置源，我们将于官方出现全员额度补偿或事件源稳定后第一时间上线实时记录。"
+        },
+        "grok": {
+          "title": "Grok 雷达",
+          "subtitle": "追踪 SuperGrok / X Premium+ 额度刷新与官方补偿动态（实时追踪接入中）",
+          "rulesTitle": "官方额度刷新规则参考",
+          "rule1Title": "2 小时滑动窗口",
+          "rule1Body": "Grok 对话、DeepSearch 与 Think 额度按 2 小时滑动窗口独立计算，到达窗口期后自动恢复。",
+          "rule2Title": "分层额度策略",
+          "rule2Body": "SuperGrok 与 SuperGrok Heavy 享有更高并发与额度上限，具体以 Grok 客户端提示为准。",
+          "rule3Title": "实时雷达状态",
+          "rule3Body": "当前为占位展示，绝不虚构历史记录；待公开重置公告源接入后自动展示完整日历与时间轴。"
+        }
+      }
+    },
+    "checkCenter": {
+      "navLabel": "账号检测导航",
+      "tabs": {
+        "gpt": "GPT 账号检测",
+        "claude": "Claude 环境检测"
+      },
+      "gpt": {
+        "title": "GPT 账号检测",
+        "subtitle": "粘贴 ChatGPT Session，实时校验当前订阅档位、到期时间与 Codex 额度窗口。凭据仅驻留本地内存，关闭即清除。"
+      },
+      "claude": {
+        "title": "Claude 环境检测",
+        "subtitle": "在本地浏览器实时检测 10 项中国环境特征指纹风险，并独立核验出口 IP 地区支持、WebRTC 泄漏与 Anthropic 连通性。",
+        "scoreTitle": "中国环境特征风险评分",
+        "scoreSub": "全部 10 项指纹在本地完成检测，不向服务器上传原始系统信息",
+        "scoreUnit": "分",
+        "band": {
+          "low": "低风险 · 环境干净",
+          "medium": "中风险 · 存在中国特征",
+          "high": "高风险 · 极易识别为中国环境"
+        },
+        "bandDesc": {
+          "low": "当前浏览器未暴露明显中国环境特征，适合配合纯净海外节点访问 Claude。",
+          "medium": "检测到部分中国环境特征，建议按下方权重最高项优先调整时区或语言设置。",
+          "high": "检测到多项强中国环境特征，使用 Claude 网页或 Claude Code 时触发风控概率较高。"
+        },
+        "triggeredSummary": "命中 {count} / 10 项特征",
+        "claudeUsedBadge": "Claude Code 实测读取",
+        "weightPts": "+{points} / {weight}",
+        "safeTag": "干净",
+        "notDetected": "未检出",
+        "notChecked": "未检测",
+        "signals": {
+          "timezone": "系统时区",
+          "language": "浏览器语言",
+          "fonts": "中文字体探测",
+          "vendorFonts": "国产厂商字体",
+          "webrtcLeak": "WebRTC IP 泄漏",
+          "cnBrowser": "国产浏览器 / WebView",
+          "deviceVendor": "国产设备品牌",
+          "intlLocale": "Intl 区域格式",
+          "timezoneOffset": "UTC+8 时区偏移",
+          "emoji": "系统 Emoji 体系"
+        },
+        "fixesTitle": "优先修复建议",
+        "fixesClean": "当前本地指纹表现干净，继续保持海外节点出口稳定与时区一致即可。",
+        "fixes": {
+          "timezone": "将系统或浏览器时区修改为与代理出口一致的海外时区（如 America/Los_Angeles 或 Asia/Tokyo），这是 Claude Code 实测会读取的最高权重信号。",
+          "language": "将浏览器首选语言调整为 en-US（或移至首位），避免把 zh-CN 作为默认语言。",
+          "fonts": "系统安装了常见简体中文字体（常规中文系统均会命中），如需深度隔离可使用英文系统镜像或独立虚拟机 / 指纹浏览器。",
+          "vendorFonts": "检测到国产手机或系统自带厂商字体，建议在非国产定制系统的桌面浏览器环境中使用 Claude。",
+          "webrtcLeak": "检测到 WebRTC 暴露了与代理出口不一致的公网 IP，请在浏览器中禁用非代理 WebRTC UDP 或启用防泄漏扩展。",
+          "cnBrowser": "当前为国产浏览器或内置 WebView，请切换至标准版 Chrome、Firefox、Arc 或 Safari。",
+          "deviceVendor": "User-Agent 暴露了国产设备品牌标识，建议使用标准桌面系统或无品牌改写的浏览器环境。",
+          "intlLocale": "Intl 区域格式为中文简中，可将系统区域格式切换为 en-US。",
+          "timezoneOffset": "当前系统时钟偏移为 UTC+8，切换系统时区后该项会自动消除。",
+          "emoji": "检测到国产定制系统 Emoji 特征，建议切换标准桌面操作系统访问。"
+        },
+        "region": {
+          "supported": "Anthropic 支持地区",
+          "restricted": "Anthropic 受限地区",
+          "unknown": "地区待确认"
+        },
+        "timezoneMatch": "浏览器时区与出口一致",
+        "timezoneMismatch": "浏览器时区（{browser}）与出口（{exit}）不一致",
+        "webrtcClean": "未检测到异源公网 IP 泄漏",
+        "webrtcLeak": "检测到异源公网 IP 暴露",
+        "recheck": "重新检测",
+        "includeRtc": "同时检测 WebRTC 泄漏",
+        "exitCardTitle": "出口网络与地区支持",
+        "connectCardTitle": "Anthropic 服务连通性",
+        "advancedTitle": "终端脚本校验与脱敏报告"
+      }
     }
   }
 }

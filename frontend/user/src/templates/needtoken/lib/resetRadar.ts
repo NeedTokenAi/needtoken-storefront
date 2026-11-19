@@ -111,26 +111,58 @@ export interface ResetCalendarDay {
   future: boolean
 }
 
+export interface ResetCalendarRichDay extends ResetCalendarDay {
+  isToday: boolean
+  records: ResetRecord[]
+}
+
 /** Align weeks Monday-first and group records by the displayed UTC+8 day. */
 export function resetCalendar(records: readonly ResetRecord[], now = Date.now()): ResetCalendarDay[][] {
+  return resetCalendarWithRecords(records, now).map(week =>
+    week.map(({ date, regular, banked, inCoverage, future }) => ({ date, regular, banked, inCoverage, future })),
+  )
+}
+
+/** Same UTC+8 Monday-first annual calendar, enriched with each day's matching records for rich hover cards. */
+export function resetCalendarWithRecords(records: readonly ResetRecord[], now = Date.now()): ResetCalendarRichDay[][] {
   const today = Math.floor((now + BEIJING_OFFSET_MS) / DAY_MS) * DAY_MS
+  const todayStr = new Date(today).toISOString().slice(0, 10)
   const yearStart = today - 364 * DAY_MS
   const weekday = (new Date(yearStart).getUTCDay() + 6) % 7
   const start = yearStart - weekday * DAY_MS
   const earliest = records.reduce((min, record) => Math.min(min, Math.floor((Date.parse(record.announced_at) + BEIJING_OFFSET_MS) / DAY_MS) * DAY_MS), today)
-  const counts = new Map<string, { regular: number; banked: number }>()
+  const grouped = new Map<string, { regular: number; banked: number; records: ResetRecord[] }>()
   for (const record of records) {
     if (Date.parse(record.announced_at) > now) continue
     const date = new Date(Date.parse(record.announced_at) + BEIJING_OFFSET_MS).toISOString().slice(0, 10)
-    const current = counts.get(date) ?? { regular: 0, banked: 0 }
+    const current = grouped.get(date) ?? { regular: 0, banked: 0, records: [] }
     current[record.type]++
-    counts.set(date, current)
+    current.records.push(record)
+    grouped.set(date, current)
   }
   return Array.from({ length: Math.ceil(((today - start) / DAY_MS + 1) / 7) }, (_, week) => Array.from({ length: 7 }, (_, day) => {
     const time = start + (week * 7 + day) * DAY_MS
     const date = new Date(time).toISOString().slice(0, 10)
-    return { date, ...(counts.get(date) ?? { regular: 0, banked: 0 }), inCoverage: records.length > 0 && time >= earliest && time <= today, future: time > today }
+    const bucket = grouped.get(date)
+    return {
+      date,
+      regular: bucket?.regular ?? 0,
+      banked: bucket?.banked ?? 0,
+      records: bucket?.records ?? [],
+      inCoverage: records.length > 0 && time >= earliest && time <= today,
+      future: time > today,
+      isToday: date === todayStr,
+    }
   }))
+}
+
+/** Whole calendar days between two announcement timestamps (newer - older), or null if invalid. */
+export function resetGapDays(newerAnnouncedAt: string, olderAnnouncedAt: string | undefined): number | null {
+  if (!olderAnnouncedAt) return null
+  const newer = Date.parse(newerAnnouncedAt)
+  const older = Date.parse(olderAnnouncedAt)
+  if (!Number.isFinite(newer) || !Number.isFinite(older) || newer < older) return null
+  return Math.max(0, Math.round((newer - older) / DAY_MS))
 }
 
 export function resetRecordPage(records: readonly ResetRecord[], type: 'all' | ResetRecord['type'], count = RESET_RECORD_PAGE_SIZE) {

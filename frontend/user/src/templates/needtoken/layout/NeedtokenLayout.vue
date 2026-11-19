@@ -193,10 +193,7 @@ const navNodes = computed<(NavTopLink | NavGroup)[]>(() => [
     link('docs', '/docs', t('needtoken.nav.docs')),
   ] },
   { kind: 'link', key: 'radar', path: '/tools/radar', label: t('needtoken.nav.radar'), icon: 'radar' },
-  { kind: 'group', key: 'accountCheck', label: t('needtoken.nav.accountCheck'), icon: 'accountCheck', items: [
-    link('environment', '/tools/environment', t('needtoken.nav.claudeCheck')),
-    link('codexCheck', '/tools/codex-account', t('needtoken.nav.codexCheck')),
-  ] },
+  { kind: 'link', key: 'accountCheck', path: '/tools/codex-account', label: t('needtoken.nav.accountCheck'), icon: 'accountCheck' },
   { kind: 'group', key: 'help', label: t('needtoken.nav.help'), icon: 'help', items: [
     link('blog', '/blog', t('needtoken.nav.blog')),
     link('faq', '/faq', t('needtoken.nav.faq')),
@@ -206,6 +203,7 @@ const navNodes = computed<(NavTopLink | NavGroup)[]>(() => [
 const isActive = (item: { key: string; path?: string; disabled?: boolean }) => {
   if (item.disabled || !item.path) return false
   if (item.key === 'plans') return [API_PLANS_PATH, API_SERVICES_PATH].some(path => route.path === path || route.path.startsWith(`${path}/`))
+  if (item.key === 'accountCheck') return ['/tools/codex-account', '/tools/environment'].some(path => route.path === path || route.path.startsWith(`${path}/`))
   return item.path === '/' ? route.path === '/' : route.path === item.path || route.path.startsWith(`${item.path}/`)
 }
 

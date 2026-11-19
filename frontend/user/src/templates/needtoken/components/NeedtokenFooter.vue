@@ -120,8 +120,8 @@ const columns = computed(() => [
   ] },
   { key: 'support', title: t('needtoken.footer.support'), links: [
     { path: '/tools/radar', label: t('needtoken.nav.radar') },
-    { path: '/tools/environment', label: t('needtoken.nav.environment') },
-    { path: '/tools/codex-account', label: t('needtoken.nav.codexCheck') },
+    { path: '/tools/codex-account', label: t('needtoken.checkCenter.tabs.gpt') },
+    { path: '/tools/environment', label: t('needtoken.checkCenter.tabs.claude') },
     { path: '/free-apple-id', label: t('needtoken.nav.appleIds') },
     { path: '/guest/orders', label: t('navbar.guestOrders') },
   ] },
