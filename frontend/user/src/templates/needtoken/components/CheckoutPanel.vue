@@ -174,7 +174,7 @@ void guestTurnstileRef
 .nt-checkout-head h1 { font-size: 32px; font-weight: 500; line-height: 1.25; }
 .nt-checkout-head p { margin-top: 8px; color: var(--ui-text-secondary); font-size: 14px; line-height: 1.7; }
 .nt-checkout-grid { display: grid; min-width: 0; margin: 0; padding: 0; border: 0; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: 24px; align-items: start; }
-.nt-checkout-detail, .nt-checkout-order { min-width: 0; padding: 24px; border: 1px solid var(--ui-border); border-radius: 20px; background: var(--ui-bg-elevated); }
+.nt-checkout-detail, .nt-checkout-order { min-width: 0; padding: 24px; border: 1px solid var(--ui-border); border-radius: 20px; background: var(--ui-bg-elevated); box-shadow: var(--nt-card-shadow); }
 .nt-checkout-order { position: sticky; top: 88px; }
 .nt-checkout-detail h2 { font-size: 18px; font-weight: 500; }
 .nt-checkout-order h3 { font-size: 14px; font-weight: 500; }
@@ -205,9 +205,10 @@ void guestTurnstileRef
 .nt-checkout-breakdown .is-discount dd { color: var(--ui-accent); }
 .nt-checkout-field, .nt-checkout-guest { display: grid; gap: 12px; margin-top: 24px; font-size: 13px; }
 .nt-checkout-modes { display: flex; flex-wrap: wrap; gap: 8px; }
-.nt-checkout-modes :deep(button), .nt-checkout-modes :deep(a) { min-height: 40px; border-radius: 8px; font-size: 13px; font-weight: 500; box-shadow: none; transition: background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.nt-checkout-modes :deep(button:active:not(:disabled)), .nt-checkout-modes :deep(a:active) { transform: translateY(1px); }
-.nt-checkout-guest-fields { display: grid; gap: 16px; margin-top: 4px; }
+.nt-checkout-modes :deep(button), .nt-checkout-modes :deep(a) { min-height: 40px; border-radius: 10px; font-size: 13px; font-weight: 500; box-shadow: none; transition: background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+.nt-checkout-modes :deep(button:active:not(:disabled)), .nt-checkout-modes :deep(a:active) { transform: scale(0.97); transition-duration: var(--nt-duration-press, 80ms); }
+.nt-checkout-guest-fields { display: grid; gap: 16px; margin-top: 4px; animation: nt-panel-reveal 220ms var(--nt-ease-emphasized) backwards; }
+@keyframes nt-panel-reveal { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .nt-checkout-guest-fields label { display: grid; gap: 8px; font-size: 13px; color: var(--ui-text-secondary); }
 .nt-checkout-guest-fields > p, .nt-checkout-captcha > p, .nt-checkout-status { color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
 .nt-checkout-guest-fields > p { margin-top: -8px; }
@@ -220,14 +221,17 @@ void guestTurnstileRef
 .nt-checkout-wallet input { accent-color: var(--ui-accent); width: 16px; height: 16px; }
 .nt-checkout-wallet p { color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
 .nt-checkout-channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 12px; margin-top: 12px; }
-.nt-checkout-channels button { display: grid; align-content: center; gap: 8px; min-width: 0; min-height: 56px; padding: 12px; border: 1px solid var(--ui-border); border-radius: 8px; background: transparent; text-align: left; font-size: 13px; transition: border-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
+.nt-checkout-channels button { display: grid; align-content: center; gap: 8px; min-width: 0; min-height: 56px; padding: 12px; border: 1px solid var(--ui-border); border-radius: 12px; background: transparent; text-align: left; font-size: 13px; transition: border-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), background-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease), box-shadow var(--nt-motion-enter, 180ms) var(--nt-motion-ease), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
 .nt-checkout-channel-name { display: flex; align-items: center; gap: 8px; }
 .nt-checkout-channel-name > span { min-width: 0; overflow-wrap: anywhere; }
-.nt-checkout-channels button:hover:not(:disabled):not(.selected) { border-color: var(--ui-border-strong); background: var(--ui-bg-soft); }
-.nt-checkout-channels button.selected { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
-.nt-checkout-channels button:active:not(:disabled) { transform: translateY(1px); }
+@media (hover: hover) {
+  .nt-checkout-channels button:hover:not(:disabled):not(.selected) { border-color: var(--ui-border-strong); background: var(--ui-bg-soft); transform: translateY(-1px); }
+}
+.nt-checkout-channels button.selected { border-color: var(--ui-accent); background: var(--ui-accent-soft); box-shadow: 0 0 0 1px var(--nt-accent-border); }
+.nt-checkout-channels button:active:not(:disabled) { transform: scale(0.975); transition-duration: var(--nt-duration-press, 80ms); }
 .nt-checkout-channels button:disabled { color: var(--ui-text-muted); background: var(--ui-bg-soft); opacity: .6; cursor: not-allowed; }
-.nt-checkout-channel-check { margin-left: auto; color: var(--ui-accent); flex: none; }
+.nt-checkout-channel-check { margin-left: auto; color: var(--ui-accent); flex: none; animation: nt-checkout-check-pop 280ms var(--nt-ease-spring) backwards; }
+@keyframes nt-checkout-check-pop { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
 .nt-checkout-channels img { width: 24px; height: 24px; object-fit: contain; flex: none; }
 .nt-checkout-channels small { color: var(--ui-text-muted); font-size: 12px; line-height: 1.6; }
 .nt-checkout-status { margin: 12px 0; }
@@ -266,8 +270,8 @@ void guestTurnstileRef
   .nt-checkout-channels { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .nt-checkout, .nt-checkout-spinner { animation: none; }
-  .nt-checkout :deep(button), .nt-checkout :deep(a), .nt-checkout :deep(input), .nt-checkout-total > p { transition: none; }
-  .nt-checkout :deep(button:active), .nt-checkout :deep(a:active) { transform: none; }
+  .nt-checkout, .nt-checkout-spinner, .nt-checkout-guest-fields, .nt-checkout-channel-check { animation: none; }
+  .nt-checkout :deep(button), .nt-checkout :deep(a), .nt-checkout :deep(input), .nt-checkout-total > p, .nt-checkout-channels button { transition: none; }
+  .nt-checkout :deep(button:active), .nt-checkout :deep(a:active), .nt-checkout-channels button:hover, .nt-checkout-channels button:active { transform: none; }
 }
 </style>

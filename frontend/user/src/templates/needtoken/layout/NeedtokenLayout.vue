@@ -8,11 +8,12 @@
           <span class="truncate">{{ brandName }}</span>
         </RouterLink>
 
-        <nav class="nt-desktop-navigation ml-4 flex items-center gap-1 max-[1239px]:hidden" :aria-label="t('needtoken.nav.label')">
+        <nav ref="navRailEl" class="nt-desktop-navigation ml-4 flex items-center gap-0.5 max-[1239px]:hidden" :aria-label="t('needtoken.nav.label')">
+          <span class="nt-sliding-thumb nt-nav-thumb" :class="{ 'is-ready': navIndicatorReady }" :style="navIndicatorStyle" aria-hidden="true" />
           <template v-for="node in navNodes" :key="node.key">
-            <RouterLink v-if="node.kind === 'link'" :to="node.path" class="whitespace-nowrap rounded-md px-3 py-2 text-[14px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" :class="isActive(node) ? '!text-primary' : ''" :aria-current="isActive(node) ? 'page' : undefined">{{ node.label }}</RouterLink>
+            <RouterLink v-if="node.kind === 'link'" :to="node.path" class="nt-nav-link whitespace-nowrap rounded-full px-3.5 py-1.5 text-[14px] font-medium text-muted-foreground hover:text-foreground" :class="isActive(node) ? 'is-active !text-primary' : ''" :data-nav-active="isActive(node) ? 'true' : undefined" :aria-current="isActive(node) ? 'page' : undefined">{{ node.label }}</RouterLink>
             <div v-else :ref="el => setGroupEl(node.key, el)" class="relative" @focusout="onGroupFocusOut($event, node.key)" @keydown="onGroupKeydown($event, node.key)">
-              <button :id="`nt-nav-${node.key}`" type="button" class="nt-nav-group-button" :class="node.items.some(isActive) ? 'text-primary' : 'text-muted-foreground'" :aria-expanded="openGroup === node.key" :aria-controls="`nt-nav-panel-${node.key}`" @click="toggleGroup(node.key)">
+              <button :id="`nt-nav-${node.key}`" type="button" class="nt-nav-group-button" :class="node.items.some(isActive) ? 'is-active text-primary' : 'text-muted-foreground'" :data-nav-active="node.items.some(isActive) ? 'true' : undefined" :aria-expanded="openGroup === node.key" :aria-controls="`nt-nav-panel-${node.key}`" @click="toggleGroup(node.key)">
                 {{ node.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="openGroup === node.key ? 'rotate-180' : ''" />
               </button>
               <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
@@ -108,6 +109,7 @@ import GhostFibersBackground from '../components/GhostFibersBackground.vue'
 import SupportWidget from '../components/SupportWidget.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import { useNeedtokenEffects } from '../composables/useNeedtokenEffects'
+import { useSlidingIndicator } from '../composables/useSlidingIndicator'
 import { prefetchStorefrontRoute } from '../../../router'
 import { normalizeNeedtokenSupport } from '../lib/supportConfig'
 import { useTheme } from '../../../utils/theme'
@@ -121,7 +123,13 @@ const authStore = useUserAuthStore()
 const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
 const scopeEl = ref<HTMLElement | null>(null)
+const navRailEl = ref<HTMLElement | null>(null)
 useNeedtokenEffects(scopeEl)
+const { indicatorStyle: navIndicatorStyle, indicatorReady: navIndicatorReady } = useSlidingIndicator(
+  navRailEl,
+  '[data-nav-active="true"]',
+  [() => route.path, () => appStore.locale],
+)
 
 function prefetchLink(event: Event) {
   const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null
@@ -281,18 +289,27 @@ onUnmounted(() => {
 .nt-site-header { padding-inline: 24px; background: var(--nt-header-bg); }
 @media (min-width: 1240px) { .nt-header-inner { padding-inline: 24px; } }
 @media (max-width: 640px) { .nt-site-header { padding-inline: 14px; } }
-.nt-site-header :where(a, button) { transition: color var(--nt-motion-fast) var(--nt-motion-ease), background-color var(--nt-motion-fast) var(--nt-motion-ease); }
-.nt-nav-group-button { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 8px 12px; white-space: nowrap; font-size: 14px; font-weight: 500; }
-.nt-nav-group-button:hover, .nt-nav-group-button[aria-expanded="true"] { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
-.nt-nav-dropdown { position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: max-content; min-width: 192px; max-width: min(320px, 70vw); padding: 8px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); box-shadow: var(--nt-popover-shadow); }
-.nt-nav-dropdown-link { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 40px; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+.nt-site-header :where(a, button) { transition: color var(--nt-motion-fast) var(--nt-motion-ease), background-color var(--nt-motion-fast) var(--nt-motion-ease), transform var(--nt-duration-rebound) var(--nt-ease-spring); }
+.nt-desktop-navigation { position: relative; padding: 4px; border: 1px solid var(--ui-border); border-radius: 999px; background: var(--nt-nav-rail-bg); }
+.nt-nav-thumb { border-radius: 999px; background: var(--nt-nav-thumb-bg); box-shadow: var(--nt-nav-thumb-shadow); }
+.nt-nav-link { position: relative; z-index: 1; }
+.nt-nav-link.is-active, .nt-nav-group-button.is-active { font-weight: 600; }
+.nt-nav-group-button { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 14px; white-space: nowrap; font-size: 14px; font-weight: 500; }
+.nt-nav-group-button:hover, .nt-nav-group-button[aria-expanded="true"] { color: var(--ui-text-primary); }
+.nt-nav-group-button:not(.is-active):hover, .nt-nav-group-button:not(.is-active)[aria-expanded="true"] { background: var(--nt-surface-subtle); }
+.nt-nav-dropdown { position: absolute; top: calc(100% + 10px); left: 0; z-index: 60; width: max-content; min-width: 192px; max-width: min(320px, 70vw); padding: 8px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); box-shadow: var(--nt-popover-shadow); transform-origin: top left; }
+.nt-nav-dropdown-link { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 40px; padding: 8px 12px; border-radius: 10px; font-size: 13px; }
 .nt-nav-dropdown-link:hover { color: var(--ui-accent); background: var(--ui-bg-soft); }
 .nt-nav-dropdown-link.is-disabled { color: var(--ui-text-muted); cursor: default; }
 .nt-nav-dropdown-link.is-disabled em, .nt-mobile-disabled em { font-style: normal; font-size: 11px; color: var(--nt-warning-ink); }
-.nt-language-options, .nt-mobile-navigation { box-shadow: var(--nt-popover-shadow); }
+.nt-language-options, .nt-mobile-navigation { box-shadow: var(--nt-popover-shadow); transform-origin: top right; }
 .nt-mobile-navigation { max-height: calc(100dvh - 90px); overflow-y: auto; overscroll-behavior: contain; }
-.nt-menu-enter-active { transition: opacity var(--nt-motion-enter) var(--nt-motion-ease), transform var(--nt-motion-enter) var(--nt-motion-ease); }
-.nt-menu-leave-active { transition: opacity var(--nt-motion-fast) var(--nt-motion-ease), transform var(--nt-motion-fast) var(--nt-motion-ease); pointer-events: none; }
-.nt-menu-enter-from, .nt-menu-leave-to { opacity: 0; transform: translateY(-4px); }
-@media (prefers-reduced-motion: reduce) { .nt-menu-enter-from, .nt-menu-leave-to { transform: none; } }
+.nt-auth-entry:active { transform: scale(0.97); transition-duration: var(--nt-duration-press); }
+.nt-menu-enter-active { transition: opacity 180ms var(--nt-ease-emphasized), transform 220ms var(--nt-ease-spring-soft); }
+.nt-menu-leave-active { transition: opacity 110ms var(--nt-motion-ease), transform 110ms var(--nt-motion-ease); pointer-events: none; }
+.nt-menu-enter-from, .nt-menu-leave-to { opacity: 0; transform: translateY(-6px) scale(0.96); }
+@media (prefers-reduced-motion: reduce) {
+  .nt-menu-enter-from, .nt-menu-leave-to { transform: none; }
+  .nt-auth-entry:active { transform: none; }
+}
 </style>

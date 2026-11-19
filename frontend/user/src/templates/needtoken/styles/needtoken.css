@@ -25,6 +25,12 @@ body.nt-tokens {
   --nt-motion-enter: 180ms;
   --nt-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --nt-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --nt-ease-spring-soft: cubic-bezier(0.22, 1.15, 0.36, 1);
+  --nt-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --nt-duration-press: 80ms;
+  --nt-duration-rebound: 480ms;
+  --nt-duration-slide: 380ms;
+  --nt-duration-accordion: 360ms;
 
   --ui-bg-page: #f5f7f6;
   --ui-bg-elevated: #ffffff;
@@ -120,6 +126,20 @@ body.nt-tokens {
   --nt-brand-gemini: #3b7ef0;
   --nt-brand-grok: #18231f;
   --nt-brand-unknown: #65766d;
+
+  --nt-card-top-sheen: linear-gradient(90deg, transparent, rgba(13, 148, 115, 0.35), transparent);
+  --nt-card-spotlight: rgba(13, 148, 115, 0.085);
+  --nt-nav-rail-bg: rgba(15, 23, 20, 0.035);
+  --nt-nav-thumb-bg: #ffffff;
+  --nt-nav-thumb-shadow: 0 1px 3px rgba(15, 23, 20, 0.08), 0 0 0 1px rgba(15, 23, 20, 0.06);
+
+  --nt-art-paper: #fcfdf9;
+  --nt-art-paper-back: #e5ece5;
+  --nt-art-paper-alt: #f0f5ef;
+  --nt-art-paper-mid: #d8e0d9;
+  --nt-art-stroke: #c4d0c7;
+  --nt-art-line: #d4ddd5;
+  --nt-art-shadow: rgba(38, 57, 47, 0.1);
 }
 
 /* ---------- 深色主题令牌 ---------- */
@@ -218,6 +238,20 @@ body.nt-tokens {
   --nt-brand-gemini: #8cabff;
   --nt-brand-grok: #eef2f6;
   --nt-brand-unknown: #97a8b5;
+
+  --nt-card-top-sheen: linear-gradient(90deg, transparent, rgba(94, 234, 212, 0.32), transparent);
+  --nt-card-spotlight: rgba(45, 212, 167, 0.09);
+  --nt-nav-rail-bg: rgba(255, 255, 255, 0.035);
+  --nt-nav-thumb-bg: rgba(255, 255, 255, 0.08);
+  --nt-nav-thumb-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 4px rgba(0, 0, 0, 0.35);
+
+  --nt-art-paper: #172027;
+  --nt-art-paper-back: #10171d;
+  --nt-art-paper-alt: #1d2830;
+  --nt-art-paper-mid: #23303a;
+  --nt-art-stroke: rgba(148, 163, 184, 0.28);
+  --nt-art-line: rgba(148, 163, 184, 0.18);
+  --nt-art-shadow: rgba(0, 0, 0, 0.45);
 }
 
 .nt-scope {
@@ -268,7 +302,80 @@ body.nt-tokens {
 }
 /* Native summary inherits through a browser slot; pass corners explicitly. */
 .nt-scope details > summary { border-radius: var(--nt-disclosure-radius, 0); }
-.nt-scope details > summary > svg { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }
+.nt-scope details > summary > svg { transition: transform 440ms var(--nt-ease-spring); }
+
+/* Smooth native <details> accordion animation using modern ::details-content + interpolate-size. */
+.nt-scope details::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+.nt-scope details:not([open])::details-content {
+  block-size: 0;
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nt-scope details::details-content {
+    transition:
+      block-size var(--nt-duration-accordion) var(--nt-ease-spring-soft),
+      opacity 220ms var(--nt-motion-ease),
+      content-visibility var(--nt-duration-accordion),
+      display var(--nt-duration-accordion);
+    transition-behavior: allow-discrete;
+  }
+}
+
+/* Shared sliding pill thumb base style */
+.nt-scope .nt-sliding-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, width;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nt-scope .nt-sliding-thumb.is-ready {
+    transition:
+      transform var(--nt-duration-slide) var(--nt-ease-spring-soft),
+      width var(--nt-duration-slide) var(--nt-ease-spring-soft),
+      height var(--nt-duration-slide) var(--nt-ease-spring-soft),
+      opacity 180ms ease;
+  }
+}
+
+/* Scroll-driven section reveal (compositor-only, progressive enhancement + IO fallback) */
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    @keyframes nt-scroll-rise {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .nt-scope .nt-scroll-reveal {
+      animation: nt-scroll-rise auto cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 28%;
+    }
+  }
+
+  .nt-scope .nt-scroll-reveal--pending {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  .nt-scope .nt-scroll-reveal--shown {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 420ms var(--nt-motion-ease), transform 480ms var(--nt-ease-spring-soft);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nt-scope details > summary > svg { transition: none; }
 }
@@ -304,7 +411,11 @@ body.nt-tokens :is(a, button).nt-button-purchase,
   font-weight: 600;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   text-shadow: none;
-  transition: background-color var(--nt-motion-fast) var(--nt-motion-ease), border-color var(--nt-motion-fast) var(--nt-motion-ease), transform var(--nt-motion-fast) var(--nt-motion-ease);
+  transition:
+    background-color var(--nt-motion-fast) var(--nt-motion-ease),
+    border-color var(--nt-motion-fast) var(--nt-motion-ease),
+    box-shadow var(--nt-motion-enter) var(--nt-motion-ease),
+    transform var(--nt-duration-rebound) var(--nt-ease-spring);
 }
 .nt-scope :is(a, button).nt-button-purchase:hover,
 body.nt-tokens :is(a, button).nt-button-purchase:hover,
@@ -315,7 +426,10 @@ body.nt-tokens :is(a, button).nt-button-purchase:hover,
 }
 .nt-scope :is(a, button).nt-button-purchase:not(:disabled, [aria-disabled="true"]):active,
 body.nt-tokens :is(a, button).nt-button-purchase:not(:disabled, [aria-disabled="true"]):active,
-.nt-scope .nt-native-cart a[href="/checkout"]:active { transform: translateY(1px); }
+.nt-scope .nt-native-cart a[href="/checkout"]:active {
+  transform: scale(0.975);
+  transition-duration: var(--nt-duration-press);
+}
 .nt-scope :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="true"]),
 body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="true"]) {
   border-color: var(--nt-purchase-disabled-border);

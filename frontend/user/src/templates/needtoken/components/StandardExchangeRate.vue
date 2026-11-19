@@ -4,6 +4,7 @@
       <ArrowLeftRight :size="15" aria-hidden="true" />
       <span>{{ t('needtoken.displayPricing.rateBadge') }}</span>
     </button>
+    <Transition name="nt-rate-pop">
     <div v-if="open" :id="panelId" class="nt-standard-rate__panel" role="region" :aria-label="t('needtoken.displayPricing.rateTitle')">
       <div class="nt-standard-rate__heading"><h2>{{ t('needtoken.displayPricing.rateTitle') }}</h2><button type="button" :aria-label="t('needtoken.displayPricing.closeRate')" @click="close(true)"><X :size="15" aria-hidden="true" /></button></div>
       <template v-if="rate">
@@ -17,6 +18,7 @@
       </template>
       <p class="nt-standard-rate__note">{{ t('needtoken.displayPricing.rateSettlementHint', { currency: settlementCurrency }) }}</p>
     </div>
+    </Transition>
   </div>
 </template>
 
@@ -49,8 +51,16 @@ onUnmounted(() => document.removeEventListener('pointerdown', onPointerDown))
 .nt-standard-rate__trigger { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 100%; color: inherit; cursor: pointer; font: inherit; text-align: center; }
 .nt-standard-rate__trigger > svg { flex: none; opacity: .85; }
 .nt-standard-rate__trigger > span { min-width: 0; overflow-wrap: anywhere; }
-.nt-standard-rate__panel { position: absolute; right: -6px; bottom: calc(100% + 18px); z-index: 40; width: 330px; max-width: calc(100vw - 40px); padding: 18px; border: 1px solid var(--nt-accent-border); border-radius: 15px; background: var(--ui-bg-elevated); color: var(--ui-text-secondary); box-shadow: var(--nt-popover-shadow); font-size: 12px; font-weight: 400; line-height: 1.75; text-align: left; }
-.nt-standard-rate--below .nt-standard-rate__panel { top: calc(100% + 18px); bottom: auto; }
+.nt-standard-rate__panel { position: absolute; right: -6px; bottom: calc(100% + 18px); z-index: 40; width: 330px; max-width: calc(100vw - 40px); padding: 18px; border: 1px solid var(--nt-accent-border); border-radius: 15px; background: var(--ui-bg-elevated); color: var(--ui-text-secondary); box-shadow: var(--nt-popover-shadow); font-size: 12px; font-weight: 400; line-height: 1.75; text-align: left; transform-origin: bottom right; }
+.nt-standard-rate--below .nt-standard-rate__panel { top: calc(100% + 18px); bottom: auto; transform-origin: top right; }
+.nt-rate-pop-enter-active { transition: opacity 180ms var(--nt-ease-emphasized), transform 240ms var(--nt-ease-spring-soft); }
+.nt-rate-pop-leave-active { transition: opacity 110ms var(--nt-motion-ease), transform 110ms var(--nt-motion-ease); pointer-events: none; }
+.nt-rate-pop-enter-from, .nt-rate-pop-leave-to { opacity: 0; transform: translateY(6px) scale(0.96); }
+.nt-standard-rate--below .nt-rate-pop-enter-from, .nt-standard-rate--below .nt-rate-pop-leave-to { transform: translateY(-6px) scale(0.96); }
+@media (prefers-reduced-motion: reduce) {
+  .nt-rate-pop-enter-active, .nt-rate-pop-leave-active { transition: none; }
+  .nt-rate-pop-enter-from, .nt-rate-pop-leave-to { transform: none; }
+}
 .nt-standard-rate__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .nt-standard-rate__heading h2 { color: var(--ui-text-primary); font-size: 14px; font-weight: 650; line-height: 1.5; }
 .nt-standard-rate__heading button { display: grid; flex: none; place-items: center; width: 22px; height: 22px; margin: -2px -3px 0 0; border-radius: 6px; color: var(--ui-text-muted); }

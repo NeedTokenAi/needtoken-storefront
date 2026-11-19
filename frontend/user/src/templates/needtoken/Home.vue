@@ -1,5 +1,5 @@
 <template>
-  <div class="nt-home">
+  <div ref="homeEl" class="nt-home">
     <section class="home-hero" aria-labelledby="home-title">
       <GhostFibersBackground variant="hero" />
       <div class="home-container hero-content">
@@ -14,7 +14,8 @@
           </div>
         </div>
         <div class="library-toolbar">
-          <nav class="library-tabs" :aria-label="t('needtoken.homeLibrary.tabs')">
+          <nav ref="libraryTabsEl" class="library-tabs" :class="{ 'has-thumb': libraryThumbVisible }" :aria-label="t('needtoken.homeLibrary.tabs')">
+            <span class="nt-sliding-thumb library-tabs-thumb" :class="{ 'is-ready': libraryThumbReady }" :style="libraryThumbStyle" aria-hidden="true" />
             <button type="button" :aria-pressed="kind === 'recharge'" :class="{ active: kind === 'recharge' }" @click="setKind('recharge')"><Zap :size="16" aria-hidden="true" />{{ t('needtoken.nav.recharge') }}</button>
             <button type="button" :aria-pressed="kind === 'rental'" :class="{ active: kind === 'rental' }" @click="setKind('rental')"><PackageCheck :size="16" aria-hidden="true" />{{ t('needtoken.nav.rental') }}</button>
             <a href="https://needtoken.ai/api-services"><KeyRound :size="16" aria-hidden="true" />{{ t('needtoken.nav.plans') }}<ArrowUpRight :size="13" aria-hidden="true" /></a>
@@ -35,7 +36,7 @@
           <p v-else-if="error" class="price-rail-state" role="alert">{{ t('needtoken.homeLibrary.loadError') }} <button type="button" @click="reload">{{ t('needtoken.common.retry') }}</button></p>
           <p v-else-if="!products.length" class="price-rail-state" role="status">{{ t('needtoken.homeLibrary.empty') }}</p>
           <template v-else>
-            <HomePriceCard v-for="product in products" :key="serviceCardKey(product)" :product="product" :kind="kind" />
+            <HomePriceCard v-for="(product, index) in products" :key="serviceCardKey(product)" :product="product" :kind="kind" :style="{ '--card-index': index }" />
           </template>
         </div>
 
@@ -49,11 +50,12 @@
       </div>
     </section>
 
-    <section class="home-container purchase-section" aria-labelledby="purchase-title" @mouseenter="hoverPaused = true" @mouseleave="hoverPaused = false" @focusin="focusPaused = true" @focusout="onFlowFocusOut">
+    <section class="home-container purchase-section nt-scroll-reveal" aria-labelledby="purchase-title" @mouseenter="hoverPaused = true" @mouseleave="hoverPaused = false" @focusin="focusPaused = true" @focusout="onFlowFocusOut">
       <div class="section-heading">
         <p class="section-eyebrow">{{ t('needtoken.homeServices.steps.eyebrow') }}</p>
         <div class="flow-controls">
-          <div ref="flowTabs" class="flow-tabs" role="tablist" :aria-label="t('needtoken.homeServices.flowControls.label')">
+          <div ref="flowTabs" class="flow-tabs" :class="{ 'has-thumb': flowThumbVisible }" role="tablist" :aria-label="t('needtoken.homeServices.flowControls.label')">
+            <span class="nt-sliding-thumb flow-tabs-thumb" :class="{ 'is-ready': flowThumbReady }" :style="flowThumbStyle" aria-hidden="true" />
             <button v-for="(flow, index) in flowKeys" :id="`flow-tab-${flow}`" :key="flow" type="button" role="tab" :aria-selected="activeFlow === flow" aria-controls="purchase-flow-panel" :tabindex="activeFlow === flow ? 0 : -1" :class="{ active: activeFlow === flow }" @click="selectFlow(index)" @keydown="onFlowKeydown($event, index)">{{ t(`needtoken.homeServices.flows.${flow}.label`) }}</button>
           </div>
           <button v-if="!reducedMotion" type="button" class="flow-playback" :aria-label="t(userPaused ? 'needtoken.homeServices.flowControls.resume' : 'needtoken.homeServices.flowControls.pause')" :title="t(userPaused ? 'needtoken.homeServices.flowControls.resume' : 'needtoken.homeServices.flowControls.pause')" :aria-pressed="userPaused" @click="userPaused = !userPaused">
@@ -88,7 +90,7 @@
       </div>
     </section>
 
-    <section class="home-container information-section" aria-labelledby="questions-title">
+    <section class="home-container information-section nt-scroll-reveal" aria-labelledby="questions-title">
       <div class="questions-intro">
         <p class="section-eyebrow">{{ t('needtoken.homeServices.faq.eyebrow') }}</p>
         <h2 id="questions-title">{{ t('needtoken.homeServices.faq.title') }}</h2>
@@ -120,14 +122,24 @@ import HomePriceCard from './components/HomePriceCard.vue'
 import NeedtokenSkeleton from './components/NeedtokenSkeleton.vue'
 import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import { useHomeCatalog } from './composables/useHomeCatalog'
+import { useSlidingIndicator } from './composables/useSlidingIndicator'
+import { useScrollReveal } from './composables/useScrollReveal'
 import GhostFibersBackground from './components/GhostFibersBackground.vue'
 import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import { serviceCardKey } from './lib/serviceCatalog'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { getLocalizedText } = useLocalized()
+const homeEl = ref<HTMLElement | null>(null)
+const libraryTabsEl = ref<HTMLElement | null>(null)
+useScrollReveal(homeEl)
 const { kind, scope, childCategories, selectedId, products, categoriesLoading, loading, error, setKind, selectCategory, prefetchCategory, reload } = useHomeCatalog()
+const { indicatorStyle: libraryThumbStyle, indicatorReady: libraryThumbReady, indicatorVisible: libraryThumbVisible } = useSlidingIndicator(
+  libraryTabsEl,
+  'button.active',
+  [kind, locale],
+)
 const sloganParts = computed(() => t('needtoken.homeLibrary.title').split(/[、,]/).map(part => part.trim()).filter(Boolean))
 usePageSeo({
   title: () => t('needtoken.homeServices.seoTitle'),
@@ -151,6 +163,11 @@ const reducedMotion = ref(false)
 const pageHidden = ref(false)
 const mounted = ref(false)
 const flowTabs = ref<HTMLElement | null>(null)
+const { indicatorStyle: flowThumbStyle, indicatorReady: flowThumbReady, indicatorVisible: flowThumbVisible } = useSlidingIndicator(
+  flowTabs,
+  'button.active',
+  [activeFlow, locale],
+)
 let rotationTimer: number | undefined
 let motionQuery: MediaQueryList | undefined
 
@@ -218,48 +235,53 @@ onUnmounted(() => {
 .library-payment-controls { display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
 .library-payment-controls :deep(.payment-method-strip) { min-width: 0; }
 .library-payment-controls :deep(.nt-display-currency) { flex-shrink: 0; }
-.library-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--ui-border); border-radius: 14px; background: var(--ui-bg-elevated); }
-.library-tabs button, .library-tabs a { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 40px; padding: 8px 16px; border: 0; border-radius: 10px; color: var(--home-secondary); font-size: 14px; font-weight: 500; transition: color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.library-tabs button.active { color: var(--ui-text-on-accent); background: var(--ui-accent); }
+.library-tabs { position: relative; display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--ui-border); border-radius: 14px; background: var(--ui-bg-elevated); box-shadow: var(--nt-card-shadow); }
+.library-tabs-thumb { border-radius: 10px; background: var(--ui-accent); box-shadow: 0 2px 10px -2px var(--ui-accent-soft); }
+.library-tabs button, .library-tabs a { position: relative; z-index: 1; display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 40px; padding: 8px 16px; border: 0; border-radius: 10px; color: var(--home-secondary); font-size: 14px; font-weight: 500; transition: color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+.library-tabs button.active { color: var(--ui-text-on-accent); font-weight: 600; background: var(--ui-accent); }
+.library-tabs.has-thumb button.active { background: transparent; }
 .library-tabs :is(button, a):not(.active):hover { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
 .library-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 20px; }
 .library-filters--loading i { display: block; width: 104px; height: 36px; border-radius: 18px; background: var(--nt-skeleton-base); }
-.library-filters button { min-height: 36px; padding: 8px 16px; border: 1px solid transparent; border-radius: 999px; color: var(--home-secondary); font-size: 13px; transition: color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), border-color var(--nt-motion-fast, 120ms), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
+.library-filters button { min-height: 36px; padding: 8px 16px; border: 1px solid transparent; border-radius: 999px; color: var(--home-secondary); font-size: 13px; transition: color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), border-color var(--nt-motion-fast, 120ms), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
 .library-filters button:hover { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
-.library-tabs :is(button, a):active, .library-filters button:active { transform: translateY(1px); }
+.library-tabs :is(button, a):active, .library-filters button:active { transform: scale(0.965); transition-duration: var(--nt-duration-press, 80ms); }
 .library-filters button.active { color: var(--ui-accent); border-color: var(--nt-accent-border); background: var(--ui-accent-soft); }
 .price-rail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); min-height: 132px; gap: 16px; margin-top: 24px; padding-bottom: 8px; }
-.price-rail.is-ready { animation: catalogue-ready var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out) both; }
-@keyframes catalogue-ready { from { opacity: .55; } to { opacity: 1; } }
+.price-rail.is-ready > :deep(.home-price-card) { animation: nt-card-rise 320ms var(--nt-ease-spring-soft) calc(min(var(--card-index, 0), 8) * 42ms) backwards; }
+@keyframes nt-card-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 .price-rail-state { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; min-height: 180px; padding: 24px; border: 1px dashed var(--ui-border-strong); border-radius: 20px; color: var(--home-muted); font-size: 14px; text-align: center; }
 .price-rail-state button { min-height: 40px; padding: 8px 16px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-accent); }
 .price-rail > :deep(.nt-page-skeleton--prices) { grid-column: 1 / -1; padding: 0; }
 .hero-benefits { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; gap: 12px; margin-top: 24px; }
-.hero-benefit { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: 12px; gap: 8px; border: 1px solid var(--nt-benefit-border); border-radius: 12px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); box-shadow: var(--nt-card-shadow); font-size: 12px; font-weight: 500; line-height: 1.5; text-align: center; transition: border-color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms); }
-.hero-benefit:hover { border-color: var(--nt-accent-border); }
+.hero-benefit { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: 12px; gap: 8px; border: 1px solid var(--nt-benefit-border); border-radius: 12px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); box-shadow: var(--nt-card-shadow); font-size: 12px; font-weight: 500; line-height: 1.5; text-align: center; transition: border-color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), box-shadow var(--nt-motion-enter, 180ms), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+.hero-benefit:hover { border-color: var(--nt-accent-border); box-shadow: var(--nt-card-shadow-hover); transform: translateY(-2px); }
 .hero-benefit svg { flex: none; color: var(--nt-benefit-icon); }
 .hero-benefit--rate { position: relative; z-index: 3; }
-@keyframes slogan-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes slogan-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .purchase-section { padding-top: 64px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .section-eyebrow { margin-bottom: 12px; color: var(--ui-accent); font-size: 12px; font-weight: 500; letter-spacing: .01em; }
 .section-heading .section-eyebrow { margin-bottom: 0; }
 .flow-title, .questions-intro h2 { font-size: 28px; line-height: 1.4; font-weight: 600; letter-spacing: 0; text-wrap: balance; }
 .flow-title { margin-top: 12px; }
-.flow-word { display: inline-block; color: var(--ui-accent); margin-right: .3em; animation: flow-reveal var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
+.flow-word { display: inline-block; color: var(--ui-accent); margin-right: .3em; animation: flow-reveal 260ms var(--nt-ease-spring-soft); }
 .flow-controls { display: flex; align-items: center; gap: 8px; }
-.flow-tabs { display: flex; align-items: center; gap: 4px; }
-.flow-tabs button { min-height: 36px; padding: 8px 12px; border: 1px solid transparent; border-radius: 10px; color: var(--home-muted); font-size: 12px; line-height: 1.5; }
-.flow-tabs button.active { color: var(--ui-accent); border-color: var(--nt-accent-border); background: var(--nt-accent-subtle); }
-.flow-tabs button:hover { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
-.flow-tabs button, .flow-playback, .text-action { transition: color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), border-color var(--nt-motion-fast, 120ms), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.flow-tabs button:active, .flow-playback:active, .text-action:active { transform: translateY(1px); }
+.flow-tabs { position: relative; display: flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--ui-border); border-radius: 13px; background: var(--nt-nav-rail-bg); }
+.flow-tabs-thumb { border: 1px solid var(--nt-accent-border); border-radius: 9px; background: var(--nt-accent-subtle); }
+.flow-tabs button { position: relative; z-index: 1; min-height: 34px; padding: 6px 12px; border: 1px solid transparent; border-radius: 9px; color: var(--home-muted); font-size: 12px; line-height: 1.5; }
+.flow-tabs button.active { color: var(--ui-accent); border-color: var(--nt-accent-border); background: var(--nt-accent-subtle); font-weight: 600; }
+.flow-tabs.has-thumb button.active { border-color: transparent; background: transparent; }
+.flow-tabs button:not(.active):hover { color: var(--ui-text-primary); }
+.flow-tabs button, .flow-playback, .text-action { transition: color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), border-color var(--nt-motion-fast, 120ms), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+.flow-tabs button:active, .flow-playback:active, .text-action:active { transform: scale(0.95); transition-duration: var(--nt-duration-press, 80ms); }
 .flow-playback { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border: 1px solid var(--ui-border); border-radius: 50%; color: var(--home-muted); }
 .flow-playback:hover { color: var(--ui-accent); border-color: var(--ui-accent); }
 .section-description { max-width: 365px; color: var(--home-muted); font-size: 13px; line-height: 1.85; text-wrap: pretty; }
-.purchase-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 28px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--nt-surface-translucent); list-style: none; animation: flow-reveal var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
-@keyframes flow-reveal { from { opacity: .35; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-.purchase-step { display: flex; align-items: start; gap: 16px; position: relative; padding: 24px; }
+.purchase-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 28px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--nt-surface-translucent); box-shadow: var(--nt-card-shadow); list-style: none; animation: flow-reveal 260ms var(--nt-ease-spring-soft); }
+@keyframes flow-reveal { from { opacity: .25; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.purchase-step { display: flex; align-items: start; gap: 16px; position: relative; padding: 24px; transition: background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease); }
+.purchase-step:hover { background: var(--nt-surface-subtle); }
 .purchase-step + .purchase-step { border-left: 1px solid var(--ui-border); }
 .step-index { flex: none; padding-top: 4px; color: var(--ui-accent); font-family: var(--nt-font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 .purchase-step h3 { font-size: 15px; line-height: 1.5; font-weight: 600; }
@@ -279,7 +301,7 @@ onUnmounted(() => {
 .question { border-bottom: 1px solid var(--ui-border); }
 .question summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; color: var(--ui-text-primary); cursor: pointer; font-size: 14px; font-weight: 500; line-height: 1.6; list-style: none; }
 .question summary::-webkit-details-marker { display: none; }
-.question-toggle { flex: none; color: var(--home-muted); transition: color var(--nt-motion-fast, 120ms), transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
+.question-toggle { flex: none; color: var(--home-muted); transition: color var(--nt-motion-fast, 120ms), transform 440ms var(--nt-ease-spring); }
 .question summary:hover .question-toggle { color: var(--ui-text-primary); }
 .question[open] .question-toggle { transform: rotate(45deg); color: var(--ui-accent); }
 .question > p { padding: 0 32px 20px 0; color: var(--home-muted); font-size: 13px; line-height: 1.9; }
@@ -326,9 +348,9 @@ onUnmounted(() => {
   .questions-intro .text-action { margin-top: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .library-tabs :is(button, a), .library-filters button, .question-toggle { transition: none; }
-  .flow-word, .purchase-steps, .slogan-word, .price-rail.is-ready { animation: none; }
+  .library-tabs :is(button, a), .library-filters button, .question-toggle, .hero-benefit { transition: none; }
+  .flow-word, .purchase-steps, .slogan-word, .price-rail.is-ready > :deep(.home-price-card) { animation: none; }
   .flow-tabs button, .flow-playback, .text-action { transition: none; }
-  .library-tabs :is(button, a):active, .library-filters button:active, .flow-tabs button:active, .flow-playback:active, .text-action:active { transform: none; }
+  .hero-benefit:hover, .library-tabs :is(button, a):active, .library-filters button:active, .flow-tabs button:active, .flow-playback:active, .text-action:active { transform: none; }
 }
 </style>

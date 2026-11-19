@@ -1,5 +1,6 @@
 <template>
   <div v-if="support.enabled" ref="widgetEl" class="nt-support-widget" :class="{ 'nt-support-widget--raised': raised }">
+    <Transition name="nt-support-pop">
     <section v-if="open" :id="panelId" ref="panelEl" class="nt-support-panel" role="dialog" aria-modal="false" :aria-labelledby="`${panelId}-title`" @keydown="onPanelKeydown">
       <header class="nt-support-heading">
         <div class="nt-support-heading-icon"><Headset :size="22" /></div>
@@ -11,6 +12,7 @@
       </header>
 
       <div class="nt-support-tabs" role="tablist" :aria-label="t('needtoken.support.tabsLabel')">
+        <span class="nt-support-tabs-thumb" :class="{ 'is-second': tab === 'bookmark' }" aria-hidden="true" />
         <button v-for="item in tabs" :id="`${panelId}-tab-${item}`" :key="item" type="button" role="tab" :aria-selected="tab === item" :aria-controls="`${panelId}-content-${item}`" :tabindex="tab === item ? 0 : -1" @click="tab = item" @keydown="onTabKeydown($event, item)">
           <MessageCircle v-if="item === 'contact'" :size="16" /><Star v-else :size="16" />{{ t(`needtoken.support.${item}`) }}
         </button>
@@ -41,6 +43,7 @@
         </dl>
       </div>
     </section>
+    </Transition>
 
     <button ref="triggerEl" type="button" class="nt-support-trigger" :aria-label="open ? t('needtoken.support.close') : t('needtoken.support.open')" :aria-expanded="open" :aria-controls="panelId" aria-haspopup="dialog" @click="toggle">
       <X v-if="open" :size="23" />
@@ -181,21 +184,27 @@ onUnmounted(() => {
 
 <style scoped>
 .nt-support-widget { position: fixed; right: max(22px, env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 55; }
-.nt-support-trigger { width: 54px; height: 54px; display: grid; place-items: center; margin-left: auto; border: 1px solid var(--nt-purchase-border); border-radius: 50%; background: var(--nt-purchase-bg); color: var(--nt-purchase-fg); box-shadow: var(--nt-card-shadow-hover), inset 0 1px 0 rgba(255, 255, 255, 0.25); transition: background-color 160ms, transform 160ms; }
-.nt-support-trigger:hover { background: var(--nt-purchase-bg-hover); transform: translateY(-2px); }
+.nt-support-trigger { width: 54px; height: 54px; display: grid; place-items: center; margin-left: auto; border: 1px solid var(--nt-purchase-border); border-radius: 50%; background: var(--nt-purchase-bg); color: var(--nt-purchase-fg); box-shadow: var(--nt-card-shadow-hover), inset 0 1px 0 rgba(255, 255, 255, 0.25); transition: background-color 160ms var(--nt-motion-ease), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+.nt-support-trigger:hover { background: var(--nt-purchase-bg-hover); transform: translateY(-2px) scale(1.03); }
+.nt-support-trigger:active { transform: scale(0.92); transition-duration: var(--nt-duration-press, 80ms); }
 .nt-support-eyes { display: flex; align-items: center; justify-content: center; gap: 4px; pointer-events: none; }
 .nt-support-eye { display: grid; place-items: center; width: 15px; height: 17px; border-radius: 50%; background: #fff; box-shadow: inset 0 -1px 0 #052f2514; transform-origin: center; }
 .nt-support-pupil { display: block; width: 6px; height: 7px; border-radius: 50%; background: #123f34; transform: translate(var(--nt-eye-x, 0), var(--nt-eye-y, 0)); transition: transform 100ms ease-out; }
 .nt-support-trigger:hover .nt-support-eye, .nt-support-trigger:focus-visible .nt-support-eye { animation: nt-support-blink 300ms ease-in-out; }
 @keyframes nt-support-blink { 0%, 100% { transform: scaleY(1); } 42% { transform: scaleY(.22); } 72% { transform: scaleY(1.06); } }
-.nt-support-panel { position: absolute; right: 0; bottom: 68px; width: 364px; max-width: calc(100vw - 32px); max-height: min(640px, calc(100dvh - 120px)); overflow: auto; border: 1px solid var(--nt-accent-border); border-radius: 20px; background: var(--ui-bg-elevated); box-shadow: var(--nt-popover-shadow); }
+.nt-support-panel { position: absolute; right: 0; bottom: 68px; width: 364px; max-width: calc(100vw - 32px); max-height: min(640px, calc(100dvh - 120px)); overflow: auto; border: 1px solid var(--nt-accent-border); border-radius: 20px; background: var(--ui-bg-elevated); box-shadow: var(--nt-popover-shadow); transform-origin: bottom right; }
+.nt-support-pop-enter-active { transition: opacity 200ms var(--nt-ease-emphasized), transform 260ms var(--nt-ease-spring-soft); }
+.nt-support-pop-leave-active { transition: opacity 120ms var(--nt-motion-ease), transform 120ms var(--nt-motion-ease); pointer-events: none; }
+.nt-support-pop-enter-from, .nt-support-pop-leave-to { opacity: 0; transform: translateY(10px) scale(0.94); }
 .nt-support-heading { display: flex; align-items: flex-start; gap: 12px; padding: 22px 20px 18px; border-bottom: 1px solid var(--ui-border); background: linear-gradient(115deg, var(--nt-accent-subtle), transparent); }
 .nt-support-heading-icon { display: grid; flex-shrink: 0; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--ui-accent-soft); color: var(--ui-accent); }
 .nt-support-close { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; color: var(--ui-text-secondary); }
 .nt-support-close:hover { background: var(--ui-bg-soft); }
-.nt-support-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 18px 20px 0; padding: 4px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-bg-soft); }
-.nt-support-tabs button { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 9px 6px; border-radius: 8px; color: var(--ui-text-muted); font-size: 13px; font-weight: 600; }
-.nt-support-tabs button[aria-selected="true"] { background: var(--ui-bg-elevated); color: var(--ui-accent); box-shadow: var(--nt-card-shadow); }
+.nt-support-tabs { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 18px 20px 0; padding: 4px; border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-bg-soft); }
+.nt-support-tabs-thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 6px); border-radius: 8px; background: var(--ui-bg-elevated); box-shadow: var(--nt-card-shadow); transition: transform var(--nt-duration-slide, 380ms) var(--nt-ease-spring-soft); pointer-events: none; z-index: 0; }
+.nt-support-tabs-thumb.is-second { transform: translateX(calc(100% + 4px)); }
+.nt-support-tabs button { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 9px 6px; border-radius: 8px; color: var(--ui-text-muted); font-size: 13px; font-weight: 600; transition: color var(--nt-motion-fast) var(--nt-motion-ease); }
+.nt-support-tabs button[aria-selected="true"] { color: var(--ui-accent); }
 .nt-support-content { padding: 22px 20px 18px; }
 .nt-support-qrs { display: flex; justify-content: center; gap: 14px; }
 .nt-support-qrs figure { flex: 1; min-width: 0; max-width: 192px; text-align: center; }
@@ -219,5 +228,9 @@ onUnmounted(() => {
   .nt-support-trigger { width: 48px; height: 48px; }
   .nt-support-panel { bottom: 62px; max-height: calc(100dvh - 106px); }
 }
-@media (prefers-reduced-motion: reduce) { .nt-support-trigger, .nt-support-pupil { transition: none; } .nt-support-trigger:hover { transform: none; } .nt-support-trigger .nt-support-eye { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .nt-support-trigger, .nt-support-pupil, .nt-support-tabs-thumb, .nt-support-pop-enter-active, .nt-support-pop-leave-active { transition: none; }
+  .nt-support-trigger:hover, .nt-support-trigger:active, .nt-support-pop-enter-from, .nt-support-pop-leave-to { transform: none; }
+  .nt-support-trigger .nt-support-eye { animation: none; }
+}
 </style>
