@@ -24,8 +24,8 @@
             <div v-if="!Component" :class="{ 'nt-home-route-placeholder': route.path === '/' }">
               <NeedtokenSkeleton :kind="route.path === '/' ? 'prices' : 'page'" :count="route.path === '/' ? 4 : 3" />
             </div>
-            <Transition name="nt-page">
-              <component :is="Component" v-if="Component" />
+            <Transition name="nt-page" mode="out-in">
+              <component :is="Component" v-if="Component" :key="route.path" />
             </Transition>
           </RouterView>
         </ErrorBoundary>
@@ -159,10 +159,21 @@ watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(va
 .page-fade-leave-to {
   opacity: 0;
 }
-.nt-page-enter-active { transition: opacity 160ms ease-out, transform 160ms ease-out; }
-.nt-page-enter-from { opacity: .5; transform: translateY(3px); }
-/* The new page mounts immediately: no outgoing fade holding the next page blank. */
-.nt-page-leave-active { display: none; }
+.nt-page-enter-active {
+  transition: opacity 220ms var(--nt-ease-spring-soft, cubic-bezier(0.22, 1.15, 0.36, 1)), transform 260ms var(--nt-ease-spring-soft, cubic-bezier(0.22, 1.15, 0.36, 1));
+}
+.nt-page-leave-active {
+  transition: opacity 110ms ease-in, transform 110ms ease-in;
+  pointer-events: none;
+}
+.nt-page-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.nt-page-leave-to {
+  opacity: 0;
+  transform: translateY(-3px);
+}
 .nt-route-progress { position: fixed; inset: 64px 0 auto; z-index: 45; height: 2px; overflow: hidden; pointer-events: none; background: color-mix(in srgb, var(--ui-accent, #2dd4a7) 10%, transparent); }
 .nt-route-progress > span:first-child { display: block; width: 35%; height: 100%; background: var(--ui-accent, #2dd4a7); animation: nt-route-travel 1.1s ease-in-out infinite; }
 .nt-route-error { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--nt-warning-border, #e5b96940); color: var(--nt-warning-ink, #e5b969); font-size: 12px; line-height: 1.7; }
@@ -170,5 +181,5 @@ watch(() => appStore.config?.storefront_template, (value) => rememberTemplate(va
 .nt-home-route-placeholder { max-width: var(--nt-content-max-width, 1200px); min-height: 480px; margin: 0 auto; padding: 48px 24px; }
 @media (max-width: 640px) { .nt-home-route-placeholder { padding: 32px 20px; } }
 @keyframes nt-route-travel { from { transform: translateX(-105%); } to { transform: translateX(390%); } }
-@media (prefers-reduced-motion: reduce) { .page-fade-enter-active, .page-fade-leave-active, .nt-page-enter-active { transition: none; } .nt-page-enter-from { opacity: 1; transform: none; } .nt-route-progress > span:first-child { animation: none; width: 100%; opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .page-fade-enter-active, .page-fade-leave-active, .nt-page-enter-active, .nt-page-leave-active { transition: none; } .nt-page-enter-from, .nt-page-leave-to { opacity: 1; transform: none; } .nt-route-progress > span:first-child { animation: none; width: 100%; opacity: .6; } }
 </style>

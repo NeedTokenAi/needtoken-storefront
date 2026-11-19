@@ -25,6 +25,7 @@
         <img v-if="images[0]" class="purchase-product-image" :src="images[0]" :alt="getLocalizedText(product.title)" />
       </header>
 
+      <Transition :name="stepTransitionName">
       <div v-show="!inlineCheckout" class="purchase-grid">
         <section class="purchase-main">
           <div class="purchase-section-head">
@@ -103,7 +104,7 @@
           <div class="summary-label">{{ t('needtoken.purchaseServices.orderSummary') }}</div>
           <h2>{{ selectedTitle }}</h2>
           <p class="summary-option">{{ selectedSku ? skuDisplayText(selectedSku) : t('productDetail.skuRequired') }}</p>
-          <div class="summary-price" :class="{ unconfirmed: !selectedSku || !isKnownPurchasePrice(currentUnitPrice) }">{{ !selectedSku ? t('productDetail.skuRequired') : isKnownPurchasePrice(currentUnitPrice) ? formatDisplayPrice(currentUnitPrice) : t('needtoken.purchaseServices.priceUnavailable') }}<span>{{ selectedPresentation.priceSuffix || t('needtoken.purchaseServices.unitPrice') }}</span></div>
+          <div class="summary-price" :class="{ unconfirmed: !selectedSku || !isKnownPurchasePrice(currentUnitPrice) }"><span :key="`${selectedSkuId}-${currentUnitPrice ?? ''}`" class="summary-price-value">{{ !selectedSku ? t('productDetail.skuRequired') : isKnownPurchasePrice(currentUnitPrice) ? formatDisplayPrice(currentUnitPrice) : t('needtoken.purchaseServices.priceUnavailable') }}</span><span class="summary-price-unit">{{ selectedPresentation.priceSuffix || t('needtoken.purchaseServices.unitPrice') }}</span></div>
           <p v-if="isConverted && selectedSku && isKnownPurchasePrice(currentUnitPrice)" class="summary-price-reference">{{ t('needtoken.variants.settlementPrice', { price: formatSettlement(currentUnitPrice) }) }}</p>
           <p v-if="officialReference" class="summary-price-reference">{{ t('needtoken.variants.officialReference', { price: officialReference }) }}</p>
           <div v-if="hasSelectedDiscount" class="summary-original">{{ formatDisplayPrice(selectedSku?.price_amount) }}</div>
@@ -130,8 +131,10 @@
           <div class="summary-secure"><LockKeyhole :size="13" />{{ t('needtoken.purchaseServices.secureOrder') }}</div>
         </aside>
       </div>
+      </Transition>
 
 
+      <Transition :name="stepTransitionName">
       <div v-if="checkoutReady" v-show="inlineCheckout" ref="inlineRegion" class="inline-checkout" tabindex="-1" :aria-label="t('needtoken.purchaseServices.stepPay')">
         <p class="inline-step-hint" role="status">{{ t(inlineOrderCreated ? 'needtoken.purchaseFlow.orderCreated' : inlineSubmitting ? 'needtoken.purchaseFlow.submitting' : 'needtoken.purchaseFlow.reviewHint') }}</p>
         <CheckoutPanel embedded :active="inlineCheckout" @pending-change="inlineSubmitting = $event" @order-created="inlineOrderCreated = $event">
@@ -155,6 +158,7 @@
           </template>
         </CheckoutPanel>
       </div>
+      </Transition>
 
       <div v-if="!inlineCheckout" class="purchase-mobile-bar" :aria-label="t('needtoken.purchaseServices.orderSummary')">
         <div class="mobile-purchase-info">
@@ -199,6 +203,8 @@ const router = useRouter()
 const appStore = useAppStore()
 const requestedSkuInvalid = ref(false)
 const inlineCheckout = ref(false)
+const stepDirection = ref<'forward' | 'backward'>('forward')
+const stepTransitionName = computed(() => stepDirection.value === 'forward' ? 'nt-step-forward' : 'nt-step-backward')
 const checkoutReady = ref(false)
 const inlineSubmitting = ref(false)
 const inlineOrderCreated = ref(false)
@@ -329,6 +335,7 @@ const stepRoute = (checkout: boolean) => ({
 async function showInlineCheckout(updateRoute = true, focus = true) {
   if (inlineSubmitting.value || inlineOrderCreated.value || !canOrder.value || requiresLogin.value) return
   if (!prepareBuyNow()) return
+  stepDirection.value = 'forward'
   checkoutReady.value = true
   inlineCheckout.value = true
   if (updateRoute) await router.replace(stepRoute(true))
@@ -343,6 +350,7 @@ function resumeInlineCheckout() {
 }
 async function backToSelection() {
   if (inlineSubmitting.value || inlineOrderCreated.value) return
+  stepDirection.value = 'backward'
   inlineCheckout.value = false
   await router.replace(stepRoute(false))
   await nextTick()
@@ -380,12 +388,12 @@ const submitCart = () => {
 .purchase-category { color: var(--ui-text-secondary); font-size: 13px; font-weight: 500; }
 .purchase-intro { margin-top: 12px; max-width: 64ch; font-size: 14px; line-height: 1.8; color: var(--ui-text-secondary); overflow-wrap: anywhere; }
 .purchase-steps { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 16px; font-size: 12px; color: var(--ui-text-muted); }
-.purchase-steps li { display: flex; align-items: center; gap: 8px; }
-.purchase-steps li > span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--ui-border-strong); border-radius: 50%; font-size: 11px; font-variant-numeric: tabular-nums; }
-.purchase-steps .current { color: var(--ui-accent); }
-.purchase-steps .current > span { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
+.purchase-steps li { display: flex; align-items: center; gap: 8px; transition: color 200ms var(--nt-motion-ease); }
+.purchase-steps li > span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--ui-border-strong); border-radius: 50%; font-size: 11px; font-variant-numeric: tabular-nums; transition: border-color 200ms var(--nt-motion-ease), background-color 200ms var(--nt-motion-ease), transform 360ms var(--nt-ease-spring); }
+.purchase-steps .current { color: var(--ui-accent); font-weight: 500; }
+.purchase-steps .current > span { border-color: var(--ui-accent); background: var(--ui-accent-soft); transform: scale(1.06); }
 .purchase-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 24px; align-items: start; }
-.purchase-main, .purchase-summary { border: 1px solid var(--ui-border); border-radius: 20px; background: var(--ui-bg-elevated); }
+.purchase-main, .purchase-summary { border: 1px solid var(--ui-border); border-radius: 20px; background: var(--ui-bg-elevated); box-shadow: var(--nt-card-shadow); }
 .purchase-main { padding: 24px; min-width: 0; }
 .purchase-section-head { display: flex; gap: 16px; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .purchase-section-head h2 { font-size: 18px; font-weight: 500; }
@@ -401,16 +409,20 @@ const submitCart = () => {
 .summary-price-reference { margin-top: 8px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
 .option-top > span:first-child, .summary-option { min-width: 0; overflow-wrap: anywhere; }
 .purchase-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-.purchase-option { padding: 16px; border-radius: 12px; border: 1px solid var(--ui-border); background: transparent; color: var(--ui-text-primary); text-align: left; min-width: 0; transition: border-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
-.purchase-option:not(.selected):hover { border-color: var(--ui-border-strong); background: var(--nt-surface-subtle); }
-.purchase-option.selected { border-color: var(--ui-accent); background: var(--ui-accent-soft); }
-.purchase-option:active { transform: translateY(1px); }
+.purchase-option { padding: 16px; border-radius: 14px; border: 1px solid var(--ui-border); background: transparent; color: var(--ui-text-primary); text-align: left; min-width: 0; transition: border-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), background-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), box-shadow var(--nt-motion-enter, 180ms) var(--nt-motion-ease), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+@media (hover: hover) {
+  .purchase-option:not(.selected):hover { border-color: var(--ui-border-strong); background: var(--nt-surface-subtle); transform: translateY(-2px); }
+}
+.purchase-option.selected { border-color: var(--ui-accent); background: var(--ui-accent-soft); box-shadow: 0 0 0 1px var(--nt-accent-border); }
+.purchase-option:active { transform: scale(0.98); transition-duration: var(--nt-duration-press, 80ms); }
 .purchase-option.unavailable { border-style: dashed; }
 .purchase-option.unavailable:not(.selected) { color: var(--ui-text-muted); }
 .option-top { display: flex; justify-content: space-between; align-items: start; gap: 8px; font-size: 13px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
 .option-top > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.option-check { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--ui-border-strong); display: grid; place-items: center; flex: none; }
+.option-check { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--ui-border-strong); display: grid; place-items: center; flex: none; transition: border-color 180ms var(--nt-motion-ease), background-color 180ms var(--nt-motion-ease); }
 .selected .option-check { border-color: var(--ui-accent); background: var(--ui-accent); color: var(--ui-text-on-accent); }
+.selected .option-check svg { animation: nt-check-pop 280ms var(--nt-ease-spring) backwards; }
+@keyframes nt-check-pop { from { opacity: 0; transform: scale(0.45); } to { opacity: 1; transform: scale(1); } }
 .option-price { margin-top: 12px; font-size: 24px; line-height: 1.25; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .option-price.unconfirmed, .summary-price.unconfirmed { font-size: 16px; font-weight: 400; color: var(--ui-text-muted); }
 .option-original { font-size: 12px; color: var(--ui-text-muted); text-decoration: line-through; margin-top: 4px; font-variant-numeric: tabular-nums; }
@@ -430,7 +442,9 @@ const submitCart = () => {
 .purchase-summary h2 { font-size: 20px; font-weight: 500; line-height: 1.5; margin-top: 8px; overflow-wrap: anywhere; }
 .summary-option { font-size: 13px; color: var(--ui-text-secondary); margin-top: 8px; line-height: 1.6; overflow-wrap: anywhere; }
 .summary-price { margin-top: 24px; font-size: 40px; line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.summary-price > span { margin-left: 8px; color: var(--ui-text-muted); font-size: 13px; font-weight: 400; }
+.summary-price-value { display: inline-block; animation: nt-summary-tick 200ms var(--nt-ease-spring-soft) backwards; }
+@keyframes nt-summary-tick { from { opacity: 0.45; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.summary-price > .summary-price-unit { margin-left: 8px; color: var(--ui-text-muted); font-size: 13px; font-weight: 400; }
 .summary-original { font-size: 12px; color: var(--ui-text-muted); text-decoration: line-through; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .summary-badge { display: inline-flex; background: var(--ui-accent-soft); color: var(--ui-accent); font-size: 12px; border-radius: 4px; padding: 4px 8px; margin-top: 12px; }
 .quantity-row { margin-top: 24px; border-top: 1px solid var(--ui-border); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
@@ -443,11 +457,11 @@ const submitCart = () => {
 .quantity-control input { width: 40px; text-align: center; background: transparent; border: 0; border-left: 1px solid var(--ui-border); border-right: 1px solid var(--ui-border); font-size: 13px; font-variant-numeric: tabular-nums; }
 .summary-stock { margin-top: 8px; font-size: 12px; color: var(--ui-text-muted); text-align: right; }
 .summary-note { margin-top: 16px; font-size: 12px; line-height: 1.8; color: var(--ui-text-muted); }
-.purchase-primary, .purchase-secondary { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; font-size: 14px; font-weight: 500; transition: background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), border-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out); }
+.purchase-primary, .purchase-secondary { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; font-size: 14px; font-weight: 500; transition: background-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), border-color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease, ease-out), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
 .purchase-primary { margin-top: 16px; }
 .purchase-secondary { border: 1px solid var(--ui-border-strong); color: var(--ui-text-secondary); margin-top: 12px; }
 .purchase-secondary:hover:not(:disabled) { background: var(--ui-bg-soft); color: var(--ui-text-primary); }
-.purchase-primary:active:not(:disabled), .purchase-secondary:active:not(:disabled) { transform: translateY(1px); }
+.purchase-primary:active:not(:disabled), .purchase-secondary:active:not(:disabled) { transform: scale(0.98); transition-duration: var(--nt-duration-press, 80ms); }
 .purchase-primary:disabled, .purchase-secondary:disabled { cursor: not-allowed; }
 .purchase-secondary:disabled { color: var(--ui-text-muted); background: var(--ui-bg-soft); border-color: var(--ui-border); opacity: .6; }
 .summary-secure { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; font-size: 12px; color: var(--ui-text-muted); }
@@ -541,11 +555,25 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .purchase-options { grid-template-columns: minmax(0, 1fr); }
   .purchase-product-image { width: 48px; height: 48px; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .nt-purchase-page { animation: none; } .purchase-option:active, .purchase-primary:active, .purchase-secondary:active { transform: none; } }
-
+.nt-step-forward-enter-active,
+.nt-step-backward-enter-active {
+  transition: opacity 220ms var(--nt-ease-emphasized), transform 280ms var(--nt-ease-spring-soft);
+}
+.nt-step-forward-leave-active,
+.nt-step-backward-leave-active {
+  display: none;
+}
+.nt-step-forward-enter-from {
+  opacity: 0;
+  transform: translateX(18px);
+}
+.nt-step-backward-enter-from {
+  opacity: 0;
+  transform: translateX(-18px);
+}
 .purchase-back:disabled { opacity: .5; cursor: not-allowed; }
 .purchase-heading:hover .purchase-product-image { transform: translateY(-2px); }
-.inline-checkout { scroll-margin-top: 88px; animation: purchase-in var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
+.inline-checkout { scroll-margin-top: 88px; }
 .inline-checkout:focus { outline: none; }
 .inline-step-hint { margin-bottom: 20px; color: var(--ui-text-muted); font-size: 13px; line-height: 1.7; }
 .inline-plan-review { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-bottom: 20px; margin-bottom: 24px; border-bottom: 1px solid var(--ui-border); color: var(--ui-text-secondary); font-size: 13px; line-height: 1.6; }
@@ -556,9 +584,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .inline-product-content > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; color: var(--ui-text-secondary); cursor: pointer; list-style: none; font-size: 14px; }
 .inline-product-content > summary::-webkit-details-marker { display: none; }
 .inline-product-content > summary:hover { color: var(--ui-text-primary); }
-.inline-product-content > summary > svg { flex: none; transition: transform var(--nt-motion-fast) var(--nt-motion-ease); }
+.inline-product-content > summary > svg { flex: none; transition: transform 440ms var(--nt-ease-spring); }
 .inline-product-content[open] > summary { margin-bottom: 16px; }
 .inline-product-content[open] > summary > svg { transform: rotate(90deg); }
-@media (prefers-reduced-motion: reduce) { .purchase-heading:hover .purchase-product-image { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .nt-purchase-page, .summary-price-value, .selected .option-check svg, .purchase-skeleton { animation: none; }
+  .purchase-option, .purchase-primary, .purchase-secondary, .purchase-steps li, .purchase-steps li > span, .purchase-product-image, .inline-product-content > summary > svg, .nt-step-forward-enter-active, .nt-step-backward-enter-active { transition: none; }
+  .nt-step-forward-enter-from, .nt-step-backward-enter-from, .purchase-option:hover, .purchase-option:active, .purchase-primary:active, .purchase-secondary:active, .purchase-heading:hover .purchase-product-image, .purchase-steps .current > span { transform: none; }
+}
 
 </style>

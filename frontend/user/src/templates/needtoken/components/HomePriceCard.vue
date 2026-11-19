@@ -1,5 +1,5 @@
 <template>
-  <component :is="available ? 'router-link' : 'article'" :to="available ? target : undefined" :tabindex="available ? undefined : 0" :aria-disabled="!available || undefined" class="home-price-card" :class="{ 'is-unavailable': !available }" :data-product-id="product.id" :data-sku-id="sku?.id" :data-brand="brand" :data-plan="plan">
+  <component :is="available ? 'router-link' : 'article'" :to="available ? target : undefined" :tabindex="available ? undefined : 0" :aria-disabled="!available || undefined" class="home-price-card" :class="{ 'is-unavailable': !available }" :data-product-id="product.id" :data-sku-id="sku?.id" :data-brand="brand" :data-plan="plan" @pointermove="onCardPointerMove">
     <div class="home-price-copy">
       <div class="home-price-topline">
         <span class="home-price-mark" aria-hidden="true">
@@ -67,14 +67,24 @@ const officialChip = computed(() => priceSuffix.value && officialReference.value
 const image = computed(() => getFirstImageUrl(props.product.images))
 watch(image, () => { imageFailed.value = false; imageLoaded.value = false })
 const target = computed(() => ({ path: `/products/${props.product.slug}`, query: { sku: String(sku.value?.id || 0), checkout: '1' } }))
+function onCardPointerMove(event: PointerEvent) {
+  if (event.pointerType === 'touch') return
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  el.style.setProperty('--mx', `${Math.round(event.clientX - rect.left)}px`)
+  el.style.setProperty('--my', `${Math.round(event.clientY - rect.top)}px`)
+}
 </script>
 
 <style scoped>
-.home-price-card { position: relative; display: flex; min-width: 0; min-height: 156px; padding: 16px; border: 1px solid var(--nt-card-border); border-radius: 18px; background: var(--ui-bg-elevated); color: var(--ui-text-primary); box-shadow: var(--nt-card-shadow); transition: transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out), border-color var(--nt-motion-enter, 180ms), background-color var(--nt-motion-enter, 180ms), box-shadow var(--nt-motion-enter, 180ms); }
+.home-price-card { position: relative; display: flex; overflow: hidden; min-width: 0; min-height: 156px; padding: 16px; border: 1px solid var(--nt-card-border); border-radius: 18px; background: var(--ui-bg-elevated); color: var(--ui-text-primary); box-shadow: var(--nt-card-shadow); transition: transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring), border-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), background-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), box-shadow var(--nt-motion-enter, 180ms) var(--nt-motion-ease); }
+.home-price-card::before { content: ''; position: absolute; top: 0; left: 16%; right: 16%; height: 1px; background: var(--nt-card-top-sheen); opacity: 0; transition: opacity 240ms var(--nt-motion-ease); pointer-events: none; z-index: 2; }
+.home-price-card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), var(--nt-card-spotlight), transparent 72%); opacity: 0; transition: opacity 260ms var(--nt-motion-ease); pointer-events: none; z-index: 0; }
 .home-price-card.is-unavailable { border-color: var(--ui-border); opacity: 0.78; }
-.home-price-copy { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; width: 100%; }
+.home-price-copy { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; min-width: 0; width: 100%; }
 .home-price-topline { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; min-width: 0; }
-.home-price-mark { display: grid; width: 22px; height: 22px; place-items: center; transition: transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
+.home-price-mark { display: grid; width: 22px; height: 22px; place-items: center; transition: transform 440ms var(--nt-ease-spring); }
 .home-price-mark :deep(.product-brand-mark), .home-price-mark :deep(.product-brand-symbol) { width: 100%; height: 100%; }
 .home-price-name { min-width: 0; color: var(--ui-text-primary); font-size: 16px; font-weight: 600; line-height: 20px; letter-spacing: 0; overflow-wrap: anywhere; transition: color var(--nt-motion-enter, 180ms); }
 .home-price-tier { color: var(--nt-tier-default); font-size: .9em; font-weight: 500; white-space: nowrap; }
@@ -92,23 +102,26 @@ const target = computed(() => ({ path: `/products/${props.product.slug}`, query:
 .home-price-value { min-width: 0; overflow-wrap: anywhere; }
 .home-price-amount > small { color: var(--ui-text-muted); font-size: 12px; line-height: 16px; font-weight: 400; }
 .home-price-currency { margin-right: 2px; font-size: .58em; font-weight: 500; line-height: 1; white-space: pre; }
-.home-price-art { position: absolute; right: 0; top: 0; width: 72px; height: 56px; pointer-events: none; }
-.home-price-art__fallback { position: absolute; inset: 0; transition: opacity var(--nt-motion-enter, 180ms); }
+.home-price-art { position: absolute; right: 0; top: 0; width: 72px; height: 56px; perspective: 900px; pointer-events: none; }
+.home-price-art__fallback { position: absolute; inset: 0; transition: opacity var(--nt-motion-enter, 180ms), transform 440ms var(--nt-ease-spring); }
 .home-price-art__fallback.is-hidden { opacity: 0; }
-.home-price-art img { position: absolute; right: 0; bottom: 0; width: 64px; height: 52px; opacity: 0; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.14)); transform-origin: 50% 75%; transition: opacity var(--nt-motion-enter, 180ms), transform var(--nt-motion-enter, 180ms) var(--nt-motion-ease, ease-out); }
+.home-price-art img { position: absolute; right: 0; bottom: 0; width: 64px; height: 52px; opacity: 0; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.14)); transform-origin: 50% 75%; transition: opacity var(--nt-motion-enter, 180ms), transform 440ms var(--nt-ease-spring); }
 .home-price-art img.is-loaded { opacity: 1; }
-.home-price-card:focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 4px; transform: translateY(-2px); border-color: var(--nt-card-border-hover); background: var(--nt-surface-hover); box-shadow: var(--nt-card-shadow-hover); }
-.home-price-card:focus-visible .home-price-mark { transform: translateY(-1px) rotate(-4deg); }
+.home-price-card:focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 4px; transform: translateY(-3px); border-color: var(--nt-card-border-hover); background: var(--nt-surface-hover); box-shadow: var(--nt-card-shadow-hover); }
+.home-price-card:focus-visible::before { opacity: 1; }
+.home-price-card:focus-visible .home-price-mark { transform: translateY(-1px) rotate(-5deg) scale(1.04); }
 .home-price-card:focus-visible .home-price-name { color: var(--nt-accent-ink-hover); }
-.home-price-card:focus-visible .home-price-art img { transform: translateY(-2px) rotate(-2deg); }
+.home-price-card:focus-visible .home-price-art img, .home-price-card:focus-visible .home-price-art__fallback { transform: translateY(-2px) rotate(-2deg); }
 @media (hover: hover) {
-  .home-price-card:hover { transform: translateY(-2px); border-color: var(--nt-card-border-hover); background: var(--nt-surface-hover); box-shadow: var(--nt-card-shadow-hover); }
-  .home-price-card:hover .home-price-mark { transform: translateY(-1px) rotate(-4deg); }
+  .home-price-card:hover { transform: translateY(-3px); border-color: var(--nt-card-border-hover); background: var(--nt-surface-hover); box-shadow: var(--nt-card-shadow-hover); }
+  .home-price-card:hover::before, .home-price-card:hover::after { opacity: 1; }
+  .home-price-card:hover .home-price-mark { transform: translateY(-1px) rotate(-5deg) scale(1.04); }
   .home-price-card:hover .home-price-name { color: var(--nt-accent-ink-hover); }
-  .home-price-card:hover .home-price-art img { transform: translateY(-2px) rotate(-2deg); }
+  .home-price-card:hover .home-price-art img { transform: translateY(-3px) rotate(-2.5deg) scale(1.03); }
+  .home-price-card:hover .home-price-art__fallback { transform: translateY(-2px) rotateX(4deg); }
 }
-a.home-price-card:active { transform: translateY(1px); box-shadow: var(--nt-card-shadow); }
-a.home-price-card:active .home-price-mark, a.home-price-card:active .home-price-art img { transform: translateY(0); }
+a.home-price-card:active { transform: translateY(0) scale(0.985); box-shadow: var(--nt-card-shadow); transition-duration: var(--nt-duration-press, 80ms); }
+a.home-price-card:active .home-price-mark, a.home-price-card:active .home-price-art img, a.home-price-card:active .home-price-art__fallback { transform: none; }
 @media (min-width: 1440px) {
   .home-price-card { min-height: 132px; padding: 12px; border-radius: 16px; }
   .home-price-topline { grid-template-columns: 20px minmax(0, 1fr) 13px; gap: 6px; }
@@ -130,7 +143,8 @@ a.home-price-card:active .home-price-mark, a.home-price-card:active .home-price-
   .home-price-amount { font-size: 26px; line-height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-price-card, .home-price-name, .home-price-mark, .home-price-art img, .home-price-art__fallback { transition: none; }
-  .home-price-card:is(:hover, :focus-visible, :active), .home-price-card:is(:hover, :focus-visible, :active) :is(.home-price-mark, .home-price-art img) { transform: none; }
+  .home-price-card, .home-price-card::before, .home-price-card::after, .home-price-name, .home-price-mark, .home-price-art img, .home-price-art__fallback { transition: none; }
+  .home-price-card::after { display: none; }
+  .home-price-card:is(:hover, :focus-visible, :active), .home-price-card:is(:hover, :focus-visible, :active) :is(.home-price-mark, .home-price-art img, .home-price-art__fallback) { transform: none; }
 }
 </style>
