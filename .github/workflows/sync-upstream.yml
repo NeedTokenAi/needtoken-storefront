@@ -1,5 +1,5 @@
-# 每天 00:00 UTC（北京时间 08:00）把上游 dujiao-next 的一个固定提交开成 PR。
-# 没有 id-token，不接触 GCP。不要改成 pull_request_target。
+# 每天 00:00 UTC（北京时间 08:00）把上游 dujiao-next 的一个固定稳定版提交开成 PR。
+# 没有 id-token，不接触生产云凭证。不要改成 pull_request_target。
 # 见 docs/ops/upstream-sync.md。
 name: sync-upstream
 
@@ -48,6 +48,10 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.auth.outputs.mode == 'pat' && secrets.SYNC_GITHUB_TOKEN || github.token }}
           SYNC_AUTH_MODE: ${{ steps.auth.outputs.mode }}
-          UPSTREAM_CHANNEL: ${{ vars.UPSTREAM_CHANNEL }}
+          UPSTREAM_CHANNEL: ${{ vars.UPSTREAM_CHANNEL || 'stable-tags' }}
+          UPSTREAM_MIN_TAG: ${{ vars.UPSTREAM_MIN_TAG }}
           UPSTREAM_REPO: dujiao-next/dujiao-next
+          UPSTREAM_AUTO_MERGE_MAX_FILES: ${{ vars.UPSTREAM_AUTO_MERGE_MAX_FILES || '300' }}
+          CI_DISPATCH_WORKFLOW: ci.yml
+          CI_SUMMARY_TEXT: ci（Verify installer / Verify API / Verify release config / Verify fullstack build）
         run: .github/scripts/sync-upstream.sh
