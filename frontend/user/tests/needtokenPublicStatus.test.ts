@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, matchesTerms, operationalCount, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, publicHistoryDays, publicHistoryIncidents, publicIncidentTone, publicStatusColor, publicStatusFresh, publicStatusTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone } from '../src/templates/needtoken/lib/publicStatus.ts'
+import { fallbackSeriesFromSummary, incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, matchesTerms, operationalCount, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, parsePublicStatusSeries, publicHistoryDays, publicHistoryIncidents, publicIncidentTone, publicStatusColor, publicStatusFresh, publicStatusTone, seriesOverallTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone } from '../src/templates/needtoken/lib/publicStatus.ts'
 
 test('parsePublicStatus keeps component states and does not invent uptime', () => {
   const view = parsePublicStatus({
@@ -291,4 +291,77 @@ test('daily records keep real incident details and severity while uncovered days
   assert.equal(publicStatusColor(days.find(day => day.date === '2026-11-15')!.tone), 'yellow')
   assert.equal(publicStatusColor(days.find(day => day.date === '2026-11-16')!.tone), 'gray')
   assert.equal(days.filter(day => !day.records.length).every(day => day.tone === 'unknown'), true)
+})
+
+test('parsePublicStatusSeries validates 90-day uptime series for GPT (2 groups) and Claude (3 groups)', () => {
+  const gptSeries = parsePublicStatusSeries([
+    {
+      key: 'chatgpt',
+      label: 'ChatGPT',
+      component_count: 16,
+      status: 'operational',
+      uptime_percent: 99.26,
+      days: [
+        { date: '2026-11-18', status: 'operational' },
+        {
+          date: '2026-11-19',
+          status: 'degraded_performance',
+          events: [
+            { id: 'inc-1', name: 'Elevated errors', url: 'https://status.openai.com/incidents/inc-1' },
+            { id: 'bad', name: 'Untrusted', url: 'https://evil.example/phish' },
+          ],
+        },
+        { date: 'invalid-date', status: 'operational' },
+      ],
+    },
+    {
+      key: 'codex',
+      label: 'Codex',
+      component_count: 4,
+      status: 'operational',
+      uptime_percent: 99.94,
+      days: [{ date: '2026-11-19', status: 'operational' }],
+    },
+    { key: 'empty', label: 'Empty', days: [] },
+  ], 'https://status.openai.com/')
+
+  assert.equal(gptSeries.length, 2)
+  assert.equal(gptSeries[0]!.componentCount, 16)
+  assert.equal(gptSeries[0]!.uptimePercent, 99.26)
+  assert.equal(gptSeries[0]!.days.length, 2)
+  assert.equal(publicStatusColor(gptSeries[0]!.days[0]!.status), 'green')
+  assert.equal(publicStatusColor(gptSeries[0]!.days[1]!.status), 'yellow')
+  assert.equal(gptSeries[0]!.days[1]!.events[0]!.url, 'https://status.openai.com/incidents/inc-1')
+  assert.equal(gptSeries[0]!.days[1]!.events[1]!.url, null)
+  assert.equal(seriesOverallTone(gptSeries, true), 'operational')
+  assert.equal(seriesOverallTone(gptSeries, false), 'unknown')
+
+  const claudeSeries = parsePublicStatusSeries([
+    { key: 'claude', label: 'Claude', component_count: 1, status: 'operational', uptime_percent: 99.56, days: [{ date: '2026-11-19', status: 'operational' }] },
+    { key: 'claude_code', label: 'Claude Code', component_count: 1, status: 'partial_outage', uptime_percent: 99.7, days: [{ date: '2026-11-19', status: 'major_outage' }] },
+    { key: 'claude_api', label: 'Claude API', component_count: 1, status: 'operational', uptime_percent: 150, days: [{ date: '2026-11-19', status: 'operational' }] },
+  ], 'https://status.claude.com/')
+  assert.equal(claudeSeries.length, 3)
+  assert.equal(claudeSeries[2]!.uptimePercent, null)
+  assert.equal(seriesOverallTone(claudeSeries, true), 'partial_outage')
+})
+
+test('fallbackSeriesFromSummary preserves official groups without fabricating uptime or green history', () => {
+  const now = Date.parse('2026-11-19T12:00:00Z')
+  const claudeSummary = parsePublicStatus({
+    page: { name: 'Claude' },
+    status: { indicator: 'none', description: 'Operational' },
+    components: [
+      { id: 'rwppv331jlwc', name: 'claude.ai', status: 'operational' },
+      { id: 'yyzkbfz2thpt', name: 'Claude Code', status: 'degraded_performance' },
+      { id: 'k8w3r06qmzrp', name: 'Claude API (api.anthropic.com)', status: 'operational' },
+    ],
+  }, 'https://status.claude.com/')
+  assert.equal(claudeSummary.ok, true)
+  if (!claudeSummary.ok) return
+  const fallback = fallbackSeriesFromSummary(claudeSummary, 'claude', now)
+  assert.deepEqual(fallback.map(item => item.key), ['claude', 'claude_code', 'claude_api'])
+  assert.equal(fallback[1]!.status, 'degraded_performance')
+  assert.equal(fallback.every(item => item.uptimePercent === null), true)
+  assert.equal(fallback.every(item => item.days.length === 90 && item.days.every(d => d.status === 'unknown')), true)
 })

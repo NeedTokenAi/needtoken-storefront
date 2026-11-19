@@ -31,6 +31,7 @@ high_risk_cases=(
   "internal/workflows/checkout.go"
   "internal/modules/catalog/product/store/gormstore/repo.go"
   "scripts/init.sql"
+  "internal/modules/diagnostics/infrastructure/statuspage/series.go"
   "frontend/user/src/templates/needtoken/layout/NeedtokenLayout.vue"
   "frontend/user/src/templates/needtoken/styles/needtoken.css"
   "frontend/user/index.html"

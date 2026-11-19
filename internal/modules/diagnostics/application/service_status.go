@@ -13,7 +13,7 @@ const (
 	statusRetryAfter   = 30 * time.Second
 	statusStaleFor     = 10 * time.Minute
 	statusFetchTimeout = 8 * time.Second
-	statusHistoryWait  = 2 * time.Second
+	statusHistoryWait  = 3 * time.Second
 )
 
 type statusCacheEntry struct {
@@ -82,6 +82,7 @@ func (s *ServiceStatus) refreshStatus(provider diagnosticscontract.ServiceStatus
 		sourceURL = "https://status.claude.com/"
 	}
 	history := diagnosticscontract.ServiceStatusHistory{State: "unavailable", Coverage: "partial", SourceURL: sourceURL + "history", Incidents: []diagnosticscontract.ServiceStatusIncident{}}
+	var series []diagnosticscontract.ServiceStatusSeries
 	var err error
 	if s.source == nil {
 		err = diagnosticscontract.ErrServiceStatusUnavailable
@@ -89,22 +90,45 @@ func (s *ServiceStatus) refreshStatus(provider diagnosticscontract.ServiceStatus
 		summary, err = s.source.Fetch(ctx, provider)
 	}
 	if err == nil {
-		if source, ok := s.source.(diagnosticscontract.ServiceStatusHistorySource); ok {
-			historyCtx, historyCancel := context.WithTimeout(ctx, statusHistoryBudget(ctx))
-			recent, historyErr := source.FetchHistory(historyCtx, provider)
-			historyCancel()
-			if historyErr == nil && recent.State == "ready" {
-				// Recent announcements never establish a complete uptime window.
-				history.State = "ready"
-				history.Incidents = recent.Incidents
+		historySource, hasHistory := s.source.(diagnosticscontract.ServiceStatusHistorySource)
+		seriesSource, hasSeries := s.source.(diagnosticscontract.ServiceStatusSeriesSource)
+		if hasHistory || hasSeries {
+			budget := statusHistoryBudget(ctx)
+			var wg sync.WaitGroup
+			if hasHistory {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					historyCtx, historyCancel := context.WithTimeout(ctx, budget)
+					recent, historyErr := historySource.FetchHistory(historyCtx, provider)
+					historyCancel()
+					if historyErr == nil && recent.State == "ready" {
+						// Recent announcements never establish a complete uptime window.
+						history.State = "ready"
+						history.Incidents = recent.Incidents
+					}
+				}()
 			}
+			if hasSeries {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					seriesCtx, seriesCancel := context.WithTimeout(ctx, budget)
+					fetched, seriesErr := seriesSource.FetchSeries(seriesCtx, provider, summary)
+					seriesCancel()
+					if seriesErr == nil && len(fetched) > 0 {
+						series = fetched
+					}
+				}()
+			}
+			wg.Wait()
 		}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.now().UTC()
 	if err == nil {
-		result := copyStatusSnapshot(diagnosticscontract.ServiceStatusSnapshot{Provider: provider, SourceURL: sourceURL, FetchedAt: now, Summary: summary, History: history}, false)
+		result := copyStatusSnapshot(diagnosticscontract.ServiceStatusSnapshot{Provider: provider, SourceURL: sourceURL, FetchedAt: now, Summary: summary, History: history, Series: series}, false)
 		entry.latest = &result
 		entry.retry = time.Time{}
 	} else {
@@ -152,7 +176,29 @@ func copyStatusSnapshot(value diagnosticscontract.ServiceStatusSnapshot, stale b
 	}
 	value.Summary.Incidents = copyStatusIncidents(value.Summary.Incidents)
 	value.History.Incidents = copyStatusIncidents(value.History.Incidents)
+	value.Series = copyStatusSeries(value.Series)
 	return value
+}
+
+func copyStatusSeries(rows []diagnosticscontract.ServiceStatusSeries) []diagnosticscontract.ServiceStatusSeries {
+	if len(rows) == 0 {
+		return nil
+	}
+	result := append(make([]diagnosticscontract.ServiceStatusSeries, 0, len(rows)), rows...)
+	for index := range result {
+		item := &result[index]
+		if item.UptimePercent != nil {
+			percent := *item.UptimePercent
+			item.UptimePercent = &percent
+		}
+		item.Days = append(make([]diagnosticscontract.ServiceStatusSeriesDay, 0, len(item.Days)), item.Days...)
+		for dayIndex := range item.Days {
+			if len(item.Days[dayIndex].Events) > 0 {
+				item.Days[dayIndex].Events = append(make([]diagnosticscontract.ServiceStatusSeriesEvent, 0, len(item.Days[dayIndex].Events)), item.Days[dayIndex].Events...)
+			}
+		}
+	}
+	return result
 }
 
 func copyStatusIncidents(rows []diagnosticscontract.ServiceStatusIncident) []diagnosticscontract.ServiceStatusIncident {
