@@ -3085,6 +3085,32 @@
         "previous": "前一天",
         "next": "后一天",
         "dayPosition": "{index} / {total}"
+      },
+      "headline": {
+        "gptOperational": "ChatGPT 和 Codex 运行正常",
+        "gptDegraded": "ChatGPT 或 Codex 部分服务波动",
+        "gptOutage": "ChatGPT 或 Codex 存在服务异常",
+        "claudeOperational": "Claude 全线服务运行正常",
+        "claudeDegraded": "Claude 部分服务波动",
+        "claudeOutage": "Claude 部分服务存在异常",
+        "loading": "正在获取官方状态",
+        "unavailable": "暂无法连接官方状态页",
+        "outdated": "状态数据已过期"
+      },
+      "series": {
+        "serviceCount": "{count} 项服务",
+        "uptime": "可用率 {value}%",
+        "daysAgo": "90 天前",
+        "today": "今天",
+        "updatedJustNow": "更新于 刚刚",
+        "updatedMinutesAgo": "更新于 {count} 分钟前",
+        "noIncidentDay": "当日无故障记录",
+        "unknownDayShort": "当日暂无可用率记录",
+        "subtitle": {
+          "claude": "claude.ai",
+          "claude_code": "CLI & IDE",
+          "claude_api": "api.anthropic.com"
+        }
       }
     },
     "radar": {

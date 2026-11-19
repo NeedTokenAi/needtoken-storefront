@@ -3085,6 +3085,32 @@
         "previous": "Previous day",
         "next": "Next day",
         "dayPosition": "{index} / {total}"
+      },
+      "headline": {
+        "gptOperational": "ChatGPT and Codex are operational",
+        "gptDegraded": "Some ChatGPT or Codex services are degraded",
+        "gptOutage": "ChatGPT or Codex experiencing an outage",
+        "claudeOperational": "All Claude services are operational",
+        "claudeDegraded": "Some Claude services are degraded",
+        "claudeOutage": "Some Claude services are experiencing an outage",
+        "loading": "Checking official status",
+        "unavailable": "Official status page unavailable",
+        "outdated": "Status snapshot is outdated"
+      },
+      "series": {
+        "serviceCount": "{count} services",
+        "uptime": "{value}% uptime",
+        "daysAgo": "90 days ago",
+        "today": "Today",
+        "updatedJustNow": "Updated just now",
+        "updatedMinutesAgo": "Updated {count}m ago",
+        "noIncidentDay": "No incidents reported",
+        "unknownDayShort": "No availability record",
+        "subtitle": {
+          "claude": "claude.ai",
+          "claude_code": "CLI & IDE",
+          "claude_api": "api.anthropic.com"
+        }
       }
     },
     "radar": {

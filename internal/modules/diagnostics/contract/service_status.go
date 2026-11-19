@@ -99,15 +99,39 @@ type ServiceStatusSummary struct {
 	Incidents  []ServiceStatusIncident  `json:"incidents"`
 }
 
+type ServiceStatusSeriesEvent struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name"`
+	URL  string `json:"url,omitempty"`
+}
+
+type ServiceStatusSeriesDay struct {
+	Date   string                     `json:"date"`
+	Status string                     `json:"status"`
+	Events []ServiceStatusSeriesEvent `json:"events,omitempty"`
+}
+
+// ServiceStatusSeries carries a 90-day daily availability timeline for a
+// specific official product group (e.g. ChatGPT/Codex or Claude/Claude Code/Claude API).
+type ServiceStatusSeries struct {
+	Key            string                   `json:"key"`
+	Label          string                   `json:"label"`
+	ComponentCount int                      `json:"component_count"`
+	Status         string                   `json:"status"`
+	UptimePercent  *float64                 `json:"uptime_percent,omitempty"`
+	Days           []ServiceStatusSeriesDay `json:"days"`
+}
+
 type ServiceStatusSnapshot struct {
 	Provider  ServiceStatusProvider `json:"provider"`
 	SourceURL string                `json:"source_url"`
 	// FetchedAt is this site's successful retrieval time. Page.UpdatedAt remains
 	// the provider's record-update time and is never relabeled as a health check.
-	FetchedAt time.Time            `json:"fetched_at"`
-	Stale     bool                 `json:"stale"`
-	Summary   ServiceStatusSummary `json:"summary"`
-	History   ServiceStatusHistory `json:"history"`
+	FetchedAt time.Time             `json:"fetched_at"`
+	Stale     bool                  `json:"stale"`
+	Summary   ServiceStatusSummary  `json:"summary"`
+	History   ServiceStatusHistory  `json:"history"`
+	Series    []ServiceStatusSeries `json:"series,omitempty"`
 }
 
 type ServiceStatusSource interface {
@@ -118,6 +142,12 @@ type ServiceStatusSource interface {
 // successfully retrieved current-status summary.
 type ServiceStatusHistorySource interface {
 	FetchHistory(context.Context, ServiceStatusProvider) (ServiceStatusHistory, error)
+}
+
+// Series is optional so an unavailable 90-day uptime feed cannot invalidate a
+// successfully retrieved current-status summary.
+type ServiceStatusSeriesSource interface {
+	FetchSeries(context.Context, ServiceStatusProvider, ServiceStatusSummary) ([]ServiceStatusSeries, error)
 }
 
 type ServiceStatusReader interface {

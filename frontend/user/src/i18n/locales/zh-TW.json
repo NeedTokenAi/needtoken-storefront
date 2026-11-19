@@ -3085,6 +3085,32 @@
         "previous": "前一天",
         "next": "後一天",
         "dayPosition": "{index} / {total}"
+      },
+      "headline": {
+        "gptOperational": "ChatGPT 和 Codex 運作正常",
+        "gptDegraded": "ChatGPT 或 Codex 部分服務波動",
+        "gptOutage": "ChatGPT 或 Codex 存在服務異常",
+        "claudeOperational": "Claude 全線服務運作正常",
+        "claudeDegraded": "Claude 部分服務波動",
+        "claudeOutage": "Claude 部分服務存在異常",
+        "loading": "正在取得官方狀態",
+        "unavailable": "暫無法連線官方狀態頁",
+        "outdated": "狀態資料已過期"
+      },
+      "series": {
+        "serviceCount": "{count} 項服務",
+        "uptime": "可用率 {value}%",
+        "daysAgo": "90 天前",
+        "today": "今天",
+        "updatedJustNow": "更新於 剛剛",
+        "updatedMinutesAgo": "更新於 {count} 分鐘前",
+        "noIncidentDay": "當日無故障記錄",
+        "unknownDayShort": "當日暫無可用率記錄",
+        "subtitle": {
+          "claude": "claude.ai",
+          "claude_code": "CLI & IDE",
+          "claude_api": "api.anthropic.com"
+        }
       }
     },
     "radar": {

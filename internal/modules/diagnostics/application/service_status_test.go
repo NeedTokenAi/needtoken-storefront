@@ -339,3 +339,47 @@ func TestCoreFailureMarksWholeIncidentSnapshotStaleAndExpiresItTogether(t *testi
 		t.Fatal("expired core/history snapshot was still served or history queried after core failure")
 	}
 }
+
+type statusSeriesSourceFixture struct {
+	statusSourceFunc
+	series func(context.Context, diagnosticscontract.ServiceStatusProvider, diagnosticscontract.ServiceStatusSummary) ([]diagnosticscontract.ServiceStatusSeries, error)
+}
+
+func (f statusSeriesSourceFixture) FetchSeries(ctx context.Context, provider diagnosticscontract.ServiceStatusProvider, summary diagnosticscontract.ServiceStatusSummary) ([]diagnosticscontract.ServiceStatusSeries, error) {
+	return f.series(ctx, provider, summary)
+}
+
+func TestStatusCacheDeepCopiesSeriesAndToleratesSeriesFailure(t *testing.T) {
+	pct := 99.56
+	sourceSeries := []diagnosticscontract.ServiceStatusSeries{{
+		Key: "claude", Label: "Claude", ComponentCount: 1, Status: "operational", UptimePercent: &pct,
+		Days: []diagnosticscontract.ServiceStatusSeriesDay{{Date: "2026-11-19", Status: "operational", Events: []diagnosticscontract.ServiceStatusSeriesEvent{{ID: "ev1", Name: "Original event"}}}},
+	}}
+	service := NewServiceStatus(statusSeriesSourceFixture{
+		statusSourceFunc: func(context.Context, diagnosticscontract.ServiceStatusProvider) (diagnosticscontract.ServiceStatusSummary, error) {
+			return fixtureStatusSummary(), nil
+		},
+		series: func(_ context.Context, provider diagnosticscontract.ServiceStatusProvider, _ diagnosticscontract.ServiceStatusSummary) ([]diagnosticscontract.ServiceStatusSeries, error) {
+			if provider == diagnosticscontract.ServiceStatusOpenAI {
+				return nil, errors.New("optional series failed")
+			}
+			return sourceSeries, nil
+		},
+	})
+	first, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusClaude)
+	if err != nil || len(first.Series) != 1 || first.Series[0].UptimePercent == nil || *first.Series[0].UptimePercent != 99.56 {
+		t.Fatalf("series was not cached: %#v %v", first, err)
+	}
+	*sourceSeries[0].UptimePercent = 0
+	sourceSeries[0].Days[0].Events[0].Name = "source mutated"
+	*first.Series[0].UptimePercent = 12.34
+	first.Series[0].Days[0].Events[0].Name = "caller mutated"
+	second, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusClaude)
+	if err != nil || *second.Series[0].UptimePercent != 99.56 || second.Series[0].Days[0].Events[0].Name != "Original event" {
+		t.Fatalf("series cache retained mutable reference: %#v %v", second.Series, err)
+	}
+	fallback, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
+	if err != nil || len(fallback.Summary.Components) != 1 || len(fallback.Series) != 0 {
+		t.Fatalf("optional series failure damaged core summary: %#v %v", fallback, err)
+	}
+}

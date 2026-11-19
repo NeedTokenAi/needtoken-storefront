@@ -423,3 +423,128 @@ export function publicStatusTone(components: PublicStatusComponent[], fresh: boo
   }
   return 'operational'
 }
+
+export interface PublicStatusSeriesEvent {
+  id?: string
+  name: string
+  url: string | null
+}
+
+export interface PublicStatusSeriesDay {
+  date: string
+  status: PublicComponentStatus
+  events: PublicStatusSeriesEvent[]
+}
+
+export interface PublicStatusSeries {
+  key: string
+  label: string
+  componentCount: number
+  status: PublicComponentStatus
+  uptimePercent: number | null
+  days: PublicStatusSeriesDay[]
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+const parseComponentStatus = (value: unknown): PublicComponentStatus => {
+  const raw = shortText(value, 40)
+  return COMPONENT_STATUSES.has(raw as PublicComponentStatus) ? raw as PublicComponentStatus : 'unknown'
+}
+
+/** Parses 90-day product availability series produced by the backend status proxy. */
+export function parsePublicStatusSeries(payload: unknown, sourceUrl: string): PublicStatusSeries[] {
+  if (!Array.isArray(payload)) return []
+  const result: PublicStatusSeries[] = []
+  for (const rawItem of payload) {
+    const item = record(rawItem)
+    const key = shortText(item?.key, 40)
+    const label = shortText(item?.label, 80)
+    if (!item || !key || !label || !Array.isArray(item.days) || !item.days.length) continue
+
+    const days: PublicStatusSeriesDay[] = []
+    for (const rawDay of item.days.slice(-90)) {
+      const day = record(rawDay)
+      const date = shortText(day?.date, 20)
+      if (!day || !ISO_DATE_RE.test(date)) continue
+      const events: PublicStatusSeriesEvent[] = Array.isArray(day.events)
+        ? day.events.slice(0, 5).flatMap((rawEvent): PublicStatusSeriesEvent[] => {
+          const event = record(rawEvent)
+          const name = shortText(event?.name, 500)
+          if (!event || !name) return []
+          const id = shortText(event.id, 80)
+          return [{ ...(id ? { id } : {}), name, url: incidentUrl(event.url, sourceUrl) }]
+        })
+        : []
+      days.push({ date, status: parseComponentStatus(day.status), events })
+    }
+    if (!days.length) continue
+
+    const rawCount = typeof item.component_count === 'number' && Number.isInteger(item.component_count) && item.component_count > 0
+      ? item.component_count
+      : 1
+    const rawUptime = item.uptime_percent
+    const uptimePercent = typeof rawUptime === 'number' && Number.isFinite(rawUptime) && rawUptime >= 0 && rawUptime <= 100
+      ? Math.round(rawUptime * 100) / 100
+      : null
+
+    result.push({
+      key,
+      label,
+      componentCount: rawCount,
+      status: parseComponentStatus(item.status),
+      uptimePercent,
+      days,
+    })
+  }
+  return result
+}
+
+const emptySeriesDays = (now: number): PublicStatusSeriesDay[] => {
+  const dayMs = 24 * 60 * 60 * 1000
+  const today = Math.floor(now / dayMs) * dayMs
+  return Array.from({ length: 90 }, (_, index): PublicStatusSeriesDay => ({
+    date: new Date(today - (89 - index) * dayMs).toISOString().slice(0, 10),
+    status: 'unknown',
+    events: [],
+  }))
+}
+
+/** Graceful fallback grouping from current summary when the optional 90-day uptime feed is unavailable. */
+export function fallbackSeriesFromSummary(summary: PublicStatusSnapshot | null, service: PublicStatusService, now: number): PublicStatusSeries[] {
+  const components = summary?.components ?? []
+  const days = emptySeriesDays(now)
+  if (service === 'gpt') {
+    const groupMembers = (name: string) => {
+      const groups = components.filter(c => c.isGroup && c.name.trim().toLowerCase() === name)
+      const groupIds = new Set(groups.flatMap(g => g.id ? [g.id] : []))
+      const childIds = new Set(groups.flatMap(g => g.childIds ?? []))
+      return components.filter(c => !c.isGroup && ((c.groupId && groupIds.has(c.groupId)) || (c.id && childIds.has(c.id))))
+    }
+    const chatgpt = groupMembers('chatgpt')
+    const codex = groupMembers('codex')
+    const rows: PublicStatusSeries[] = []
+    if (chatgpt.length) rows.push({ key: 'chatgpt', label: 'ChatGPT', componentCount: chatgpt.length, status: publicStatusTone(chatgpt, true), uptimePercent: null, days })
+    if (codex.length) rows.push({ key: 'codex', label: 'Codex', componentCount: codex.length, status: publicStatusTone(codex, true), uptimePercent: null, days })
+    return rows
+  }
+  const findClaude = (id: string, matcher: RegExp) => components.find(c => !c.isGroup && (c.id === id || matcher.test(c.name.trim())))
+  const targets = [
+    { key: 'claude', label: 'Claude', comp: findClaude('rwppv331jlwc', /^claude\.ai$/i) },
+    { key: 'claude_code', label: 'Claude Code', comp: findClaude('yyzkbfz2thpt', /^claude code$/i) },
+    { key: 'claude_api', label: 'Claude API', comp: findClaude('k8w3r06qmzrp', /^claude api\b/i) },
+  ]
+  return targets.flatMap(item => item.comp ? [{
+    key: item.key,
+    label: item.label,
+    componentCount: 1,
+    status: item.comp.status,
+    uptimePercent: null,
+    days,
+  }] : [])
+}
+
+export function seriesOverallTone(series: PublicStatusSeries[], fresh: boolean): PublicComponentStatus {
+  if (!fresh || !series.length) return 'unknown'
+  return publicStatusTone(series.map(item => ({ name: item.label, status: item.status })), fresh)
+}
