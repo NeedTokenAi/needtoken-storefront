@@ -11,10 +11,15 @@
         <nav ref="navRailEl" class="nt-desktop-navigation ml-4 flex items-center gap-0.5 max-[1239px]:hidden" :aria-label="t('needtoken.nav.label')">
           <span class="nt-sliding-thumb nt-nav-thumb" :class="{ 'is-ready': navIndicatorReady }" :style="navIndicatorStyle" aria-hidden="true" />
           <template v-for="node in navNodes" :key="node.key">
-            <RouterLink v-if="node.kind === 'link'" :to="node.path" class="nt-nav-link whitespace-nowrap rounded-full px-3.5 py-1.5 text-[14px] font-medium text-muted-foreground hover:text-foreground" :class="isActive(node) ? 'is-active !text-primary' : ''" :data-nav-active="isActive(node) ? 'true' : undefined" :aria-current="isActive(node) ? 'page' : undefined">{{ node.label }}</RouterLink>
+            <RouterLink v-if="node.kind === 'link'" :to="node.path" class="nt-nav-link inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[14px] font-medium text-muted-foreground hover:text-foreground" :class="isActive(node) ? 'is-active !text-primary' : ''" :data-nav-active="isActive(node) ? 'true' : undefined" :aria-current="isActive(node) ? 'page' : undefined" @click="triggerIconBurst(node.key)">
+              <NavAnimatedIcon :name="node.icon" :active="isActive(node)" :burst="iconBursts[node.key]" />
+              <span>{{ node.label }}</span>
+            </RouterLink>
             <div v-else :ref="el => setGroupEl(node.key, el)" class="relative" @focusout="onGroupFocusOut($event, node.key)" @keydown="onGroupKeydown($event, node.key)">
               <button :id="`nt-nav-${node.key}`" type="button" class="nt-nav-group-button" :class="node.items.some(isActive) ? 'is-active text-primary' : 'text-muted-foreground'" :data-nav-active="node.items.some(isActive) ? 'true' : undefined" :aria-expanded="openGroup === node.key" :aria-controls="`nt-nav-panel-${node.key}`" @click="toggleGroup(node.key)">
-                {{ node.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="openGroup === node.key ? 'rotate-180' : ''" />
+                <NavAnimatedIcon :name="node.icon" :active="node.items.some(isActive) || openGroup === node.key" :burst="iconBursts[node.key]" />
+                <span>{{ node.label }}</span>
+                <ChevronDown class="h-3.5 w-3.5 transition-transform" :class="openGroup === node.key ? 'rotate-180' : ''" />
               </button>
               <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
               <div v-if="openGroup === node.key" :id="`nt-nav-panel-${node.key}`" class="nt-nav-dropdown" :aria-labelledby="`nt-nav-${node.key}`">
@@ -31,10 +36,6 @@
         <div class="ml-auto flex shrink-0 items-center gap-2">
           <RouterLink to="/guest/orders" class="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground max-[419px]:hidden" :aria-label="t('navbar.guestOrders')" :title="t('navbar.guestOrders')">
             <ClipboardList class="h-[18px] w-[18px]" />
-          </RouterLink>
-          <RouterLink to="/cart" class="relative grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-label="t('navbar.cart')">
-            <ShoppingCart class="h-[18px] w-[18px]" />
-            <span v-if="cartCount > 0" class="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{{ cartCount }}</span>
           </RouterLink>
           <div ref="langEl" class="relative max-[1239px]:hidden" @focusout="onLanguageFocusOut">
             <button type="button" class="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-label="t('navbar.selectLanguage')" :aria-expanded="langOpen" aria-controls="nt-language-options" @click="langOpen = !langOpen; openGroup = null">
@@ -58,9 +59,15 @@
             <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
             <nav v-if="moreOpen" id="nt-mobile-navigation" class="nt-mobile-navigation absolute right-0 top-[calc(100%+8px)] z-[60] flex min-w-[230px] flex-col rounded-xl border border-border bg-card p-2" :aria-label="t('needtoken.nav.label')">
               <template v-for="node in navNodes" :key="`m-${node.key}`">
-                <RouterLink v-if="node.kind === 'link'" :to="node.path" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :class="isActive(node) ? '!text-primary' : ''" :aria-current="isActive(node) ? 'page' : undefined" @click="moreOpen = false">{{ node.label }}</RouterLink>
+                <RouterLink v-if="node.kind === 'link'" :to="node.path" class="flex items-center gap-2 rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :class="isActive(node) ? '!text-primary' : ''" :aria-current="isActive(node) ? 'page' : undefined" @click="triggerIconBurst(node.key); moreOpen = false">
+                  <NavAnimatedIcon :name="node.icon" :active="isActive(node)" :burst="iconBursts[node.key]" />
+                  <span>{{ node.label }}</span>
+                </RouterLink>
                 <div v-else class="mt-1 border-t border-border pt-1">
-                  <button type="button" class="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-expanded="mobileGroup === node.key" :aria-controls="`nt-mobile-${node.key}`" @click="mobileGroup = mobileGroup === node.key ? null : node.key">{{ node.label }}<ChevronDown class="h-3.5 w-3.5 transition-transform" :class="mobileGroup === node.key ? 'rotate-180' : ''" /></button>
+                  <button type="button" class="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-expanded="mobileGroup === node.key" :aria-controls="`nt-mobile-${node.key}`" @click="triggerIconBurst(node.key); mobileGroup = mobileGroup === node.key ? null : node.key">
+                    <span class="inline-flex items-center gap-2"><NavAnimatedIcon :name="node.icon" :active="node.items.some(isActive) || mobileGroup === node.key" :burst="iconBursts[node.key]" /><span>{{ node.label }}</span></span>
+                    <ChevronDown class="h-3.5 w-3.5 transition-transform" :class="mobileGroup === node.key ? 'rotate-180' : ''" />
+                  </button>
                   <div v-if="mobileGroup === node.key" :id="`nt-mobile-${node.key}`" class="ml-3 border-l border-border pl-2">
                     <template v-for="item in node.items" :key="`m-${item.key}`">
                       <span v-if="item.disabled" class="nt-mobile-disabled flex items-center justify-between rounded px-3 py-2 text-sm text-muted-foreground" aria-disabled="true">{{ item.label }}<em class="text-[11px] not-italic">{{ item.badge }}</em></span>
@@ -93,17 +100,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { ArrowUpRight, ChevronDown, ClipboardList, Languages, Menu, ShoppingCart, X } from 'lucide-vue-next'
+import { ArrowUpRight, ChevronDown, ClipboardList, Languages, Menu, X } from 'lucide-vue-next'
 import { useAppStore } from '../../../stores/app'
-import { useCartStore } from '../../../stores/cart'
 import { useUserAuthStore } from '../../../stores/userAuth'
 import { getImageUrl } from '../../../utils/image'
 import { authReturnPath as safeAuthReturnPath } from '../../../utils/authReturnPath'
 import { API_PLANS_PATH, API_SERVICES_PATH, CATEGORY_SLUGS, NEEDTOKEN_BRAND_NAME, NEEDTOKEN_BRAND_ICON, NEEDTOKEN_TOUCH_ICON } from '../config'
 import BrandMark from '../components/BrandMark.vue'
+import NavAnimatedIcon, { type NavIconName } from '../components/NavAnimatedIcon.vue'
 import NeedtokenFooter from '../components/NeedtokenFooter.vue'
 import GhostFibersBackground from '../components/GhostFibersBackground.vue'
 import SupportWidget from '../components/SupportWidget.vue'
@@ -118,12 +125,15 @@ import '../styles/needtoken.css'
 const { t } = useI18n()
 const route = useRoute()
 const appStore = useAppStore()
-const cartStore = useCartStore()
 const authStore = useUserAuthStore()
 const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
 const scopeEl = ref<HTMLElement | null>(null)
 const navRailEl = ref<HTMLElement | null>(null)
+const iconBursts = reactive<Record<string, number>>({})
+function triggerIconBurst(key: string) {
+  iconBursts[key] = (iconBursts[key] || 0) + 1
+}
 useNeedtokenEffects(scopeEl)
 const { indicatorStyle: navIndicatorStyle, indicatorReady: navIndicatorReady } = useSlidingIndicator(
   navRailEl,
@@ -164,30 +174,30 @@ watch(() => appStore.isResellerTenant, (isReseller) => {
 }, { immediate: true })
 const support = computed(() => normalizeNeedtokenSupport(appStore.isResellerTenant ? undefined : appStore.config?.needtoken_support, !appStore.isResellerTenant))
 const raiseSupport = computed(() => /^\/(?:products\/|checkout(?:\/|$)|pay(?:ment)?(?:\/|$))/.test(route.path))
-const cartCount = computed(() => cartStore.totalItems)
 
-interface NavLink { kind: 'link'; key: string; path: string; label: string; disabled?: boolean; badge?: string }
-interface NavGroup { kind: 'group'; key: string; label: string; items: NavLink[] }
+interface NavLink { kind: 'link'; key: string; path: string; label: string; icon?: NavIconName; disabled?: boolean; badge?: string }
+interface NavTopLink extends NavLink { icon: NavIconName }
+interface NavGroup { kind: 'group'; key: string; label: string; icon: NavIconName; items: NavLink[] }
 
 const link = (key: string, path: string, label: string, extra: Partial<NavLink> = {}): NavLink => ({ kind: 'link', key, path, label, ...extra })
-const navNodes = computed<(NavLink | NavGroup)[]>(() => [
-  link('home', '/', t('needtoken.nav.home')),
-  { kind: 'group', key: 'personal', label: t('needtoken.nav.personal'), items: [
+const navNodes = computed<(NavTopLink | NavGroup)[]>(() => [
+  { kind: 'link', key: 'home', path: '/', label: t('needtoken.nav.home'), icon: 'home' },
+  { kind: 'group', key: 'personal', label: t('needtoken.nav.personal'), icon: 'personal', items: [
     link('recharge', `/categories/${CATEGORY_SLUGS.recharge}`, t('needtoken.nav.recharge')),
     link('rental', `/categories/${CATEGORY_SLUGS.rental}`, t('needtoken.nav.rental')),
     link('workstation', '', t('needtoken.nav.workstation'), { disabled: true, badge: t('needtoken.nav.comingSoon') }),
   ] },
-  { kind: 'group', key: 'gateway', label: t('needtoken.nav.gateway'), items: [
+  { kind: 'group', key: 'gateway', label: t('needtoken.nav.gateway'), icon: 'gateway', items: [
     link('plans', API_SERVICES_PATH, t('needtoken.nav.plans')),
     link('models', '/models', t('needtoken.nav.models')),
     link('docs', '/docs', t('needtoken.nav.docs')),
   ] },
-  link('radar', '/tools/radar', t('needtoken.nav.radar')),
-  { kind: 'group', key: 'accountCheck', label: t('needtoken.nav.accountCheck'), items: [
+  { kind: 'link', key: 'radar', path: '/tools/radar', label: t('needtoken.nav.radar'), icon: 'radar' },
+  { kind: 'group', key: 'accountCheck', label: t('needtoken.nav.accountCheck'), icon: 'accountCheck', items: [
     link('environment', '/tools/environment', t('needtoken.nav.claudeCheck')),
     link('codexCheck', '/tools/codex-account', t('needtoken.nav.codexCheck')),
   ] },
-  { kind: 'group', key: 'help', label: t('needtoken.nav.help'), items: [
+  { kind: 'group', key: 'help', label: t('needtoken.nav.help'), icon: 'help', items: [
     link('blog', '/blog', t('needtoken.nav.blog')),
     link('faq', '/faq', t('needtoken.nav.faq')),
   ] },
@@ -204,6 +214,7 @@ function setGroupEl(key: string, el: Element | ComponentPublicInstance | null) {
   else groupEls.delete(key)
 }
 function toggleGroup(key: string) {
+  triggerIconBurst(key)
   openGroup.value = openGroup.value === key ? null : key
   langOpen.value = false
 }

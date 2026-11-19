@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeNeedtokenSupport, safeSupportImage, safeSupportLink, supportEmailHref } from '../src/templates/needtoken/lib/supportConfig.ts'
+import { normalizeNeedtokenSupport, OFFICIAL_TELEGRAM_URL, safeSupportImage, safeSupportLink, supportEmailHref } from '../src/templates/needtoken/lib/supportConfig.ts'
 
-test('NeedToken support uses the merchant email until real channels are configured', () => {
+test('NeedToken support uses the merchant email and official Telegram channel by default', () => {
   const support = normalizeNeedtokenSupport(undefined)
   assert.equal(support.businessEmail, 'business@needtoken.ai')
   assert.equal(support.enabled, true)
@@ -10,6 +10,9 @@ test('NeedToken support uses the merchant email until real channels are configur
   assert.equal(support.qqQr, '')
   assert.equal(support.serviceHours, '')
   assert.equal(support.contactUrl, '')
+  assert.equal(support.telegramUrl, OFFICIAL_TELEGRAM_URL)
+  assert.equal(normalizeNeedtokenSupport({ contact_url: 'https://needtoken.ai/faq' }).telegramUrl, OFFICIAL_TELEGRAM_URL)
+  assert.equal(normalizeNeedtokenSupport({ telegram_url: 'https://t.me/CustomSupport' }).telegramUrl, 'https://t.me/CustomSupport')
   assert.equal(normalizeNeedtokenSupport({ enabled: false }).enabled, false)
 })
 
@@ -29,6 +32,7 @@ test('reseller templates cannot inherit NeedToken contact identities', () => {
   assert.equal(support.enabled, false)
   assert.equal(support.businessEmail, '')
   assert.equal(support.wecomQr, '')
+  assert.equal(support.telegramUrl, '')
 })
 
 test('email links encode characters that otherwise become mailto query parameters', () => {

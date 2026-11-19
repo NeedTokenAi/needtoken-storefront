@@ -1808,11 +1808,12 @@
       "darkShort": "深色"
     },
     "footer": {
-      "tagline": "充值服务、成品订购与 API 套餐，一站选购，订单随时可查。",
+      "tagline": "充值服务、成品订购与 Need 网关，一站选购，订单随时可查。",
       "products": "产品与服务",
       "developers": "API 与文档",
       "support": "支持",
-      "console": "API 控制台"
+      "console": "API 控制台",
+      "contact": "联系我们"
     },
     "supply": {
       "pool": "号池",
@@ -2445,7 +2446,9 @@
       "mobileHelp": "打开分享或菜单，选择添加书签",
       "business": "商务合作",
       "scanTitle": "扫码联系",
-      "scanIntro": "扫码添加客服，咨询订单、售后与商务合作。"
+      "scanIntro": "扫码添加客服，咨询订单、售后与商务合作。",
+      "telegramContact": "Telegram 立即联系",
+      "telegramAction": "Telegram 在线咨询"
     },
     "faq": {
       "eyebrow": "帮助中心",

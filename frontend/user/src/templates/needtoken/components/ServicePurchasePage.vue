@@ -127,7 +127,6 @@
           <button type="button" class="purchase-primary nt-button-purchase" :disabled="!requiresLogin && !canOrder" @click="submitPurchase">
             {{ requiresLogin ? t('productDetail.loginToBuy') : t('needtoken.purchaseServices.continueOrder') }}<ArrowRight :size="17" />
           </button>
-          <button v-if="!requiresLogin" type="button" class="purchase-secondary" :disabled="!canOrder" @click="submitCart"><ShoppingBag :size="15" />{{ t('productDetail.addToCart') }}</button>
           <div class="summary-secure"><LockKeyhole :size="13" />{{ t('needtoken.purchaseServices.secureOrder') }}</div>
         </aside>
       </div>
@@ -179,7 +178,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight, CircleHelp, Info, LockKeyhole, Minus, Plus, RotateCw, ShieldCheck, ShoppingBag } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, ArrowUpRight, Bell, Check, ChevronRight, CircleHelp, Info, LockKeyhole, Minus, Plus, RotateCw, ShieldCheck } from 'lucide-vue-next'
 import { postAPI } from '../../../api/product'
 import { useAppStore } from '../../../stores/app'
 import { useProductDetail } from '../../../composables/useProductDetail'
@@ -256,7 +255,7 @@ const {
   selectedSkuWholesaleRules, selectedSkuPromotionFinalPrice, showSelectedSkuMemberBadge,
   isSkuPurchasable, skuStockText, quantityEffectiveLimit, quantityEffectiveMin, handleQuantityInput,
   requiresLogin, canPurchase, cannotPurchaseReason, categoryName, backToListTo, images,
-  addToCart, prepareBuyNow, loadProduct,
+  prepareBuyNow, loadProduct,
 } = useProductDetail({ onLoaded: () => {
   applyRequestedSku()
   void loadSiteNotices()
@@ -371,9 +370,6 @@ watch(() => route.query.checkout, value => {
   if (value === '1') resumeInlineCheckout()
   else inlineCheckout.value = false
 })
-const submitCart = () => {
-  if (canOrder.value) addToCart()
-}
 </script>
 
 <style scoped>

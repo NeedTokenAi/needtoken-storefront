@@ -403,8 +403,7 @@ body.nt-tokens {
 
 /* Primary purchase actions adapt cleanly to both light and dark themes. */
 .nt-scope :is(a, button).nt-button-purchase,
-body.nt-tokens :is(a, button).nt-button-purchase,
-.nt-scope .nt-native-cart a[href="/checkout"] {
+body.nt-tokens :is(a, button).nt-button-purchase {
   border: 1px solid var(--nt-purchase-border);
   background: var(--nt-purchase-bg);
   color: var(--nt-purchase-fg);
@@ -418,15 +417,13 @@ body.nt-tokens :is(a, button).nt-button-purchase,
     transform var(--nt-duration-rebound) var(--nt-ease-spring);
 }
 .nt-scope :is(a, button).nt-button-purchase:hover,
-body.nt-tokens :is(a, button).nt-button-purchase:hover,
-.nt-scope .nt-native-cart a[href="/checkout"]:hover {
+body.nt-tokens :is(a, button).nt-button-purchase:hover {
   background-color: var(--nt-purchase-bg-hover);
   color: var(--nt-purchase-fg);
   border-color: var(--nt-purchase-bg-hover);
 }
 .nt-scope :is(a, button).nt-button-purchase:not(:disabled, [aria-disabled="true"]):active,
-body.nt-tokens :is(a, button).nt-button-purchase:not(:disabled, [aria-disabled="true"]):active,
-.nt-scope .nt-native-cart a[href="/checkout"]:active {
+body.nt-tokens :is(a, button).nt-button-purchase:not(:disabled, [aria-disabled="true"]):active {
   transform: scale(0.975);
   transition-duration: var(--nt-duration-press);
 }
@@ -448,8 +445,7 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
 @media (prefers-reduced-motion: reduce) {
   .nt-scope :is(.nt-brand, .nt-footer-brand):is(:hover, :focus-visible) > img { transform: none; }
   .nt-scope :is(a, button).nt-button-purchase:active,
-  body.nt-tokens :is(a, button).nt-button-purchase:active,
-  .nt-scope .nt-native-cart a[href="/checkout"]:active { transform: none; }
+  body.nt-tokens :is(a, button).nt-button-purchase:active { transform: none; }
 }
 
 /* A painted gradient supplies the glass face even with compositor effects off. */
@@ -558,8 +554,7 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
 }
 @media (forced-colors: active) {
   .nt-scope .nt-glass-pill,
-  .nt-scope :is(a, button).nt-button-purchase,
-  .nt-scope .nt-native-cart a[href="/checkout"] {
+  .nt-scope :is(a, button).nt-button-purchase {
     border: 1px solid ButtonText;
     background: ButtonFace;
     color: ButtonText;

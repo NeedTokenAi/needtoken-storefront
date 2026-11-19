@@ -1808,11 +1808,12 @@
       "darkShort": "Dark"
     },
     "footer": {
-      "tagline": "Top-ups, ready-made accounts and API plans. Shop in one place and track your orders.",
+      "tagline": "Top-ups, ready-made accounts and Need Gateway. Shop in one place and track your orders.",
       "products": "Products & services",
       "developers": "API & docs",
       "support": "Support",
-      "console": "API console"
+      "console": "API console",
+      "contact": "Contact"
     },
     "supply": {
       "pool": "Pool",
@@ -2445,7 +2446,9 @@
       "mobileHelp": "Open Share or the menu and add a bookmark",
       "business": "Business enquiries",
       "scanTitle": "Scan to get in touch",
-      "scanIntro": "Scan a contact code for orders, after-sales support and business enquiries."
+      "scanIntro": "Scan a contact code for orders, after-sales support and business enquiries.",
+      "telegramContact": "Contact on Telegram",
+      "telegramAction": "Chat on Telegram"
     },
     "faq": {
       "eyebrow": "Help center",

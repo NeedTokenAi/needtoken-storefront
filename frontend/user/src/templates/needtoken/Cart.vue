@@ -1,9 +1,14 @@
 <template>
-  <div class="nt-native-page nt-native-cart">
-    <NativeCart />
-  </div>
+  <div class="nt-cart-redirect" aria-hidden="true" />
 </template>
 
 <script setup lang="ts">
-import NativeCart from '@/views/Cart.vue'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+// NeedToken storefront uses an inline single-step checkout flow without a standalone cart page.
+const router = useRouter()
+onMounted(() => {
+  void router.replace('/')
+})
 </script>
