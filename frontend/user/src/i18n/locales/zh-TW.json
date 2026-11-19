@@ -1808,11 +1808,12 @@
       "darkShort": "深色"
     },
     "footer": {
-      "tagline": "儲值服務、成品訂購與 API 套餐，一站選購，隨時查詢訂單。",
+      "tagline": "儲值服務、成品訂購與 Need 網關，一站選購，隨時查詢訂單。",
       "products": "產品與服務",
       "developers": "API 與文件",
       "support": "支援",
-      "console": "API 控制台"
+      "console": "API 控制台",
+      "contact": "聯絡我們"
     },
     "supply": {
       "pool": "號池",
@@ -2445,7 +2446,9 @@
       "mobileHelp": "開啟分享或選單，選擇加入書籤",
       "business": "商務合作",
       "scanTitle": "掃碼聯絡",
-      "scanIntro": "掃碼加入客服，諮詢訂單、售後與商務合作。"
+      "scanIntro": "掃碼加入客服，諮詢訂單、售後與商務合作。",
+      "telegramContact": "Telegram 立即聯絡",
+      "telegramAction": "Telegram 線上諮詢"
     },
     "faq": {
       "eyebrow": "幫助中心",

@@ -19,15 +19,16 @@
       </div>
 
       <div v-if="tab === 'contact'" :id="`${panelId}-content-contact`" class="nt-support-content" role="tabpanel" :aria-labelledby="`${panelId}-tab-contact`" tabindex="0">
-        <div v-if="qrCards.length" class="nt-support-qrs">
-          <figure v-for="card in qrCards" :key="card.key">
-            <div class="nt-support-qr"><img :src="getImageUrl(card.image)" :alt="card.label" width="160" height="160" loading="lazy" decoding="async" referrerpolicy="no-referrer" /></div>
-            <figcaption>{{ card.label }}</figcaption>
+        <div v-if="showWecomQr" class="nt-support-qrs">
+          <figure>
+            <div class="nt-support-qr"><img :src="getImageUrl(support.wecomQr)" :alt="t('needtoken.support.wecom')" width="156" height="156" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="wecomQrFailed = true" /></div>
+            <figcaption>{{ t('needtoken.support.wecom') }}</figcaption>
           </figure>
         </div>
-        <p v-else class="nt-support-empty">{{ t('needtoken.support.emailIntro') }}</p>
+        <p v-else-if="!support.telegramUrl" class="nt-support-empty">{{ t('needtoken.support.emailIntro') }}</p>
         <p v-if="support.serviceHours" class="nt-support-hours"><Clock3 :size="14" />{{ t('needtoken.support.hours', { hours: support.serviceHours }) }}</p>
-        <a v-if="support.contactUrl" :href="support.contactUrl" target="_blank" rel="noopener noreferrer" class="nt-support-action"><MessageCircle :size="17" />{{ t('needtoken.support.openContact') }}<ArrowUpRight :size="16" /></a>
+        <a v-if="support.telegramUrl" :href="support.telegramUrl" target="_blank" rel="noopener noreferrer" class="nt-support-action"><NavAnimatedIcon name="telegram" />{{ t('needtoken.support.telegramAction') }}<ArrowUpRight :size="16" /></a>
+        <a v-else-if="support.contactUrl" :href="support.contactUrl" target="_blank" rel="noopener noreferrer" class="nt-support-action"><MessageCircle :size="17" />{{ t('needtoken.support.openContact') }}<ArrowUpRight :size="16" /></a>
         <a v-else-if="support.businessEmail" :href="emailHref" class="nt-support-action"><Mail :size="17" />{{ t('needtoken.support.sendEmail') }}</a>
         <a v-if="support.businessEmail" :href="emailHref" class="nt-support-email">{{ support.businessEmail }}</a>
         <p class="nt-support-order-note">{{ t('needtoken.support.orderNote') }}</p>
@@ -58,6 +59,7 @@ import { useI18n } from 'vue-i18n'
 import { ArrowUpRight, Clock3, Headset, Mail, MessageCircle, Star, X } from 'lucide-vue-next'
 import { getImageUrl } from '../../../utils/image'
 import { supportEmailHref, type NeedtokenSupport } from '../lib/supportConfig'
+import NavAnimatedIcon from './NavAnimatedIcon.vue'
 
 const props = defineProps<{ support: NeedtokenSupport; raised?: boolean }>()
 const { t } = useI18n()
@@ -77,10 +79,9 @@ let motionQuery: MediaQueryList | undefined
 let pointerQuery: MediaQueryList | undefined
 let eyeObserver: IntersectionObserver | undefined
 const emailHref = computed(() => supportEmailHref(props.support.businessEmail))
-const qrCards = computed(() => [
-  { key: 'wecom', label: t('needtoken.support.wecom'), image: props.support.wecomQr },
-  { key: 'qq', label: t('needtoken.support.qq'), image: props.support.qqQr },
-].filter(card => !!card.image))
+const wecomQrFailed = ref(false)
+watch(() => props.support.wecomQr, () => { wecomQrFailed.value = false })
+const showWecomQr = computed(() => Boolean(props.support.wecomQr) && !wecomQrFailed.value)
 
 function close(restoreFocus = false) {
   open.value = false

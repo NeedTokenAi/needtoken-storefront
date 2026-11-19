@@ -1,10 +1,23 @@
+export const OFFICIAL_TELEGRAM_URL = 'https://t.me/NeedTokenAI'
+
 export interface NeedtokenSupport {
   enabled: boolean
   businessEmail: string
   serviceHours: string
   contactUrl: string
+  telegramUrl: string
   wecomQr: string
   qqQr: string
+}
+
+function isTelegramUrl(value: string): boolean {
+  if (!value) return false
+  try {
+    const host = new URL(value).hostname.toLowerCase()
+    return host === 't.me' || host === 'telegram.me' || host === 'telegram.dog'
+  } catch {
+    return false
+  }
 }
 
 export function safeSupportLink(value: unknown): string {
@@ -32,11 +45,15 @@ export function normalizeNeedtokenSupport(raw: unknown, useBrandDefault = true):
   const config = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
   const candidate = typeof config.business_email === 'string' ? config.business_email.trim() : ''
   const email = candidate.length <= 254 && /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(candidate) ? candidate : ''
+  const contactUrl = safeSupportLink(config.contact_url)
+  const configuredTelegram = safeSupportLink(config.telegram_url)
+  const telegramUrl = configuredTelegram || (isTelegramUrl(contactUrl) ? contactUrl : useBrandDefault ? OFFICIAL_TELEGRAM_URL : '')
   return {
     enabled: config.enabled !== false && useBrandDefault,
     businessEmail: email || (useBrandDefault ? 'business@needtoken.ai' : ''),
     serviceHours: typeof config.service_hours === 'string' ? config.service_hours.trim().slice(0, 160) : '',
-    contactUrl: safeSupportLink(config.contact_url),
+    contactUrl,
+    telegramUrl,
     wecomQr: safeSupportImage(config.wecom_qr),
     qqQr: safeSupportImage(config.qq_qr),
   }

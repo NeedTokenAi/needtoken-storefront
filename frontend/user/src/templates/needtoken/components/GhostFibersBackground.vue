@@ -1,178 +1,260 @@
 <template>
-  <div ref="container" class="nt-fiber-background" :class="[`nt-fiber--${variant}`, { 'nt-fiber--ready': ready }]" :data-renderer="ready ? 'webgl2' : 'poster'" :data-motion="moving ? 'running' : 'static'" aria-hidden="true">
-    <div class="nt-fiber-haze" />
-    <img v-if="!posterFailed" class="nt-fiber-poster" src="/needtoken-prism.webp" alt="" loading="lazy" decoding="async" @error="posterFailed = true" />
-    <div v-for="(ribbon, layer) in (posterFailed ? ribbons : [])" :key="layer" class="nt-fiber-layer" :class="`nt-fiber-layer--${layer}`">
-      <svg viewBox="0 0 1600 950" preserveAspectRatio="xMidYMid slice" fill="none" focusable="false">
-        <defs>
-          <linearGradient :id="`${id}-ribbon-${layer}`" x1="70" y1="850" x2="1510" y2="80" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#8b6ce8" stop-opacity="0.12" />
-            <stop offset="0.23" stop-color="#a5b6ec" stop-opacity="0.7" />
-            <stop offset="0.37" stop-color="#dcecf1" />
-            <stop offset="0.52" stop-color="#34d8bb" stop-opacity="0.45" />
-            <stop offset="0.7" stop-color="#9c82df" stop-opacity="0.6" />
-            <stop offset="0.87" stop-color="#d8ecef" stop-opacity="0.9" />
-            <stop offset="1" stop-color="#2dd4bf" stop-opacity="0.05" />
-          </linearGradient>
-        </defs>
-        <path v-for="(fiber, index) in ribbon" :key="index" :d="fiber.path" :stroke="`url(#${id}-ribbon-${layer})`" :stroke-width="fiber.width" :opacity="fiber.opacity" :stroke-dasharray="fiber.dashed ? '1 5' : undefined" stroke-linecap="round" vector-effect="non-scaling-stroke" />
-      </svg>
-    </div>
-    <canvas ref="canvas" class="nt-fiber-canvas" @webglcontextlost="onContextLost" />
+  <div
+    ref="container"
+    class="nt-fiber-background"
+    :class="[`nt-fiber--${variant}`, { 'nt-fiber--animated': animated, 'nt-fiber--lit': lit }]"
+    data-renderer="css-field"
+    :data-motion="animated ? 'running' : 'static'"
+    aria-hidden="true"
+  >
+    <div class="nt-hero-aurora nt-hero-aurora--primary" />
+    <div class="nt-hero-aurora nt-hero-aurora--secondary" />
+    <div class="nt-hero-grid" />
+    <div class="nt-hero-dots" />
+    <div v-if="variant === 'hero'" class="nt-hero-dots-lit" />
+    <div v-if="variant === 'hero'" class="nt-hero-spotlight" />
+    <div v-if="variant === 'hero'" class="nt-hero-beam" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useId } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ghostFibersPolicy } from '../lib/ghostFibersPolicy'
-import type { GhostFibersController } from '../lib/ghostFibersRenderer.js'
 
 const props = withDefaults(defineProps<{ variant?: 'hero' | 'subtle' }>(), { variant: 'subtle' })
-const id = `nt-fibers-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
 const container = ref<HTMLElement | null>(null)
-const canvas = ref<HTMLCanvasElement | null>(null)
-const ready = ref(false)
-const posterFailed = ref(false)
-const inView = ref(false)
-const pageVisible = ref(false)
-const motionAllowed = ref(false)
-const heldStatic = ref(false)
-const moving = computed(() => ready.value && inView.value && pageVisible.value && motionAllowed.value && !heldStatic.value)
-let renderer: GhostFibersController | null = null
+const inView = ref(true)
+const pageVisible = ref(true)
+const motionAllowed = ref(true)
+const finePointer = ref(false)
+const lit = ref(false)
+const animated = computed(() => props.variant === 'hero' && inView.value && pageVisible.value && motionAllowed.value)
+
 let intersection: IntersectionObserver | undefined
 let motionQuery: MediaQueryList | undefined
 let pointerQuery: MediaQueryList | undefined
 interface ConnectionHint extends EventTarget { saveData?: boolean }
 let connection: ConnectionHint | undefined
+let rafId = 0
+let pointerX = 0
+let pointerY = 0
 let disposed = false
-let failed = false
-let initializing = false
-let idle: number | undefined
-let idleUsesTimeout = false
-let policy = ghostFibersPolicy({ subtle: props.variant === 'subtle' })
 
-// Static vectors remain available if the exported WebP cannot load.
-const ribbons = [26, 20, 18].map((count, layer) => Array.from({ length: count }, (_, index) => {
-  const offset = index - (count - 1) / 2
-  const points = Array.from({ length: 53 }, (_, sample) => {
-    const t = sample / 52
-    const x = -130 + t * 1860
-    const twist = Math.sin(t * 7.3 + layer * 1.6)
-    const y = 870 - t * 830 + Math.sin(t * 9 + layer * 1.9) * (120 + layer * 16)
-      + offset * (6 + 8 * twist) + layer * 95
-    return `${sample ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`
-  })
-  return {
-    path: points.join(' '),
-    width: index % 7 === 0 ? 1.2 : 0.7,
-    opacity: index % 7 === 0 ? 0.74 : 0.22 + (index % 4) * 0.08,
-    dashed: index % 3 === 0,
-  }
-}))
-
-function fallback() {
-  ready.value = false
-  failed = true
-  renderer?.destroy()
-  renderer = null
-}
-function onContextLost(event: Event) {
-  event.preventDefault()
-  if (!disposed) fallback()
-}
-async function initialize() {
-  idle = undefined
-  if (disposed || failed || initializing || renderer || !inView.value || !pageVisible.value || !policy.animate) return
-  initializing = true
-  try {
-    // GPU code is a separate chunk and only loads for visible, capable devices.
-    const { createGhostFibers } = await import('../lib/ghostFibersRenderer.js')
-    if (disposed || !inView.value || !pageVisible.value || !policy.animate || !container.value || !canvas.value) return
-    renderer = createGhostFibers(container.value, canvas.value, {
-      active: true, maxDimension: policy.maxDimension, maxFps: policy.maxFps, dpr: policy.dpr,
-      onReady: () => { if (!disposed) ready.value = true },
-      onStatic: () => { heldStatic.value = true },
-      onFallback: fallback,
-    })
-    if (!renderer) fallback()
-  } catch { fallback() } finally { initializing = false }
-}
-function sync() {
+function syncPolicy() {
   if (disposed) return
   const hardware = navigator as Navigator & { deviceMemory?: number }
-  policy = ghostFibersPolicy({
-    reducedMotion: motionQuery?.matches, saveData: connection?.saveData,
-    hardwareConcurrency: hardware.hardwareConcurrency, deviceMemory: hardware.deviceMemory,
-    coarsePointer: pointerQuery?.matches, subtle: props.variant === 'subtle',
+  const policy = ghostFibersPolicy({
+    reducedMotion: motionQuery?.matches,
+    saveData: connection?.saveData,
+    hardwareConcurrency: hardware.hardwareConcurrency,
+    deviceMemory: hardware.deviceMemory,
+    coarsePointer: pointerQuery?.matches === false,
+    subtle: props.variant === 'subtle',
   })
   motionAllowed.value = policy.animate
+  finePointer.value = pointerQuery?.matches ?? false
   pageVisible.value = !document.hidden
-  const active = inView.value && pageVisible.value
-  if (renderer) {
-    renderer.setReducedMotion(!policy.animate || heldStatic.value)
-    renderer.setActive(active)
-  } else if (active && policy.animate && !failed && !initializing && idle === undefined) {
-    if (typeof window.requestIdleCallback === 'function') idle = window.requestIdleCallback(() => { void initialize() }, { timeout: 700 })
-    else { idleUsesTimeout = true; idle = window.setTimeout(() => { void initialize() }, 80) }
+  if (!animated.value || !finePointer.value) lit.value = false
+}
+
+function flushPointer() {
+  rafId = 0
+  const el = container.value
+  if (!el || !animated.value || !finePointer.value) return
+  const rect = el.getBoundingClientRect()
+  if (
+    pointerX < rect.left || pointerX > rect.right ||
+    pointerY < rect.top || pointerY > rect.bottom
+  ) {
+    lit.value = false
+    return
   }
+  el.style.setProperty('--nt-hero-x', `${Math.round(pointerX - rect.left)}px`)
+  el.style.setProperty('--nt-hero-y', `${Math.round(pointerY - rect.top)}px`)
+  lit.value = true
 }
-function observeMedia(query: MediaQueryList, observe: boolean) {
-  if (typeof query.addEventListener === 'function') {
-    if (observe) query.addEventListener('change', sync)
-    else query.removeEventListener('change', sync)
-  } else if (observe) query.addListener(sync)
-  else query.removeListener(sync)
+
+function onPointerMove(event: PointerEvent) {
+  if (event.pointerType === 'touch' || !animated.value || !finePointer.value) return
+  pointerX = event.clientX
+  pointerY = event.clientY
+  if (!rafId) rafId = window.requestAnimationFrame(flushPointer)
 }
+
+function onPointerLeave() {
+  lit.value = false
+}
+
 onMounted(() => {
   motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
-  pointerQuery = window.matchMedia('(pointer: coarse)')
+  pointerQuery = window.matchMedia('(hover: hover) and (pointer: fine)')
   connection = (navigator as Navigator & { connection?: ConnectionHint }).connection
-  observeMedia(motionQuery, true)
-  observeMedia(pointerQuery, true)
-  connection?.addEventListener('change', sync)
-  document.addEventListener('visibilitychange', sync)
+  motionQuery.addEventListener?.('change', syncPolicy)
+  pointerQuery.addEventListener?.('change', syncPolicy)
+  connection?.addEventListener?.('change', syncPolicy)
+  document.addEventListener('visibilitychange', syncPolicy)
+
   if ('IntersectionObserver' in window && container.value) {
-    intersection = new IntersectionObserver(([entry]) => { inView.value = Boolean(entry?.isIntersecting); sync() })
+    intersection = new IntersectionObserver(([entry]) => {
+      inView.value = Boolean(entry?.isIntersecting)
+      syncPolicy()
+    })
     intersection.observe(container.value)
-  } else inView.value = true
-  sync()
+  }
+  if (props.variant === 'hero') {
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
+    document.addEventListener('pointerleave', onPointerLeave)
+  }
+  syncPolicy()
 })
+
 onUnmounted(() => {
   disposed = true
-  if (idle !== undefined) {
-    if (idleUsesTimeout) window.clearTimeout(idle)
-    else window.cancelIdleCallback(idle)
-  }
+  if (rafId) window.cancelAnimationFrame(rafId)
   intersection?.disconnect()
-  if (motionQuery) observeMedia(motionQuery, false)
-  if (pointerQuery) observeMedia(pointerQuery, false)
-  connection?.removeEventListener('change', sync)
-  document.removeEventListener('visibilitychange', sync)
-  renderer?.destroy()
-  renderer = null
+  motionQuery?.removeEventListener?.('change', syncPolicy)
+  pointerQuery?.removeEventListener?.('change', syncPolicy)
+  connection?.removeEventListener?.('change', syncPolicy)
+  document.removeEventListener('visibilitychange', syncPolicy)
+  window.removeEventListener('pointermove', onPointerMove)
+  document.removeEventListener('pointerleave', onPointerLeave)
 })
 </script>
 
 <style>
-.nt-fiber-background { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; contain: paint; background: var(--ui-bg-page); }
-.nt-fiber-haze { position: absolute; inset: 0; background: radial-gradient(ellipse at 14% 18%, rgba(13, 148, 115, 0.08), transparent 48%), radial-gradient(ellipse at 88% 8%, rgba(114, 92, 212, 0.06), transparent 44%); }
-.nt-fiber-poster, .nt-fiber-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-.nt-fiber-poster { object-fit: cover; opacity: 0; transition: opacity 800ms ease; }
-.nt-fiber-canvas { opacity: 0; transition: opacity 1100ms ease; }
-.nt-fiber-layer { position: absolute; inset: -7%; opacity: 0; }
-.nt-fiber-layer svg { display: block; width: 100%; height: 100%; }
-.nt-fiber-background::after { position: absolute; inset: 0; content: ''; background: linear-gradient(180deg, transparent, transparent 62%, var(--ui-bg-page)); }
-.nt-fiber--subtle { max-height: 1100px; opacity: .55; }
+.nt-fiber-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: paint;
+  background: var(--ui-bg-page);
+  --nt-hero-x: 50%;
+  --nt-hero-y: 22%;
+  --nt-field-dot: rgba(15, 23, 20, 0.13);
+  --nt-field-dot-lit: rgba(13, 148, 115, 0.56);
+  --nt-field-grid: rgba(15, 23, 20, 0.048);
+  --nt-field-aurora-a: radial-gradient(ellipse 56% 52% at 18% 12%, rgba(13, 148, 115, 0.14), transparent 72%);
+  --nt-field-aurora-b: radial-gradient(ellipse 52% 48% at 84% 10%, rgba(14, 165, 233, 0.11), transparent 72%);
+  --nt-field-spot: radial-gradient(340px circle at var(--nt-hero-x) var(--nt-hero-y), rgba(13, 148, 115, 0.11), transparent 72%);
+  --nt-field-beam: linear-gradient(90deg, transparent 8%, rgba(13, 148, 115, 0.28) 50%, transparent 92%);
+}
 
-html.dark .nt-fiber-background { background: #07090d; }
-html.dark .nt-fiber-haze { background: radial-gradient(ellipse at 17% 88%, #8067d31a, transparent 45%), radial-gradient(ellipse at 89% 6%, #27aea11c, transparent 43%); }
-html.dark .nt-fiber-poster { opacity: .9; }
-html.dark .nt-fiber--ready .nt-fiber-canvas { opacity: 1; }
-html.dark .nt-fiber--ready .nt-fiber-poster, html.dark .nt-fiber--ready .nt-fiber-layer { opacity: 0; }
-html.dark .nt-fiber-layer { opacity: .65; }
-html.dark .nt-fiber-layer--1 { opacity: .4; }
-html.dark .nt-fiber-layer--2 { opacity: .24; }
-html.dark .nt-fiber-background::after { background: linear-gradient(180deg, #07090d08, #07090d18 32%, #07090d08 68%, #07090d); }
-html.dark .nt-fiber--subtle { opacity: .36; }
-@media (prefers-reduced-motion: reduce) { .nt-fiber-canvas, .nt-fiber-poster { transition: none; } }
+html.dark .nt-fiber-background {
+  --nt-field-dot: rgba(148, 163, 184, 0.17);
+  --nt-field-dot-lit: rgba(45, 212, 167, 0.68);
+  --nt-field-grid: rgba(148, 163, 184, 0.055);
+  --nt-field-aurora-a: radial-gradient(ellipse 58% 54% at 18% 14%, rgba(45, 212, 167, 0.17), transparent 70%);
+  --nt-field-aurora-b: radial-gradient(ellipse 54% 48% at 84% 8%, rgba(56, 189, 248, 0.12), transparent 70%);
+  --nt-field-spot: radial-gradient(360px circle at var(--nt-hero-x) var(--nt-hero-y), rgba(45, 212, 167, 0.14), transparent 72%);
+  --nt-field-beam: linear-gradient(90deg, transparent 8%, rgba(94, 234, 212, 0.34) 50%, transparent 92%);
+}
+
+.nt-hero-aurora {
+  position: absolute;
+  inset: -12% -8% -8%;
+  will-change: transform;
+  mask-image: radial-gradient(ellipse 84% 82% at 50% 22%, #000 38%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 84% 82% at 50% 22%, #000 38%, transparent 100%);
+}
+.nt-hero-aurora--primary {
+  background: var(--nt-field-aurora-a);
+}
+.nt-hero-aurora--secondary {
+  background: var(--nt-field-aurora-b);
+}
+
+.nt-hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--nt-field-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--nt-field-grid) 1px, transparent 1px);
+  background-size: 112px 112px;
+  mask-image: radial-gradient(ellipse 84% 78% at 50% 18%, #000 22%, transparent 92%);
+  -webkit-mask-image: radial-gradient(ellipse 84% 78% at 50% 18%, #000 22%, transparent 92%);
+}
+
+.nt-hero-dots,
+.nt-hero-dots-lit {
+  position: absolute;
+  inset: 0;
+  background-size: 28px 28px;
+}
+
+.nt-hero-dots {
+  background-image: radial-gradient(circle at 1px 1px, var(--nt-field-dot) 1.05px, transparent 1.15px);
+  mask-image: radial-gradient(ellipse 82% 76% at 50% 20%, #000 28%, transparent 94%);
+  -webkit-mask-image: radial-gradient(ellipse 82% 76% at 50% 20%, #000 28%, transparent 94%);
+}
+
+.nt-hero-dots-lit {
+  background-image: radial-gradient(circle at 1px 1px, var(--nt-field-dot-lit) 1.25px, transparent 1.35px);
+  mask-image: radial-gradient(240px circle at var(--nt-hero-x) var(--nt-hero-y), #000 0%, transparent 78%);
+  -webkit-mask-image: radial-gradient(240px circle at var(--nt-hero-x) var(--nt-hero-y), #000 0%, transparent 78%);
+  opacity: 0;
+  transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nt-hero-spotlight {
+  position: absolute;
+  inset: 0;
+  background: var(--nt-field-spot);
+  opacity: 0;
+  transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nt-fiber--lit .nt-hero-dots-lit,
+.nt-fiber--lit .nt-hero-spotlight {
+  opacity: 1;
+}
+
+.nt-hero-beam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--nt-field-beam);
+  opacity: 0.72;
+}
+
+.nt-fiber-background::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(180deg, transparent 0%, transparent 64%, var(--ui-bg-page) 100%);
+}
+
+.nt-fiber--subtle {
+  max-height: 760px;
+  opacity: 0.62;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nt-fiber--animated .nt-hero-aurora--primary {
+    animation: nt-aurora-drift-a 18s ease-in-out infinite alternate;
+  }
+  .nt-fiber--animated .nt-hero-aurora--secondary {
+    animation: nt-aurora-drift-b 22s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes nt-aurora-drift-a {
+  from { transform: translate3d(-1.8%, -1%, 0) scale(1); }
+  to { transform: translate3d(2.4%, 1.8%, 0) scale(1.04); }
+}
+
+@keyframes nt-aurora-drift-b {
+  from { transform: translate3d(1.6%, 1.2%, 0) scale(1.03); }
+  to { transform: translate3d(-2.2%, -1.4%, 0) scale(0.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-hero-dots-lit,
+  .nt-hero-spotlight {
+    display: none;
+  }
+}
 </style>

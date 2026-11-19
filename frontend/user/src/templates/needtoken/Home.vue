@@ -16,9 +16,9 @@
         <div class="library-toolbar">
           <nav ref="libraryTabsEl" class="library-tabs" :class="{ 'has-thumb': libraryThumbVisible }" :aria-label="t('needtoken.homeLibrary.tabs')">
             <span class="nt-sliding-thumb library-tabs-thumb" :class="{ 'is-ready': libraryThumbReady }" :style="libraryThumbStyle" aria-hidden="true" />
-            <button type="button" :aria-pressed="kind === 'recharge'" :class="{ active: kind === 'recharge' }" @click="setKind('recharge')"><Zap :size="16" aria-hidden="true" />{{ t('needtoken.nav.recharge') }}</button>
-            <button type="button" :aria-pressed="kind === 'rental'" :class="{ active: kind === 'rental' }" @click="setKind('rental')"><PackageCheck :size="16" aria-hidden="true" />{{ t('needtoken.nav.rental') }}</button>
-            <a href="https://needtoken.ai/api-services"><KeyRound :size="16" aria-hidden="true" />{{ t('needtoken.nav.plans') }}<ArrowUpRight :size="13" aria-hidden="true" /></a>
+            <button type="button" :aria-pressed="kind === 'recharge'" :class="{ active: kind === 'recharge' }" @click="onSelectKind('recharge')"><NavAnimatedIcon name="recharge" :active="kind === 'recharge'" :burst="tabBursts.recharge" />{{ t('needtoken.nav.recharge') }}</button>
+            <button type="button" :aria-pressed="kind === 'rental'" :class="{ active: kind === 'rental' }" @click="onSelectKind('rental')"><NavAnimatedIcon name="rental" :active="kind === 'rental'" :burst="tabBursts.rental" />{{ t('needtoken.nav.rental') }}</button>
+            <RouterLink :to="API_SERVICES_PATH" @click="tabBursts.gateway++"><NavAnimatedIcon name="gateway" :burst="tabBursts.gateway" />{{ t('needtoken.nav.gateway') }}<ArrowUpRight :size="13" aria-hidden="true" /></RouterLink>
           </nav>
           <div class="library-payment-controls">
             <PaymentMethodStrip compact mobile-inline />
@@ -113,12 +113,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowRight, ArrowUpRight, BadgeCheck, ClipboardList, Clock3, Pause, Play, Plus, ReceiptText, ShieldCheck, KeyRound, PackageCheck, Zap } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, BadgeCheck, ClipboardList, Clock3, Pause, Play, Plus, ReceiptText, ShieldCheck } from 'lucide-vue-next'
 import { useLocalized } from '../../composables/useProduct'
 import { usePageSeo } from '../../composables/usePageSeo'
+import { API_SERVICES_PATH } from './config'
 import HomePriceCard from './components/HomePriceCard.vue'
+import NavAnimatedIcon from './components/NavAnimatedIcon.vue'
 import NeedtokenSkeleton from './components/NeedtokenSkeleton.vue'
 import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import { useHomeCatalog } from './composables/useHomeCatalog'
@@ -135,6 +137,11 @@ const homeEl = ref<HTMLElement | null>(null)
 const libraryTabsEl = ref<HTMLElement | null>(null)
 useScrollReveal(homeEl)
 const { kind, scope, childCategories, selectedId, products, categoriesLoading, loading, error, setKind, selectCategory, prefetchCategory, reload } = useHomeCatalog()
+const tabBursts = reactive({ recharge: 0, rental: 0, gateway: 0 })
+function onSelectKind(nextKind: 'recharge' | 'rental') {
+  tabBursts[nextKind]++
+  setKind(nextKind)
+}
 const { indicatorStyle: libraryThumbStyle, indicatorReady: libraryThumbReady, indicatorVisible: libraryThumbVisible } = useSlidingIndicator(
   libraryTabsEl,
   'button.active',
@@ -224,7 +231,7 @@ onUnmounted(() => {
 .nt-home { --home-secondary: var(--ui-text-secondary, #b4bfcc); --home-muted: var(--ui-text-muted, #7d8a99); }
 .home-container { width: 100%; max-width: var(--nt-content-max-width, 1200px); margin-inline: auto; padding-inline: 24px; }
 .home-hero { position: relative; isolation: isolate; }
-.home-hero :deep(.nt-fiber-background) { opacity: .45; }
+.home-hero :deep(.nt-fiber-background) { opacity: 1; }
 .hero-content { position: relative; z-index: 1; padding-block: 48px 24px; }
 .library-head { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: 32px; }
 .hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-text-primary); font-size: 24px; font-weight: 600; letter-spacing: 0; }
