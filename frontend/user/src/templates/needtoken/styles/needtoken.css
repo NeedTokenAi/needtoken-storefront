@@ -90,10 +90,14 @@ body.nt-tokens {
   --nt-tier-20x: #966622;
   --nt-tier-50x: #7c4d93;
 
-  --nt-benefit-bg: #ffffff;
-  --nt-benefit-border: rgba(15, 23, 20, 0.1);
-  --nt-benefit-fg: #1c2b25;
-  --nt-benefit-icon: #0d9473;
+  --nt-benefit-bg: linear-gradient(180deg, #fbe289 0%, #f1c64a 100%);
+  --nt-benefit-bg-hover: linear-gradient(180deg, #fce89d 0%, #f4cd5a 100%);
+  --nt-benefit-border: rgba(180, 125, 12, 0.44);
+  --nt-benefit-border-hover: rgba(154, 101, 16, 0.68);
+  --nt-benefit-fg: #2b1f06;
+  --nt-benefit-icon: #5c410b;
+  --nt-benefit-shadow: inset 0 1px 0 rgba(255, 251, 232, 0.72), 0 1px 2px rgba(120, 82, 8, 0.08), 0 6px 16px -10px rgba(180, 125, 12, 0.28);
+  --nt-benefit-shadow-hover: inset 0 1px 0 rgba(255, 252, 240, 0.86), 0 4px 12px -4px rgba(180, 125, 12, 0.22), 0 10px 22px -12px rgba(180, 125, 12, 0.34);
 
   --nt-pill-bg: linear-gradient(165deg, #ffffff, #f2f6f4);
   --nt-pill-bg-hover: linear-gradient(165deg, #f0f9f5, #e4f3ec);
@@ -202,10 +206,14 @@ body.nt-tokens {
   --nt-tier-20x: #e4bd6b;
   --nt-tier-50x: #c6a7e2;
 
-  --nt-benefit-bg: rgba(14, 18, 24, 0.8);
-  --nt-benefit-border: rgba(148, 163, 184, 0.16);
-  --nt-benefit-fg: #d7e1ec;
-  --nt-benefit-icon: #2dd4a7;
+  --nt-benefit-bg: linear-gradient(145deg, #f3cd5d 0%, #e4b234 100%);
+  --nt-benefit-bg-hover: linear-gradient(145deg, #f7d672 0%, #ebbe46 100%);
+  --nt-benefit-border: rgba(255, 229, 143, 0.52);
+  --nt-benefit-border-hover: rgba(255, 238, 173, 0.8);
+  --nt-benefit-fg: #1c1506;
+  --nt-benefit-icon: #423007;
+  --nt-benefit-shadow: inset 0 1px 0 rgba(255, 248, 214, 0.42), 0 2px 10px rgba(0, 0, 0, 0.28), 0 8px 20px -12px rgba(243, 203, 87, 0.36);
+  --nt-benefit-shadow-hover: inset 0 1px 0 rgba(255, 250, 224, 0.56), 0 4px 14px rgba(0, 0, 0, 0.36), 0 12px 26px -12px rgba(243, 203, 87, 0.48);
 
   --nt-pill-bg: linear-gradient(165deg, #253239, #182329 68%, #162126);
   --nt-pill-bg-hover: linear-gradient(165deg, #324a49, #203735);
@@ -378,6 +386,16 @@ body.nt-tokens {
 
 @media (prefers-reduced-motion: reduce) {
   .nt-scope details > summary > svg { transition: none; }
+}
+
+/* 回落至 classic 视图或原生包装页时，移除根容器纯色底，避免在内容区内遮挡全宽极光背景 */
+.nt-scope .nt-page-content > .bg-background,
+.nt-scope .nt-page-content > .nt-native-page > .bg-background {
+  background-color: transparent;
+}
+.nt-scope .nt-page-content > .bg-background:not(.theme-auth-page),
+.nt-scope .nt-page-content > .nt-native-page > .bg-background {
+  min-height: 0;
 }
 
 /* Match native cart/order views to the storefront content width.
@@ -553,6 +571,16 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after { background: var(--nt-surface-subtle); }
 }
 @media (forced-colors: active) {
+  .nt-scope {
+    --nt-benefit-bg: ButtonFace;
+    --nt-benefit-bg-hover: ButtonFace;
+    --nt-benefit-border: ButtonText;
+    --nt-benefit-border-hover: Highlight;
+    --nt-benefit-fg: ButtonText;
+    --nt-benefit-icon: ButtonText;
+    --nt-benefit-shadow: none;
+    --nt-benefit-shadow-hover: none;
+  }
   .nt-scope .nt-glass-pill,
   .nt-scope :is(a, button).nt-button-purchase {
     border: 1px solid ButtonText;

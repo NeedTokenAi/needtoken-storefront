@@ -64,9 +64,10 @@ usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('need
 .api-plans-heading { text-align: center; padding-bottom: 12px; }
 .api-plans-heading h1 { font-size: clamp(27px, 2.5vw, 34px); font-weight: 750; letter-spacing: -.045em; line-height: 1.25; text-wrap: balance; }
 .api-plans-heading h1 span { color: var(--ui-accent); }
-.api-plans-promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 12px; font-size: 12px; }
-.api-plans-promises li { display: flex; min-width: 0; min-height: 34px; justify-content: center; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid var(--nt-benefit-border); border-radius: 9px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); box-shadow: var(--nt-card-shadow); font-weight: 550; line-height: 1.5; }
-.api-plans-promises svg { flex: none; color: var(--nt-benefit-icon); }
+.api-plans-promises { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 16px; font-size: 12px; }
+.api-plans-promises li { display: flex; min-width: 0; min-height: 44px; justify-content: center; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--nt-benefit-border); border-radius: 12px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); box-shadow: var(--nt-benefit-shadow); font-weight: 600; line-height: 1.5; text-align: center; transition: border-color var(--nt-motion-fast, 120ms), background var(--nt-motion-fast, 120ms), box-shadow var(--nt-motion-enter, 180ms), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+.api-plans-promises li:hover { border-color: var(--nt-benefit-border-hover); background: var(--nt-benefit-bg-hover); box-shadow: var(--nt-benefit-shadow-hover); transform: translateY(-2px); }
+.api-plans-promises svg, .api-plans-promises :deep(.nt-standard-rate__trigger > svg) { flex: none; color: var(--nt-benefit-icon); opacity: 1; }
 .api-plans-rate { position: relative; z-index: 3; }
 .api-plan-catalog { scroll-margin-top: 85px; }
 .api-plan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 12px; border-top: 1px solid var(--ui-border); }
@@ -109,5 +110,6 @@ usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('need
 .api-plan-connect > a { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ui-accent); }
 .api-plan-connect > .nt-code { grid-column: 1 / -1; min-width: 0; }
 @media (max-width: 1023px) { .api-plans-promises { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plans-rate { grid-column: 1 / -1; } .api-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .api-plan-member-note { align-items: flex-start; } }
-@media (max-width: 640px) { .api-plans { padding-top: 22px; } .api-plans-promises li { padding: 7px 9px; gap: 6px; } .api-plan-grid { grid-template-columns: minmax(0, 1fr); } .api-plan-tabs button { flex: none; padding-inline: 10px; gap: 6px; } .api-plan-member-note { flex-wrap: wrap; padding: 12px; } .api-plan-member-note > details { flex-basis: calc(100% - 32px); } .api-plan-member-note > a { margin-left: 28px; } .api-plan-how ol { grid-template-columns: 1fr; } .api-plan-how li + li { border-left: 0; border-top: 1px solid var(--ui-border); } .api-plan-connect { grid-template-columns: 1fr; padding: 20px; } .api-plan-connect > a { width: fit-content; } }
+@media (max-width: 640px) { .api-plans { padding-top: 22px; } .api-plans-promises { gap: 10px; } .api-plans-promises li { min-height: 40px; padding: 9px 10px; gap: 6px; font-size: 11px; } .api-plan-grid { grid-template-columns: minmax(0, 1fr); } .api-plan-tabs button { flex: none; padding-inline: 10px; gap: 6px; } .api-plan-member-note { flex-wrap: wrap; padding: 12px; } .api-plan-member-note > details { flex-basis: calc(100% - 32px); } .api-plan-member-note > a { margin-left: 28px; } .api-plan-how ol { grid-template-columns: 1fr; } .api-plan-how li + li { border-left: 0; border-top: 1px solid var(--ui-border); } .api-plan-connect { grid-template-columns: 1fr; padding: 20px; } .api-plan-connect > a { width: fit-content; } }
+@media (prefers-reduced-motion: reduce) { .api-plans-promises li { transition: none; } .api-plans-promises li:hover { transform: none; } }
 </style>

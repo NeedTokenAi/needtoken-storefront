@@ -1,7 +1,6 @@
 <template>
   <div ref="homeEl" class="nt-home">
     <section class="home-hero" aria-labelledby="home-title">
-      <GhostFibersBackground variant="hero" />
       <div class="home-container hero-content">
         <div class="library-head">
           <div class="hero-eyebrow">
@@ -126,7 +125,6 @@ import PaymentMethodStrip from './components/PaymentMethodStrip.vue'
 import { useHomeCatalog } from './composables/useHomeCatalog'
 import { useSlidingIndicator } from './composables/useSlidingIndicator'
 import { useScrollReveal } from './composables/useScrollReveal'
-import GhostFibersBackground from './components/GhostFibersBackground.vue'
 import DisplayCurrencySelector from './components/DisplayCurrencySelector.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import { serviceCardKey } from './lib/serviceCatalog'
@@ -230,8 +228,7 @@ onUnmounted(() => {
 <style scoped>
 .nt-home { --home-secondary: var(--ui-text-secondary, #b4bfcc); --home-muted: var(--ui-text-muted, #7d8a99); }
 .home-container { width: 100%; max-width: var(--nt-content-max-width, 1200px); margin-inline: auto; padding-inline: 24px; }
-.home-hero { position: relative; isolation: isolate; }
-.home-hero :deep(.nt-fiber-background) { opacity: 1; }
+.home-hero { position: relative; }
 .hero-content { position: relative; z-index: 1; padding-block: 48px 24px; }
 .library-head { display: flex; min-height: 56px; align-items: center; justify-content: space-between; gap: 32px; }
 .hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-text-primary); font-size: 24px; font-weight: 600; letter-spacing: 0; }
@@ -261,9 +258,9 @@ onUnmounted(() => {
 .price-rail-state button { min-height: 40px; padding: 8px 16px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-accent); }
 .price-rail > :deep(.nt-page-skeleton--prices) { grid-column: 1 / -1; padding: 0; }
 .hero-benefits { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; gap: 12px; margin-top: 24px; }
-.hero-benefit { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: 12px; gap: 8px; border: 1px solid var(--nt-benefit-border); border-radius: 12px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); box-shadow: var(--nt-card-shadow); font-size: 12px; font-weight: 500; line-height: 1.5; text-align: center; transition: border-color var(--nt-motion-fast, 120ms), background-color var(--nt-motion-fast, 120ms), box-shadow var(--nt-motion-enter, 180ms), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
-.hero-benefit:hover { border-color: var(--nt-accent-border); box-shadow: var(--nt-card-shadow-hover); transform: translateY(-2px); }
-.hero-benefit svg { flex: none; color: var(--nt-benefit-icon); }
+.hero-benefit { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 44px; padding: 11px 12px; gap: 8px; border: 1px solid var(--nt-benefit-border); border-radius: 12px; background: var(--nt-benefit-bg); color: var(--nt-benefit-fg); box-shadow: var(--nt-benefit-shadow); font-size: 12px; font-weight: 600; line-height: 1.5; text-align: center; transition: border-color var(--nt-motion-fast, 120ms), background var(--nt-motion-fast, 120ms), box-shadow var(--nt-motion-enter, 180ms), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
+.hero-benefit:hover { border-color: var(--nt-benefit-border-hover); background: var(--nt-benefit-bg-hover); box-shadow: var(--nt-benefit-shadow-hover); transform: translateY(-2px); }
+.hero-benefit svg, .hero-benefit :deep(.nt-standard-rate__trigger > svg) { flex: none; color: var(--nt-benefit-icon); opacity: 1; }
 .hero-benefit--rate { position: relative; z-index: 3; }
 @keyframes slogan-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .purchase-section { padding-top: 64px; }

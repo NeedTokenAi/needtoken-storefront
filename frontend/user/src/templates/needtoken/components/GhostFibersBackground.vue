@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ghostFibersPolicy } from '../lib/ghostFibersPolicy'
 
 const props = withDefaults(defineProps<{ variant?: 'hero' | 'subtle' }>(), { variant: 'subtle' })
@@ -38,7 +38,27 @@ let connection: ConnectionHint | undefined
 let rafId = 0
 let pointerX = 0
 let pointerY = 0
+let pointerBound = false
 let disposed = false
+
+function syncPointerListeners() {
+  const shouldBind = props.variant === 'hero'
+  if (shouldBind === pointerBound) return
+  if (shouldBind) {
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
+    document.addEventListener('pointerleave', onPointerLeave)
+    pointerBound = true
+  } else {
+    window.removeEventListener('pointermove', onPointerMove)
+    document.removeEventListener('pointerleave', onPointerLeave)
+    pointerBound = false
+    if (rafId) {
+      window.cancelAnimationFrame(rafId)
+      rafId = 0
+    }
+    lit.value = false
+  }
+}
 
 function syncPolicy() {
   if (disposed) return
@@ -85,6 +105,12 @@ function onPointerLeave() {
   lit.value = false
 }
 
+watch(() => props.variant, () => {
+  if (disposed) return
+  syncPointerListeners()
+  syncPolicy()
+})
+
 onMounted(() => {
   motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
   pointerQuery = window.matchMedia('(hover: hover) and (pointer: fine)')
@@ -101,10 +127,7 @@ onMounted(() => {
     })
     intersection.observe(container.value)
   }
-  if (props.variant === 'hero') {
-    window.addEventListener('pointermove', onPointerMove, { passive: true })
-    document.addEventListener('pointerleave', onPointerLeave)
-  }
+  syncPointerListeners()
   syncPolicy()
 })
 
@@ -116,20 +139,24 @@ onUnmounted(() => {
   pointerQuery?.removeEventListener?.('change', syncPolicy)
   connection?.removeEventListener?.('change', syncPolicy)
   document.removeEventListener('visibilitychange', syncPolicy)
-  window.removeEventListener('pointermove', onPointerMove)
-  document.removeEventListener('pointerleave', onPointerLeave)
+  if (pointerBound) {
+    window.removeEventListener('pointermove', onPointerMove)
+    document.removeEventListener('pointerleave', onPointerLeave)
+    pointerBound = false
+  }
 })
 </script>
 
 <style>
 .nt-fiber-background {
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto 0;
+  height: min(100%, 760px);
   z-index: 0;
-  overflow: hidden;
+  overflow: clip;
   pointer-events: none;
   contain: paint;
-  background: var(--ui-bg-page);
+  background: transparent;
   --nt-hero-x: 50%;
   --nt-hero-y: 22%;
   --nt-field-dot: rgba(15, 23, 20, 0.13);
@@ -155,8 +182,8 @@ html.dark .nt-fiber-background {
   position: absolute;
   inset: -12% -8% -8%;
   will-change: transform;
-  mask-image: radial-gradient(ellipse 84% 82% at 50% 22%, #000 38%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 84% 82% at 50% 22%, #000 38%, transparent 100%);
+  mask-image: radial-gradient(ellipse 92% 84% at 50% 16%, #000 42%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 92% 84% at 50% 16%, #000 42%, transparent 100%);
 }
 .nt-hero-aurora--primary {
   background: var(--nt-field-aurora-a);
@@ -172,8 +199,8 @@ html.dark .nt-fiber-background {
     linear-gradient(var(--nt-field-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--nt-field-grid) 1px, transparent 1px);
   background-size: 112px 112px;
-  mask-image: radial-gradient(ellipse 84% 78% at 50% 18%, #000 22%, transparent 92%);
-  -webkit-mask-image: radial-gradient(ellipse 84% 78% at 50% 18%, #000 22%, transparent 92%);
+  mask-image: radial-gradient(ellipse 92% 80% at 50% 16%, #000 28%, transparent 94%);
+  -webkit-mask-image: radial-gradient(ellipse 92% 80% at 50% 16%, #000 28%, transparent 94%);
 }
 
 .nt-hero-dots,
@@ -185,8 +212,8 @@ html.dark .nt-fiber-background {
 
 .nt-hero-dots {
   background-image: radial-gradient(circle at 1px 1px, var(--nt-field-dot) 1.05px, transparent 1.15px);
-  mask-image: radial-gradient(ellipse 82% 76% at 50% 20%, #000 28%, transparent 94%);
-  -webkit-mask-image: radial-gradient(ellipse 82% 76% at 50% 20%, #000 28%, transparent 94%);
+  mask-image: radial-gradient(ellipse 90% 78% at 50% 18%, #000 32%, transparent 95%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 78% at 50% 18%, #000 32%, transparent 95%);
 }
 
 .nt-hero-dots-lit {
@@ -224,12 +251,12 @@ html.dark .nt-fiber-background {
   position: absolute;
   inset: 0;
   content: '';
-  background: linear-gradient(180deg, transparent 0%, transparent 64%, var(--ui-bg-page) 100%);
+  background: linear-gradient(180deg, transparent 0%, transparent 56%, var(--ui-bg-page) 100%);
 }
 
 .nt-fiber--subtle {
-  max-height: 760px;
-  opacity: 0.62;
+  height: min(100%, 660px);
+  opacity: 0.72;
 }
 
 @media (prefers-reduced-motion: no-preference) {
