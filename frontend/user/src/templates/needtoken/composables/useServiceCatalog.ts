@@ -2,6 +2,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { categoryAPI, productAPI } from '../../../api'
 import type { PublicCategory } from '../../../utils/category'
+import { sortHomeProductsByPrice } from '../lib/homeCardPresentation'
 import {
   defaultServiceChild,
   filterServiceProducts,
@@ -72,7 +73,7 @@ export function useServiceCatalog() {
       const params = {
         category_id: currentScope.selected.id,
         page: page.value,
-        page_size: 6,
+        page_size: 15,
         search: firstQueryValue(route.query.q) || undefined,
       }
       const response = await requests.read(`products:${JSON.stringify(params)}`, async () => {
@@ -83,7 +84,7 @@ export function useServiceCatalog() {
       if (disposed || ticket !== generation) return
       if (!Array.isArray(response.data.data)) throw new Error('Invalid public product response')
       const rows = response.data.data
-      products.value = serviceCardProducts(filterServiceProducts(rows, currentScope), currentScope.kind)
+      products.value = sortHomeProductsByPrice(serviceCardProducts(filterServiceProducts(rows, currentScope), currentScope.kind))
       const pages = Number(response.data.pagination?.total_page)
       const total = Number(response.data.pagination?.total)
       totalPages.value = Number.isSafeInteger(pages) && pages >= 0 ? pages : 0

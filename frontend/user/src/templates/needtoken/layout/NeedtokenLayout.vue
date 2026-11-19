@@ -90,7 +90,7 @@
     </header>
 
     <main class="relative isolate flex-1">
-      <GhostFibersBackground v-if="route.path !== '/' && !route.path.startsWith('/tools/')" variant="subtle" />
+      <GhostFibersBackground :variant="route.path === '/' ? 'hero' : 'subtle'" />
       <div class="nt-page-content relative z-[1]"><slot /></div>
     </main>
 
