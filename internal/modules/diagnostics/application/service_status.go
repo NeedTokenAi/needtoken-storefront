@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	statusFreshFor     = 60 * time.Second
-	statusRetryAfter   = 30 * time.Second
-	statusStaleFor     = 10 * time.Minute
+	statusFreshFor     = 5 * time.Minute
+	statusRetryAfter   = 2 * time.Minute
+	statusStaleFor     = 30 * time.Minute
 	statusFetchTimeout = 8 * time.Second
 	statusHistoryWait  = 3 * time.Second
 )
@@ -128,6 +128,15 @@ func (s *ServiceStatus) refreshStatus(provider diagnosticscontract.ServiceStatus
 	defer s.mu.Unlock()
 	now := s.now().UTC()
 	if err == nil {
+		// 可选历史/90天序列临时限流或超时时，沿用仍在有效期内的既有缓存，避免弹窗柱状图瞬间变灰丢失。
+		if entry.latest != nil && now.Sub(entry.latest.FetchedAt) >= 0 && now.Sub(entry.latest.FetchedAt) < statusStaleFor {
+			if len(series) == 0 && len(entry.latest.Series) > 0 {
+				series = entry.latest.Series
+			}
+			if history.State != "ready" && entry.latest.History.State == "ready" {
+				history = entry.latest.History
+			}
+		}
 		result := copyStatusSnapshot(diagnosticscontract.ServiceStatusSnapshot{Provider: provider, SourceURL: sourceURL, FetchedAt: now, Summary: summary, History: history, Series: series}, false)
 		entry.latest = &result
 		entry.retry = time.Time{}

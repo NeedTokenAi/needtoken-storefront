@@ -37,7 +37,7 @@ func TestStatusCacheSeparatesProvidersPreservesSourceTimeAndCopiesNestedValues(t
 	}
 	first.Summary.Components[0].Components[0] = "caller changed"
 	*first.Summary.Page.UpdatedAt = base
-	elapsed.Store(int64(59 * time.Second))
+	elapsed.Store(int64(statusFreshFor - time.Second))
 	cached, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
 	if err != nil || calls.Load() != 1 || !cached.FetchedAt.Equal(base) || cached.Summary.Components[0].Components[0] != "child" || cached.Summary.Page.UpdatedAt.Month() != time.January {
 		t.Fatal("cache hit changed successful time or retained mutable caller data")
@@ -68,7 +68,7 @@ func TestStatusCacheMarksFailureStaleBacksOffAndExpiresAtTenMinutes(t *testing.T
 		t.Fatal(err)
 	}
 	failed.Store(true)
-	elapsed.Store(int64(time.Minute))
+	elapsed.Store(int64(statusFreshFor))
 	stale, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
 	if err != nil || !stale.Stale || !stale.FetchedAt.Equal(base) || calls.Load() != 2 {
 		t.Fatal("failed refresh was presented as fresh")
@@ -81,9 +81,9 @@ func TestStatusCacheMarksFailureStaleBacksOffAndExpiresAtTenMinutes(t *testing.T
 	if calls.Load() != 2 {
 		t.Fatal("failed source was not backed off")
 	}
-	elapsed.Store(int64(10 * time.Minute))
+	elapsed.Store(int64(statusStaleFor))
 	if _, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI); !errors.Is(err, diagnosticscontract.ErrServiceStatusUnavailable) {
-		t.Fatal("ten-minute-old health snapshot was still served")
+		t.Fatal("expired health snapshot was still served")
 	}
 	failed.Store(false)
 	elapsed.Add(int64(statusRetryAfter))
@@ -319,7 +319,7 @@ func TestCoreFailureMarksWholeIncidentSnapshotStaleAndExpiresItTogether(t *testi
 		t.Fatal(err)
 	}
 	failed.Store(true)
-	elapsed.Store(int64(time.Minute))
+	elapsed.Store(int64(statusFreshFor))
 	value, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
 	if err != nil || !value.Stale || !value.FetchedAt.Equal(base) || value.History.State != "ready" || historyCalls.Load() != 1 {
 		t.Fatalf("stale incident snapshot lost freshness provenance: %#v %v", value, err)
@@ -381,5 +381,37 @@ func TestStatusCacheDeepCopiesSeriesAndToleratesSeriesFailure(t *testing.T) {
 	fallback, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
 	if err != nil || len(fallback.Summary.Components) != 1 || len(fallback.Series) != 0 {
 		t.Fatalf("optional series failure damaged core summary: %#v %v", fallback, err)
+	}
+}
+
+func TestRefreshRetainsCachedSeriesWhenOptionalFeedTemporarilyFails(t *testing.T) {
+	base := time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC)
+	var elapsed atomic.Int64
+	var failSeries atomic.Bool
+	pct := 99.82
+	service := NewServiceStatus(statusSeriesSourceFixture{
+		statusSourceFunc: func(context.Context, diagnosticscontract.ServiceStatusProvider) (diagnosticscontract.ServiceStatusSummary, error) {
+			return fixtureStatusSummary(), nil
+		},
+		series: func(_ context.Context, _ diagnosticscontract.ServiceStatusProvider, _ diagnosticscontract.ServiceStatusSummary) ([]diagnosticscontract.ServiceStatusSeries, error) {
+			if failSeries.Load() {
+				return nil, errors.New("upstream rate limited")
+			}
+			return []diagnosticscontract.ServiceStatusSeries{{
+				Key: "chatgpt", Label: "ChatGPT", ComponentCount: 16, Status: "operational", UptimePercent: &pct,
+				Days: []diagnosticscontract.ServiceStatusSeriesDay{{Date: "2026-11-20", Status: "operational"}},
+			}}, nil
+		},
+	})
+	service.now = func() time.Time { return base.Add(time.Duration(elapsed.Load())) }
+	first, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
+	if err != nil || len(first.Series) != 1 {
+		t.Fatalf("initial fetch missing series: %#v %v", first, err)
+	}
+	failSeries.Store(true)
+	elapsed.Store(int64(statusFreshFor))
+	refreshed, err := service.Latest(context.Background(), diagnosticscontract.ServiceStatusOpenAI)
+	if err != nil || refreshed.Stale || len(refreshed.Series) != 1 || refreshed.Series[0].Key != "chatgpt" {
+		t.Fatalf("temporary optional series failure dropped cached 90-day series: %#v %v", refreshed, err)
 	}
 }

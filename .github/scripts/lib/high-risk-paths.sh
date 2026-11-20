@@ -26,7 +26,7 @@ is_high_risk_path() {
       return 0
       ;;
     # NeedToken 二开保护区
-    internal/modules/diagnostics/* | frontend/user/src/templates/needtoken/* | frontend/user/index.html | frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts)
+    internal/modules/diagnostics/* | internal/app/httpserver/routes_storefront.go | frontend/user/src/templates/needtoken/* | frontend/user/index.html | frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts)
       return 0
       ;;
     *)

@@ -98,8 +98,12 @@ func registerStorefrontRoutes(
 			Prefix: "public_codex_resets", WindowSeconds: 60, MaxRequests: 30, BlockSeconds: 60,
 		}, middleware.KeyByIP))
 		diagnosticstransport.RegisterResetRoutes(resetTools, diagnosticsbootstrap.NewResetHandler())
-		// Public provider status shares only the read limit, never credential checks.
-		diagnosticstransport.RegisterServiceStatusRoutes(resetTools, diagnosticsbootstrap.NewServiceStatusHandler())
+		// 公开服务状态接口为纯内存缓存只读查询，使用独立且兼容 NAT/多标签页的限流额度，不与雷达/账号检测互抢配额。
+		statusTools := public.Group("/tools")
+		statusTools.Use(diagnosticstransport.NoStore(), middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
+			Prefix: "public_service_status", WindowSeconds: 60, MaxRequests: 120, BlockSeconds: 30,
+		}, middleware.KeyByIP))
+		diagnosticstransport.RegisterServiceStatusRoutes(statusTools, diagnosticsbootstrap.NewServiceStatusHandler())
 	}
 
 	// 游客接口
