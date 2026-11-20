@@ -63,7 +63,7 @@
 
         <section class="nt-checkout-payment" :aria-label="t('checkout.paymentMethod')">
           <h3>{{ t('checkout.paymentMethod') }}</h3>
-          <div v-if="showBalanceOption" class="nt-checkout-wallet">
+          <div v-if="showNeedtokenBalanceOption" class="nt-checkout-wallet">
             <div><span>{{ t('payment.walletBalanceLabel') }}</span><strong>{{ walletLoading ? t('common.loading') : formatPrice(walletBalance, previewCurrency) }}</strong></div>
             <label><input v-model="useBalance" type="checkbox" :disabled="walletOnlyPayment" />{{ t('payment.useBalance') }}</label>
             <p v-if="walletOnlyPayment">{{ t('payment.walletOnlyHint') }}</p>
@@ -127,6 +127,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCheckout } from '../../../composables/useCheckout'
+import { useAppStore } from '../../../stores/app'
+import { shouldShowCheckoutWalletBox } from '../lib/walletVisibility'
 import InvoiceRequestEditor from './InvoiceRequestEditor.vue'
 import ApiAccountLinkBanner from './ApiAccountLinkBanner.vue'
 
@@ -134,6 +136,7 @@ const props = withDefaults(defineProps<{ embedded?: boolean; active?: boolean }>
 const emit = defineEmits<{ pendingChange: [pending: boolean]; orderCreated: [created: boolean] }>()
 const route = useRoute()
 const { t } = useI18n()
+const appStore = useAppStore()
 const memberLoginTarget = computed(() => ({ path: '/auth/login', query: { redirect: route.fullPath } }))
 const {
   userAuthStore, getLocalizedText, formatPrice, getImageUrl,
@@ -153,6 +156,7 @@ const {
   handleSelectChannel, formatChannelFeeRate, formatChannelFixedFee,
   submitting, paymentTarget, paymentNavigationFailed, retryPaymentNavigation, canSubmit, handleSubmit,
 } = useCheckout({ source: props.embedded ? 'buynow' : undefined })
+const showNeedtokenBalanceOption = computed(() => showBalanceOption.value && shouldShowCheckoutWalletBox(appStore.config, walletBalance.value))
 watch(submitting, value => emit('pendingChange', value), { immediate: true, flush: 'sync' })
 watch(paymentTarget, value => emit('orderCreated', !!value), { immediate: true, flush: 'sync' })
 onBeforeRouteUpdate(() => !props.embedded || (!submitting.value && !paymentTarget.value))

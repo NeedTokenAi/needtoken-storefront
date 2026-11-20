@@ -39,7 +39,26 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 	result := &opscontract.OrdersResult{Source: "storefront", CollectedAt: collected, Freshness: "fresh", Orders: make([]opscontract.Order, 0, len(rows)), Total: total, Page: page, PageSize: pageSize}
 	var mapOrder func(orderdomain.Order) (opscontract.Order, error)
 	mapOrder = func(row orderdomain.Order) (opscontract.Order, error) {
-		out := opscontract.Order{ID: row.ID, OrderNo: row.OrderNo, ParentID: row.ParentID, Status: row.Status, Currency: row.Currency, TotalAmount: row.TotalAmount.String(), RefundedAmount: row.RefundedAmount.String(), PaymentStatus: "unpaid", FulfillmentStatus: row.Status, EntitlementStatus: "unknown", PaidAt: row.PaidAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Payments: []opscontract.Payment{}, Refunds: []opscontract.Refund{}}
+		out := opscontract.Order{
+			ID:                row.ID,
+			OrderNo:           row.OrderNo,
+			ParentID:          row.ParentID,
+			Status:            row.Status,
+			Currency:          row.Currency,
+			OriginalAmount:    row.OriginalAmount.String(),
+			DiscountAmount:    row.DiscountAmount.String(),
+			CouponID:          row.CouponID,
+			TotalAmount:       row.TotalAmount.String(),
+			RefundedAmount:    row.RefundedAmount.String(),
+			PaymentStatus:     "unpaid",
+			FulfillmentStatus: row.Status,
+			EntitlementStatus: "unknown",
+			PaidAt:            row.PaidAt,
+			CreatedAt:         row.CreatedAt,
+			UpdatedAt:         row.UpdatedAt,
+			Payments:          []opscontract.Payment{},
+			Refunds:           []opscontract.Refund{},
+		}
 		if row.PaidAt != nil {
 			out.PaymentStatus = "paid"
 		}
@@ -54,7 +73,17 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 			return opscontract.Order{}, err
 		}
 		for _, payment := range payments {
-			out.Payments = append(out.Payments, opscontract.Payment{ID: payment.ID, Status: payment.Status, Amount: payment.Amount.String(), Currency: payment.Currency, ProviderRef: payment.ProviderRef, PaidAt: payment.PaidAt, UpdatedAt: payment.UpdatedAt})
+			out.Payments = append(out.Payments, opscontract.Payment{
+				ID:           payment.ID,
+				ProviderType: payment.ProviderType,
+				ChannelType:  payment.ChannelType,
+				Status:       payment.Status,
+				Amount:       payment.Amount.String(),
+				Currency:     payment.Currency,
+				ProviderRef:  payment.ProviderRef,
+				PaidAt:       payment.PaidAt,
+				UpdatedAt:    payment.UpdatedAt,
+			})
 		}
 		refunds, err := s.orders.ListRefundRecordsByOrderIDs([]uint{row.ID})
 		if err != nil {
