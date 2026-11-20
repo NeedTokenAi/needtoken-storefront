@@ -14,6 +14,27 @@
     "invalidCredential": "Enter a valid short-lived token or session JSON containing accessToken",
     "expired": "This authorization expired. Verify again"
   },
+  "assetVaultClaim": {
+    "title": "Encrypted Vault · One-Time Secure Claim",
+    "subtitle": "Account credentials are stored in our encrypted vault and never emailed in plaintext. They are decrypted only on your private order page.",
+    "modeBuyout": "Buyout Account",
+    "modeRental": "Rental Account",
+    "maskedLabel": "Masked Account",
+    "remainingLabel": "Remaining Reveals",
+    "verifiedPlanLabel": "Pre-Delivery Verification",
+    "rentalExpiresLabel": "Rental Expires At",
+    "beforeRevealHint": "Clicking below decrypts the credentials once in memory; leaving or refreshing this page immediately clears them.",
+    "revealAction": "Claim Credentials Securely",
+    "revealing": "Decrypting…",
+    "saveNowWarning": "Copy and save these credentials right away; they will not be displayed again after leaving or refreshing.",
+    "accountLabel": "Account",
+    "secretLabel": "Credentials",
+    "notesLabel": "Notes",
+    "copyAll": "Copy All Credentials",
+    "copied": "Copied",
+    "exhaustedHint": "Credentials for this order were claimed at {time}. To prevent leakage, they are not shown again. Contact support if you need one reauthorized reveal.",
+    "failed": "Unable to retrieve credentials right now. Refresh the page or contact support."
+  },
   "common": {
     "siteName": "Dujiao-Next",
     "loading": "Loading...",

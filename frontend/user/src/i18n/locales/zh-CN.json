@@ -14,6 +14,27 @@
     "invalidCredential": "请填写有效的短期 Token 或包含 accessToken 的 Session JSON",
     "expired": "本次授权已过期，请重新验证"
   },
+  "assetVaultClaim": {
+    "title": "加密保险库 · 一次性安全领号",
+    "subtitle": "成品账号凭据由加密保险库保管，不会通过明文邮件发送，仅在当前私有订单页按授权次数安全展示。",
+    "modeBuyout": "买断成品",
+    "modeRental": "租用成品",
+    "maskedLabel": "脱敏账号标识",
+    "remainingLabel": "剩余安全领号次数",
+    "verifiedPlanLabel": "出库独立核验",
+    "rentalExpiresLabel": "租用到期时间",
+    "beforeRevealHint": "点击后将在当前页面一次性解密展示完整账号与密码，离开页面即自动清除内存明文。",
+    "revealAction": "安全领取账号凭据",
+    "revealing": "正在安全解密…",
+    "saveNowWarning": "请立即复制并妥善保存以下凭据；离开或刷新页面后将不再明文展示。",
+    "accountLabel": "登录账号",
+    "secretLabel": "凭据与密钥",
+    "notesLabel": "使用说明",
+    "copyAll": "一键复制全部凭据",
+    "copied": "已复制",
+    "exhaustedHint": "该订单的成品凭据已于 {time} 安全领取完成。为防止二次泄露不再重复明文展示；如未保存请联系客服核实后为您重授一次领号机会。",
+    "failed": "暂时无法获取安全领号凭据，请刷新页面后重试或联系客服。"
+  },
   "common": {
     "siteName": "Dujiao-Next",
     "loading": "加载中...",

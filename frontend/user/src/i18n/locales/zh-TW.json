@@ -14,6 +14,27 @@
     "invalidCredential": "請填寫有效的短期 Token 或包含 accessToken 的 Session JSON",
     "expired": "本次授權已過期，請重新驗證"
   },
+  "assetVaultClaim": {
+    "title": "加密保險庫 · 一次性安全領號",
+    "subtitle": "成品帳號憑據由加密保險庫保管，不會透過明文信件發送，僅在目前私有訂單頁依授權次數安全展示。",
+    "modeBuyout": "買斷成品",
+    "modeRental": "租用成品",
+    "maskedLabel": "脫敏帳號識別",
+    "remainingLabel": "剩餘安全領號次數",
+    "verifiedPlanLabel": "出庫獨立核驗",
+    "rentalExpiresLabel": "租用到期時間",
+    "beforeRevealHint": "點擊後將在目前頁面一次性解密展示完整帳號與密碼，離開頁面即自動清除記憶體明文。",
+    "revealAction": "安全領取帳號憑據",
+    "revealing": "正在安全解密…",
+    "saveNowWarning": "請立即複製並妥善保存以下憑據；離開或重新整理頁面後將不再明文展示。",
+    "accountLabel": "登入帳號",
+    "secretLabel": "憑據與金鑰",
+    "notesLabel": "使用說明",
+    "copyAll": "一鍵複製全部憑據",
+    "copied": "已複製",
+    "exhaustedHint": "此訂單的成品憑據已於 {time} 安全領取完成。為防止二次外洩不再重複明文展示；如未保存請聯絡客服核實後為您重授一次領號機會。",
+    "failed": "暫時無法取得安全領號憑據，請重新整理頁面後重試或聯絡客服。"
+  },
   "common": {
     "siteName": "Dujiao-Next",
     "loading": "載入中...",

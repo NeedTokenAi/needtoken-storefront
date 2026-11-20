@@ -5,6 +5,7 @@ import (
 	"github.com/dujiao-next/internal/app/httpserver/middleware"
 	accountlinkbootstrap "github.com/dujiao-next/internal/bootstrap/accountlink"
 	affiliatebootstrap "github.com/dujiao-next/internal/bootstrap/affiliate"
+	assetclaimbootstrap "github.com/dujiao-next/internal/bootstrap/assetclaim"
 	diagnosticsbootstrap "github.com/dujiao-next/internal/bootstrap/diagnostics"
 	orderbootstrap "github.com/dujiao-next/internal/bootstrap/order"
 	"github.com/dujiao-next/internal/config"
@@ -22,6 +23,7 @@ import (
 	memberleveltransport "github.com/dujiao-next/internal/modules/memberlevel/transport/http"
 	ordertransport "github.com/dujiao-next/internal/modules/order/transport/http"
 	accountlinktransport "github.com/dujiao-next/internal/modules/order/transport/http/accountlink"
+	assetclaimtransport "github.com/dujiao-next/internal/modules/order/transport/http/assetclaim"
 	authorizationtransport "github.com/dujiao-next/internal/modules/order/transport/http/subscriptionauthorization"
 	paymenttransport "github.com/dujiao-next/internal/modules/payment/transport/http"
 	paymentcallbacktransport "github.com/dujiao-next/internal/modules/payment/transport/http/callback"
@@ -77,6 +79,7 @@ func registerStorefrontRoutes(
 	storefront.Use(middleware.ResellerTenantMiddleware(c.ResellerDomainResolver))
 	affiliateHandler := affiliatebootstrap.NewStorefrontHandler(c)
 	authorizationHandler := orderbootstrap.NewSubscriptionAuthorizationHandler(c)
+	assetClaimHandler := assetclaimbootstrap.NewHandler(c)
 	consentRead := storefront.Group("", middleware.RateLimitMiddleware(redisClient, guestReadRule, middleware.KeyByIP))
 	authorizationtransport.RegisterConsentRoute(consentRead, authorizationHandler)
 
@@ -116,6 +119,7 @@ func registerStorefrontRoutes(
 		ordertransport.RegisterGuestPreviewRoute(guestRead, orderPreviewHandler)
 		ordertransport.RegisterGuestReadRoutes(guestRead, guestOrderHandler)
 		authorizationtransport.RegisterGuestReadRoutes(guestRead, authorizationHandler)
+		assetclaimtransport.RegisterGuestReadRoutes(guestRead, assetClaimHandler)
 		paymenttransport.RegisterGuestLatestRoute(guestRead, paymentLatestHandler)
 	}
 	guestWrite := guest.Group("")
@@ -123,6 +127,7 @@ func registerStorefrontRoutes(
 	{
 		ordertransport.RegisterGuestCreateRoute(guestWrite, orderCreateHandler)
 		authorizationtransport.RegisterGuestWriteRoutes(guestWrite, authorizationHandler)
+		assetclaimtransport.RegisterGuestWriteRoutes(guestWrite, assetClaimHandler)
 		ordertransport.RegisterGuestCreateAndPayRoute(guestWrite, orderCreateHandler)
 		paymenttransport.RegisterGuestWriteRoutes(guestWrite, paymentWriteHandler)
 	}
@@ -179,6 +184,8 @@ func registerStorefrontRoutes(
 		accountLinkHandler := accountlinkbootstrap.NewHandler(c)
 		accountlinktransport.RegisterMemberReadRoutes(user, accountLinkHandler)
 		accountlinktransport.RegisterMemberWriteRoutes(authorizationUser, accountLinkHandler)
+		assetclaimtransport.RegisterMemberReadRoutes(user, assetClaimHandler)
+		assetclaimtransport.RegisterMemberWriteRoutes(authorizationUser, assetClaimHandler)
 		ordertransport.RegisterUserCancelRoute(user, userOrderHandler)
 		paymenttransport.RegisterUserWriteRoutes(user, paymentWriteHandler)
 		paymenttransport.RegisterUserLatestRoute(user, paymentLatestHandler)
