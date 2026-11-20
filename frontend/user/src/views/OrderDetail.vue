@@ -54,6 +54,7 @@
 
       <div v-else class="space-y-6">
         <InvoiceRequestNotice v-if="invoiceEnabled" :order="order" />
+        <ApiAccountLinkBanner v-if="invoiceEnabled" :next-path="`/orders/${order.order_no}`" only-when-action-needed />
         <SubscriptionAuthorizationPanel :order="order" />
         <div class="rounded-2xl border bg-card shadow-sm p-6">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -443,6 +444,7 @@ import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'
 import { getActiveTemplate } from '../templates/registry'
 import InvoiceRequestNotice from '../templates/needtoken/components/InvoiceRequestNotice.vue'
+import ApiAccountLinkBanner from '../templates/needtoken/components/ApiAccountLinkBanner.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'

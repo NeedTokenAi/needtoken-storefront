@@ -58,6 +58,7 @@
           <div v-if="Number(previewMemberDiscount) > 0" class="is-discount"><dt>{{ t('checkout.previewMemberDiscount') }}</dt><dd>-{{ formatPrice(previewMemberDiscount, previewCurrency) }}</dd></div>
         </dl>
         <p v-if="previewLoading || couponRefreshing" class="nt-checkout-status" role="status">{{ previewStatusText }}</p>
+        <ApiAccountLinkBanner v-if="userAuthStore.isAuthenticated && !isResellerTenant" class="mb-4" next-path="/checkout" compact only-when-action-needed />
         <Alert v-if="checkoutAlert" :variant="pageAlertVariant(checkoutAlert.level)"><AlertDescription>{{ checkoutAlert.message }}</AlertDescription></Alert>
 
         <section class="nt-checkout-payment" :aria-label="t('checkout.paymentMethod')">
@@ -127,6 +128,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCheckout } from '../../../composables/useCheckout'
 import InvoiceRequestEditor from './InvoiceRequestEditor.vue'
+import ApiAccountLinkBanner from './ApiAccountLinkBanner.vue'
 
 const props = withDefaults(defineProps<{ embedded?: boolean; active?: boolean }>(), { embedded: false, active: true })
 const emit = defineEmits<{ pendingChange: [pending: boolean]; orderCreated: [created: boolean] }>()

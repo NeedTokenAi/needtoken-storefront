@@ -19,6 +19,7 @@
       </div>
 
       <div class="api-plan-member-note"><LockKeyhole :size="18" aria-hidden="true" /><details><summary><h2>{{ t('needtoken.apiCatalog.memberTitle') }}</h2><span>{{ t('needtoken.apiCatalog.step1Title') }}</span><ChevronDown :size="14" aria-hidden="true" /></summary><p>{{ t('needtoken.apiCatalog.memberDescription') }}</p></details><RouterLink v-if="!userAuth.isAuthenticated" :to="loginTarget">{{ t('needtoken.apiCatalog.login') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink><RouterLink v-else to="/me/orders">{{ t('needtoken.apiCatalog.myOrders') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink></div>
+      <ApiAccountLinkBanner class="mb-3" next-path="/plans" />
 
       <div v-if="categoriesLoading || loading" class="api-plan-grid" role="status" aria-busy="true" :aria-label="t('needtoken.common.loading')"><div v-for="index in 6" :key="index" class="api-plan-skeleton"><div /><div /><div /><div /></div></div>
       <div v-else-if="categoriesError || loadError" class="api-plan-state" role="alert"><PackageSearch :size="30" aria-hidden="true" /><h3>{{ t('needtoken.catalogServices.loadError') }}</h3><button type="button" @click="categoriesError ? loadCategories() : loadProducts()">{{ t('needtoken.common.retry') }}</button></div>
@@ -44,6 +45,7 @@ import CodeBlock from './components/CodeBlock.vue'
 import ServiceProductCard from './components/ServiceProductCard.vue'
 import CatalogueTools from './components/CatalogueTools.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
+import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
 import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
 import { normalizeNeedtokenSupport, supportEmailHref } from './lib/supportConfig'
 

@@ -3,6 +3,7 @@ package httpserver
 import (
 	"github.com/dujiao-next/internal/app/container"
 	"github.com/dujiao-next/internal/app/httpserver/middleware"
+	accountlinkbootstrap "github.com/dujiao-next/internal/bootstrap/accountlink"
 	affiliatebootstrap "github.com/dujiao-next/internal/bootstrap/affiliate"
 	diagnosticsbootstrap "github.com/dujiao-next/internal/bootstrap/diagnostics"
 	orderbootstrap "github.com/dujiao-next/internal/bootstrap/order"
@@ -20,6 +21,7 @@ import (
 	userauthtransport "github.com/dujiao-next/internal/modules/identity/userauth/transport/http"
 	memberleveltransport "github.com/dujiao-next/internal/modules/memberlevel/transport/http"
 	ordertransport "github.com/dujiao-next/internal/modules/order/transport/http"
+	accountlinktransport "github.com/dujiao-next/internal/modules/order/transport/http/accountlink"
 	authorizationtransport "github.com/dujiao-next/internal/modules/order/transport/http/subscriptionauthorization"
 	paymenttransport "github.com/dujiao-next/internal/modules/payment/transport/http"
 	paymentcallbacktransport "github.com/dujiao-next/internal/modules/payment/transport/http/callback"
@@ -174,6 +176,9 @@ func registerStorefrontRoutes(
 		ordertransport.RegisterUserReadRoutes(user, userOrderHandler)
 		authorizationUser := user.Group("", middleware.RateLimitMiddleware(redisClient, guestWriteRule, middleware.KeyByUserIDAndIP))
 		authorizationtransport.RegisterMemberRoutes(authorizationUser, authorizationHandler)
+		accountLinkHandler := accountlinkbootstrap.NewHandler(c)
+		accountlinktransport.RegisterMemberReadRoutes(user, accountLinkHandler)
+		accountlinktransport.RegisterMemberWriteRoutes(authorizationUser, accountLinkHandler)
 		ordertransport.RegisterUserCancelRoute(user, userOrderHandler)
 		paymenttransport.RegisterUserWriteRoutes(user, paymentWriteHandler)
 		paymenttransport.RegisterUserLatestRoute(user, paymentLatestHandler)
