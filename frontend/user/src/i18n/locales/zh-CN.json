@@ -7,6 +7,15 @@
     "codeSent": "验证码已发送",
     "credential": "短期账号 Token 或 Session JSON",
     "consent": "我同意为此订单核验并办理一个订阅周期，并在购买后关闭自动续费。账号 Token 只在短期授权内使用",
+    "nonRefundableNotice": "重要提示：虚拟订阅属于硬成本消耗品，一旦成功开通到账后不支持退款；系统将在单周期开通后自动关闭续费。",
+    "nonRefundableConsent": "我已知晓虚拟订阅属于硬成本，开通后不支持退款",
+    "progressTitle": "订阅代充履约进度",
+    "steps": {
+      "paid": "订单已付款",
+      "authorize": "提交短期授权",
+      "checkout": "信用卡代订与关续费",
+      "verified": "独立回读到账完单"
+    },
     "submit": "提交本次授权",
     "submitting": "正在提交",
     "submitted": "授权已提交，等待目标账号核验；此状态不表示订阅已到账",

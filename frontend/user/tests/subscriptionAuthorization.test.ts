@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { extractPlatformCredential, validateSubscriptionSession } from '../src/utils/subscriptionAuthorization.ts'
+import { deriveSubscriptionProgressSteps, extractPlatformCredential, validateSubscriptionSession } from '../src/utils/subscriptionAuthorization.ts'
 
 test('subscription session rejects expired, redirected or malformed credential endpoints', () => {
   const now = Date.parse('2026-11-15T08:00:00Z')
@@ -20,4 +20,19 @@ test('only platform accessToken is extracted from supplied session JSON', () => 
   assert.equal(extractPlatformCredential('{"user":{"email":"private@example.test"}}'), null)
   assert.equal(extractPlatformCredential('abc'), null)
   assert.equal(extractPlatformCredential('token\nwith-newline'), null)
+})
+
+test('deriveSubscriptionProgressSteps tracks paid, authorized, and delivered lifecycle', () => {
+  assert.deepEqual(
+    deriveSubscriptionProgressSteps('paid', false).map(s => `${s.key}:${s.state}`),
+    ['paid:done', 'authorize:active', 'checkout:pending', 'verified:pending'],
+  )
+  assert.deepEqual(
+    deriveSubscriptionProgressSteps('processing', true).map(s => `${s.key}:${s.state}`),
+    ['paid:done', 'authorize:done', 'checkout:active', 'verified:pending'],
+  )
+  assert.deepEqual(
+    deriveSubscriptionProgressSteps('delivered', false).map(s => `${s.key}:${s.state}`),
+    ['paid:done', 'authorize:done', 'checkout:done', 'verified:done'],
+  )
 })

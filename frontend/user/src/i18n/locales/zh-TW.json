@@ -7,6 +7,15 @@
     "codeSent": "驗證碼已傳送",
     "credential": "短期帳號 Token 或 Session JSON",
     "consent": "我同意為此訂單查驗並辦理一個訂閱週期，並在購買後關閉自動續訂。帳號 Token 僅在短期授權內使用",
+    "nonRefundableNotice": "重要提示：虛擬訂閱屬於硬成本消耗品，一旦成功開通到帳後不支援退款；系統將在單週期開通後自動關閉續訂。",
+    "nonRefundableConsent": "我已知曉虛擬訂閱屬於硬成本，開通後不支援退款",
+    "progressTitle": "訂閱代充履約進度",
+    "steps": {
+      "paid": "訂單已付款",
+      "authorize": "提交短期授權",
+      "checkout": "信用卡代訂與關續訂",
+      "verified": "獨立回讀到帳完單"
+    },
     "submit": "提交本次授權",
     "submitting": "正在提交",
     "submitted": "授權已提交，等待目標帳號查驗；此狀態不表示訂閱已到帳",

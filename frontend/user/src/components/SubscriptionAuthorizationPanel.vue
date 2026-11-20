@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { userOrderAPI, guestOrderAPI } from '../api/order'
-import { extractPlatformCredential, validateSubscriptionSession, type SubscriptionSession } from '../utils/subscriptionAuthorization'
+import {
+  deriveSubscriptionProgressSteps,
+  extractPlatformCredential,
+  validateSubscriptionSession,
+  type SubscriptionSession,
+} from '../utils/subscriptionAuthorization'
 
-const props = defineProps<{ order: { order_no: string; children?: any[] }; guestAuth?: { email: string; order_password: string } }>()
+const props = defineProps<{ order: { order_no: string; status?: string; children?: any[] }; guestAuth?: { email: string; order_password: string } }>()
 const { t } = useI18n()
 const eligibility = ref<{ eligible: boolean; guest_proof_required: boolean; plan?: string } | null>(null)
 const consent = ref(false)
+const nonRefundableConsent = ref(false)
 const credential = ref('')
 const code = ref('')
 const operationID = ref('')
@@ -16,6 +22,7 @@ const cooldown = ref(false)
 const busy = ref(false)
 const submitted = ref(false)
 const failure = ref('')
+const progressSteps = computed(() => deriveSubscriptionProgressSteps(props.order.status, submitted.value))
 let session: SubscriptionSession | null = null
 let expiry: ReturnType<typeof setTimeout> | undefined
 let resend: ReturnType<typeof setTimeout> | undefined
@@ -27,7 +34,7 @@ const reset = () => {
   if (expiry) clearTimeout(expiry)
   if (resend) clearTimeout(resend)
   session = null; credential.value = ''; code.value = ''; operationID.value = ''
-  challengeSent.value = false; cooldown.value = false; consent.value = false; submitted.value = false; failure.value = ''; busy.value = false
+  challengeSent.value = false; cooldown.value = false; consent.value = false; nonRefundableConsent.value = false; submitted.value = false; failure.value = ''; busy.value = false
 }
 watch(() => [props.order.order_no, props.guestAuth?.email, props.guestAuth?.order_password], async () => {
   reset(); eligibility.value = null
@@ -60,7 +67,7 @@ const sendCode = async () => {
   finally { if (current === generation) busy.value = false }
 }
 const submit = async () => {
-  if (busy.value || !consent.value || !eligibility.value?.eligible || submitted.value) return
+  if (busy.value || !consent.value || !nonRefundableConsent.value || !eligibility.value?.eligible || submitted.value) return
   const platformCredential = extractPlatformCredential(credential.value)
   if (!platformCredential) { failure.value = t('subscriptionAuthorization.invalidCredential'); return }
   const current = generation
@@ -104,6 +111,19 @@ onBeforeUnmount(reset)
   <section v-else-if="eligibility?.eligible" class="my-4 rounded-xl border bg-card p-5" :aria-label="t('subscriptionAuthorization.title')">
     <h2 class="text-base font-semibold">{{ t('subscriptionAuthorization.title') }}</h2>
     <p class="mt-2 text-sm text-muted-foreground">{{ t('subscriptionAuthorization.description', { order: order.order_no }) }}</p>
+    <ol class="mt-4 grid gap-2 sm:grid-cols-4" :aria-label="t('subscriptionAuthorization.progressTitle')">
+      <li
+        v-for="(step, idx) in progressSteps"
+        :key="step.key"
+        class="rounded-lg border px-3 py-2 text-xs"
+        :class="step.state === 'done' ? 'border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300' : step.state === 'active' ? 'border-primary/50 bg-primary/5 font-medium text-foreground' : 'border-border text-muted-foreground'"
+      >
+        <span class="mr-1 font-mono">{{ idx + 1 }}.</span>{{ t(`subscriptionAuthorization.steps.${step.key}`) }}
+      </li>
+    </ol>
+    <div class="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+      {{ t('subscriptionAuthorization.nonRefundableNotice') }}
+    </div>
     <p v-if="submitted" role="status" class="mt-4 text-sm">{{ t('subscriptionAuthorization.submitted') }}</p>
     <form v-else class="mt-4 space-y-4" @submit.prevent="submit">
       <div v-if="eligibility.guest_proof_required" class="flex flex-wrap items-end gap-3">
@@ -119,8 +139,12 @@ onBeforeUnmount(reset)
         <input v-model="consent" type="checkbox" class="mt-1" :disabled="busy" />
         <span>{{ t('subscriptionAuthorization.consent') }}</span>
       </label>
+      <label class="flex items-start gap-2 text-sm">
+        <input v-model="nonRefundableConsent" type="checkbox" class="mt-1" :disabled="busy" />
+        <span>{{ t('subscriptionAuthorization.nonRefundableConsent') }}</span>
+      </label>
       <p v-if="failure" role="alert" class="text-sm text-destructive">{{ failure }}</p>
-      <button type="submit" class="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" :disabled="busy || !consent || !credential || (eligibility.guest_proof_required && (!challengeSent || code.length !== 6))">{{ t(busy ? 'subscriptionAuthorization.submitting' : 'subscriptionAuthorization.submit') }}</button>
+      <button type="submit" class="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" :disabled="busy || !consent || !nonRefundableConsent || !credential || (eligibility.guest_proof_required && (!challengeSent || code.length !== 6))">{{ t(busy ? 'subscriptionAuthorization.submitting' : 'subscriptionAuthorization.submit') }}</button>
     </form>
   </section>
 </template>

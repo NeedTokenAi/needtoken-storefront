@@ -7,6 +7,15 @@
     "codeSent": "Code sent",
     "credential": "Short-lived account token or session JSON",
     "consent": "I authorize verification and purchase of one subscription period for this order, followed by cancellation of automatic renewal. My account token is used only within this short-lived authorization",
+    "nonRefundableNotice": "Important: Digital subscriptions incur immediate hard cost and are non-refundable once activated. Auto-renewal is turned off after the single billing cycle.",
+    "nonRefundableConsent": "I understand that digital subscriptions are non-refundable once activated",
+    "progressTitle": "Subscription Fulfillment Progress",
+    "steps": {
+      "paid": "Order Paid",
+      "authorize": "Submit Short-Lived Auth",
+      "checkout": "Card Checkout & Cancel Auto-Renew",
+      "verified": "Independent Readback Complete"
+    },
     "submit": "Submit authorization",
     "submitting": "Submitting",
     "submitted": "Authorization submitted; awaiting target account verification. The subscription has not yet been confirmed",
