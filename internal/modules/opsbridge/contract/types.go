@@ -3,13 +3,15 @@ package contract
 import "time"
 
 type Payment struct {
-	ID          uint       `json:"id"`
-	Status      string     `json:"status"`
-	Amount      string     `json:"amount"`
-	Currency    string     `json:"currency"`
-	ProviderRef string     `json:"provider_ref,omitempty"`
-	PaidAt      *time.Time `json:"paid_at,omitempty"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID           uint       `json:"id"`
+	ProviderType string     `json:"provider_type,omitempty"`
+	ChannelType  string     `json:"channel_type,omitempty"`
+	Status       string     `json:"status"`
+	Amount       string     `json:"amount"`
+	Currency     string     `json:"currency"`
+	ProviderRef  string     `json:"provider_ref,omitempty"`
+	PaidAt       *time.Time `json:"paid_at,omitempty"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 type Refund struct {
 	ID               uint      `json:"id"`
@@ -51,6 +53,9 @@ type Order struct {
 	MerchantCustomerID string        `json:"merchant_customer_id,omitempty"`
 	Status             string        `json:"status"`
 	Currency           string        `json:"currency"`
+	OriginalAmount     string        `json:"original_amount,omitempty"`
+	DiscountAmount     string        `json:"discount_amount,omitempty"`
+	CouponID           *uint         `json:"coupon_id,omitempty"`
 	TotalAmount        string        `json:"total_amount"`
 	RefundedAmount     string        `json:"refunded_amount"`
 	PaymentStatus      string        `json:"payment_status"`

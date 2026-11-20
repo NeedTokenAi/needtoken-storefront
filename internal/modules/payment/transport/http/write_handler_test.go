@@ -49,7 +49,7 @@ func TestRespondPaymentCreateError(t *testing.T) {
 		code int
 		msg  string
 	}{
-		{name: "verified link required", err: fmt.Errorf("checkout: %w", mappingcontract.ErrPlanAccountLinkRequired), code: response.CodeBadRequest, msg: "请先联系客服，验证并关联您已有的 API 账号后再购买；原有余额与用量会保留。"},
+		{name: "verified link required", err: fmt.Errorf("checkout: %w", mappingcontract.ErrPlanAccountLinkRequired), code: response.CodeBadRequest, msg: "请先自助绑定您的 API 账号后再购买；原有余额与用量会保留。"},
 		{name: "eligibility unavailable", err: mappingcontract.ErrPlanEligibilityUnavailable, code: response.CodeBadRequest, msg: "暂时无法核实 API 套餐开通条件，尚未创建付款。请稍后重试或联系客服。"},
 		{name: "plan changed", err: mappingcontract.ErrPlanChanged, code: response.CodeBadRequest, msg: "该 API 套餐已更新，请返回套餐页重新选择规格并下单。"},
 		{

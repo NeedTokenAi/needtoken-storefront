@@ -17,7 +17,7 @@ import (
 func TestPlanCheckoutSignsExactFrozenTermsAndValidatesFreshEcho(t *testing.T) {
 	hash := strings.Repeat("a", 64)
 	request := PlanCheckoutEligibilityRequest{SKUID: 901, Quantity: 1, EntitlementContract: json.RawMessage(`{"kind":"plan","issue_api_key":true,"plan":{"quota":9007199254740993}}`), EntitlementContractHash: hash, CustomerReference: PlanCheckoutCustomerReference{MerchantCustomerID: "needtoken-storefront:user:19", Source: "needtoken-storefront", Verification: "merchant_session"}}
-	for _, mode := range []string{"ready", "stale", "future", "wrong-sku", "wrong-hash", "contradictory", "http-error", "invalid-json"} {
+	for _, mode := range []string{"ready", "ready_deferred_link", "stale", "future", "wrong-sku", "wrong-hash", "contradictory", "contradictory-deferred", "http-error", "invalid-json"} {
 		t.Run(mode, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				body, _ := io.ReadAll(r.Body)
@@ -38,6 +38,8 @@ func TestPlanCheckoutSignsExactFrozenTermsAndValidatesFreshEcho(t *testing.T) {
 				}
 				result := PlanCheckoutEligibilityResult{OK: true, Ready: true, ReasonCode: "ready", SKUID: request.SKUID, EntitlementContractHash: hash, CollectedAt: time.Now().UTC()}
 				switch mode {
+				case "ready_deferred_link":
+					result.ReasonCode = "ready_deferred_link"
 				case "stale":
 					result.CollectedAt = time.Now().Add(-time.Minute)
 				case "future":
@@ -48,13 +50,17 @@ func TestPlanCheckoutSignsExactFrozenTermsAndValidatesFreshEcho(t *testing.T) {
 					result.EntitlementContractHash = strings.Repeat("b", 64)
 				case "contradictory":
 					result.ReasonCode = "account_link_required"
+				case "contradictory-deferred":
+					result.Ready = false
+					result.ReasonCode = "ready_deferred_link"
 				}
 				_ = json.NewEncoder(w).Encode(result)
 			}))
 			defer server.Close()
 			adapter := NewDujiaoNextAdapter(&siteconnectiondomain.Connection{BaseURL: server.URL, ApiKey: "key", ApiSecret: "secret"}, "")
 			_, err := adapter.CheckPlanCheckoutEligibility(context.Background(), request)
-			if (err == nil) != (mode == "ready") {
+			wantOK := mode == "ready" || mode == "ready_deferred_link"
+			if (err == nil) != wantOK {
 				t.Fatalf("mode=%s error=%v", mode, err)
 			}
 		})

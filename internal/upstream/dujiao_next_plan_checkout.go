@@ -24,7 +24,8 @@ func (a *DujiaoNextAdapter) CheckPlanCheckoutEligibility(ctx context.Context, re
 		result.CollectedAt.IsZero() || result.CollectedAt.Before(now.Add(-15*time.Second)) || result.CollectedAt.After(now.Add(5*time.Second)) {
 		return nil, ErrPlanCheckoutUnavailable
 	}
-	if result.Ready && result.ReasonCode != "ready" || !result.Ready && result.ReasonCode == "ready" {
+	readyCode := result.ReasonCode == "ready" || result.ReasonCode == "ready_deferred_link"
+	if result.Ready != readyCode {
 		return nil, ErrPlanCheckoutUnavailable
 	}
 	return &result, nil

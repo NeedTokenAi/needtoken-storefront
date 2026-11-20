@@ -43,6 +43,7 @@
 
       <div v-else-if="viewState === 'detail' && order" class="space-y-6">
         <InvoiceRequestNotice v-if="invoiceEnabled" :order="order" />
+        <AssetVaultClaimPanel :order="order" :guest-auth="auth" />
         <SubscriptionAuthorizationPanel :order="order" :guest-auth="auth" />
         <div class="rounded-2xl border bg-card shadow-sm p-6">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -420,6 +421,7 @@
 
 <script setup lang="ts">
 import SubscriptionAuthorizationPanel from "../components/SubscriptionAuthorizationPanel.vue"
+import AssetVaultClaimPanel from "../components/AssetVaultClaimPanel.vue"
 import { Copy, Check, Download, Info, Image as ImageIcon } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'

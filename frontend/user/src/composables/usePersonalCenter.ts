@@ -6,6 +6,8 @@ import { orderStatusLabel, orderStatusVariant } from '../utils/status'
 import type { PageAlert } from '../utils/alerts'
 import { useAppStore } from '../stores/app'
 import { useUserProfileStore } from '../stores/userProfile'
+import { getActiveTemplate } from '../templates/registry'
+import { shouldShowWalletSidebarTab } from '../templates/needtoken/lib/walletVisibility'
 import type { PublicMemberLevel } from '../api'
 
 export type PersonalSection = 'overview' | 'profile' | 'security' | 'orders' | 'wallet' | 'giftCard' | 'affiliate' | 'reseller' | 'api'
@@ -50,8 +52,13 @@ export function usePersonalCenter(sectionGetter: () => PersonalSection) {
   }
 
   const canAccessResellerConsole = computed(() => appStore.canAccessResellerConsole)
+  const showWalletSidebar = computed(() => shouldShowWalletSidebarTab(getActiveTemplate(), appStore.config))
   const visibleSectionItems = computed(() => {
-    return sectionItems.filter((item) => item.key !== 'reseller' || canAccessResellerConsole.value)
+    return sectionItems.filter((item) => {
+      if (item.key === 'reseller' && !canAccessResellerConsole.value) return false
+      if (item.key === 'wallet' && !showWalletSidebar.value) return false
+      return true
+    })
   })
   const currentSection = computed<PersonalSection>(() => {
     if (sectionGetter() === 'reseller' && !canAccessResellerConsole.value) {

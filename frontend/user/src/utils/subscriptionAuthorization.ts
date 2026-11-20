@@ -38,3 +38,37 @@ export function extractPlatformCredential(input: string): string | null {
   }
   return credential.length >= 8 && credential.length <= 16384 && !/[\s\x00]/.test(credential) ? credential : null
 }
+
+export type SubscriptionProgressStepState = 'done' | 'active' | 'pending'
+
+export interface SubscriptionProgressStep {
+  key: 'paid' | 'authorize' | 'checkout' | 'verified'
+  state: SubscriptionProgressStepState
+}
+
+export function deriveSubscriptionProgressSteps(orderStatus: string | undefined, submitted: boolean): SubscriptionProgressStep[] {
+  const status = String(orderStatus || '').trim().toLowerCase()
+  const finished = status === 'delivered' || status === 'completed'
+  if (finished) {
+    return [
+      { key: 'paid', state: 'done' },
+      { key: 'authorize', state: 'done' },
+      { key: 'checkout', state: 'done' },
+      { key: 'verified', state: 'done' },
+    ]
+  }
+  if (submitted) {
+    return [
+      { key: 'paid', state: 'done' },
+      { key: 'authorize', state: 'done' },
+      { key: 'checkout', state: 'active' },
+      { key: 'verified', state: 'pending' },
+    ]
+  }
+  return [
+    { key: 'paid', state: 'done' },
+    { key: 'authorize', state: 'active' },
+    { key: 'checkout', state: 'pending' },
+    { key: 'verified', state: 'pending' },
+  ]
+}

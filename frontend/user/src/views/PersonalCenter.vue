@@ -87,6 +87,7 @@
 
           <template v-if="currentSection === 'overview'">
             <!-- 数据一览 -->
+            <ApiAccountLinkBanner v-if="needtokenTemplateActive" next-path="/profile" />
             <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard
                 :label="t('personalCenter.tabs.orders')"
@@ -284,8 +285,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Crown, ShoppingBag, ShieldCheck, Percent } from 'lucide-vue-next'
+import { getActiveTemplate } from '../templates/registry'
+import ApiAccountLinkBanner from '../templates/needtoken/components/ApiAccountLinkBanner.vue'
 import { getImageUrl } from '../utils/image'
 import { pageAlertVariant, pageAlertToneClass } from '../utils/alerts'
 import StatCard from '../components/shared/StatCard.vue'
@@ -302,6 +306,7 @@ import ApiPanel from './personal/ApiPanel.vue'
 import { usePersonalCenter, type PersonalSection } from '../composables/usePersonalCenter'
 
 const { t } = useI18n()
+const needtokenTemplateActive = computed(() => getActiveTemplate() === 'needtoken')
 
 const props = withDefaults(defineProps<{ section?: PersonalSection }>(), {
   section: 'overview',

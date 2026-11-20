@@ -52,6 +52,8 @@ export const userOrderAPI = {
     cancel: (orderNo: string) => userApi.post(`/orders/${encodeURIComponent(orderNo)}/cancel`),
     subscriptionAuthorization: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/subscription-authorization`, { silentBusinessError: true }),
     openSubscriptionAuthorization: (orderNo: string, data: any) => userApi.post(`/orders/${encodeURIComponent(orderNo)}/subscription-authorization/session`, data, { silentBusinessError: true }),
+    assetClaimStatus: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/asset-claim`, { silentBusinessError: true }),
+    revealAssetClaim: (orderNo: string) => userApi.post(`/orders/${encodeURIComponent(orderNo)}/asset-claim/reveal`, {}, { silentBusinessError: true }),
     downloadFulfillment: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/fulfillment/download`, { blob: true }),
 }
 
@@ -67,6 +69,14 @@ export const guestOrderAPI = {
     openSubscriptionAuthorization: (orderNo: string, auth: GuestAuthInput, data: any) => {
         const request = withGuestAuth(auth, { silentBusinessError: true })
         return userApi.post(`/guest/orders/${encodeURIComponent(orderNo)}/subscription-authorization/session`, data, request.options)
+    },
+    assetClaimStatus: (orderNo: string, auth: GuestAuthInput) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.get(`/guest/orders/${encodeURIComponent(orderNo)}/asset-claim`, request.options)
+    },
+    revealAssetClaim: (orderNo: string, auth: GuestAuthInput) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.post(`/guest/orders/${encodeURIComponent(orderNo)}/asset-claim/reveal`, {}, request.options)
     },
     preview: (data: any) => userApi.post('/guest/orders/preview', data),
     create: (data: any) => userApi.post('/guest/orders', data),

@@ -317,6 +317,12 @@ const router = createRouter({
             component: templateView('Plans', () => import('../views/NotFound.vue')),
         },
         {
+            path: '/account-link/callback',
+            name: 'account-link-callback',
+            component: templateView('AccountLinkCallback', () => import('../views/NotFound.vue')),
+            meta: { requiresUserAuth: true },
+        },
+        {
             path: '/docs',
             name: 'api-docs',
             component: templateView('ApiDocs', () => import('../views/NotFound.vue')),
