@@ -134,14 +134,19 @@ import {
   PUBLIC_STATUS_MAX_AGE_MS,
   fallbackSeriesFromSummary,
   incidentActive,
+  parseCachedPublicStatus,
   parsePublicStatus,
   parsePublicStatusSeries,
+  parseRetryAfterMs,
   publicStatusColor,
   publicStatusFresh,
+  serializeCachedPublicStatus,
   seriesOverallTone,
   serviceStatusComponents,
   serviceStatusIncidents,
   serviceStatusTone,
+  shouldFetchStatus,
+  statusRefreshDelayMs,
   type PublicComponentStatus,
   type PublicStatusIncident,
   type PublicStatusSeries,
@@ -150,6 +155,8 @@ import {
 } from '../lib/publicStatus'
 
 type Provider = PublicStatusService
+
+const STATUS_CACHE_KEY_PREFIX = 'nt-public-status-v2:'
 
 interface StatusSource {
   id: 'openai' | 'claude'
@@ -161,6 +168,8 @@ interface StatusSource {
   stale: boolean
   refreshing: boolean
   error: 'timeout' | 'unavailable' | null
+  failures: number
+  nextRetryAt: number
   sequence: number
 }
 
@@ -186,6 +195,8 @@ const sources = ref<StatusSource[]>([
     stale: true,
     refreshing: false,
     error: null,
+    failures: 0,
+    nextRetryAt: 0,
     sequence: 0,
   },
   {
@@ -198,6 +209,8 @@ const sources = ref<StatusSource[]>([
     stale: true,
     refreshing: false,
     error: null,
+    failures: 0,
+    nextRetryAt: 0,
     sequence: 0,
   },
 ])
@@ -231,7 +244,7 @@ const showEnteringPanel = (element: Element) => {
 const providers = computed<ProviderView[]>(() =>
   sources.value.map(source => {
     const id: Provider = source.id === 'openai' ? 'gpt' : 'claude'
-    const fresh = source.state === 'ready' && !source.stale && publicStatusFresh(source.fetchedAt, now.value)
+    const fresh = source.state === 'ready' && publicStatusFresh(source.fetchedAt, now.value)
     const series = source.series.length
       ? source.series
       : fallbackSeriesFromSummary(source.snapshot, id, now.value)
@@ -374,6 +387,63 @@ function onPointerChange() {
   finePointer.value = pointerQuery?.matches ?? false
 }
 
+function cacheKey(id: StatusSource['id']) {
+  return `${STATUS_CACHE_KEY_PREFIX}${id}`
+}
+
+function hydrateSourceFromCache(source: StatusSource, currentTime: number): boolean {
+  try {
+    const cached = parseCachedPublicStatus(window.localStorage.getItem(cacheKey(source.id)), source.id, source.href, currentTime)
+    if (!cached) return false
+    const existingTs = Date.parse(source.fetchedAt || '')
+    const cachedTs = Date.parse(cached.fetchedAt)
+    if (Number.isFinite(existingTs) && existingTs >= cachedTs && source.snapshot) return true
+    source.snapshot = cached.snapshot
+    if (cached.series.length || !source.series.length) source.series = cached.series
+    source.fetchedAt = cached.fetchedAt
+    source.stale = cached.stale
+    source.state = 'ready'
+    source.error = null
+    source.failures = 0
+    source.nextRetryAt = 0
+    return true
+  } catch {
+    return false
+  }
+}
+
+function persistSourceCache(source: StatusSource, rawSummary: unknown, rawSeries: unknown, fetchedAt: string, stale: boolean) {
+  try {
+    window.localStorage.setItem(cacheKey(source.id), serializeCachedPublicStatus({
+      provider: source.id,
+      fetchedAt,
+      stale,
+      summary: rawSummary,
+      series: rawSeries,
+    }))
+  } catch {
+    /* localStorage 不可用（隐私模式或容量满）时静默降级为内存态 */
+  }
+}
+
+function scheduleNextRefresh() {
+  window.clearTimeout(refreshTimer)
+  if (disposed || !pageVisible.value) return
+  const currentTime = Date.now()
+  const delays = sources.value.map(source => {
+    if (source.nextRetryAt > currentTime) return source.nextRetryAt - currentTime
+    return statusRefreshDelayMs({
+      fetchedAt: source.fetchedAt,
+      failures: source.failures,
+      now: currentTime,
+    })
+  })
+  const delay = Math.max(10_000, Math.min(...delays))
+  refreshTimer = window.setTimeout(() => {
+    void refresh()
+  }, delay)
+}
+
 function scheduleExpiry() {
   window.clearTimeout(expiryTimer)
   const expiries = sources.value.flatMap(source => {
@@ -388,12 +458,16 @@ function scheduleExpiry() {
 }
 
 async function loadSource(source: StatusSource, signal: AbortSignal, run: number) {
+  let retryAfterMs: number | null = null
   try {
     const response = await fetch(`/api/v1/public/tools/service-status/${source.id}`, {
       signal,
       headers: { accept: 'application/json' },
       credentials: 'omit',
     })
+    if (response.status === 429 || response.status === 503) {
+      retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'), Date.now())
+    }
     if (!response.ok) throw new Error('status unavailable')
     const body = await response.json()
     const data = body?.status_code === 0 ? body.data : null
@@ -409,19 +483,39 @@ async function loadSource(source: StatusSource, signal: AbortSignal, run: number
     const snapshot = parsePublicStatus(data.summary, source.href)
     if (!snapshot.ok) throw new Error('invalid status payload')
     if (disposed || run !== currentRun || !pageVisible.value) return
+    const parsedSeries = parsePublicStatusSeries(data.series, source.href)
     source.snapshot = snapshot
-    source.series = parsePublicStatusSeries(data.series, source.href)
+    // 若后端临时未返回 90 天序列，保留内存中尚未过期的既有序列避免图表闪烁清空
+    if (parsedSeries.length || !publicStatusFresh(source.fetchedAt, Date.now())) {
+      source.series = parsedSeries
+    }
     source.fetchedAt = data.fetched_at
     source.stale = data.stale
     source.state = 'ready'
     source.error = null
+    source.failures = 0
+    source.nextRetryAt = 0
     source.sequence++
+    persistSourceCache(source, data.summary, parsedSeries.length ? data.series : [], data.fetched_at, data.stale)
   } catch {
     if (disposed || run !== currentRun || !pageVisible.value) return
-    source.state = 'unavailable'
-    source.stale = true
-    source.error = signal.aborted ? 'timeout' : 'unavailable'
-    source.sequence++
+    const currentTime = Date.now()
+    source.failures = Math.min(source.failures + 1, 6)
+    const backoffMs = statusRefreshDelayMs({
+      fetchedAt: source.fetchedAt,
+      failures: source.failures,
+      retryAfterMs,
+      now: currentTime,
+    })
+    source.nextRetryAt = currentTime + backoffMs
+    // 已有仍在有效期内的快照时，遇到 429 或临时超时不清空状态，仅记录退避时间等待平滑恢复
+    const hasUsableSnapshot = source.snapshot !== null && publicStatusFresh(source.fetchedAt, currentTime)
+    if (!hasUsableSnapshot) {
+      source.state = 'unavailable'
+      source.stale = true
+      source.error = signal.aborted ? 'timeout' : 'unavailable'
+      source.sequence++
+    }
   } finally {
     if (run === currentRun) source.refreshing = false
   }
@@ -429,17 +523,28 @@ async function loadSource(source: StatusSource, signal: AbortSignal, run: number
 
 async function refresh() {
   if (disposed || !pageVisible.value || inFlight) return
+  const currentTime = Date.now()
+  now.value = currentTime
+  sources.value.forEach(source => {
+    hydrateSourceFromCache(source, currentTime)
+  })
+  const targets = sources.value.filter(source => shouldFetchStatus(source.fetchedAt, source.nextRetryAt, currentTime))
+  if (!targets.length) {
+    scheduleExpiry()
+    scheduleNextRefresh()
+    return
+  }
   window.clearTimeout(refreshTimer)
   inFlight = true
   const run = ++currentRun
   controller = new AbortController()
   const activeController = controller
-  sources.value.forEach(source => {
+  targets.forEach(source => {
     source.refreshing = true
   })
   timeout = window.setTimeout(() => activeController.abort(), 8000)
   try {
-    await Promise.all(sources.value.map(source => loadSource(source, activeController.signal, run)))
+    await Promise.all(targets.map(source => loadSource(source, activeController.signal, run)))
   } finally {
     if (run !== currentRun) return
     window.clearTimeout(timeout)
@@ -447,9 +552,20 @@ async function refresh() {
     controller = undefined
     now.value = Date.now()
     scheduleExpiry()
-    if (!disposed && pageVisible.value) {
-      refreshTimer = window.setTimeout(refresh, 60_000)
-    }
+    scheduleNextRefresh()
+  }
+}
+
+function onStorageSync(event: StorageEvent) {
+  if (disposed || !event.key || !event.key.startsWith(STATUS_CACHE_KEY_PREFIX)) return
+  const providerId = event.key.slice(STATUS_CACHE_KEY_PREFIX.length)
+  const target = sources.value.find(source => source.id === providerId)
+  if (!target) return
+  const currentTime = Date.now()
+  now.value = currentTime
+  if (hydrateSourceFromCache(target, currentTime)) {
+    scheduleExpiry()
+    scheduleNextRefresh()
   }
 }
 
@@ -479,6 +595,7 @@ onMounted(() => {
   pointerQuery.addEventListener('change', onPointerChange)
   document.addEventListener('pointerdown', onOutsidePointer)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('storage', onStorageSync)
   onVisibilityChange()
 })
 
@@ -489,6 +606,7 @@ onUnmounted(() => {
   pointerQuery?.removeEventListener('change', onPointerChange)
   document.removeEventListener('pointerdown', onOutsidePointer)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('storage', onStorageSync)
 })
 </script>
 

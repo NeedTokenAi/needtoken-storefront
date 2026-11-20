@@ -407,13 +407,107 @@ export function publicHistoryDays(incidents: PublicStatusIncident[], now: number
   return days
 }
 
-export const PUBLIC_STATUS_MAX_AGE_MS = 2 * 60 * 1000
+export const PUBLIC_STATUS_MAX_AGE_MS = 15 * 60 * 1000
+export const PUBLIC_STATUS_REFRESH_MS = 5 * 60 * 1000
+export const PUBLIC_STATUS_MIN_FETCH_GAP_MS = 3 * 60 * 1000
+export const PUBLIC_STATUS_BACKOFF_BASE_MS = 2 * 60 * 1000
+export const PUBLIC_STATUS_BACKOFF_MAX_MS = 10 * 60 * 1000
 
 /** Retrieval time is freshness; a provider's unchanged component date is not. */
 export function publicStatusFresh(fetchedAt: string | null, now: number): boolean {
   if (!fetchedAt) return false
   const fetched = Date.parse(fetchedAt)
   return Number.isFinite(fetched) && fetched <= now + 30_000 && now - fetched < PUBLIC_STATUS_MAX_AGE_MS
+}
+
+export function parseRetryAfterMs(headerValue: string | null, now: number): number | null {
+  if (!headerValue) return null
+  const trimmed = headerValue.trim()
+  if (!trimmed) return null
+  let delayMs: number | null = null
+  if (/^\d+$/.test(trimmed)) {
+    delayMs = Number(trimmed) * 1000
+  } else {
+    const target = Date.parse(trimmed)
+    if (Number.isFinite(target)) delayMs = target - now
+  }
+  if (delayMs === null || !Number.isFinite(delayMs) || delayMs <= 0) return null
+  return Math.min(PUBLIC_STATUS_BACKOFF_MAX_MS, Math.max(10_000, delayMs))
+}
+
+export function shouldFetchStatus(fetchedAt: string | null, nextRetryAt: number, now: number): boolean {
+  if (nextRetryAt > now) return false
+  if (!fetchedAt) return true
+  const fetched = Date.parse(fetchedAt)
+  if (!Number.isFinite(fetched) || fetched > now + 30_000) return true
+  return now - fetched >= PUBLIC_STATUS_MIN_FETCH_GAP_MS
+}
+
+export function statusRefreshDelayMs(options: {
+  fetchedAt: string | null
+  failures: number
+  retryAfterMs?: number | null
+  now: number
+}): number {
+  const { fetchedAt, failures, retryAfterMs = null, now } = options
+  if (failures > 0) {
+    const exponential = Math.min(
+      PUBLIC_STATUS_BACKOFF_MAX_MS,
+      PUBLIC_STATUS_BACKOFF_BASE_MS * (2 ** Math.min(failures - 1, 3)),
+    )
+    return retryAfterMs !== null ? Math.max(exponential, retryAfterMs) : exponential
+  }
+  if (fetchedAt) {
+    const fetched = Date.parse(fetchedAt)
+    if (Number.isFinite(fetched) && fetched <= now + 30_000) {
+      const remaining = fetched + PUBLIC_STATUS_REFRESH_MS - now
+      if (remaining > 5_000) return remaining
+    }
+  }
+  return PUBLIC_STATUS_REFRESH_MS
+}
+
+export interface CachedPublicStatusPayload {
+  provider: 'openai' | 'claude'
+  fetchedAt: string
+  stale: boolean
+  summary: unknown
+  series: unknown
+}
+
+export interface ParsedCachedPublicStatus {
+  fetchedAt: string
+  stale: boolean
+  snapshot: PublicStatusSnapshot
+  series: PublicStatusSeries[]
+}
+
+export function serializeCachedPublicStatus(payload: CachedPublicStatusPayload): string {
+  return JSON.stringify(payload)
+}
+
+export function parseCachedPublicStatus(
+  raw: string | null,
+  provider: 'openai' | 'claude',
+  fallbackUrl: string,
+  now: number,
+): ParsedCachedPublicStatus | null {
+  if (!raw) return null
+  try {
+    const parsed = record(JSON.parse(raw))
+    if (!parsed || parsed.provider !== provider || typeof parsed.fetchedAt !== 'string') return null
+    if (!publicStatusFresh(parsed.fetchedAt, now)) return null
+    const snapshot = parsePublicStatus(parsed.summary, fallbackUrl)
+    if (!snapshot.ok) return null
+    return {
+      fetchedAt: parsed.fetchedAt,
+      stale: Boolean(parsed.stale),
+      snapshot,
+      series: parsePublicStatusSeries(parsed.series, fallbackUrl),
+    }
+  } catch {
+    return null
+  }
 }
 
 export function publicStatusTone(components: PublicStatusComponent[], fresh: boolean): PublicComponentStatus {

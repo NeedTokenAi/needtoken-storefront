@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { fallbackSeriesFromSummary, incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, matchesTerms, operationalCount, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, parsePublicStatusSeries, publicHistoryDays, publicHistoryIncidents, publicIncidentTone, publicStatusColor, publicStatusFresh, publicStatusTone, seriesOverallTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone } from '../src/templates/needtoken/lib/publicStatus.ts'
+import { fallbackSeriesFromSummary, incidentElapsedMinutes, incidentPhase, mergePublicStatusIncidents, matchesTerms, operationalCount, parseCachedPublicStatus, parsePublicIncidents, parsePublicStatus, parsePublicStatusHistory, parsePublicStatusSeries, parseRetryAfterMs, publicHistoryDays, publicHistoryIncidents, publicIncidentTone, publicStatusColor, publicStatusFresh, publicStatusTone, serializeCachedPublicStatus, seriesOverallTone, serviceStatusComponents, serviceStatusIncidents, serviceStatusTone, shouldFetchStatus, statusRefreshDelayMs } from '../src/templates/needtoken/lib/publicStatus.ts'
 
 test('parsePublicStatus keeps component states and does not invent uptime', () => {
   const view = parsePublicStatus({
@@ -100,12 +100,38 @@ test('Claude consumer pill covers claude.ai only, not API or Claude Code', () =>
 
 test('unknown, stale, invalid, future and absent retrievals never become healthy', () => {
   const now = Date.parse('2026-11-14T16:00:00Z')
-  for (const value of [null, 'invalid', '2026-11-14T15:57:59Z', '2026-11-14T16:10:00Z']) assert.equal(publicStatusFresh(value, now), false)
-  assert.equal(publicStatusFresh('2026-11-14T15:59:30Z', now), true)
+  for (const value of [null, 'invalid', '2026-11-14T15:44:59Z', '2026-11-14T16:10:00Z']) assert.equal(publicStatusFresh(value, now), false)
+  assert.equal(publicStatusFresh('2026-11-14T15:52:00Z', now), true)
   assert.equal(publicStatusTone([{ name: 'ChatGPT', status: 'operational' }], false), 'unknown')
   assert.equal(publicStatusTone([], true), 'unknown')
   assert.equal(publicStatusTone([{ name: 'ChatGPT', status: 'unknown' }], true), 'unknown')
   assert.equal(publicStatusTone([{ name: 'ChatGPT', status: 'operational' }], true), 'operational')
+})
+
+test('status polling throttles rapid tab switches, backs off on 429 and shares valid cache entries', () => {
+  const now = Date.parse('2026-11-20T06:00:00Z')
+  assert.equal(shouldFetchStatus('2026-11-20T05:58:00Z', 0, now), false, 'skips fetch within minimum gap')
+  assert.equal(shouldFetchStatus('2026-11-20T05:56:00Z', 0, now), true, 'fetches after minimum gap elapses')
+  assert.equal(shouldFetchStatus(null, now + 30_000, now), false, 'respects active backoff window')
+  assert.equal(parseRetryAfterMs('45', now), 45_000)
+  assert.equal(parseRetryAfterMs('2', now), 10_000)
+  assert.equal(parseRetryAfterMs('3600', now), 600_000)
+  assert.equal(statusRefreshDelayMs({ fetchedAt: '2026-11-20T05:58:00Z', failures: 0, now }), 180_000)
+  assert.equal(statusRefreshDelayMs({ fetchedAt: null, failures: 1, retryAfterMs: 180_000, now }), 180_000)
+  assert.equal(statusRefreshDelayMs({ fetchedAt: null, failures: 2, now }), 240_000)
+
+  const raw = serializeCachedPublicStatus({
+    provider: 'openai',
+    fetchedAt: '2026-11-20T05:57:00Z',
+    stale: false,
+    summary: { page: { name: 'OpenAI' }, status: { indicator: 'none', description: 'Operational' }, components: [{ name: 'ChatGPT', status: 'operational' }] },
+    series: [{ key: 'chatgpt', label: 'ChatGPT', component_count: 16, status: 'operational', uptime_percent: 99.5, days: [{ date: '2026-11-20', status: 'operational' }] }],
+  })
+  const cached = parseCachedPublicStatus(raw, 'openai', 'https://status.openai.com/', now)
+  assert.ok(cached)
+  assert.equal(cached.series.length, 1)
+  assert.equal(parseCachedPublicStatus(raw, 'claude', 'https://status.claude.com/', now), null)
+  assert.equal(parseCachedPublicStatus(raw, 'openai', 'https://status.openai.com/', now + 20 * 60_000), null)
 })
 
 test('incident summaries preserve latest official update, association and valid times', () => {
