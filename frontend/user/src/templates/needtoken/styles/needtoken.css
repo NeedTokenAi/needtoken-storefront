@@ -388,14 +388,18 @@ body.nt-tokens {
   .nt-scope details > summary > svg { transition: none; }
 }
 
-/* 回落至 classic 视图或原生包装页时，移除根容器纯色底，避免在内容区内遮挡全宽极光背景 */
+/* 回落至 classic 视图、认证页或原生包装页时，移除根容器纯色底与局部渐变，避免在内容区内遮挡全宽极光背景 */
 .nt-scope .nt-page-content > .bg-background,
-.nt-scope .nt-page-content > .nt-native-page > .bg-background {
-  background-color: transparent;
+.nt-scope .nt-page-content > .nt-native-page > .bg-background,
+.nt-scope .nt-page-content > .theme-auth-page {
+  background: transparent;
 }
 .nt-scope .nt-page-content > .bg-background:not(.theme-auth-page),
 .nt-scope .nt-page-content > .nt-native-page > .bg-background {
   min-height: 0;
+}
+.nt-scope .nt-page-content > .theme-auth-page {
+  min-height: clamp(540px, calc(100svh - 160px), 780px);
 }
 
 /* Match native cart/order views to the storefront content width.
