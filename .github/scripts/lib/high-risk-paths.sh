@@ -27,6 +27,7 @@ is_high_risk_path() {
       ;;
     # NeedToken 二开保护区
     internal/modules/diagnostics/* | internal/modules/opsbridge/* | internal/app/httpserver/routes_storefront.go | \
+      internal/app/httpserver/routes_channel.go | \
       frontend/user/src/templates/needtoken/* | frontend/user/index.html | \
       frontend/user/src/router/index.ts | frontend/user/src/api/order.ts | \
       frontend/user/src/composables/usePersonalCenter.ts | \

@@ -7,5 +7,13 @@ import (
 )
 
 func NewHandler(c *container.Container) *opstransport.Handler {
-	return opstransport.New(opsapp.New(c.OrderStore, c.PaymentStore, c.ProcurementOrderRepo))
+	return opstransport.New(opsapp.NewWithCatalog(
+		c.OrderStore,
+		c.PaymentStore,
+		c.ProcurementOrderRepo,
+		c.CategoryRepo,
+		c.ProductRepo,
+		c.ProductSKURepo,
+		c.CouponRepo,
+	))
 }

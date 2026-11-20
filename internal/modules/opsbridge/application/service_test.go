@@ -2,12 +2,20 @@ package application_test
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dujiao-next/internal/constants"
+	categorycontract "github.com/dujiao-next/internal/modules/catalog/category/contract"
+	categorydomain "github.com/dujiao-next/internal/modules/catalog/category/domain"
+	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
+	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
+	couponcontract "github.com/dujiao-next/internal/modules/coupon/contract"
+	coupondomain "github.com/dujiao-next/internal/modules/coupon/domain"
 	"github.com/dujiao-next/internal/modules/opsbridge/application"
+	opscontract "github.com/dujiao-next/internal/modules/opsbridge/contract"
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
@@ -86,5 +94,140 @@ func TestOpsWhitelistNeverSerializesCredentialsOrDeliveryPayload(t *testing.T) {
 	}
 	if len(result.Orders[0].Payments) != 1 || result.Orders[0].Payments[0].ProviderType != "official" || result.Orders[0].Payments[0].ChannelType != "wechat" {
 		t.Fatalf("payment channel metadata missing: %+v", result.Orders[0].Payments)
+	}
+}
+
+type fakeCatRepo struct {
+	categorycontract.Repository
+	items map[string]*categorydomain.Category
+}
+
+func (f *fakeCatRepo) List() ([]categorydomain.Category, error) {
+	out := []categorydomain.Category{}
+	for _, c := range f.items {
+		out = append(out, *c)
+	}
+	return out, nil
+}
+func (f *fakeCatRepo) GetByID(id string) (*categorydomain.Category, error) { return f.items[id], nil }
+func (f *fakeCatRepo) Update(c *categorydomain.Category) error {
+	f.items["1"] = c
+	return nil
+}
+
+type fakeProdRepo struct {
+	productcontract.Repository
+	prod  *productdomain.Product
+	quick map[string]interface{}
+}
+
+func (f *fakeProdRepo) List(productcontract.ListFilter) ([]productdomain.Product, int64, error) {
+	return []productdomain.Product{*f.prod}, 1, nil
+}
+func (f *fakeProdRepo) GetAdminByID(string) (*productdomain.Product, error) { return f.prod, nil }
+func (f *fakeProdRepo) QuickUpdate(_ string, fields map[string]interface{}) error {
+	f.quick = fields
+	return nil
+}
+
+type fakeSKURepo struct {
+	productcontract.SKURepository
+	sku *productdomain.ProductSKU
+}
+
+func (f *fakeSKURepo) ListByProduct(uint, bool) ([]productdomain.ProductSKU, error) {
+	return []productdomain.ProductSKU{*f.sku}, nil
+}
+func (f *fakeSKURepo) GetByID(uint) (*productdomain.ProductSKU, error) { return f.sku, nil }
+func (f *fakeSKURepo) Update(s *productdomain.ProductSKU) error {
+	f.sku = s
+	return nil
+}
+
+type fakeCouponRepo struct {
+	couponcontract.Repository
+	items map[string]*coupondomain.Coupon
+	byID  map[uint]*coupondomain.Coupon
+}
+
+func (f *fakeCouponRepo) List(couponcontract.ListFilter) ([]coupondomain.Coupon, int64, error) {
+	out := []coupondomain.Coupon{}
+	for _, c := range f.items {
+		out = append(out, *c)
+	}
+	return out, int64(len(out)), nil
+}
+func (f *fakeCouponRepo) GetByCode(code string) (*coupondomain.Coupon, error) {
+	return f.items[code], nil
+}
+func (f *fakeCouponRepo) GetByID(id uint) (*coupondomain.Coupon, error) { return f.byID[id], nil }
+func (f *fakeCouponRepo) Create(c *coupondomain.Coupon) error {
+	c.ID = uint(len(f.items) + 1)
+	f.items[c.Code] = c
+	f.byID[c.ID] = c
+	return nil
+}
+func (f *fakeCouponRepo) Update(c *coupondomain.Coupon) error {
+	f.items[c.Code] = c
+	f.byID[c.ID] = c
+	return nil
+}
+
+func TestOpsBridgeCatalogAndCouponManagement(t *testing.T) {
+	cats := &fakeCatRepo{items: map[string]*categorydomain.Category{
+		"1": {ID: 1, Slug: "api-plans", NameJSON: jsonmap.JSON{"zh-CN": "API 套餐"}, SortOrder: 10, IsActive: true},
+	}}
+	prods := &fakeProdRepo{prod: &productdomain.Product{
+		ID: 10, CategoryID: 1, Slug: "chatgpt-plus", TitleJSON: jsonmap.JSON{"zh-CN": "ChatGPT Plus"},
+		PriceAmount: money.FromDecimal(decimal.NewFromInt(20)), IsActive: true, SortOrder: 5,
+	}}
+	skus := &fakeSKURepo{sku: &productdomain.ProductSKU{
+		ID: 101, ProductID: 10, SKUCode: "MONTHLY", PriceAmount: money.FromDecimal(decimal.NewFromInt(20)), ManualStockTotal: 5, IsActive: true,
+	}}
+	coupons := &fakeCouponRepo{items: map[string]*coupondomain.Coupon{}, byID: map[uint]*coupondomain.Coupon{}}
+	svc := application.NewWithCatalog(orders{}, payments{}, procurements{}, cats, prods, skus, coupons)
+
+	catRes, err := svc.Categories()
+	if err != nil || len(catRes.Categories) != 1 || catRes.Categories[0].Name["zh-CN"] != "API 套餐" {
+		t.Fatalf("Categories failed: %+v err=%v", catRes, err)
+	}
+	sortVal := 99
+	inactive := false
+	updatedCat, err := svc.UpdateCategory("1", opscontract.UpdateCategoryInput{SortOrder: &sortVal, IsActive: &inactive})
+	if err != nil || updatedCat.SortOrder != 99 || updatedCat.IsActive {
+		t.Fatalf("UpdateCategory failed: %+v err=%v", updatedCat, err)
+	}
+
+	prodRes, err := svc.Products(1, 20, "", "")
+	if err != nil || len(prodRes.Products) != 1 || len(prodRes.Products[0].SKUs) != 1 {
+		t.Fatalf("Products failed: %+v err=%v", prodRes, err)
+	}
+	if _, err := svc.UpdateProduct("10", opscontract.UpdateProductInput{IsActive: &inactive}); err != nil || prods.quick["is_active"] != false {
+		t.Fatalf("UpdateProduct failed: err=%v quick=%+v", err, prods.quick)
+	}
+
+	newPrice := "24.90"
+	newStock := 18
+	updatedSKU, err := svc.UpdateSKU(101, opscontract.UpdateSKUInput{PriceAmount: &newPrice, ManualStockTotal: &newStock})
+	if err != nil || updatedSKU.PriceAmount != "24.90" || updatedSKU.ManualStockTotal != 18 {
+		t.Fatalf("UpdateSKU failed: %+v err=%v", updatedSKU, err)
+	}
+
+	created, err := svc.CreateCoupon(opscontract.CreateCouponInput{
+		Code: "save20", Type: constants.CouponTypePercent, Value: "20", UsageLimit: 50, ScopeRefIDs: []uint{10},
+	})
+	if err != nil || created.Code != "SAVE20" || created.Value != "20.00" || !created.IsActive {
+		t.Fatalf("CreateCoupon failed: %+v err=%v", created, err)
+	}
+	if _, err := svc.CreateCoupon(opscontract.CreateCouponInput{Code: "SAVE20", Type: constants.CouponTypePercent, Value: "10"}); !errors.Is(err, opscontract.ErrConflict) {
+		t.Fatalf("duplicate coupon code must return ErrConflict, got %v", err)
+	}
+	disabled, err := svc.UpdateCouponStatus(created.ID, false)
+	if err != nil || disabled.IsActive {
+		t.Fatalf("UpdateCouponStatus failed: %+v err=%v", disabled, err)
+	}
+	listed, err := svc.Coupons(1, 20, "", nil)
+	if err != nil || listed.Total != 1 {
+		t.Fatalf("Coupons list failed: %+v err=%v", listed, err)
 	}
 }
