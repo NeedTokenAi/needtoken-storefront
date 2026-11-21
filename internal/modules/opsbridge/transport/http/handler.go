@@ -126,6 +126,29 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *Handler) CreateSKU(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	productID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || productID == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	var req opscontract.CreateSKUInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.CreateSKU(uint(productID), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *Handler) UpdateSKU(c *gin.Context) {
 	if h.bridge == nil {
 		fail(c, opscontract.ErrNotConfigured)
@@ -203,6 +226,37 @@ func (h *Handler) UpdateCouponStatus(c *gin.Context) {
 		return
 	}
 	result, err := h.bridge.UpdateCouponStatus(uint(id), req.IsActive)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) Pricing(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	result, err := h.bridge.Pricing()
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) UpdatePricing(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.UpdatePricingInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.UpdatePricing(req)
 	if err != nil {
 		fail(c, err)
 		return

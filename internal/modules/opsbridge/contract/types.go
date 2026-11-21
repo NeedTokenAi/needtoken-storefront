@@ -139,6 +139,7 @@ type Product struct {
 	CategoryID        uint              `json:"category_id"`
 	Slug              string            `json:"slug"`
 	Title             map[string]string `json:"title"`
+	Description       map[string]string `json:"description,omitempty"`
 	PriceAmount       string            `json:"price_amount"`
 	CostPriceAmount   string            `json:"cost_price_amount"`
 	PurchaseType      string            `json:"purchase_type"`
@@ -179,14 +180,78 @@ type CreateProductInput struct {
 }
 
 type UpdateProductInput struct {
-	IsActive  *bool `json:"is_active,omitempty"`
-	SortOrder *int  `json:"sort_order,omitempty"`
+	CategoryID       *uint             `json:"category_id,omitempty"`
+	Slug             *string           `json:"slug,omitempty"`
+	Title            map[string]string `json:"title,omitempty"`
+	Description      map[string]string `json:"description,omitempty"`
+	PriceAmount      *string           `json:"price_amount,omitempty"`
+	CostPriceAmount  *string           `json:"cost_price_amount,omitempty"`
+	PurchaseType     *string           `json:"purchase_type,omitempty"`
+	FulfillmentType  *string           `json:"fulfillment_type,omitempty"`
+	ManualStockTotal *int              `json:"manual_stock_total,omitempty"`
+	IsActive         *bool             `json:"is_active,omitempty"`
+	SortOrder        *int              `json:"sort_order,omitempty"`
+}
+
+type CreateSKUInput struct {
+	SKUCode          string `json:"sku_code"`
+	PriceAmount      string `json:"price_amount"`
+	CostPriceAmount  string `json:"cost_price_amount,omitempty"`
+	ManualStockTotal *int   `json:"manual_stock_total,omitempty"`
+	SortOrder        int    `json:"sort_order,omitempty"`
+	IsActive         *bool  `json:"is_active,omitempty"`
 }
 
 type UpdateSKUInput struct {
+	SKUCode          *string `json:"sku_code,omitempty"`
 	PriceAmount      *string `json:"price_amount,omitempty"`
+	CostPriceAmount  *string `json:"cost_price_amount,omitempty"`
 	ManualStockTotal *int    `json:"manual_stock_total,omitempty"`
+	SortOrder        *int    `json:"sort_order,omitempty"`
 	IsActive         *bool   `json:"is_active,omitempty"`
+}
+
+type ConnectionPricing struct {
+	ID                 uint      `json:"id"`
+	Name               string    `json:"name"`
+	Protocol           string    `json:"protocol"`
+	Status             string    `json:"status"`
+	ExchangeRate       string    `json:"exchange_rate"`
+	PriceMarkupPercent string    `json:"price_markup_percent"`
+	PriceRoundingMode  string    `json:"price_rounding_mode"`
+	AutoSyncPrice      bool      `json:"auto_sync_price"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+type PricingSettings struct {
+	Source                 string              `json:"source"`
+	CollectedAt            time.Time           `json:"collected_at"`
+	Freshness              string              `json:"freshness"`
+	SiteCurrency           string              `json:"site_currency"`
+	DefaultDisplayCurrency string              `json:"default_display_currency"`
+	USDCNYRate             string              `json:"usd_cny_rate"`
+	RateUpdatedAt          string              `json:"rate_updated_at,omitempty"`
+	Connections            []ConnectionPricing `json:"connections"`
+}
+
+type UpdatePricingInput struct {
+	SiteCurrency           *string  `json:"site_currency,omitempty"`
+	DefaultDisplayCurrency *string  `json:"default_display_currency,omitempty"`
+	USDCNYRate             *string  `json:"usd_cny_rate,omitempty"`
+	ConnectionID           *uint    `json:"connection_id,omitempty"`
+	ExchangeRate           *float64 `json:"exchange_rate,omitempty"`
+	PriceMarkupPercent     *float64 `json:"price_markup_percent,omitempty"`
+	PriceRoundingMode      *string  `json:"price_rounding_mode,omitempty"`
+	AutoSyncPrice          *bool    `json:"auto_sync_price,omitempty"`
+}
+
+// PricingStore abstracts storefront currency/display-rate settings and upstream
+// connection exchange-rate/markup settings without exposing secrets.
+type PricingStore interface {
+	GetSitePricing() (siteCurrency, defaultDisplayCurrency, usdCnyRate, rateUpdatedAt string, err error)
+	UpdateSitePricing(siteCurrency, defaultDisplayCurrency, usdCnyRate *string) error
+	ListConnectionPricing() ([]ConnectionPricing, error)
+	UpdateConnectionPricing(id uint, exchangeRate, markupPercent *float64, roundingMode *string, autoSyncPrice *bool) error
 }
 
 type Coupon struct {
@@ -248,8 +313,11 @@ type Bridge interface {
 	Products(page, pageSize int, categoryID, search string) (*ProductsResult, error)
 	CreateProduct(input CreateProductInput) (*Product, error)
 	UpdateProduct(id string, input UpdateProductInput) (*Product, error)
+	CreateSKU(productID uint, input CreateSKUInput) (*ProductSKU, error)
 	UpdateSKU(id uint, input UpdateSKUInput) (*ProductSKU, error)
 	Coupons(page, pageSize int, code string, isActive *bool) (*CouponsResult, error)
 	CreateCoupon(input CreateCouponInput) (*Coupon, error)
 	UpdateCouponStatus(id uint, active bool) (*Coupon, error)
+	Pricing() (*PricingSettings, error)
+	UpdatePricing(input UpdatePricingInput) (*PricingSettings, error)
 }
