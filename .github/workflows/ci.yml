@@ -48,7 +48,7 @@ jobs:
         run: bash .github/scripts/tests/cloudflare-image-record_test.sh
 
       - name: Run container wrapper checks
-        run: node --test cloudflare/src/runtime.test.js
+        run: node --test cloudflare/src/runtime.test.js cloudflare/src/admin_gate.test.js
 
       - name: Check release archive includes installer
         run: |

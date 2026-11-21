@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
+import { handleEdgeAdminGate } from "./admin_gate.js";
 import {
   APP_PORT,
   ContainerNotReady,
@@ -30,6 +31,8 @@ export class Storefront extends DurableObject {
   }
 
   async fetch(request) {
+    const gate = await handleEdgeAdminGate(request, this.env, this.ctx.storage?.sql);
+    if (gate.response) return gate.response;
     try {
       await this.ensureStarted();
       return await this.ctx.container.getTcpPort(APP_PORT).fetch(forwardRequest(request));

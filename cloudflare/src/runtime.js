@@ -1,3 +1,5 @@
+import { isEdgeOnlyEnvKey, stripEdgeGateHeaders } from "./admin_gate.js";
+
 export const APP_PORT = 8080;
 
 // Cloud Run injects PORT. The production env copied into this Worker does not.
@@ -42,7 +44,7 @@ export function containerEnv(env) {
     return out;
   }
   for (const [key, value] of Object.entries(env)) {
-    if (typeof value === "string") {
+    if (typeof value === "string" && !isEdgeOnlyEnvKey(key)) {
       out[key] = value;
     }
   }
@@ -94,5 +96,6 @@ export function forwardRequest(request) {
   url.host = "container";
   const forwarded = new Request(url, request);
   forwarded.headers.delete("host");
+  stripEdgeGateHeaders(forwarded.headers);
   return forwarded;
 }
