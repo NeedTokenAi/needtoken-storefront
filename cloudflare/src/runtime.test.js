@@ -189,6 +189,7 @@ test("the worker source uses the runtime values and does not restrict hosts", ()
   assert.match(source, /error instanceof ContainerNotReady/);
   assert.match(source, /return notReadyResponse\(\)/);
   assert.match(source, /waitForReady\(/);
+  assert.equal(source.includes("this.portReady && container?.running"), true);
   assert.equal(source.includes("instanceName"), false);
   assert.equal(source.includes("instance-1"), false);
   assert.equal(source.includes("needtoken.ai"), false);
