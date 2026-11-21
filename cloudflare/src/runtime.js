@@ -21,6 +21,7 @@ export const RESIDENT_CRON = "* * * * *";
 // sleepAfter. setInactivityTimeout rejects any value above 6 hours, so 24h
 // cannot be applied. This is the platform maximum. The minute cron resets it.
 export const INACTIVITY_TIMEOUT_MS = 6 * 60 * 60 * 1000;
+export const INACTIVITY_REFRESH_MS = 5 * 60 * 1000;
 
 // The published cold start took 2–3 minutes. Wrangler 4 stops the old container
 // before it starts the new one, so this wait has to cover that gap.
