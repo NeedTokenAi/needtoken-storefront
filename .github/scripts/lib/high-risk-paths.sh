@@ -26,16 +26,17 @@ is_high_risk_path() {
       return 0
       ;;
     # NeedToken 二开保护区
-    internal/modules/diagnostics/* | internal/modules/opsbridge/* | internal/app/httpserver/routes_storefront.go | \
-      internal/app/httpserver/routes_channel.go | \
+    internal/modules/diagnostics/* | internal/modules/opsbridge/* | internal/modules/apipublic/* | \
+      internal/app/httpserver/routes_storefront.go | internal/app/httpserver/routes_channel.go | \
       frontend/user/src/templates/needtoken/* | frontend/user/index.html | \
       frontend/user/src/router/index.ts | frontend/user/src/api/order.ts | \
+      frontend/user/src/stores/userProfile.ts | \
       frontend/user/src/composables/usePersonalCenter.ts | \
       frontend/user/src/components/AssetVaultClaimPanel.vue | \
       frontend/user/src/components/SubscriptionAuthorizationPanel.vue | \
       frontend/user/src/utils/subscriptionAuthorization.ts | \
       frontend/user/src/views/OrderDetail.vue | frontend/user/src/views/GuestOrderDetail.vue | \
-      frontend/user/src/views/PersonalCenter.vue | \
+      frontend/user/src/views/PersonalCenter.vue | frontend/user/src/views/personal/GiftCardPanel.vue | \
       frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts)
       return 0
       ;;

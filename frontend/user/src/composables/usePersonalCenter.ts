@@ -54,16 +54,21 @@ export function usePersonalCenter(sectionGetter: () => PersonalSection) {
   }
 
   const canAccessResellerConsole = computed(() => appStore.canAccessResellerConsole)
+  const isNeedtokenTemplate = computed(() => getActiveTemplate() === 'needtoken')
   const showWalletSidebar = computed(() => shouldShowWalletSidebarTab(getActiveTemplate(), appStore.config))
   const visibleSectionItems = computed(() => {
     return sectionItems.filter((item) => {
       if (item.key === 'reseller' && !canAccessResellerConsole.value) return false
       if (item.key === 'wallet' && !showWalletSidebar.value) return false
+      if (item.key === 'api' && isNeedtokenTemplate.value) return false
       return true
     })
   })
   const currentSection = computed<PersonalSection>(() => {
     if (sectionGetter() === 'reseller' && !canAccessResellerConsole.value) {
+      return 'overview'
+    }
+    if (sectionGetter() === 'api' && isNeedtokenTemplate.value) {
       return 'overview'
     }
     return sectionGetter()
@@ -176,6 +181,7 @@ export function usePersonalCenter(sectionGetter: () => PersonalSection) {
     const [profileOk] = await Promise.all([
       userProfileStore.loadProfile(),
       userProfileStore.loadRecentOrders(5),
+      userProfileStore.loadWalletAccount(),
       // 个人中心每次进入都强制刷新，后台改了折扣率/专属价不用整页刷新才能看到
       userProfileStore.loadMemberLevels(true),
       userProfileStore.loadMyProductPrices(true),

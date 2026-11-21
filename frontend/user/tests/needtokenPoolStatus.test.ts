@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { levelFor, parsePoolStatus } from '../src/templates/needtoken/lib/poolStatus.ts'
+import { levelFor, parsePoolStatus, summarizePoolStatus } from '../src/templates/needtoken/lib/poolStatus.ts'
 
 test('parsePoolStatus keeps known levels and coerces the rest to unknown', () => {
     const view = parsePoolStatus({
@@ -13,9 +13,20 @@ test('parsePoolStatus keeps known levels and coerces the rest to unknown', () =>
     assert.equal(view.stale, true)
     assert.equal(view.updatedAt?.toISOString(), '2026-11-02T06:00:00.000Z')
     assert.deepEqual(view.levels, { pool: 'available', aws: 'busy', odd: 'unknown', none: 'unknown' })
+    assert.deepEqual(summarizePoolStatus(view), {
+        enabled: true,
+        totalGroups: 2,
+        healthyGroups: 2,
+        overall: 'available',
+    })
 })
 
-test('levelFor shows nothing without trustworthy data', () => {
+test('parsePoolStatus handles unconfigured array fallback safely and levelFor shows nothing without trustworthy data', () => {
+    const emptyFallback = parsePoolStatus({ groups: [] })
+    assert.equal(emptyFallback.enabled, false)
+    assert.deepEqual(emptyFallback.levels, {})
+    assert.equal(summarizePoolStatus(emptyFallback).enabled, false)
+
     const view = parsePoolStatus({ enabled: true, groups: { pool: { status: 'unavailable' }, x: { status: 'unknown' } } })
     assert.equal(levelFor(view, 'pool'), 'unavailable')
     assert.equal(levelFor(view, 'x'), null)

@@ -69,6 +69,19 @@ func TestCustomerLinkBridgeSignsRequestsMapsErrorsAndBlocksRedirects(t *testing.
 				"next_path":       "/plans",
 				"awakened_orders": 2,
 			})
+		case "/api/v1/upstream/customer-links/console-sso":
+			var body CustomerConsoleSSOInput
+			if json.Unmarshal(raw, &body) != nil || body.MerchantCustomerID != "needtoken-storefront:user:42" || body.Email != "alice@example.com" || !body.EmailVerified || body.TargetPath != "/keys" {
+				t.Errorf("unexpected console-sso body: %s", raw)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"mode":            "sso",
+				"redirect_url":    "https://api.needtoken.ai/oauth?redirect=%2Fkeys#needtoken_ticket=tok_1",
+				"linked":          true,
+				"native_user_id":  108,
+				"auto_created":    true,
+				"awakened_orders": 1,
+			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -100,7 +113,18 @@ func TestCustomerLinkBridgeSignsRequestsMapsErrorsAndBlocksRedirects(t *testing.
 	if _, err := adapter.CompleteCustomerLink(ctx, "needtoken-storefront:user:42", "lnk_123", "expired"); !errors.Is(err, ErrCustomerLinkExpired) {
 		t.Fatalf("want ErrCustomerLinkExpired, got %v", err)
 	}
-	if seen != 5 {
+	ssoRes, err := adapter.ConsoleSSOCustomerLink(ctx, CustomerConsoleSSOInput{
+		MerchantCustomerID: "needtoken-storefront:user:42",
+		Email:              "alice@example.com",
+		EmailVerified:      true,
+		DisplayName:        "Alice",
+		TargetPath:         "/keys",
+		NextPath:           "/me",
+	})
+	if err != nil || ssoRes.Mode != "sso" || !ssoRes.Linked || ssoRes.NativeUserID != 108 || !ssoRes.AutoCreated {
+		t.Fatalf("consoleSSO=%+v err=%v", ssoRes, err)
+	}
+	if seen != 6 {
 		t.Fatalf("unexpected request count: %d", seen)
 	}
 
@@ -117,7 +141,7 @@ func TestCustomerLinkBridgeSignsRequestsMapsErrorsAndBlocksRedirects(t *testing.
 	if _, err := redirectAdapter.CustomerLinkStatus(ctx, "needtoken-storefront:user:42"); !errors.Is(err, ErrCustomerLinkUnavailable) {
 		t.Fatalf("redirect should fail closed: %v", err)
 	}
-	if seen != 5 {
+	if seen != 6 {
 		t.Fatalf("redirect leaked request to upstream: seen=%d", seen)
 	}
 }

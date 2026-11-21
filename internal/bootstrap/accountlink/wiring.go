@@ -22,7 +22,33 @@ func NewHandler(c *container.Container) *accountlinkhttp.Handler {
 			connID = uint(parsed)
 		}
 	}
-	return accountlinkhttp.New(accountlink.New(upstreamBridge{c: c, configuredConnectionID: connID}))
+	svc := accountlink.New(upstreamBridge{c: c, configuredConnectionID: connID}).
+		WithIdentityReader(memberIdentityReader{c: c})
+	return accountlinkhttp.New(svc)
+}
+
+type memberIdentityReader struct {
+	c *container.Container
+}
+
+func (r memberIdentityReader) LookupMember(_ context.Context, userID uint) (accountlink.MemberIdentity, error) {
+	if r.c == nil || r.c.UserStore == nil {
+		return accountlink.MemberIdentity{}, accountlink.ErrUnavailable
+	}
+	user, err := r.c.UserStore.GetByID(userID)
+	if err != nil {
+		return accountlink.MemberIdentity{}, err
+	}
+	if user == nil {
+		return accountlink.MemberIdentity{UserID: userID, Active: false}, nil
+	}
+	return accountlink.MemberIdentity{
+		UserID:        user.ID,
+		Email:         strings.TrimSpace(user.Email),
+		EmailVerified: user.EmailVerifiedAt != nil,
+		DisplayName:   strings.TrimSpace(user.DisplayName),
+		Active:        user.Status == constants.UserStatusActive,
+	}, nil
 }
 
 type upstreamBridge struct {
@@ -137,6 +163,35 @@ func (b upstreamBridge) Complete(ctx context.Context, merchantCustomerID, challe
 		Status:         res.Status,
 		NativeUserID:   res.NativeUserID,
 		NextPath:       res.NextPath,
+		AwakenedOrders: res.AwakenedOrders,
+	}, nil
+}
+
+func (b upstreamBridge) ConsoleSSO(ctx context.Context, input accountlink.ConsoleSSOInput) (accountlink.ConsoleSSOResult, error) {
+	adapter, enabled, err := b.resolveAdapter()
+	if err != nil {
+		return accountlink.ConsoleSSOResult{}, err
+	}
+	if !enabled {
+		return accountlink.ConsoleSSOResult{}, accountlink.ErrUnavailable
+	}
+	res, err := adapter.ConsoleSSOCustomerLink(ctx, upstream.CustomerConsoleSSOInput{
+		MerchantCustomerID: input.MerchantCustomerID,
+		Email:              input.Email,
+		EmailVerified:      input.EmailVerified,
+		DisplayName:        input.DisplayName,
+		TargetPath:         input.TargetPath,
+		NextPath:           input.NextPath,
+	})
+	if err != nil {
+		return accountlink.ConsoleSSOResult{}, translateUpstreamError(err)
+	}
+	return accountlink.ConsoleSSOResult{
+		Mode:           res.Mode,
+		RedirectURL:    res.RedirectURL,
+		Linked:         res.Linked,
+		NativeUserID:   res.NativeUserID,
+		AutoCreated:    res.AutoCreated,
 		AwakenedOrders: res.AwakenedOrders,
 	}, nil
 }

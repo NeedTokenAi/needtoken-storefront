@@ -1,88 +1,291 @@
 <template>
-  <section class="api-hero" aria-labelledby="api-services-title">
-    <div class="api-hero-copy">
-      <p class="api-hero-label">{{ t('needtoken.apiConnect.eyebrow') }}</p>
-      <h1 id="api-services-title">{{ t('needtoken.apiConnect.heroTitle') }}<span>{{ t('needtoken.apiConnect.heroAccent') }}</span></h1>
-      <p class="api-hero-intro">{{ t('needtoken.apiConnect.heroIntro') }}</p>
-      <div class="api-hero-actions">
-        <RouterLink to="/plans" class="primary">{{ t('needtoken.apiUse.buy') }}<ArrowRight :size="16" aria-hidden="true" /></RouterLink>
-        <a href="#api-connect">{{ t('needtoken.apiConnect.start') }}<ArrowDown :size="16" aria-hidden="true" /></a>
+  <section class="api-hero-wrap" aria-labelledby="api-services-title">
+    <div class="api-hero">
+      <div class="api-hero-copy">
+        <p class="api-hero-label">{{ t('needtoken.apiConnect.eyebrow') }}</p>
+        <h1 id="api-services-title">
+          {{ t('needtoken.apiConnect.heroTitle') }}
+          <span>{{ t('needtoken.apiConnect.heroAccent') }}</span>
+        </h1>
+        <p class="api-hero-intro">{{ t('needtoken.apiConnect.heroIntro') }}</p>
+
+        <div class="api-hero-actions">
+          <RouterLink to="/plans" class="primary">
+            <span>{{ t('needtoken.apiUse.buy') }}</span>
+            <ArrowRight :size="16" aria-hidden="true" />
+          </RouterLink>
+          <button
+            type="button"
+            class="console-btn"
+            :disabled="ssoLoading"
+            @click="handleOpenConsole"
+          >
+            <LoaderCircle v-if="ssoLoading" :size="16" class="spin" aria-hidden="true" />
+            <Terminal v-else :size="16" aria-hidden="true" />
+            <span>{{ t('needtoken.apiConnect.enterConsoleAction') }}</span>
+            <ArrowUpRight :size="15" aria-hidden="true" />
+          </button>
+          <a href="#api-connect" class="ghost-link">
+            <span>{{ t('needtoken.apiConnect.start') }}</span>
+            <ArrowDown :size="15" aria-hidden="true" />
+          </a>
+        </div>
+        <p class="api-hero-footnote">{{ t('needtoken.apiConnect.heroNote') }}</p>
       </div>
-      <p class="api-hero-footnote">{{ t('needtoken.apiConnect.heroNote') }}</p>
+
+      <div class="api-preview" :aria-label="t('needtoken.apiConnect.previewLabel')">
+        <div class="preview-header">
+          <span><Braces :size="16" aria-hidden="true" />{{ t('needtoken.apiConnect.previewTitle') }}</span>
+          <span class="preview-pill">{{ activeProtocolMeta.badge }}</span>
+        </div>
+        <ol class="api-route" :aria-label="t('needtoken.apiConnect.routeLabel')">
+          <li>
+            <Terminal :size="18" aria-hidden="true" />
+            <span>{{ t('needtoken.apiConnect.client') }}<small>{{ t('needtoken.apiConnect.clientDetail') }}</small></span>
+          </li>
+          <li class="route-arrow" aria-hidden="true"><ArrowRight :size="16" /></li>
+          <li class="route-gateway">
+            <img src="/needtoken-icon.svg" alt="" />
+            <span>NeedToken<small>{{ t('needtoken.apiConnect.gatewayDetail') }}</small></span>
+          </li>
+          <li class="route-arrow" aria-hidden="true"><ArrowRight :size="16" /></li>
+          <li>
+            <Cpu :size="18" aria-hidden="true" />
+            <span>{{ t('needtoken.apiConnect.model') }}<small>{{ t('needtoken.apiConnect.modelDetail') }}</small></span>
+          </li>
+        </ol>
+        <div class="preview-endpoint">
+          <span>POST</span>
+          <code>{{ activeProtocolMeta.endpoint }}</code>
+        </div>
+        <div class="preview-code-head">
+          <div role="group" :aria-label="t('needtoken.apiConnect.previewLanguage')">
+            <button
+              v-for="tab in previewTabs"
+              :key="tab.id"
+              type="button"
+              :aria-pressed="previewKind === tab.id"
+              @click="previewKind = tab.id"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+          <span>{{ t('needtoken.apiConnect.requestExample') }}</span>
+        </div>
+        <pre :key="previewKind" class="preview-code" tabindex="0" :aria-label="t('needtoken.apiConnect.requestExample')"><code>{{ previewSnippet }}</code></pre>
+        <div class="preview-footer">
+          <KeyRound :size="14" aria-hidden="true" />
+          <code>NEEDTOKEN_API_KEY</code>
+          <span>{{ t('needtoken.apiConnect.environmentKey') }}</span>
+        </div>
+      </div>
     </div>
 
-    <div class="api-preview" :aria-label="t('needtoken.apiConnect.previewLabel')">
-      <div class="preview-header"><span><Braces :size="16" aria-hidden="true" />{{ t('needtoken.apiConnect.previewTitle') }}</span><span>{{ t('needtoken.apiConnect.example') }}</span></div>
-      <ol class="api-route" :aria-label="t('needtoken.apiConnect.routeLabel')">
-        <li><Terminal :size="18" aria-hidden="true" /><span>{{ t('needtoken.apiConnect.client') }}<small>{{ t('needtoken.apiConnect.clientDetail') }}</small></span></li>
-        <li class="route-arrow" aria-hidden="true"><ArrowRight :size="16" /></li>
-        <li class="route-gateway"><img src="/needtoken-icon.svg" alt="" /><span>NeedToken<small>{{ t('needtoken.apiConnect.gatewayDetail') }}</small></span></li>
-        <li class="route-arrow" aria-hidden="true"><ArrowRight :size="16" /></li>
-        <li><Cpu :size="18" aria-hidden="true" /><span>{{ t('needtoken.apiConnect.model') }}<small>{{ t('needtoken.apiConnect.modelDetail') }}</small></span></li>
-      </ol>
-      <div class="preview-endpoint"><span>POST</span><code>/v1/chat/completions</code></div>
-      <div class="preview-code-head">
-        <div role="group" :aria-label="t('needtoken.apiConnect.previewLanguage')"><button v-for="kind in languages" :key="kind" type="button" :aria-pressed="language === kind" @click="language = kind">{{ kind === 'curl' ? 'cURL' : 'Python' }}</button></div>
-        <span>{{ t('needtoken.apiConnect.requestExample') }}</span>
+    <!-- 实时网关指标条 -->
+    <dl class="api-metrics-strip" :aria-label="t('needtoken.apiConnect.metrics.label')">
+      <div class="metric-cell">
+        <dt>{{ t('needtoken.apiConnect.metrics.modelsLabel') }}</dt>
+        <dd>
+          <strong>{{ modelCountDisplay }}</strong>
+          <span>{{ t('needtoken.apiConnect.metrics.modelsSub') }}</span>
+        </dd>
       </div>
-      <pre :key="language" class="preview-code" tabindex="0" :aria-label="t('needtoken.apiConnect.requestExample')"><code>{{ code }}</code></pre>
-      <div class="preview-footer"><KeyRound :size="14" aria-hidden="true" /><code>NEEDTOKEN_API_KEY</code><span>{{ t('needtoken.apiConnect.environmentKey') }}</span></div>
-    </div>
+      <div class="metric-cell">
+        <dt>{{ t('needtoken.apiConnect.metrics.vendorsLabel') }}</dt>
+        <dd>
+          <strong>{{ vendorCountDisplay }}</strong>
+          <span>{{ t('needtoken.apiConnect.metrics.vendorsSub') }}</span>
+        </dd>
+      </div>
+      <div class="metric-cell">
+        <dt>{{ t('needtoken.apiConnect.metrics.protocolsLabel') }}</dt>
+        <dd>
+          <strong>4</strong>
+          <span>{{ t('needtoken.apiConnect.metrics.protocolsSub') }}</span>
+        </dd>
+      </div>
+      <div class="metric-cell">
+        <dt>{{ t('needtoken.apiConnect.metrics.poolLabel') }}</dt>
+        <dd>
+          <strong class="metric-status">
+            <i class="status-dot" :class="`is-${poolSummary.overall}`" aria-hidden="true" />
+            {{ poolStatusDisplay }}
+          </strong>
+          <span>{{ poolStatusSub }}</span>
+        </dd>
+      </div>
+    </dl>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowDown, ArrowRight, Braces, Cpu, KeyRound, Terminal } from 'lucide-vue-next'
-import { API_BASE_URL, DEFAULT_MODELS } from '../config'
-import { apiPreviewCode, type ApiPreview } from '../lib/apiIntegrations'
+import { useRouter } from 'vue-router'
+import { ArrowDown, ArrowRight, ArrowUpRight, Braces, Cpu, KeyRound, LoaderCircle, Terminal } from 'lucide-vue-next'
+import { useUserAuthStore } from '../../../stores/userAuth'
+import { useAppStore } from '../../../stores/app'
+import { API_BASE_URL, CONSOLE_URL, DEFAULT_MODELS } from '../config'
+import { apiPreviewCode } from '../lib/apiIntegrations'
+import { usePricing } from '../lib/usePricing'
+import { summarizePoolStatus } from '../lib/poolStatus'
+import { usePoolStatus } from '../lib/usePoolStatus'
+import { useApiAccountLink } from '../composables/useApiAccountLink'
+
+type HeroPreviewKind = 'responses' | 'curl' | 'anthropic' | 'python'
 
 const { t } = useI18n()
-const languages = ['curl', 'python'] as const
-const language = ref<ApiPreview>('curl')
-const code = computed(() => apiPreviewCode(language.value, API_BASE_URL, DEFAULT_MODELS[0]))
+const router = useRouter()
+const userAuth = useUserAuthStore()
+const appStore = useAppStore()
+const pricing = usePricing()
+const pool = usePoolStatus()
+const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
+
+const previewTabs: readonly { id: HeroPreviewKind; label: string }[] = [
+  { id: 'responses', label: 'Responses' },
+  { id: 'curl', label: 'Chat' },
+  { id: 'anthropic', label: 'Messages' },
+  { id: 'python', label: 'Python' },
+]
+const previewKind = ref<HeroPreviewKind>('responses')
+
+const rootOrigin = computed(() => API_BASE_URL.replace(/\/v1$/, ''))
+const primaryModel = computed(() => DEFAULT_MODELS[0])
+const claudeModel = computed(() => DEFAULT_MODELS.find(m => m.startsWith('claude')) || 'claude-sonnet-4-6')
+
+const activeProtocolMeta = computed(() => {
+  switch (previewKind.value) {
+    case 'responses':
+      return { endpoint: '/v1/responses', badge: 'OpenAI Responses' }
+    case 'anthropic':
+      return { endpoint: '/v1/messages', badge: 'Anthropic Native' }
+    default:
+      return { endpoint: '/v1/chat/completions', badge: 'OpenAI Compatible' }
+  }
+})
+
+const previewSnippet = computed(() => {
+  if (previewKind.value === 'responses') {
+    return `curl '${API_BASE_URL}/responses' \\\n  -H "Authorization: Bearer $NEEDTOKEN_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n  "model": "${primaryModel.value}",\n  "input": "Hello from NeedToken Gateway"\n}'`
+  }
+  if (previewKind.value === 'anthropic') {
+    return `curl '${rootOrigin.value}/v1/messages' \\\n  -H "x-api-key: $NEEDTOKEN_API_KEY" \\\n  -H "anthropic-version: 2023-06-01" \\\n  -H "content-type: application/json" \\\n  -d '{\n  "model": "${claudeModel.value}",\n  "max_tokens": 1024,\n  "messages": [{"role": "user", "content": "Hello"}]\n}'`
+  }
+  return apiPreviewCode(previewKind.value, API_BASE_URL, primaryModel.value)
+})
+
+const uniqueModelCount = computed(() => new Set(pricing.offers.value.map(o => o.modelId)).size)
+const uniqueVendorCount = computed(() => new Set(pricing.offers.value.map(o => o.vendor)).size)
+const modelCountDisplay = computed(() => (uniqueModelCount.value > 0 ? String(uniqueModelCount.value) : `${DEFAULT_MODELS.length}+`))
+const vendorCountDisplay = computed(() => (uniqueVendorCount.value > 0 ? String(uniqueVendorCount.value) : '5+'))
+
+const poolSummary = computed(() => summarizePoolStatus(pool.view.value))
+const poolStatusDisplay = computed(() => {
+  if (!poolSummary.value.enabled) return t('needtoken.apiConnect.metrics.poolStandby')
+  return `${poolSummary.value.healthyGroups} / ${poolSummary.value.totalGroups}`
+})
+const poolStatusSub = computed(() => {
+  if (!poolSummary.value.enabled) return t('needtoken.apiConnect.metrics.poolStandbySub')
+  return t('needtoken.apiConnect.metrics.poolOnlineSub')
+})
+
+const handleOpenConsole = () => {
+  if (appStore.isResellerTenant) {
+    window.open(CONSOLE_URL, '_blank', 'noopener,noreferrer')
+    return
+  }
+  if (!userAuth.isAuthenticated) {
+    void router.push({ path: '/auth/login', query: { redirect: '/api-services' } })
+    return
+  }
+  void openApiConsoleSSO('/dashboard', '/api-services')
+}
+
+onMounted(() => {
+  void pricing.ensureLoaded()
+  void pool.ensureLoaded()
+})
 </script>
 
 <style scoped>
-.api-hero { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); align-items: center; gap: 64px; min-height: 560px; padding-block: 64px; animation: api-enter 400ms cubic-bezier(.22,1,.36,1) both; }
+.api-hero-wrap { padding-top: 48px; padding-bottom: 44px; animation: api-enter 400ms cubic-bezier(.22,1,.36,1) both; }
+.api-hero { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr); align-items: center; gap: 52px; }
 .api-hero-copy { min-width: 0; }
-.api-hero-label { color: var(--ui-accent); font-size: 13px; font-weight: 500; }
-.api-hero h1 { margin-top: 20px; font-size: clamp(36px, 4.2vw, 56px); line-height: 1.16; letter-spacing: -.03em; font-weight: 500; text-wrap: balance; }
+.api-hero-label { color: var(--ui-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.api-hero h1 { margin-top: 16px; font-size: clamp(34px, 4vw, 52px); line-height: 1.15; letter-spacing: -.035em; font-weight: 650; text-wrap: balance; }
 .api-hero h1 span { display: block; margin-top: 8px; color: var(--ui-accent); }
-.api-hero-intro { margin-top: 24px; max-width: 34em; color: var(--ui-text-secondary); font-size: 16px; line-height: 1.85; text-wrap: pretty; }
-.api-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 32px; }
-.api-hero-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; padding: 12px 20px; border: 1px solid var(--ui-border-strong); border-radius: 10px; color: var(--ui-text-secondary); font-size: 14px; font-weight: 500; transition: color 160ms, background 160ms, border-color 160ms; }
-.api-hero-actions a:hover { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
+.api-hero-intro { margin-top: 20px; max-width: 36em; color: var(--ui-text-secondary); font-size: 15.5px; line-height: 1.82; text-wrap: pretty; }
+.api-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 28px; }
+.api-hero-actions a,
+.api-hero-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; padding: 11px 18px; border: 1px solid var(--ui-border-strong); border-radius: 11px; color: var(--ui-text-primary); background: var(--ui-bg-elevated); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: color 160ms, background 160ms, border-color 160ms, transform 160ms; }
+.api-hero-actions a:hover,
+.api-hero-actions button:hover:not(:disabled) { border-color: var(--nt-accent-border-strong, var(--ui-accent)); background: var(--ui-bg-soft); }
 .api-hero-actions a.primary { color: var(--ui-text-on-accent); border-color: var(--ui-accent); background: var(--ui-accent); }
 .api-hero-actions a.primary:hover { background: var(--ui-accent-hover); }
-.api-hero-footnote { margin-top: 20px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.75; }
+.api-hero-actions .console-btn { border-color: var(--nt-accent-border, var(--ui-border-strong)); color: var(--ui-accent); background: var(--nt-accent-subtle, var(--ui-bg-elevated)); }
+.api-hero-actions .ghost-link { border-color: transparent; background: transparent; color: var(--ui-text-secondary); padding-inline: 12px; }
+.api-hero-actions button:disabled { opacity: .65; cursor: not-allowed; }
+.api-hero-footnote { margin-top: 18px; color: var(--ui-text-muted); font-size: 12px; line-height: 1.75; }
+
 .api-preview { min-width: 0; overflow: hidden; border: 1px solid var(--ui-border-strong); border-radius: 20px; background: var(--ui-bg-elevated); }
-.preview-header, .preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; color: var(--ui-text-muted); font-size: 12px; }
+.preview-header, .preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; color: var(--ui-text-muted); font-size: 12px; }
 .preview-header { border-bottom: 1px solid var(--ui-border); }
-.preview-header > span:first-child { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-text-secondary); }
-.api-route { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px; }
+.preview-header > span:first-child { display: inline-flex; align-items: center; gap: 8px; color: var(--ui-text-secondary); font-weight: 500; }
+.preview-pill { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--nt-accent-border, var(--ui-border)); color: var(--ui-accent); font: 11px var(--nt-font-mono); }
+.api-route { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 20px; }
 .api-route li:not(.route-arrow) { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ui-text-secondary); font-size: 13px; }
 .api-route li > svg { flex: none; color: var(--ui-text-muted); }
 .api-route li > span { min-width: 0; }
-.api-route small { display: block; margin-top: 4px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.5; }
+.api-route small { display: block; margin-top: 3px; color: var(--ui-text-muted); font-size: 11px; line-height: 1.5; }
 .api-route img { width: 28px; height: 28px; flex: none; }
-.api-route .route-gateway > span { color: var(--ui-accent); }
+.api-route .route-gateway > span { color: var(--ui-accent); font-weight: 600; }
 .route-arrow { flex: none; color: var(--ui-text-muted); }
-.preview-endpoint { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-block: 1px solid var(--ui-border); background: var(--ui-bg-soft); font-size: 12px; }
-.preview-endpoint span { color: var(--ui-accent); font-family: var(--nt-font-mono); }
-.preview-endpoint code { min-width: 0; overflow-wrap: anywhere; color: var(--ui-text-secondary); }
-.preview-code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 20px 0; color: var(--ui-text-muted); font-size: 11px; }
-.preview-code-head > div { display: flex; gap: 4px; }
-.preview-code-head button { padding: 6px 8px; border-radius: 6px; color: var(--ui-text-muted); font-size: 12px; transition: color 160ms, background 160ms; }
-.preview-code-head button[aria-pressed=true] { color: var(--ui-text-primary); background: var(--ui-bg-soft); }
-.preview-code { height: 176px; overflow: auto; padding: 16px 20px; color: var(--ui-text-secondary); font-size: 12px; line-height: 1.85; tab-size: 2; }
+.preview-endpoint { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-block: 1px solid var(--ui-border); background: var(--ui-bg-soft); font-size: 12px; }
+.preview-endpoint span { color: var(--ui-accent); font-family: var(--nt-font-mono); font-weight: 600; }
+.preview-endpoint code { min-width: 0; overflow-wrap: anywhere; color: var(--ui-text-secondary); font-family: var(--nt-font-mono); }
+.preview-code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 20px 0; color: var(--ui-text-muted); font-size: 11px; }
+.preview-code-head > div { display: flex; flex-wrap: wrap; gap: 4px; }
+.preview-code-head button { padding: 5px 9px; border-radius: 6px; color: var(--ui-text-muted); font-size: 12px; transition: color 160ms, background 160ms; }
+.preview-code-head button[aria-pressed=true] { color: var(--ui-accent); background: var(--ui-accent-soft, var(--ui-bg-soft)); font-weight: 600; }
+.preview-code { height: 184px; overflow: auto; padding: 14px 20px; color: var(--ui-text-secondary); font: 12px/1.8 var(--nt-font-mono); tab-size: 2; }
 .preview-footer { justify-content: flex-start; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--ui-border); background: var(--ui-bg-soft); font-size: 11px; }
 .preview-footer > span { margin-left: auto; }
-.api-hero :is(a,button,pre):focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
+
+.api-metrics-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 32px; }
+.metric-cell { padding: 16px 18px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); }
+.metric-cell dt { font-size: 11.5px; color: var(--ui-text-muted); font-weight: 500; }
+.metric-cell dd { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.metric-cell strong { font: 700 22px/1.2 var(--nt-font-mono); color: var(--ui-text-primary); letter-spacing: -.03em; }
+.metric-cell dd > span { font-size: 11.5px; color: var(--ui-text-secondary); }
+.metric-status { display: inline-flex; align-items: center; gap: 8px; font-family: inherit !important; font-size: 17px !important; }
+.status-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--ui-text-muted); }
+.status-dot.is-available { background: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16); }
+.status-dot.is-busy { background: #f59e0b; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16); }
+.status-dot.is-unavailable { background: #ef4444; }
+
+.spin { animation: hero-spin 1s linear infinite; }
+@keyframes hero-spin { to { transform: rotate(360deg); } }
 @keyframes api-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@media (max-width: 1100px) { .api-hero { gap: 32px; } .api-route { gap: 8px; } .api-route li:not(.route-arrow) { gap: 6px; font-size: 12px; } .api-route small { font-size: 10px; } }
-@media (max-width: 850px) { .api-hero { grid-template-columns: minmax(0, 1fr); min-height: auto; gap: 40px; padding-block: 48px; } .api-hero-copy { max-width: 640px; } .api-hero h1 { font-size: clamp(36px, 6vw, 52px); } .api-preview { width: 100%; max-width: 680px; } .api-route { justify-content: space-around; } }
-@media (max-width: 480px) { .api-hero { padding-block: 40px; gap: 32px; } .api-hero h1 { font-size: 36px; } .api-hero-intro { font-size: 14px; margin-top: 20px; } .api-hero-actions { margin-top: 24px; } .api-hero-actions a { min-height: 44px; padding: 10px 16px; } .api-preview { border-radius: 16px; } .preview-header, .preview-footer { padding: 12px 16px; } .api-route { margin: 20px 12px; gap: 6px; } .api-route li:not(.route-arrow) { flex-direction: row; align-items: center; gap: 6px; font-size: 12px; } .api-route small { display: none; } .api-route .route-gateway { flex-direction: row; align-items: center; } .api-route img { width: 24px; height: 24px; } .preview-endpoint { padding-inline: 16px; font-size: 11px; gap: 8px; } .preview-code-head { padding-inline: 12px; } .preview-code { padding: 16px; font-size: 11px; height: 144px; } .preview-footer > span { margin-left: 0; } }
-@media (prefers-reduced-motion: reduce) { .api-hero { animation: none; } .api-hero :is(a,button) { transition: none; } }
+
+.api-hero-wrap :is(a,button,pre):focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
+@media (max-width: 1024px) {
+  .api-hero { gap: 32px; }
+  .api-metrics-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 850px) {
+  .api-hero { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .api-hero-copy { max-width: 640px; }
+  .api-preview { width: 100%; max-width: 680px; }
+}
+@media (max-width: 480px) {
+  .api-hero-wrap { padding-top: 28px; padding-bottom: 28px; }
+  .api-hero h1 { font-size: 32px; }
+  .api-hero-actions a, .api-hero-actions button { min-height: 42px; padding: 10px 14px; font-size: 13px; }
+  .api-route small { display: none; }
+  .api-metrics-strip { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric-cell { padding: 13px 14px; }
+  .metric-cell strong { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .api-hero-wrap { animation: none; } .api-hero-wrap :is(a,button) { transition: none; } }
 </style>

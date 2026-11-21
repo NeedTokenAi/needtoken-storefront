@@ -2,50 +2,115 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
     buildOffers,
+    buildPricingGroups,
     filterOffers,
     formatUsd,
+    inferVendorFromModelName,
+    resolveEndpointBadges,
+    selectOffersByGroup,
     sortOffers,
     toggleCompare,
     type PricingResponse,
 } from '../src/templates/needtoken/lib/pricing.ts'
 
 const options = {
-    defaultModels: ['gpt-6.1-sol', 'gpt-6-astra'],
+    defaultModels: ['gpt-5.4', 'claude-sonnet-4-6'],
     blockedModels: ['gpt-5.2'],
     supplyLineByGroup: { pool: 'pool' },
 }
 
 const response: PricingResponse = {
     data: [
-        { model_name: 'gpt-6-astra', quota_type: 0, model_ratio: 1.25, model_price: 0, completion_ratio: 8, vendor_id: 1, enable_groups: ['pool', 'aws'] },
-        { model_name: 'gpt-6.1-sol', quota_type: 0, model_ratio: 0.5, model_price: 0, completion_ratio: 4, vendor_id: 1, enable_groups: ['pool'] },
+        {
+            model_name: 'claude-sonnet-4-6',
+            quota_type: 0,
+            model_ratio: 1.5,
+            model_price: 0,
+            completion_ratio: 5,
+            cache_ratio: 0.1,
+            vendor_id: 2,
+            enable_groups: ['pool', 'aws'],
+            supported_endpoint_types: ['anthropic', 'openai'],
+            tags: 'coding, agent',
+            description: 'Flagship coding and reasoning model',
+        },
+        {
+            model_name: 'gpt-5.4',
+            quota_type: 0,
+            model_ratio: 1.25,
+            model_price: 0,
+            completion_ratio: 4,
+            cache_ratio: 0.25,
+            vendor_id: 1,
+            enable_groups: ['pool'],
+            supported_endpoint_types: ['openai-response', 'openai'],
+        },
         // 未配价：new-api 兜底倍率 37.5
-        { model_name: 'gpt-6-luna', quota_type: 0, model_ratio: 37.5, model_price: 0, completion_ratio: 1, enable_groups: ['pool'] },
+        { model_name: 'gpt-unpriced', quota_type: 0, model_ratio: 37.5, model_price: 0, completion_ratio: 1, enable_groups: ['pool'] },
         // 黑名单模型
         { model_name: 'gpt-5.2', quota_type: 0, model_ratio: 1, model_price: 0, completion_ratio: 1, enable_groups: ['pool'] },
         // 按次计费
         { model_name: 'image-x', quota_type: 1, model_ratio: 0, model_price: 0.04, completion_ratio: 0, owner_by: 'acme', enable_groups: ['aws'] },
     ],
-    vendors: [{ id: 1, name: 'OpenAI' }],
+    vendors: [{ id: 1, name: 'OpenAI' }, { id: 2, name: 'Anthropic' }],
     group_ratio: { pool: 1, aws: 1.5 },
+    usable_group: { pool: '标准号池分组', aws: 'AWS 企业专线' },
+    supported_endpoint: {
+        'openai-response': { path: '/v1/responses', method: 'POST' },
+        anthropic: { path: '/v1/messages', method: 'POST' },
+    },
 }
 
-test('buildOffers splits each model by group and uses new-api price formula', () => {
+test('buildOffers splits each model by group, computes cache price, and preserves group descriptions', () => {
     const offers = buildOffers(response, options)
-    const astraAws = offers.find(o => o.key === 'gpt-6-astra@aws')
-    assert.ok(astraAws)
-    assert.equal(astraAws.inputPrice, 1.25 * 2 * 1.5)
-    assert.equal(astraAws.outputPrice, 1.25 * 2 * 1.5 * 8)
-    assert.equal(astraAws.vendor, 'OpenAI')
-    assert.equal(astraAws.supplyLine, null)
-    const astraPool = offers.find(o => o.key === 'gpt-6-astra@pool')
-    assert.equal(astraPool?.supplyLine, 'pool')
-    assert.equal(astraPool?.inputPrice, 2.5)
+    const claudeAws = offers.find(o => o.key === 'claude-sonnet-4-6@aws')
+    assert.ok(claudeAws)
+    assert.equal(claudeAws.inputPrice, 1.5 * 2 * 1.5)
+    assert.equal(claudeAws.outputPrice, 1.5 * 2 * 1.5 * 5)
+    assert.ok(Math.abs((claudeAws.cachePrice ?? 0) - 0.45) < 1e-9)
+    assert.equal(claudeAws.vendor, 'Anthropic')
+    assert.equal(claudeAws.groupDescription, 'AWS 企业专线')
+    assert.equal(claudeAws.supplyLine, null)
+    assert.deepEqual(claudeAws.tags, ['coding', 'agent'])
+    assert.deepEqual(claudeAws.endpoints.map(e => e.label), ['Messages', 'Chat'])
+
+    const claudePool = offers.find(o => o.key === 'claude-sonnet-4-6@pool')
+    assert.equal(claudePool?.supplyLine, 'pool')
+    assert.equal(claudePool?.inputPrice, 3)
+    assert.ok(Math.abs((claudePool?.cachePrice ?? 0) - 0.3) < 1e-9)
+})
+
+test('buildPricingGroups and selectOffersByGroup support live group switching and deduplication', () => {
+    const groups = buildPricingGroups(response, options.supplyLineByGroup)
+    assert.deepEqual(groups.map(g => ({ name: g.name, ratio: g.ratio, desc: g.description })), [
+        { name: 'pool', ratio: 1, desc: '标准号池分组' },
+        { name: 'aws', ratio: 1.5, desc: 'AWS 企业专线' },
+    ])
+
+    const offers = buildOffers(response, options)
+    const recommended = selectOffersByGroup(offers, '')
+    assert.equal(recommended.filter(o => o.modelId === 'claude-sonnet-4-6').length, 1)
+    assert.equal(recommended.find(o => o.modelId === 'claude-sonnet-4-6')?.group, 'pool')
+
+    const awsScoped = selectOffersByGroup(offers, 'aws')
+    assert.deepEqual(awsScoped.map(o => o.key), ['claude-sonnet-4-6@aws', 'image-x@aws'])
+})
+
+test('inferVendorFromModelName and resolveEndpointBadges classify common gateway models', () => {
+    assert.equal(inferVendorFromModelName('gpt-5.4'), 'OpenAI')
+    assert.equal(inferVendorFromModelName('claude-opus-4-6'), 'Anthropic')
+    assert.equal(inferVendorFromModelName('gemini-2.5-pro'), 'Google')
+    assert.equal(inferVendorFromModelName('deepseek-v3'), 'DeepSeek')
+    assert.equal(inferVendorFromModelName('grok-4'), 'xAI')
+    assert.deepEqual(
+        resolveEndpointBadges(['openai-response', 'openai-response-compact', 'gemini']).map(b => b.label),
+        ['Responses', 'Gemini'],
+    )
 })
 
 test('buildOffers drops unpriced and blocked models', () => {
     const ids = buildOffers(response, options).map(o => o.modelId)
-    assert.equal(ids.includes('gpt-6-luna'), false)
+    assert.equal(ids.includes('gpt-unpriced'), false)
     assert.equal(ids.includes('gpt-5.2'), false)
 })
 
@@ -54,6 +119,7 @@ test('buildOffers handles per-call pricing and empty responses', () => {
     assert.equal(image?.unit, 'per_call')
     assert.equal(image?.inputPrice, 0.04 * 1.5)
     assert.equal(image?.outputPrice, null)
+    assert.equal(image?.cachePrice, null)
     assert.equal(image?.vendor, 'acme')
     assert.deepEqual(buildOffers({}, options), [])
 })
@@ -61,21 +127,22 @@ test('buildOffers handles per-call pricing and empty responses', () => {
 test('sortOffers puts default models first and sorts token prices before per-call', () => {
     const offers = buildOffers(response, options)
     assert.deepEqual(sortOffers(offers, 'default', options.defaultModels).map(o => o.key), [
-        'gpt-6.1-sol@pool', 'gpt-6-astra@aws', 'gpt-6-astra@pool', 'image-x@aws',
+        'gpt-5.4@pool', 'claude-sonnet-4-6@aws', 'claude-sonnet-4-6@pool', 'image-x@aws',
     ])
     assert.deepEqual(sortOffers(offers, 'price_asc', options.defaultModels).map(o => o.key), [
-        'gpt-6.1-sol@pool', 'gpt-6-astra@pool', 'gpt-6-astra@aws', 'image-x@aws',
+        'gpt-5.4@pool', 'claude-sonnet-4-6@pool', 'claude-sonnet-4-6@aws', 'image-x@aws',
     ])
     assert.deepEqual(sortOffers(offers, 'price_desc', options.defaultModels).map(o => o.key), [
-        'gpt-6-astra@aws', 'gpt-6-astra@pool', 'gpt-6.1-sol@pool', 'image-x@aws',
+        'claude-sonnet-4-6@aws', 'claude-sonnet-4-6@pool', 'gpt-5.4@pool', 'image-x@aws',
     ])
 })
 
-test('filterOffers matches vendor, supply line and keyword', () => {
+test('filterOffers matches vendor, supply line, billingType and keyword', () => {
     const offers = buildOffers(response, options)
-    assert.deepEqual(filterOffers(offers, { supply: 'pool' }).map(o => o.key), ['gpt-6-astra@pool', 'gpt-6.1-sol@pool'])
-    assert.deepEqual(filterOffers(offers, { supply: 'group:aws', vendor: 'OpenAI' }).map(o => o.key), ['gpt-6-astra@aws'])
-    assert.deepEqual(filterOffers(offers, { keyword: 'SOL' }).map(o => o.key), ['gpt-6.1-sol@pool'])
+    assert.deepEqual(filterOffers(offers, { supply: 'pool' }).map(o => o.key), ['claude-sonnet-4-6@pool', 'gpt-5.4@pool'])
+    assert.deepEqual(filterOffers(offers, { supply: 'group:aws', vendor: 'Anthropic' }).map(o => o.key), ['claude-sonnet-4-6@aws'])
+    assert.deepEqual(filterOffers(offers, { billingType: 'per_call' }).map(o => o.key), ['image-x@aws'])
+    assert.deepEqual(filterOffers(offers, { keyword: 'reasoning' }).map(o => o.key), ['claude-sonnet-4-6@pool', 'claude-sonnet-4-6@aws'])
 })
 
 test('toggleCompare keeps at most three selections', () => {
@@ -93,7 +160,7 @@ test('formatUsd trims trailing zeros', () => {
     assert.equal(formatUsd(-1), '-')
 })
 
-test('expression, plugin, video and conditional prices never use legacy token numbers', () => {
+test('expression, plugin, video and audio/image multimodal prices never use legacy token numbers', () => {
     const base = { model_name: 'conditional', quota_type: 0, model_ratio: 0.5, model_price: 1, completion_ratio: 4, enable_groups: ['pool'] }
     const variants = [
         { ...base, model_name: 'expr', billing_mode: 'tiered_expr', billing_expr: 'p > 100 ? p * 3 : p' },
@@ -101,7 +168,7 @@ test('expression, plugin, video and conditional prices never use legacy token nu
         { ...base, model_name: 'video', supported_endpoint_types: ['openai-video'] },
         { ...base, model_name: 'task', billing_usage_schema: { seconds: { type: 'number', unit: 'seconds' } } },
         { ...base, model_name: 'audio', audio_ratio: 20 },
-        { ...base, model_name: 'cache', cache_ratio: 0.1 },
+        { ...base, model_name: 'image-mm', image_ratio: 5 },
         { ...base, model_name: 'future-mode', quota_type: 2 },
     ]
     const offers = buildOffers({ data: variants, group_ratio: { pool: 1 }, pricing_version: 'source-marker' }, options)

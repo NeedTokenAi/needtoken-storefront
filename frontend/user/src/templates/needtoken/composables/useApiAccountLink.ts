@@ -1,6 +1,12 @@
 import { ref } from 'vue'
 import { userApi } from '../../../api/client'
-import { isSafeAuthorizeUrl, sanitizeLinkNextPath } from '../lib/apiAccountLinkPolicy'
+import {
+  isSafeAuthorizeUrl,
+  sanitizeConsoleNextPath,
+  sanitizeConsoleTargetPath,
+  sanitizeLinkNextPath,
+  type ApiConsoleTargetPath,
+} from '../lib/apiAccountLinkPolicy'
 
 export interface ApiAccountLinkStatus {
   enabled: boolean
@@ -23,6 +29,15 @@ export interface ApiAccountLinkCompleteResult {
   native_user_id?: number
   next_path?: string
   awakened_orders: number
+}
+
+export interface ApiConsoleSSOResult {
+  mode: 'sso' | 'bind_challenge' | string
+  redirect_url: string
+  linked: boolean
+  native_user_id?: number
+  auto_created?: boolean
+  awakened_orders?: number
 }
 
 const sharedStatus = ref<ApiAccountLinkStatus | null>(null)
@@ -74,6 +89,34 @@ export async function startApiAccountLinkRequest(nextPath?: string): Promise<Api
   return data
 }
 
+export async function requestApiConsoleSSO(
+  targetPath: ApiConsoleTargetPath | string = '/dashboard',
+  nextPath = '/me',
+): Promise<ApiConsoleSSOResult> {
+  const safeTarget = sanitizeConsoleTargetPath(targetPath)
+  const safeNext = sanitizeConsoleNextPath(nextPath)
+  const res = await userApi.post(
+    '/me/api-console-sso',
+    { target_path: safeTarget, next_path: safeNext },
+    { silentBusinessError: true },
+  )
+  const data = res?.data?.data as ApiConsoleSSOResult | undefined
+  if (!data || !isSafeAuthorizeUrl(data.redirect_url)) {
+    throw new Error('invalid_sso_redirect_url')
+  }
+  if (data.linked) {
+    sharedStatus.value = {
+      enabled: true,
+      linked: true,
+      status: 'self_verified',
+      native_user_id: data.native_user_id,
+      pending_orders: 0,
+    }
+    sharedLoaded.value = true
+  }
+  return data
+}
+
 export async function completeApiAccountLinkRequest(
   challengeId: string,
   approval: string,
@@ -101,6 +144,8 @@ export async function completeApiAccountLinkRequest(
 export function useApiAccountLink() {
   const loading = ref(false)
   const starting = ref(false)
+  const ssoLoading = ref(false)
+  const ssoTarget = ref<string>('')
   const errorMessage = ref('')
 
   const load = async (force = false) => {
@@ -113,7 +158,7 @@ export function useApiAccountLink() {
   }
 
   const beginLinking = async (nextPath?: string) => {
-    if (starting.value) return
+    if (starting.value || ssoLoading.value) return
     starting.value = true
     errorMessage.value = ''
     try {
@@ -125,12 +170,30 @@ export function useApiAccountLink() {
     }
   }
 
+  const openApiConsoleSSO = async (targetPath: ApiConsoleTargetPath | string = '/dashboard', nextPath = '/me') => {
+    if (ssoLoading.value || starting.value) return
+    ssoLoading.value = true
+    ssoTarget.value = sanitizeConsoleTargetPath(targetPath)
+    errorMessage.value = ''
+    try {
+      const result = await requestApiConsoleSSO(targetPath, nextPath)
+      window.location.assign(result.redirect_url)
+    } catch (err: any) {
+      errorMessage.value = typeof err?.message === 'string' ? err.message : ''
+      ssoLoading.value = false
+      ssoTarget.value = ''
+    }
+  }
+
   return {
     status: sharedStatus,
     loading,
     starting,
+    ssoLoading,
+    ssoTarget,
     errorMessage,
     load,
     beginLinking,
+    openApiConsoleSSO,
   }
 }

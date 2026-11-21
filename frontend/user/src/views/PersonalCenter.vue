@@ -52,6 +52,19 @@
                 <component :is="item.icon" class="h-4 w-4 shrink-0" />
                 <span class="truncate">{{ t(item.label) }}</span>
               </button>
+              <button
+                v-if="showNeedtokenConsoleShortcut"
+                type="button"
+                :disabled="ssoLoading"
+                @click="openConsoleFromSidebar"
+                class="mt-2 flex w-full items-center justify-between gap-2 rounded-xl border border-primary/25 bg-primary/10 px-4 py-2.5 text-left text-sm font-semibold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+              >
+                <span class="flex min-w-0 items-center gap-2">
+                  <Terminal class="h-4 w-4 shrink-0" />
+                  <span class="truncate">{{ t('needtoken.nav.apiConsole') }}</span>
+                </span>
+                <ArrowUpRight class="h-3.5 w-3.5 shrink-0" />
+              </button>
             </div>
 
             <div class="lg:hidden">
@@ -71,6 +84,19 @@
                     <span>{{ t(item.label) }}</span>
                   </span>
                 </button>
+                <button
+                  v-if="showNeedtokenConsoleShortcut"
+                  type="button"
+                  :disabled="ssoLoading"
+                  @click="openConsoleFromSidebar"
+                  class="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-3.5 py-2 text-xs font-semibold text-primary"
+                >
+                  <span class="flex items-center gap-1.5">
+                    <Terminal class="h-3.5 w-3.5" />
+                    <span>{{ t('needtoken.nav.apiConsole') }}</span>
+                    <ArrowUpRight class="h-3 w-3" />
+                  </span>
+                </button>
               </div>
             </div>
           </div>
@@ -87,7 +113,7 @@
 
           <template v-if="currentSection === 'overview'">
             <!-- 数据一览 -->
-            <ApiAccountLinkBanner v-if="needtokenTemplateActive" next-path="/profile" />
+            <ApiAccountLinkBanner v-if="needtokenTemplateActive" next-path="/me" />
             <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <StatCard
                 :label="t('personalCenter.tabs.orders')"
@@ -323,9 +349,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Crown, ShoppingBag, ShieldCheck, Percent, BadgePercent } from 'lucide-vue-next'
+import { Crown, ShoppingBag, ShieldCheck, Percent, BadgePercent, ArrowUpRight, Terminal } from 'lucide-vue-next'
+import { useAppStore } from '../stores/app'
 import { getActiveTemplate } from '../templates/registry'
 import ApiAccountLinkBanner from '../templates/needtoken/components/ApiAccountLinkBanner.vue'
+import { useApiAccountLink } from '../templates/needtoken/composables/useApiAccountLink'
 import { getImageUrl } from '../utils/image'
 import { pageAlertVariant, pageAlertToneClass } from '../utils/alerts'
 import StatCard from '../components/shared/StatCard.vue'
@@ -342,7 +370,13 @@ import ApiPanel from './personal/ApiPanel.vue'
 import { usePersonalCenter, type PersonalSection } from '../composables/usePersonalCenter'
 
 const { t } = useI18n()
+const appStore = useAppStore()
 const needtokenTemplateActive = computed(() => getActiveTemplate() === 'needtoken')
+const showNeedtokenConsoleShortcut = computed(() => needtokenTemplateActive.value && !appStore.isResellerTenant)
+const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
+const openConsoleFromSidebar = () => {
+  void openApiConsoleSSO('/dashboard', '/me')
+}
 
 const props = withDefaults(defineProps<{ section?: PersonalSection }>(), {
   section: 'overview',

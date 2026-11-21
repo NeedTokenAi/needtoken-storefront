@@ -18,7 +18,7 @@ export function useEmailEntry() {
   const sendCaptcha = ref<CaptchaPayload>({}), sendTurnstileToken = ref('')
   const sendImageRef = ref<InstanceType<typeof ImageCaptcha> | null>(null)
   const sendTurnstileRef = ref<InstanceType<typeof TurnstileCaptcha> | null>(null)
-  const destination = () => authReturnPath(route.query.redirect)
+  const destination = () => authReturnPath(route.query.redirect, '/me')
   const nativeLogin = useLogin({ onAuthenticated: () => router.push(destination()) })
   const nativeRegister = useRegister({ requireEmailProof: true, onRegistered: () => router.push(setupTwoFactor.value
     ? { path: '/me/security', query: { setup_2fa: '1', return_to: destination() } }

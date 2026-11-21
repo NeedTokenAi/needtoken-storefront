@@ -5,12 +5,14 @@ import (
 	"github.com/dujiao-next/internal/app/httpserver/middleware"
 	accountlinkbootstrap "github.com/dujiao-next/internal/bootstrap/accountlink"
 	affiliatebootstrap "github.com/dujiao-next/internal/bootstrap/affiliate"
+	apipublicbootstrap "github.com/dujiao-next/internal/bootstrap/apipublic"
 	assetclaimbootstrap "github.com/dujiao-next/internal/bootstrap/assetclaim"
 	diagnosticsbootstrap "github.com/dujiao-next/internal/bootstrap/diagnostics"
 	orderbootstrap "github.com/dujiao-next/internal/bootstrap/order"
 	"github.com/dujiao-next/internal/config"
 	affiliatetransport "github.com/dujiao-next/internal/modules/affiliate/transport/http"
 	apicredentialtransport "github.com/dujiao-next/internal/modules/apicredential/transport/http"
+	apipublictransport "github.com/dujiao-next/internal/modules/apipublic/transport/http"
 	auditlogtransport "github.com/dujiao-next/internal/modules/auditlog/transport/http"
 	captchatransport "github.com/dujiao-next/internal/modules/captcha/transport/http"
 	carttransport "github.com/dujiao-next/internal/modules/cart/transport/http"
@@ -110,6 +112,11 @@ func registerStorefrontRoutes(
 			Prefix: "public_service_status", WindowSeconds: 60, MaxRequests: 120, BlockSeconds: 30,
 		}, middleware.KeyByIP))
 		diagnosticstransport.RegisterServiceStatusRoutes(statusTools, diagnosticsbootstrap.NewServiceStatusHandler())
+		apiPublic := public.Group("")
+		apiPublic.Use(middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
+			Prefix: "public_api_gateway_meta", WindowSeconds: 60, MaxRequests: 120, BlockSeconds: 30,
+		}, middleware.KeyByIP))
+		apipublictransport.RegisterPublicRoutes(apiPublic, apipublicbootstrap.NewHandler(c))
 	}
 
 	// 游客接口

@@ -45,6 +45,24 @@ type CustomerLinkComplete struct {
 	AwakenedOrders int    `json:"awakened_orders"`
 }
 
+type CustomerConsoleSSOInput struct {
+	MerchantCustomerID string `json:"merchant_customer_id"`
+	Email              string `json:"email"`
+	EmailVerified      bool   `json:"email_verified"`
+	DisplayName        string `json:"display_name,omitempty"`
+	TargetPath         string `json:"target_path,omitempty"`
+	NextPath           string `json:"next_path,omitempty"`
+}
+
+type CustomerConsoleSSOResult struct {
+	Mode           string `json:"mode"`
+	RedirectURL    string `json:"redirect_url"`
+	Linked         bool   `json:"linked"`
+	NativeUserID   int    `json:"native_user_id,omitempty"`
+	AutoCreated    bool   `json:"auto_created"`
+	AwakenedOrders int    `json:"awakened_orders"`
+}
+
 func (a *DujiaoNextAdapter) CustomerLinkStatus(ctx context.Context, merchantCustomerID string) (CustomerLinkStatus, error) {
 	var result struct {
 		OK bool `json:"ok"`
@@ -102,6 +120,40 @@ func (a *DujiaoNextAdapter) CompleteCustomerLink(ctx context.Context, merchantCu
 		return CustomerLinkComplete{}, ErrCustomerLinkUnavailable
 	}
 	return result.CustomerLinkComplete, nil
+}
+
+func (a *DujiaoNextAdapter) ConsoleSSOCustomerLink(ctx context.Context, input CustomerConsoleSSOInput) (CustomerConsoleSSOResult, error) {
+	var result struct {
+		OK *bool `json:"ok,omitempty"`
+		CustomerConsoleSSOResult
+	}
+	payload := CustomerConsoleSSOInput{
+		MerchantCustomerID: strings.TrimSpace(input.MerchantCustomerID),
+		Email:              strings.TrimSpace(input.Email),
+		EmailVerified:      input.EmailVerified,
+		DisplayName:        strings.TrimSpace(input.DisplayName),
+		TargetPath:         strings.TrimSpace(input.TargetPath),
+		NextPath:           strings.TrimSpace(input.NextPath),
+	}
+	if err := a.customerLinkRequest(ctx, http.MethodPost, "/api/v1/upstream/customer-links/console-sso", payload, &result); err != nil {
+		return CustomerConsoleSSOResult{}, err
+	}
+	if result.OK != nil && !*result.OK {
+		return CustomerConsoleSSOResult{}, ErrCustomerLinkUnavailable
+	}
+	result.RedirectURL = strings.TrimSpace(result.RedirectURL)
+	result.Mode = strings.TrimSpace(result.Mode)
+	if result.RedirectURL == "" {
+		return CustomerConsoleSSOResult{}, ErrCustomerLinkUnavailable
+	}
+	if result.Mode == "" {
+		if result.Linked {
+			result.Mode = "sso"
+		} else {
+			result.Mode = "bind_challenge"
+		}
+	}
+	return result.CustomerConsoleSSOResult, nil
 }
 
 // customerLinkRequest signs the exact request path (without query) and body with

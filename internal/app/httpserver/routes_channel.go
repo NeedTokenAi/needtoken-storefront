@@ -45,6 +45,8 @@ func registerChannelRoutes(
 		channelAPI.GET("/needtoken-ops/coupons", opsHandler.Coupons)
 		channelAPI.POST("/needtoken-ops/coupons", opsHandler.CreateCoupon)
 		channelAPI.PATCH("/needtoken-ops/coupons/:id/status", opsHandler.UpdateCouponStatus)
+		channelAPI.GET("/needtoken-ops/gift-cards", opsHandler.GiftCards)
+		channelAPI.POST("/needtoken-ops/gift-cards/generate", opsHandler.GenerateGiftCards)
 		channelAPI.GET("/needtoken-ops/pricing", opsHandler.Pricing)
 		channelAPI.PATCH("/needtoken-ops/pricing", opsHandler.UpdatePricing)
 		telegramtransport.RegisterChannelBotRoutes(channelAPI, channelTelegramBotHandler)

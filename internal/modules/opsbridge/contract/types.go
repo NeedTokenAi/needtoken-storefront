@@ -301,6 +301,63 @@ type UpdateCouponStatusInput struct {
 	IsActive bool `json:"is_active"`
 }
 
+type GiftCard struct {
+	ID             uint       `json:"id"`
+	BatchID        *uint      `json:"batch_id,omitempty"`
+	BatchNo        string     `json:"batch_no,omitempty"`
+	Name           string     `json:"name"`
+	Code           string     `json:"code"`
+	Amount         string     `json:"amount"`
+	Currency       string     `json:"currency"`
+	Status         string     `json:"status"`
+	IsExpired      bool       `json:"is_expired"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	RedeemedAt     *time.Time `json:"redeemed_at,omitempty"`
+	RedeemedUserID *uint      `json:"redeemed_user_id,omitempty"`
+	WalletTxnID    *uint      `json:"wallet_txn_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type GiftCardBatch struct {
+	ID        uint       `json:"id"`
+	BatchNo   string     `json:"batch_no"`
+	Name      string     `json:"name"`
+	Amount    string     `json:"amount"`
+	Currency  string     `json:"currency"`
+	Quantity  int        `json:"quantity"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type GiftCardsResult struct {
+	Source      string     `json:"source"`
+	CollectedAt time.Time  `json:"collected_at"`
+	Freshness   string     `json:"freshness"`
+	GiftCards   []GiftCard `json:"gift_cards"`
+	Cards       []GiftCard `json:"cards"`
+	Total       int64      `json:"total"`
+	Page        int        `json:"page"`
+	PageSize    int        `json:"page_size"`
+}
+
+type GenerateGiftCardsInput struct {
+	Name      string `json:"name"`
+	Quantity  int    `json:"quantity"`
+	Amount    string `json:"amount"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+}
+
+type GenerateGiftCardsResult struct {
+	Source      string        `json:"source"`
+	CollectedAt time.Time     `json:"collected_at"`
+	Freshness   string        `json:"freshness"`
+	Batch       GiftCardBatch `json:"batch"`
+	BatchNo     string        `json:"batch_no"`
+	Created     int           `json:"created"`
+	Cards       []GiftCard    `json:"cards"`
+}
+
 type Reader interface {
 	Orders(page, pageSize int) (*OrdersResult, error)
 	Overview() (*Overview, error)
@@ -318,6 +375,8 @@ type Bridge interface {
 	Coupons(page, pageSize int, code string, isActive *bool) (*CouponsResult, error)
 	CreateCoupon(input CreateCouponInput) (*Coupon, error)
 	UpdateCouponStatus(id uint, active bool) (*Coupon, error)
+	GiftCards(page, pageSize int, code, status, batchNo string, redeemedUserID uint) (*GiftCardsResult, error)
+	GenerateGiftCards(input GenerateGiftCardsInput) (*GenerateGiftCardsResult, error)
 	Pricing() (*PricingSettings, error)
 	UpdatePricing(input UpdatePricingInput) (*PricingSettings, error)
 }

@@ -2,7 +2,8 @@
   <section id="api-connect" class="api-connect" aria-labelledby="api-connect-title">
     <header class="connect-heading">
       <div><p>{{ t('needtoken.apiConnect.setupLabel') }}</p><h2 id="api-connect-title">{{ t('needtoken.apiConnect.setupTitle') }}</h2><p class="connect-intro">{{ t('needtoken.apiConnect.setupIntro') }}</p></div>
-      <a :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer">{{ t('needtoken.apiConnect.getKey') }}<ArrowUpRight :size="16" aria-hidden="true" /></a>
+      <button v-if="userAuth.isAuthenticated && !appStore.isResellerTenant" type="button" class="connect-key-btn" :disabled="ssoLoading" @click="openConsoleKeys">{{ t('needtoken.apiConnect.getKey') }}<ArrowUpRight :size="16" aria-hidden="true" /></button>
+      <a v-else :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer">{{ t('needtoken.apiConnect.getKey') }}<ArrowUpRight :size="16" aria-hidden="true" /></a>
     </header>
 
     <div class="connect-toolbar">
@@ -70,9 +71,18 @@ import { useI18n } from 'vue-i18n'
 import { ArrowUpRight, Bot, Check, Cloud, Code2, Copy, Download, Network, Server, Settings2, Zap } from 'lucide-vue-next'
 import { API_BASE_URL, CONSOLE_URL, DEFAULT_MODELS } from '../config'
 import { API_INTEGRATIONS, CC_SWITCH_REFERENCE_URL, integrationEndpoint, integrationModel, integrationTemplate, type IntegrationId, type IntegrationScenario } from '../lib/apiIntegrations'
+import { useUserAuthStore } from '../../../stores/userAuth'
+import { useAppStore } from '../../../stores/app'
+import { useApiAccountLink } from '../composables/useApiAccountLink'
 import CodeBlock from './CodeBlock.vue'
 
 const { t } = useI18n()
+const userAuth = useUserAuthStore()
+const appStore = useAppStore()
+const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
+const openConsoleKeys = () => {
+  void openApiConsoleSSO('/keys', '/api-services')
+}
 const scenarios = [
   { id: 'coding', icon: Code2 },
   { id: 'local', icon: Network },
@@ -136,7 +146,7 @@ onUnmounted(() => { disposed = true; if (copyTimer) clearTimeout(copyTimer) })
 .connect-heading > div > p:first-child { color: var(--ui-accent); font-size: 12px; }
 .connect-heading h2 { margin-top: 12px; font-size: 32px; line-height: 1.3; font-weight: 500; letter-spacing: -.02em; }
 .connect-intro { margin-top: 12px; color: var(--ui-text-secondary); font-size: 14px; line-height: 1.8; }
-.connect-heading > a { display: inline-flex; align-items: center; gap: 8px; flex: none; min-height: 40px; color: var(--ui-accent); font-size: 13px; }
+.connect-heading > a, .connect-key-btn { display: inline-flex; align-items: center; gap: 8px; flex: none; min-height: 40px; color: var(--ui-accent); font-size: 13px; font-weight: 600; cursor: pointer; }
 .connect-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 .scenario-tabs { display: inline-flex; gap: 4px; max-width: 100%; padding: 4px; border: 1px solid var(--ui-border); border-radius: 13px; background: var(--ui-bg-soft); }
 .scenario-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; min-height: 40px; padding: 8px 16px; border: 1px solid transparent; border-radius: 9px; color: var(--ui-text-secondary); white-space: nowrap; font-size: 14px; transition: color 160ms, background 160ms, border-color 160ms; }
