@@ -386,6 +386,136 @@ func (s *Service) Products(page, pageSize int, categoryID, search string) (*opsc
 	}, nil
 }
 
+func (s *Service) CreateProduct(input opscontract.CreateProductInput) (*opscontract.Product, error) {
+	if s.products == nil || s.categories == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if input.CategoryID == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	cat, err := s.categories.GetByID(strconv.FormatUint(uint64(input.CategoryID), 10))
+	if err != nil {
+		return nil, err
+	}
+	if cat == nil {
+		return nil, opscontract.ErrInvalidInput
+	}
+	slug := strings.ToLower(strings.TrimSpace(input.Slug))
+	if slug == "" || len(slug) > 120 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	for _, r := range slug {
+		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+			return nil, opscontract.ErrInvalidInput
+		}
+	}
+	count, err := s.products.CountBySlug(slug, nil)
+	if err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		return nil, opscontract.ErrConflict
+	}
+	title := jsonmap.JSON{}
+	for k, v := range input.Title {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			title[strings.TrimSpace(k)] = trimmed
+		}
+	}
+	if len(title) == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	desc := jsonmap.JSON{}
+	for k, v := range input.Description {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			desc[strings.TrimSpace(k)] = trimmed
+		}
+	}
+	priceDec, err := decimal.NewFromString(strings.TrimSpace(input.PriceAmount))
+	if err != nil || !priceDec.IsPositive() {
+		return nil, opscontract.ErrInvalidInput
+	}
+	costDec := decimal.Zero
+	if rawCost := strings.TrimSpace(input.CostPriceAmount); rawCost != "" {
+		costDec, err = decimal.NewFromString(rawCost)
+		if err != nil || costDec.IsNegative() {
+			return nil, opscontract.ErrInvalidInput
+		}
+	}
+	purchaseType := strings.TrimSpace(input.PurchaseType)
+	if purchaseType == "" {
+		purchaseType = constants.ProductPurchaseMember
+	}
+	if purchaseType != constants.ProductPurchaseMember && purchaseType != constants.ProductPurchaseGuest {
+		return nil, opscontract.ErrInvalidInput
+	}
+	fulfillmentType := strings.TrimSpace(input.FulfillmentType)
+	if fulfillmentType == "" {
+		fulfillmentType = constants.FulfillmentTypeManual
+	}
+	if fulfillmentType != constants.FulfillmentTypeManual && fulfillmentType != constants.FulfillmentTypeAuto {
+		return nil, opscontract.ErrInvalidInput
+	}
+	manualStock := 0
+	if input.ManualStockTotal != nil {
+		manualStock = *input.ManualStockTotal
+	}
+	if manualStock < constants.ManualStockUnlimited {
+		return nil, opscontract.ErrInvalidInput
+	}
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+	now := time.Now().UTC()
+	prod := &productdomain.Product{
+		CategoryID:       input.CategoryID,
+		Slug:             slug,
+		TitleJSON:        title,
+		DescriptionJSON:  desc,
+		PriceAmount:      money.FromDecimal(priceDec.Round(2)),
+		CostPriceAmount:  money.FromDecimal(costDec.Round(2)),
+		PurchaseType:     purchaseType,
+		StockDisplayMode: constants.ProductStockDisplayExact,
+		FulfillmentType:  fulfillmentType,
+		ManualStockTotal: manualStock,
+		IsActive:         isActive,
+		SortOrder:        input.SortOrder,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if err := s.products.Create(prod); err != nil {
+		return nil, err
+	}
+	var skus []productdomain.ProductSKU
+	if s.skus != nil {
+		skuCode := strings.ToUpper(strings.TrimSpace(input.SKUCode))
+		if skuCode == "" {
+			skuCode = strings.ToUpper(slug)
+		}
+		if len(skuCode) > 64 {
+			skuCode = skuCode[:64]
+		}
+		sku := &productdomain.ProductSKU{
+			ProductID:        prod.ID,
+			SKUCode:          skuCode,
+			PriceAmount:      prod.PriceAmount,
+			CostPriceAmount:  prod.CostPriceAmount,
+			ManualStockTotal: manualStock,
+			IsActive:         true,
+			SortOrder:        0,
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}
+		if err := s.skus.Create(sku); err != nil {
+			return nil, err
+		}
+		skus = append(skus, *sku)
+	}
+	out := mapProduct(*prod, skus)
+	return &out, nil
+}
+
 func (s *Service) UpdateProduct(id string, input opscontract.UpdateProductInput) (*opscontract.Product, error) {
 	if s.products == nil {
 		return nil, opscontract.ErrNotConfigured

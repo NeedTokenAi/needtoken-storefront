@@ -163,6 +163,21 @@ type ProductsResult struct {
 	PageSize    int       `json:"page_size"`
 }
 
+type CreateProductInput struct {
+	CategoryID       uint              `json:"category_id"`
+	Slug             string            `json:"slug"`
+	Title            map[string]string `json:"title"`
+	Description      map[string]string `json:"description,omitempty"`
+	PriceAmount      string            `json:"price_amount"`
+	CostPriceAmount  string            `json:"cost_price_amount,omitempty"`
+	PurchaseType     string            `json:"purchase_type,omitempty"`
+	FulfillmentType  string            `json:"fulfillment_type,omitempty"`
+	ManualStockTotal *int              `json:"manual_stock_total,omitempty"`
+	SKUCode          string            `json:"sku_code,omitempty"`
+	SortOrder        int               `json:"sort_order,omitempty"`
+	IsActive         *bool             `json:"is_active,omitempty"`
+}
+
 type UpdateProductInput struct {
 	IsActive  *bool `json:"is_active,omitempty"`
 	SortOrder *int  `json:"sort_order,omitempty"`
@@ -231,6 +246,7 @@ type Bridge interface {
 	Categories() (*CategoriesResult, error)
 	UpdateCategory(id string, input UpdateCategoryInput) (*Category, error)
 	Products(page, pageSize int, categoryID, search string) (*ProductsResult, error)
+	CreateProduct(input CreateProductInput) (*Product, error)
 	UpdateProduct(id string, input UpdateProductInput) (*Product, error)
 	UpdateSKU(id uint, input UpdateSKUInput) (*ProductSKU, error)
 	Coupons(page, pageSize int, code string, isActive *bool) (*CouponsResult, error)
