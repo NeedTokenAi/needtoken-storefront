@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 把 UPSTREAM_CHANNEL 解析成一个固定的上游 tag 和 commit SHA。
-# 不调用 /releases/latest：那个指针可以改，而且 Release 对象的 target_commitish
+# 把 UPSTREAM_CHANNEL（或显式 TARGET_TAG）解析成一个固定的上游 tag 和 commit SHA。
+# 不调用 /releases/latest：那个指针可以改，且 Release 对象的 target_commitish
 # 经常是分支名（v1.5.2 返回的是 main），不是提交。
 set -euo pipefail
 
@@ -11,6 +11,8 @@ source "$root/lib/stable-tag.sh"
 CHANNEL=${UPSTREAM_CHANNEL:-stable-tags}
 REPO=${UPSTREAM_REPO:-dujiao-next/dujiao-next}
 MIN_TAG=${UPSTREAM_MIN_TAG:-}
+TARGET_TAG=${UPSTREAM_TARGET_TAG:-}
+SKIP_TAGS=${UPSTREAM_SKIP_TAGS:-}
 
 case "$CHANNEL" in
   stable-tags | releases) ;;
@@ -25,30 +27,55 @@ if [[ -n $MIN_TAG ]] && ! [[ $MIN_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
-tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
+is_skipped_tag() {
+  local candidate=$1 item
+  [[ -n $SKIP_TAGS ]] || return 1
+  local IFS=','
+  for item in $SKIP_TAGS; do
+    item=${item//[[:space:]]/}
+    [[ -n $item && $item == "$candidate" ]] && return 0
+  done
+  return 1
+}
 
-if [[ $CHANNEL == stable-tags ]]; then
-  # 只读 tag 名。调用方稍后单独 fetch 选中的那一个提交，这里不把 tag 写进 fork。
-  gh api --paginate "repos/${REPO}/git/matching-refs/tags/v" --jq '.[].ref' \
-    | sed 's#^refs/tags/##' >"$tmp"
+if [[ -n $TARGET_TAG ]]; then
+  if ! [[ $TARGET_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf 'unsupported UPSTREAM_TARGET_TAG=%q (expected vMAJOR.MINOR.PATCH)\n' "$TARGET_TAG" >&2
+    exit 1
+  fi
+  tag=$TARGET_TAG
+  CHANNEL="manual-tag"
 else
-  # 非 draft、非 prerelease，再用稳定 semver 过滤。仍然不看 "latest" 旗标。
-  gh api --paginate "repos/${REPO}/releases?per_page=100" \
-    --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' >"$tmp"
-fi
+  tmp=$(mktemp)
+  filtered=$(mktemp)
+  trap 'rm -f "$tmp" "$filtered"' EXIT
 
-tag=$(select_stable_tag "$MIN_TAG" <"$tmp")
-if [[ -z $tag ]]; then
-  if [[ -n $MIN_TAG ]]; then
+  if [[ $CHANNEL == stable-tags ]]; then
+    gh api --paginate "repos/${REPO}/git/matching-refs/tags/v" --jq '.[].ref' \
+      | sed 's#^refs/tags/##' >"$tmp"
+  else
+    gh api --paginate "repos/${REPO}/releases?per_page=100" \
+      --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' >"$tmp"
+  fi
+
+  : >"$filtered"
+  while IFS= read -r line; do
+    [[ -n $line ]] || continue
+    if is_skipped_tag "$line"; then
+      continue
+    fi
+    printf '%s\n' "$line" >>"$filtered"
+  done <"$tmp"
+
+  tag=$(select_stable_tag "$MIN_TAG" <"$filtered")
+  if [[ -z $tag ]]; then
     printf 'status=no_eligible_tag\n'
     printf 'channel=%s\n' "$CHANNEL"
     printf 'min_tag=%s\n' "$MIN_TAG"
     exit 0
   fi
-  echo "no stable semver tag found for ${REPO} via ${CHANNEL}" >&2
-  exit 1
 fi
+
 [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
   printf 'refusing unexpected tag %q\n' "$tag" >&2
   exit 1
@@ -57,7 +84,6 @@ fi
 obj_type=$(gh api "repos/${REPO}/git/ref/tags/${tag}" --jq '.object.type')
 obj_sha=$(gh api "repos/${REPO}/git/ref/tags/${tag}" --jq '.object.sha')
 if [[ $obj_type == tag ]]; then
-  # 附注 tag：再剥一层到 commit。轻量 tag 的 object.type 直接就是 commit。
   peel_type=$(gh api "repos/${REPO}/git/tags/${obj_sha}" --jq '.object.type')
   peel_sha=$(gh api "repos/${REPO}/git/tags/${obj_sha}" --jq '.object.sha')
   obj_type=$peel_type
