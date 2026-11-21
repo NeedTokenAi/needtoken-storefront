@@ -331,9 +331,51 @@ func TestBatchSyncRefreshesPolicyBeforePriceParsingAndNeverInfersMissingDeclarat
 		svc := &Service{mappings: mappings, products: products, skus: skus, skuMappings: links}
 		product := &upstream.UpstreamProduct{ID: 22, IsActive: true, ReservationPolicyDeclared: declared, SKUs: []upstream.UpstreamSKU{{ID: 901, SKUCode: "US-Plus", PriceAmount: "invalid-price", IsActive: true}}}
 		now := time.Now()
-		svc.syncProductFromData(mappings.row, &siteconnectiondomain.Connection{ID: 77}, product, &now)
+		svc.syncProductFromData(mappings.row, &siteconnectiondomain.Connection{ID: 77}, product, &now, nil, true)
 		if skus.rows[111].ReservationPolicyKnown != declared || skus.rows[111].RequiresReservation {
 			t.Fatal("batch sync inferred a policy or skipped its update after price error", declared, skus.rows[111])
 		}
+	}
+}
+
+// updateRecordingMappings 只实现回填用到的写入方法，用于验证写入了哪些映射。
+// 回填走的是单列更新（UpdateUpstreamCategoryID），不是整行 Update。
+type updateRecordingMappings struct {
+	mappingcontract.MappingRepository
+	updated map[uint]uint
+}
+
+func (r *updateRecordingMappings) UpdateUpstreamCategoryID(id uint, upstreamCategoryID uint) error {
+	r.updated[id] = upstreamCategoryID
+	return nil
+}
+
+func TestBackfillUpstreamCategoryIDsFillsOnlyMissing(t *testing.T) {
+	repo := &updateRecordingMappings{updated: map[uint]uint{}}
+	svc := &Service{mappings: repo}
+	adapter := &pagedProductsAdapter{total: 5}
+	// 商品 ID → 分类 ID = id%3：1→1, 2→2, 3→0, 4→1
+	mappings := []mappingdomain.Mapping{
+		{ID: 1, UpstreamProductID: 1},
+		{ID: 2, UpstreamProductID: 2, UpstreamCategoryID: 99}, // 已有分类，不能被覆盖
+		{ID: 3, UpstreamProductID: 3},                         // 上游未分类，保持 0
+		{ID: 4, UpstreamProductID: 4},
+	}
+
+	svc.backfillUpstreamCategoryIDs(context.Background(), adapter, 1, mappings)
+
+	if mappings[0].UpstreamCategoryID != 1 || mappings[1].UpstreamCategoryID != 99 ||
+		mappings[2].UpstreamCategoryID != 0 || mappings[3].UpstreamCategoryID != 1 {
+		t.Fatalf("unexpected backfill result: %+v", mappings)
+	}
+	if len(repo.updated) != 2 || repo.updated[1] != 1 || repo.updated[4] != 1 {
+		t.Fatalf("expected only mappings 1 and 4 persisted, got %v", repo.updated)
+	}
+
+	// 全部都有分类时不应再请求上游
+	adapter.calls = 0
+	svc.backfillUpstreamCategoryIDs(context.Background(), adapter, 1, []mappingdomain.Mapping{{ID: 9, UpstreamCategoryID: 5}})
+	if adapter.calls != 0 {
+		t.Fatalf("expected no upstream request when nothing to backfill, got %d", adapter.calls)
 	}
 }

@@ -5,21 +5,18 @@ import (
 	"strings"
 	"time"
 
-	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
-
-	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
-
-	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
-	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
-
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/logger"
-	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
-	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	"github.com/dujiao-next/internal/shared/money"
 	"github.com/dujiao-next/internal/shared/serial"
-
 	"github.com/shopspring/decimal"
+
+	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
+	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
+	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
+	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
+	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 )
 
 // CreateWalletRechargePaymentInput 创建钱包充值支付请求
@@ -96,9 +93,16 @@ func (s *PaymentService) CreateWalletRechargePayment(input CreateWalletRechargeP
 		feeConfig = s.settingService.GetPaymentFeeConfig()
 	}
 	paymentAmount, feeAmount, feePolicy := calculatePaymentAmounts(amount, feeRate, fixedFee, feeConfig.CustomerFeeEnabled)
-	currency := strings.ToUpper(strings.TrimSpace(input.Currency))
-	if currency == "" {
-		currency = "CNY"
+	// 充值本金必须使用站点币种，渠道结算币种由网关适配器换算。
+	currency := constants.SiteCurrencyDefault
+	if s.settingService != nil {
+		currency, err = s.settingService.GetSiteCurrency(constants.SiteCurrencyDefault)
+		if err != nil {
+			return nil, ErrPaymentCreateFailed
+		}
+	}
+	if requestedCurrency := strings.ToUpper(strings.TrimSpace(input.Currency)); requestedCurrency != "" && requestedCurrency != currency {
+		return nil, ErrPaymentCurrencyMismatch
 	}
 	if err := validatePaymentCurrencyForChannel(currency, channel); err != nil {
 		return nil, err
@@ -129,6 +133,8 @@ func (s *PaymentService) CreateWalletRechargePayment(input CreateWalletRechargeP
 			CreatedAt:       now,
 			UpdatedAt:       now,
 		}
+		// 先落库网关订单号，早于创建响应到达的回调才能定位到这条支付。
+		payment.GatewayOrderNo = resolveGatewayOrderNo(channel, payment)
 		if err := paymentRepo.Create(payment); err != nil {
 			return ErrPaymentCreateFailed
 		}
@@ -140,6 +146,7 @@ func (s *PaymentService) CreateWalletRechargePayment(input CreateWalletRechargeP
 		}
 		recharge = &walletdomain.RechargeOrder{
 			RechargeNo:      rechargeNo,
+			ClientIP:        strings.TrimSpace(input.ClientIP),
 			UserID:          input.UserID,
 			PaymentID:       payment.ID,
 			ChannelID:       channel.ID,
@@ -181,23 +188,7 @@ func (s *PaymentService) CreateWalletRechargePayment(input CreateWalletRechargeP
 		ReturnBusinessNo: recharge.RechargeNo,
 		RequestScheme:    input.RequestScheme,
 	}, virtualOrder, channel, payment); err != nil {
-		_ = s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
-			rechargeRepo := tx.Wallets().Wallets()
-			paymentRepo := tx.Payments()
-			failedAt := time.Now()
-			payment.Status = constants.PaymentStatusFailed
-			payment.UpdatedAt = failedAt
-			if updateErr := paymentRepo.Update(payment); updateErr != nil {
-				return updateErr
-			}
-			lockedRecharge, getErr := rechargeRepo.GetRechargeOrderByPaymentIDForUpdate(payment.ID)
-			if getErr != nil || lockedRecharge == nil {
-				return getErr
-			}
-			lockedRecharge.Status = constants.WalletRechargeStatusFailed
-			lockedRecharge.UpdatedAt = failedAt
-			return rechargeRepo.UpdateRechargeOrder(lockedRecharge)
-		})
+		s.failRechargeAttempt(payment.ID)
 		return nil, err
 	}
 	if s.queue != nil && s.queue.Enabled() {
@@ -209,26 +200,7 @@ func (s *PaymentService) CreateWalletRechargePayment(input CreateWalletRechargeP
 				"delay_minutes", int(delay/time.Minute),
 				"error", err,
 			)
-			_ = s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
-				rechargeRepo := tx.Wallets().Wallets()
-				paymentRepo := tx.Payments()
-				failedAt := time.Now()
-				payment.Status = constants.PaymentStatusFailed
-				payment.UpdatedAt = failedAt
-				if updateErr := paymentRepo.Update(payment); updateErr != nil {
-					return updateErr
-				}
-				lockedRecharge, getErr := rechargeRepo.GetRechargeOrderByPaymentIDForUpdate(payment.ID)
-				if getErr != nil || lockedRecharge == nil {
-					return getErr
-				}
-				if lockedRecharge.Status == constants.WalletRechargeStatusSuccess {
-					return nil
-				}
-				lockedRecharge.Status = constants.WalletRechargeStatusFailed
-				lockedRecharge.UpdatedAt = failedAt
-				return rechargeRepo.UpdateRechargeOrder(lockedRecharge)
-			})
+			s.failRechargeAttempt(payment.ID)
 			return nil, ErrQueueUnavailable
 		}
 	}
@@ -323,4 +295,38 @@ func canExpireWalletRechargePayment(payment *paymentdomain.Payment, recharge *wa
 		return false
 	}
 	return payment.Status == constants.PaymentStatusInitiated || payment.Status == constants.PaymentStatusPending
+}
+
+// failRechargeAttempt 重新加锁读取支付与充值单后再标记失败；网关请求期间回调已到账的不能被旧快照覆盖。
+func (s *PaymentService) failRechargeAttempt(paymentID uint) {
+	_ = s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
+		current, err := tx.Payments().GetByIDForUpdate(paymentID)
+		if err != nil || current == nil {
+			return err
+		}
+		if current.Status != constants.PaymentStatusInitiated && current.Status != constants.PaymentStatusPending {
+			return nil
+		}
+		rechargeRepo := tx.Wallets().Wallets()
+		lockedRecharge, err := rechargeRepo.GetRechargeOrderByPaymentIDForUpdate(paymentID)
+		if err != nil {
+			return err
+		}
+		if lockedRecharge != nil && (lockedRecharge.Status == constants.WalletRechargeStatusSuccess ||
+			lockedRecharge.Status == constants.WalletRechargeStatusPartiallyRefunded || lockedRecharge.Status == constants.WalletRechargeStatusRefunded) {
+			return nil
+		}
+		failedAt := time.Now()
+		current.Status = constants.PaymentStatusFailed
+		current.UpdatedAt = failedAt
+		if err := tx.Payments().Update(current); err != nil {
+			return err
+		}
+		if lockedRecharge == nil {
+			return nil
+		}
+		lockedRecharge.Status = constants.WalletRechargeStatusFailed
+		lockedRecharge.UpdatedAt = failedAt
+		return rechargeRepo.UpdateRechargeOrder(lockedRecharge)
+	})
 }
