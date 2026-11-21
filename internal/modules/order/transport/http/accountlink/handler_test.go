@@ -15,6 +15,7 @@ import (
 
 type fakeBridge struct {
 	gotRef string
+	gotSSO accountlink.ConsoleSSOInput
 	err    error
 }
 
@@ -39,6 +40,31 @@ func (f *fakeBridge) Complete(_ context.Context, ref, _, _ string) (accountlink.
 	}
 	return accountlink.CompleteResult{Linked: true, Status: "self_verified", NativeUserID: 55, NextPath: "/plans", AwakenedOrders: 1}, nil
 }
+func (f *fakeBridge) ConsoleSSO(_ context.Context, input accountlink.ConsoleSSOInput) (accountlink.ConsoleSSOResult, error) {
+	f.gotRef = input.MerchantCustomerID
+	f.gotSSO = input
+	if f.err != nil {
+		return accountlink.ConsoleSSOResult{}, f.err
+	}
+	return accountlink.ConsoleSSOResult{
+		Mode:         "sso",
+		RedirectURL:  "https://api.needtoken.ai/oauth?redirect=%2Fkeys#needtoken_ticket=tok_xyz",
+		Linked:       true,
+		NativeUserID: 108,
+	}, nil
+}
+
+type fakeIdentity struct{}
+
+func (fakeIdentity) LookupMember(_ context.Context, userID uint) (accountlink.MemberIdentity, error) {
+	return accountlink.MemberIdentity{
+		UserID:        userID,
+		Email:         "verified-user@example.com",
+		EmailVerified: true,
+		DisplayName:   "Verified User",
+		Active:        true,
+	}, nil
+}
 
 func TestAccountLinkMemberHTTPFlowAndSecurityHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -48,7 +74,8 @@ func TestAccountLinkMemberHTTPFlowAndSecurityHeaders(t *testing.T) {
 		c.Set("user_id", uint(18))
 		c.Next()
 	})
-	RegisterMemberRoutes(authGroup, New(accountlink.New(bridge)))
+	svc := accountlink.New(bridge).WithIdentityReader(fakeIdentity{})
+	RegisterMemberRoutes(authGroup, New(svc))
 
 	// GET status
 	w := httptest.NewRecorder()
@@ -81,6 +108,25 @@ func TestAccountLinkMemberHTTPFlowAndSecurityHeaders(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &envelope)
 	if envelope.StatusCode == 0 {
 		t.Fatalf("unknown field must be rejected: %s", w.Body.String())
+	}
+
+	// POST console-sso uses server-side email and rejects spoofed email fields
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/me/api-console-sso", bytes.NewBufferString(`{"target_path":"/keys","next_path":"/me"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || bridge.gotSSO.Email != "verified-user@example.com" || bridge.gotSSO.TargetPath != "/keys" {
+		t.Fatalf("console-sso status=%d sso=%+v body=%s", w.Code, bridge.gotSSO, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/me/api-console-sso", bytes.NewBufferString(`{"target_path":"/keys","email":"attacker@example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	envelope.StatusCode = 0
+	_ = json.Unmarshal(w.Body.Bytes(), &envelope)
+	if envelope.StatusCode == 0 {
+		t.Fatalf("spoofed email field must be rejected: %s", w.Body.String())
 	}
 
 	// POST complete

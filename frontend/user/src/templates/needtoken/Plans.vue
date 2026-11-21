@@ -14,7 +14,8 @@
           <button v-for="kind in audiences" :key="kind" type="button" :aria-pressed="audience === kind" :class="{ active: audience === kind }" @click="selectAudience(kind)"><component :is="kind === 'personal' ? UserRound : Building2" :size="16" aria-hidden="true" />{{ t(`needtoken.apiCatalog.${kind}`) }}</button>
         </nav>
         <CatalogueTools v-model="searchQuery" :search-label="t('needtoken.apiCatalog.search')" :count="!loading && !categoriesLoading && !loadError && !categoriesError ? totalProducts : null" :loading="categoriesLoading || loading" @search="submitSearch">
-          <a :href="CONSOLE_URL" class="api-plan-console" rel="noopener">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
+          <button v-if="userAuth.isAuthenticated && !appStore.isResellerTenant" type="button" class="api-plan-console" :disabled="ssoLoading" @click="openConsoleFromPlans">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></button>
+          <a v-else :href="CONSOLE_URL" class="api-plan-console" rel="noopener">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
         </CatalogueTools>
       </div>
 
@@ -46,12 +47,17 @@ import ServiceProductCard from './components/ServiceProductCard.vue'
 import CatalogueTools from './components/CatalogueTools.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
+import { useApiAccountLink } from './composables/useApiAccountLink'
 import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
 import { normalizeNeedtokenSupport, supportEmailHref } from './lib/supportConfig'
 
 const { t } = useI18n()
 const userAuth = useUserAuthStore()
 const appStore = useAppStore()
+const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
+const openConsoleFromPlans = () => {
+  void openApiConsoleSSO('/dashboard', '/plans')
+}
 const { audience, categoriesLoading, categoriesError, products, loading, loadError, totalPages, totalProducts, page, searchQuery, loadCategories, loadProducts, selectAudience, changePage, submitSearch, clearSearch } = useApiPlanCatalog()
 const audiences = ['personal', 'enterprise'] as const
 const notes = ['memberOnly', 'quotaNote', 'usageNote', 'enterpriseNote']

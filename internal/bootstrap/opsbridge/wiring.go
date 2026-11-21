@@ -31,6 +31,9 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 			connections: c.SiteConnectionService,
 		})
 	}
+	if c.GiftCardRepo != nil {
+		svc.WithGiftCards(c.GiftCardRepo)
+	}
 	return opstransport.New(svc)
 }
 

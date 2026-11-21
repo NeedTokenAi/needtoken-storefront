@@ -965,7 +965,9 @@
       "errors": {
         "codeRequired": "请先输入礼品卡卡密",
         "redeemFailed": "礼品卡兑换失败，请稍后重试"
-      }
+      },
+      "walletBalanceLabel": "当前账号储值余额",
+      "walletDeductionNotice": "礼品卡兑换金额直接充入当前账号储值余额，购买任意商品结算时可直接抵扣。"
     },
     "apiPanel": {
       "title": "API 对接",
@@ -1838,7 +1840,8 @@
       "faq": "常见问题",
       "environment": "检测工具",
       "appleIds": "免费苹果 ID",
-      "authEntry": "登录 / 注册"
+      "authEntry": "登录 / 注册",
+      "apiConsole": "API 控制台"
     },
     "theme": {
       "label": "外观主题",
@@ -2017,7 +2020,8 @@
         "input": "输入价",
         "output": "输出价",
         "perCall": "每次",
-        "unit": "计价单位 / 条件"
+        "unit": "计价单位 / 条件",
+        "cacheHit": "缓存命中"
       },
       "perCallShort": "次",
       "buy": "购买套餐",
@@ -2043,7 +2047,25 @@
         "task": "价格取决于任务用量、时长或规格；此处不换算为 token 单价。",
         "multimodal": "涉及缓存、图像或音频等独立计量条件，请在控制台确认完整计价。",
         "unknown": "当前计费方式无法准确解释，请在控制台核价。"
-      }
+      },
+      "eyebrow": "MODEL SQUARE · 实时定价",
+      "statsModels": "在线 {count} 款模型 · {vendors} 家厂商",
+      "groupSwitcherLabel": "计费分组切换器",
+      "groupSwitcherTitle": "计费分组与倍率",
+      "groupRecommended": "推荐首选分组",
+      "groupRecommendedHint": "每个模型默认展示推荐可用分组单价，点击具体分组可实时重算",
+      "groupExpandAll": "跨分组全部展开",
+      "groupExpandAllHint": "展开同一模型在所有可用分组下的独立报价，便于跨分组比价",
+      "groupMultiplier": "分组倍率 ×{ratio}",
+      "billingFilterLabel": "计费模式筛选",
+      "billingAll": "全部计费",
+      "billingToken": "按量 Token",
+      "billingPerCall": "按次计费",
+      "perCallBadge": "按次",
+      "copyModelId": "复制模型 ID {model}",
+      "copyIdShort": "复制模型 ID",
+      "copied": "已复制",
+      "callInConsole": "去控制台调用"
     },
     "plans": {
       "title": "API 套餐",
@@ -2150,7 +2172,35 @@
         "quota": "按需补充额度",
         "usage": "用量可查"
       },
-      "quotaNote": "实际额度、有效期和调用速率以所购套餐为准。"
+      "quotaNote": "实际额度、有效期和调用速率以所购套餐为准。",
+      "protocolsEyebrow": "NATIVE PROTOCOLS · 原生兼容",
+      "protocolsTitle": "四大原生协议，零改代码无缝接入",
+      "protocolsIntro": "统一企业级 AI 网关架构，保留各厂商原生协议语义、推理链、工具调用与 Prompt Cache，只需替换 Base URL 与 API Key。",
+      "protocolCards": {
+        "openai": {
+          "title": "OpenAI Responses & Chat 原生协议",
+          "desc": "完整支持 /v1/responses 与 /v1/chat/completions，原生透传推理 Token、Function Calling 与结构化输出。"
+        },
+        "anthropic": {
+          "title": "Anthropic Messages 原生协议",
+          "desc": "100% 兼容 /v1/messages、Extended Thinking 与 Prompt Caching，Claude Code 零协议转换直连。"
+        },
+        "gemini": {
+          "title": "Google Gemini Native 原生协议",
+          "desc": "原生支持 /v1beta/models 流式与非流式多模态生成、百万级长上下文与 Google SDK 直连。"
+        },
+        "ecosystem": {
+          "title": "主流开发与桌面生态即插即用",
+          "desc": "无缝接入 Claude Code、Cursor、Codex CLI、OpenCode、Cherry Studio、NextChat 等全场景客户端，明细笔笔可查。"
+        }
+      },
+      "hotModelsEyebrow": "LIVE CATALOG · 实时费率",
+      "hotModelsTitle": "热门模型实时价格速览",
+      "hotModelsIntro": "以下单价实时同步自网关公开定价表（默认首选分组），按量计费精确到百万 Token，支持缓存命中优惠。",
+      "viewAllModels": "前往模型广场查看全部",
+      "protocolsCol": "支持协议",
+      "inspectModel": "查看详情 →",
+      "hotModelsFallbackHint": "点击任意模型前往模型广场查看实时分组倍率与输入/输出单价。"
     },
     "homeServices": {
       "seoTitle": "充值服务、成品订购与 API 套餐",
@@ -2615,11 +2665,11 @@
     "apiAccountLink": {
       "title": "API 账号绑定状态",
       "unlinkedHeading": "尚未绑定 NeedToken API 账号",
-      "unlinkedDescription": "购买 API 套餐后将自动下发权益到您绑定的 API 账号（原有余额与用量完整保留）。推荐现在一键绑定，也支持先付款后随时绑定自动开通。",
+      "unlinkedDescription": "已验证邮箱支持免重复注册，一键自动创建并绑定 API 控制台账号；若已有独立网关老账号，也可直接登录验证完成安全绑定。",
       "pendingHeading": "您有 {count} 笔已付款 API 套餐等待绑定开通",
       "pendingDescription": "请点击右侧按钮前往 API 控制台确认授权；绑定完成后系统将立即自动为您开通套餐并签发 API Key。",
       "linkedHeading": "已绑定 NeedToken API 账号",
-      "linkedDescription": "后续购买的 API 套餐将自动开通至此账号，并可在 API 控制台查看额度、用量与新签发的 API Key。",
+      "linkedDescription": "店面与 API 控制台已安全打通，购买的套餐权益自动下发，支持免密直达控制台管理 Key 与实时用量。",
       "bindAction": "一键绑定 API 账号",
       "bindNowToActivate": "立即绑定并开通套餐",
       "redirecting": "正在前往授权…",
@@ -2633,7 +2683,15 @@
       "callbackContinue": "继续前往",
       "callbackFailedTitle": "API 账号绑定未完成",
       "callbackFailedDesc": "本次授权校验未通过或已失效，请重新发起绑定。",
-      "callbackMissingParams": "缺少授权回跳参数，请返回商城页面重新点击绑定按钮。"
+      "callbackMissingParams": "缺少授权回跳参数，请返回商城页面重新点击绑定按钮。",
+      "oneClickOpenConsole": "一键开通并进入 API 控制台",
+      "bindExistingAction": "绑定已有独立老账号",
+      "enterConsoleSSO": "进入 API 控制台（免密直达）",
+      "ssoRedirecting": "正在进入控制台…",
+      "shortcutsLabel": "API 控制台快捷入口",
+      "shortcutKeys": "管理 API Key",
+      "shortcutDashboard": "查看用量与额度",
+      "shortcutSubscriptions": "我的订阅"
     },
     "claudeEnvironment": {
       "eyebrow": "CLAUDE CODE · 网络与环境",
@@ -3578,7 +3636,21 @@
       "configureTool": "配置 {name}",
       "quickConfigTitle": "从你的 Key 列表快速导入",
       "quickConfigHint": "登录 API 控制台，在 API Key 列表中选择「导入到 CC Switch」。未看到导入入口时，可复制下方参数手动添加。",
-      "quickConfig": "快速配置"
+      "quickConfig": "快速配置",
+      "enterConsoleAction": "进入 API 控制台",
+      "metrics": {
+        "label": "网关实时指标",
+        "modelsLabel": "在线模型",
+        "modelsSub": "同步网关公开定价表",
+        "vendorsLabel": "聚合厂商",
+        "vendorsSub": "OpenAI · Anthropic · Google · DeepSeek",
+        "protocolsLabel": "原生协议端点",
+        "protocolsSub": "Responses · Chat · Messages · Gemini",
+        "poolLabel": "供给分组健康",
+        "poolOnlineSub": "在线可用供给分组",
+        "poolStandby": "统一调度",
+        "poolStandbySub": "高可用多通道自动容灾"
+      }
     },
     "purchaseFlow": {
       "backToPlans": "返回选方案",

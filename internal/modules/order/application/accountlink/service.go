@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 var (
@@ -18,7 +19,16 @@ var (
 	ErrForbidden   = errors.New("api account link forbidden")
 )
 
-var safeNextPath = regexp.MustCompile(`^/(|plans|checkout|profile|orders|orders/[A-Za-z0-9_-]{1,64})$`)
+var safeNextPath = regexp.MustCompile(`^/(|me|plans|api-services|models|checkout|profile|orders|orders/[A-Za-z0-9_-]{1,64})$`)
+
+var allowedConsoleTargetPaths = map[string]struct{}{
+	"/dashboard":     {},
+	"/keys":          {},
+	"/subscriptions": {},
+	"/wallet":        {},
+	"/usage-logs":    {},
+	"/playground":    {},
+}
 
 type Status struct {
 	Enabled       bool       `json:"enabled"`
@@ -43,18 +53,55 @@ type CompleteResult struct {
 	AwakenedOrders int    `json:"awakened_orders"`
 }
 
+type ConsoleSSOInput struct {
+	MerchantCustomerID string
+	Email              string
+	EmailVerified      bool
+	DisplayName        string
+	TargetPath         string
+	NextPath           string
+}
+
+type ConsoleSSOResult struct {
+	Mode           string `json:"mode"`
+	RedirectURL    string `json:"redirect_url"`
+	Linked         bool   `json:"linked"`
+	NativeUserID   int    `json:"native_user_id,omitempty"`
+	AutoCreated    bool   `json:"auto_created"`
+	AwakenedOrders int    `json:"awakened_orders"`
+}
+
+type MemberIdentity struct {
+	UserID        uint
+	Email         string
+	EmailVerified bool
+	DisplayName   string
+	Active        bool
+}
+
+type IdentityReader interface {
+	LookupMember(ctx context.Context, userID uint) (MemberIdentity, error)
+}
+
 type Bridge interface {
 	Status(ctx context.Context, merchantCustomerID string) (Status, error)
 	Start(ctx context.Context, merchantCustomerID, nextPath string) (Challenge, error)
 	Complete(ctx context.Context, merchantCustomerID, challengeID, approval string) (CompleteResult, error)
+	ConsoleSSO(ctx context.Context, input ConsoleSSOInput) (ConsoleSSOResult, error)
 }
 
 type Service struct {
-	bridge Bridge
+	bridge   Bridge
+	identity IdentityReader
 }
 
 func New(bridge Bridge) *Service {
 	return &Service{bridge: bridge}
+}
+
+func (s *Service) WithIdentityReader(reader IdentityReader) *Service {
+	s.identity = reader
+	return s
 }
 
 func merchantCustomerID(userID uint) (string, error) {
@@ -75,8 +122,39 @@ func normalizeNextPath(raw string) (string, error) {
 	return trimmed, nil
 }
 
+func normalizeConsoleSSONextPath(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "/me", nil
+	}
+	if !safeNextPath.MatchString(trimmed) {
+		return "", ErrInvalid
+	}
+	return trimmed, nil
+}
+
+func normalizeConsoleTargetPath(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "/dashboard", nil
+	}
+	if _, ok := allowedConsoleTargetPaths[trimmed]; !ok {
+		return "", ErrInvalid
+	}
+	return trimmed, nil
+}
+
 func validAuthorizeURL(raw string) bool {
-	u, err := url.Parse(strings.TrimSpace(raw))
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return false
+	}
+	for _, r := range trimmed {
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	u, err := url.Parse(trimmed)
 	if err != nil {
 		return false
 	}
@@ -135,6 +213,47 @@ func (s *Service) Complete(ctx context.Context, userID uint, challengeID, approv
 	}
 	if res.NextPath != "" && !safeNextPath.MatchString(res.NextPath) {
 		res.NextPath = "/orders"
+	}
+	return res, nil
+}
+
+func (s *Service) ConsoleSSO(ctx context.Context, userID uint, targetPath, nextPath string) (ConsoleSSOResult, error) {
+	ref, err := merchantCustomerID(userID)
+	if err != nil {
+		return ConsoleSSOResult{}, err
+	}
+	safeTarget, err := normalizeConsoleTargetPath(targetPath)
+	if err != nil {
+		return ConsoleSSOResult{}, err
+	}
+	safeNext, err := normalizeConsoleSSONextPath(nextPath)
+	if err != nil {
+		return ConsoleSSOResult{}, err
+	}
+	if s.bridge == nil || s.identity == nil {
+		return ConsoleSSOResult{}, ErrUnavailable
+	}
+	member, err := s.identity.LookupMember(ctx, userID)
+	if err != nil {
+		return ConsoleSSOResult{}, ErrUnavailable
+	}
+	email := strings.TrimSpace(member.Email)
+	if !member.Active || email == "" {
+		return ConsoleSSOResult{}, ErrForbidden
+	}
+	res, err := s.bridge.ConsoleSSO(ctx, ConsoleSSOInput{
+		MerchantCustomerID: ref,
+		Email:              email,
+		EmailVerified:      member.EmailVerified,
+		DisplayName:        strings.TrimSpace(member.DisplayName),
+		TargetPath:         safeTarget,
+		NextPath:           safeNext,
+	})
+	if err != nil {
+		return ConsoleSSOResult{}, err
+	}
+	if !validAuthorizeURL(res.RedirectURL) {
+		return ConsoleSSOResult{}, ErrUnavailable
 	}
 	return res, nil
 }

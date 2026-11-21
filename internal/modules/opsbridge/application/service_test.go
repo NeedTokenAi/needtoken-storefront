@@ -14,6 +14,8 @@ import (
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
 	couponcontract "github.com/dujiao-next/internal/modules/coupon/contract"
 	coupondomain "github.com/dujiao-next/internal/modules/coupon/domain"
+	giftcardcontract "github.com/dujiao-next/internal/modules/giftcard/contract"
+	giftcarddomain "github.com/dujiao-next/internal/modules/giftcard/domain"
 	"github.com/dujiao-next/internal/modules/opsbridge/application"
 	opscontract "github.com/dujiao-next/internal/modules/opsbridge/contract"
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
@@ -378,4 +380,97 @@ func TestOpsBridgeCatalogAndCouponManagement(t *testing.T) {
 	if err != nil || pricingRes.DefaultDisplayCurrency != "USD" || pricingRes.USDCNYRate != "7.30" || pricingStore.connRate != 7.35 || pricingStore.connMarkup != 15.0 {
 		t.Fatalf("UpdatePricing failed: %+v store=%+v err=%v", pricingRes, pricingStore, err)
 	}
+
+	// Gift card generation & listing through contract repository
+	gcRepo := &fakeGiftCardRepo{}
+	svc.WithGiftCards(gcRepo)
+
+	ov, err := svc.Overview()
+	if err != nil {
+		t.Fatalf("Overview failed: %v", err)
+	}
+	hasGiftRead := false
+	hasGiftWrite := false
+	for _, capName := range ov.Capabilities {
+		if capName == "gift_cards.read" {
+			hasGiftRead = true
+		}
+		if capName == "gift_cards.write" {
+			hasGiftWrite = true
+		}
+	}
+	if !hasGiftRead || !hasGiftWrite {
+		t.Fatalf("expected gift_cards capabilities in overview, got %v", ov.Capabilities)
+	}
+
+	exp := time.Now().UTC().Add(48 * time.Hour).Format(time.RFC3339)
+	genRes, err := svc.GenerateGiftCards(opscontract.GenerateGiftCardsInput{
+		Name:      "Ops 活动储值卡",
+		Quantity:  3,
+		Amount:    "50.00",
+		ExpiresAt: exp,
+	})
+	if err != nil || genRes.Created != 3 || len(genRes.Cards) != 3 || !strings.HasPrefix(genRes.BatchNo, "GCB") || genRes.Batch.BatchNo != genRes.BatchNo {
+		t.Fatalf("GenerateGiftCards failed: %+v err=%v", genRes, err)
+	}
+	for _, card := range genRes.Cards {
+		if !strings.HasPrefix(card.Code, "GC") || card.Amount != "50.00" || card.Currency != "CNY" || card.Status != giftcarddomain.GiftCardStatusActive || card.BatchNo != genRes.BatchNo {
+			t.Fatalf("unexpected generated card: %+v", card)
+		}
+	}
+	if _, err := svc.GenerateGiftCards(opscontract.GenerateGiftCardsInput{Name: "", Quantity: 1, Amount: "10"}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("empty gift card name must fail with ErrInvalidInput, got %v", err)
+	}
+	if _, err := svc.GenerateGiftCards(opscontract.GenerateGiftCardsInput{Name: "Bad", Quantity: 1001, Amount: "10"}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("excessive gift card quantity must fail with ErrInvalidInput, got %v", err)
+	}
+
+	listRes, err := svc.GiftCards(1, 20, "", "active", genRes.BatchNo, 0)
+	if err != nil || listRes.Total != 3 || len(listRes.GiftCards) != 3 || len(listRes.Cards) != 3 {
+		t.Fatalf("GiftCards list failed: %+v err=%v", listRes, err)
+	}
+}
+
+type fakeGiftCardRepo struct {
+	giftcardcontract.Repository
+	batches []giftcarddomain.GiftCardBatch
+	cards   []giftcarddomain.GiftCard
+	nextID  uint
+}
+
+func (f *fakeGiftCardRepo) WithinTransaction(fn func(repo giftcardcontract.Repository) error) error {
+	return fn(f)
+}
+
+func (f *fakeGiftCardRepo) CreateBatch(batch *giftcarddomain.GiftCardBatch, cards []giftcarddomain.GiftCard) error {
+	f.nextID++
+	batch.ID = f.nextID
+	bCopy := *batch
+	f.batches = append(f.batches, bCopy)
+	for i := range cards {
+		f.nextID++
+		cards[i].ID = f.nextID
+		cards[i].BatchID = &batch.ID
+		cCopy := cards[i]
+		cCopy.Batch = &bCopy
+		f.cards = append(f.cards, cCopy)
+	}
+	return nil
+}
+
+func (f *fakeGiftCardRepo) List(filter giftcardcontract.ListFilter) ([]giftcarddomain.GiftCard, int64, error) {
+	var out []giftcarddomain.GiftCard
+	for _, c := range f.cards {
+		if filter.Status != "" && c.Status != filter.Status {
+			continue
+		}
+		if filter.BatchNo != "" && (c.Batch == nil || !strings.Contains(c.Batch.BatchNo, filter.BatchNo)) {
+			continue
+		}
+		if filter.Code != "" && !strings.Contains(c.Code, filter.Code) {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out, int64(len(out)), nil
 }

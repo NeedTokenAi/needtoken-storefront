@@ -9,6 +9,27 @@
             </template>
           </PanelHeading>
 
+          <div class="mb-6 flex flex-col justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 sm:flex-row sm:items-center">
+            <div class="flex items-start gap-3">
+              <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <Wallet class="h-4.5 w-4.5" />
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {{ t('personalCenter.giftCard.walletBalanceLabel') }}
+                </div>
+                <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {{ t('personalCenter.giftCard.walletDeductionNotice') }}
+                </p>
+              </div>
+            </div>
+            <div class="shrink-0 text-left sm:text-right">
+              <div class="font-mono text-xl font-black tabular-nums text-primary">
+                {{ userProfileStore.loadingWallet ? '—' : storedBalanceText }}
+              </div>
+            </div>
+          </div>
+
           <Alert v-if="panelAlert" class="mb-5" :variant="pageAlertVariant(panelAlert.level)" :class="pageAlertToneClass(panelAlert.level)">
             <AlertDescription>{{ panelAlert.message }}</AlertDescription>
           </Alert>
@@ -93,10 +114,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { giftCardAPI, type CaptchaPayload, type GiftCardRedeemResult } from '../../api'
 import { useAppStore } from '../../stores/app'
+import { useUserProfileStore } from '../../stores/userProfile'
 import { pageAlertVariant, pageAlertToneClass, type PageAlert } from '../../utils/alerts'
 import ImageCaptcha from '../../components/captcha/ImageCaptcha.vue'
 import TurnstileCaptcha from '../../components/captcha/TurnstileCaptcha.vue'
-import { Check, Gift } from 'lucide-vue-next'
+import { Check, Gift, Wallet } from 'lucide-vue-next'
 import PanelHeading from '../../components/shared/PanelHeading.vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -106,6 +128,7 @@ import { Input } from '@/components/ui/input'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const userProfileStore = useUserProfileStore()
 
 const redeemForm = reactive({
   code: '',
@@ -134,9 +157,15 @@ const redeemedAmountText = computed(() => {
 })
 
 const currentBalanceText = computed(() => {
-  const balance = String(lastRedeem.value?.wallet?.balance || '').trim()
-  const currency = String(lastRedeem.value?.gift_card?.currency || appStore.config?.currency || 'CNY').trim()
+  const balance = String(lastRedeem.value?.wallet?.balance || userProfileStore.walletBalance || '').trim()
+  const currency = String(lastRedeem.value?.gift_card?.currency || userProfileStore.walletAccount?.currency || appStore.config?.currency || 'CNY').trim()
   if (!balance) return '-'
+  return `${balance} ${currency}`
+})
+
+const storedBalanceText = computed(() => {
+  const balance = userProfileStore.walletBalance
+  const currency = String(userProfileStore.walletAccount?.currency || appStore.config?.currency || 'CNY').trim()
   return `${balance} ${currency}`
 })
 
@@ -213,6 +242,14 @@ const submitRedeem = async () => {
     })
     const payload = response.data.data || ({} as GiftCardRedeemResult)
     lastRedeem.value = payload
+    if (payload.wallet) {
+      userProfileStore.syncWalletAccount({
+        balance: String(payload.wallet.balance ?? ''),
+        currency: String(payload.gift_card?.currency || appStore.config?.currency || 'CNY'),
+      })
+    } else {
+      void userProfileStore.loadWalletAccount()
+    }
     panelAlert.value = {
       level: 'success',
       message: t('personalCenter.giftCard.redeemSuccess', {
@@ -243,6 +280,7 @@ onMounted(() => {
   if (!appStore.config) {
     void appStore.loadConfig()
   }
+  void userProfileStore.loadWalletAccount()
 })
 </script>
 

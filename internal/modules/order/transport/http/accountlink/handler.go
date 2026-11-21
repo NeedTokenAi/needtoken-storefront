@@ -29,6 +29,7 @@ func RegisterMemberReadRoutes(routes gin.IRoutes, h *Handler) {
 func RegisterMemberWriteRoutes(routes gin.IRoutes, h *Handler) {
 	routes.POST("/me/api-account-link/start", h.start)
 	routes.POST("/me/api-account-link/complete", h.complete)
+	routes.POST("/me/api-console-sso", h.consoleSSO)
 }
 
 func RegisterMemberRoutes(routes gin.IRoutes, h *Handler) {
@@ -88,6 +89,33 @@ func (h *Handler) complete(c *gin.Context) {
 		return
 	}
 	result, err := h.service.Complete(c.Request.Context(), userID, input.ChallengeID, input.Approval)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) consoleSSO(c *gin.Context) {
+	h.privateHeaders(c)
+	tenant := reseller.TenantOrMain(c.Request.Context())
+	if tenant.Unavailable || tenant.ResellerID != nil {
+		h.fail(c, accountlink.ErrForbidden)
+		return
+	}
+	userID, ok := ginutil.GetUserID(c)
+	if !ok || userID == 0 {
+		h.fail(c, accountlink.ErrForbidden)
+		return
+	}
+	var input struct {
+		TargetPath string `json:"target_path"`
+		NextPath   string `json:"next_path"`
+	}
+	if !h.decodeJSON(c, &input, true) {
+		return
+	}
+	result, err := h.service.ConsoleSSO(c.Request.Context(), userID, input.TargetPath, input.NextPath)
 	if err != nil {
 		h.fail(c, err)
 		return

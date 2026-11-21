@@ -1,11 +1,14 @@
 package application
 
 import (
+	crand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dujiao-next/internal/constants"
 	categorycontract "github.com/dujiao-next/internal/modules/catalog/category/contract"
@@ -14,6 +17,8 @@ import (
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
 	couponcontract "github.com/dujiao-next/internal/modules/coupon/contract"
 	coupondomain "github.com/dujiao-next/internal/modules/coupon/domain"
+	giftcardcontract "github.com/dujiao-next/internal/modules/giftcard/contract"
+	giftcarddomain "github.com/dujiao-next/internal/modules/giftcard/domain"
 	opscontract "github.com/dujiao-next/internal/modules/opsbridge/contract"
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
@@ -32,6 +37,7 @@ type Service struct {
 	products     productcontract.Repository
 	skus         productcontract.SKURepository
 	coupons      couponcontract.Repository
+	giftCards    giftcardcontract.Repository
 	pricing      opscontract.PricingStore
 }
 
@@ -61,6 +67,11 @@ func NewWithCatalog(
 
 func (s *Service) WithPricing(pricing opscontract.PricingStore) *Service {
 	s.pricing = pricing
+	return s
+}
+
+func (s *Service) WithGiftCards(giftCards giftcardcontract.Repository) *Service {
+	s.giftCards = giftCards
 	return s
 }
 
@@ -201,6 +212,9 @@ func (s *Service) Overview() (*opscontract.Overview, error) {
 	}
 	if s.coupons != nil {
 		caps = append(caps, "coupons.read", "coupons.write")
+	}
+	if s.giftCards != nil {
+		caps = append(caps, "gift_cards.read", "gift_cards.write")
 	}
 	result := &opscontract.Overview{Source: "storefront", CollectedAt: time.Now().UTC(), Freshness: "fresh", OrdersByStatus: map[string]int64{}, Capabilities: caps}
 	_, total, err := s.orders.ListAdmin(ordercontract.ListFilter{Page: 1, PageSize: 1})
@@ -969,6 +983,198 @@ func (s *Service) CreateCoupon(input opscontract.CreateCouponInput) (*opscontrac
 	}
 	out := mapCoupon(*rec)
 	return &out, nil
+}
+
+func (s *Service) GiftCards(page, pageSize int, code, status, batchNo string, redeemedUserID uint) (*opscontract.GiftCardsResult, error) {
+	if s.giftCards == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 50
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	normalizedStatus := strings.TrimSpace(strings.ToLower(status))
+	if normalizedStatus != "" {
+		switch normalizedStatus {
+		case giftcarddomain.GiftCardStatusActive, giftcarddomain.GiftCardStatusRedeemed, giftcarddomain.GiftCardStatusDisabled, "expired":
+		default:
+			return nil, opscontract.ErrInvalidInput
+		}
+	}
+	rows, total, err := s.giftCards.List(giftcardcontract.ListFilter{
+		Code:           strings.TrimSpace(strings.ToUpper(code)),
+		Status:         normalizedStatus,
+		BatchNo:        strings.TrimSpace(strings.ToUpper(batchNo)),
+		RedeemedUserID: redeemedUserID,
+		Page:           page,
+		PageSize:       pageSize,
+	})
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	items := make([]opscontract.GiftCard, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, mapGiftCard(row, "", now))
+	}
+	return &opscontract.GiftCardsResult{
+		Source:      "storefront",
+		CollectedAt: now,
+		Freshness:   "fresh",
+		GiftCards:   items,
+		Cards:       items,
+		Total:       total,
+		Page:        page,
+		PageSize:    pageSize,
+	}, nil
+}
+
+func (s *Service) GenerateGiftCards(input opscontract.GenerateGiftCardsInput) (*opscontract.GenerateGiftCardsResult, error) {
+	if s.giftCards == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" || utf8.RuneCountInString(name) > 120 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if input.Quantity <= 0 || input.Quantity > 1000 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	rawAmt, err := decimal.NewFromString(strings.TrimSpace(input.Amount))
+	if err != nil {
+		return nil, opscontract.ErrInvalidInput
+	}
+	amount := rawAmt.Round(2)
+	if !amount.Equal(rawAmt) || amount.LessThanOrEqual(decimal.Zero) {
+		return nil, opscontract.ErrInvalidInput
+	}
+
+	now := time.Now().UTC()
+	var expiresAt *time.Time
+	if rawExp := strings.TrimSpace(input.ExpiresAt); rawExp != "" {
+		parsed, parseErr := parseOptionalTime(rawExp)
+		if parseErr != nil || !parsed.After(now) {
+			return nil, opscontract.ErrInvalidInput
+		}
+		utc := parsed.UTC()
+		expiresAt = &utc
+	}
+
+	// Read site currency BEFORE opening transaction to prevent SQLite MaxOpenConns=1 self-deadlock.
+	currency := constants.SiteCurrencyDefault
+	if s.pricing != nil {
+		if siteCur, _, _, _, curErr := s.pricing.GetSitePricing(); curErr == nil && strings.TrimSpace(siteCur) != "" {
+			currency = strings.ToUpper(strings.TrimSpace(siteCur))
+		}
+	}
+
+	batchNo := strings.ToUpper(fmt.Sprintf("GCB%s%s", now.Format("20060102150405"), opsRandomHex(4)))
+	batch := &giftcarddomain.GiftCardBatch{
+		BatchNo:   batchNo,
+		Name:      name,
+		Amount:    money.FromDecimal(amount),
+		Currency:  currency,
+		Quantity:  input.Quantity,
+		ExpiresAt: expiresAt,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	cards := make([]giftcarddomain.GiftCard, 0, input.Quantity)
+	for i := range input.Quantity {
+		cards = append(cards, giftcarddomain.GiftCard{
+			Name:      name,
+			Code:      strings.ToUpper(fmt.Sprintf("GC%s%04d%s", now.Format("060102150405"), i%10000, opsRandomHex(5))),
+			Amount:    money.FromDecimal(amount),
+			Currency:  currency,
+			Status:    giftcarddomain.GiftCardStatusActive,
+			ExpiresAt: expiresAt,
+			CreatedAt: now,
+			UpdatedAt: now,
+		})
+	}
+
+	if err := s.giftCards.WithinTransaction(func(repo giftcardcontract.Repository) error {
+		return repo.CreateBatch(batch, cards)
+	}); err != nil {
+		return nil, err
+	}
+
+	outCards := make([]opscontract.GiftCard, 0, len(cards))
+	for _, card := range cards {
+		outCards = append(outCards, mapGiftCard(card, batch.BatchNo, now))
+	}
+
+	return &opscontract.GenerateGiftCardsResult{
+		Source:      "storefront",
+		CollectedAt: now,
+		Freshness:   "fresh",
+		Batch: opscontract.GiftCardBatch{
+			ID:        batch.ID,
+			BatchNo:   batch.BatchNo,
+			Name:      batch.Name,
+			Amount:    batch.Amount.String(),
+			Currency:  batch.Currency,
+			Quantity:  batch.Quantity,
+			ExpiresAt: batch.ExpiresAt,
+			CreatedAt: batch.CreatedAt,
+		},
+		BatchNo: batch.BatchNo,
+		Created: len(outCards),
+		Cards:   outCards,
+	}, nil
+}
+
+func mapGiftCard(card giftcarddomain.GiftCard, fallbackBatchNo string, now time.Time) opscontract.GiftCard {
+	batchNo := fallbackBatchNo
+	if card.Batch != nil && card.Batch.BatchNo != "" {
+		batchNo = card.Batch.BatchNo
+	}
+	isExpired := card.Status == giftcarddomain.GiftCardStatusActive && card.ExpiresAt != nil && card.ExpiresAt.Before(now)
+	return opscontract.GiftCard{
+		ID:             card.ID,
+		BatchID:        card.BatchID,
+		BatchNo:        batchNo,
+		Name:           card.Name,
+		Code:           card.Code,
+		Amount:         card.Amount.String(),
+		Currency:       card.Currency,
+		Status:         card.Status,
+		IsExpired:      isExpired,
+		ExpiresAt:      card.ExpiresAt,
+		RedeemedAt:     card.RedeemedAt,
+		RedeemedUserID: card.RedeemedUserID,
+		WalletTxnID:    card.WalletTxnID,
+		CreatedAt:      card.CreatedAt,
+		UpdatedAt:      card.UpdatedAt,
+	}
+}
+
+func parseOptionalTime(raw string) (time.Time, error) {
+	for _, layout := range []string{time.RFC3339Nano, time.RFC3339, "2006-01-02 15:04:05", "2006-01-02"} {
+		if parsed, err := time.Parse(layout, raw); err == nil {
+			if layout == "2006-01-02" {
+				parsed = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 23, 59, 59, 0, time.UTC)
+			}
+			return parsed, nil
+		}
+	}
+	return time.Time{}, opscontract.ErrInvalidInput
+}
+
+func opsRandomHex(n int) string {
+	buf := make([]byte, n)
+	if _, err := crand.Read(buf); err != nil {
+		for i := range buf {
+			buf[i] = byte('A' + (i % 26))
+		}
+	}
+	return hex.EncodeToString(buf)
 }
 
 func (s *Service) UpdateCouponStatus(id uint, active bool) (*opscontract.Coupon, error) {

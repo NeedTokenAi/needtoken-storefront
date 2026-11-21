@@ -23,11 +23,11 @@ export const API_BASE_URL = `${CONSOLE_URL}/v1`
 export const API_SERVICES_PATH = '/api-services'
 export const API_PLANS_PATH = '/plans'
 
-/** new-api 公开定价接口（模型广场数据源） */
-export const PRICING_URL = trimSlash(env.VITE_NEEDTOKEN_PRICING_URL || `${CONSOLE_URL}/api/pricing`)
+/** 店面同源公开定价缓存接口（可通过 VITE_NEEDTOKEN_PRICING_URL 覆盖） */
+export const PRICING_URL = trimSlash(env.VITE_NEEDTOKEN_PRICING_URL || '/api/v1/public/api-pricing')
 
-/** 胶水公开的号池状态接口；不配置时模型广场显示“状态待接入” */
-export const STATUS_URL = trimSlash(env.VITE_NEEDTOKEN_STATUS_URL || '')
+/** 店面同源公开号池状态缓存接口（可通过 VITE_NEEDTOKEN_STATUS_URL 覆盖） */
+export const STATUS_URL = trimSlash(env.VITE_NEEDTOKEN_STATUS_URL || '/api/v1/public/pool-status')
 
 export const CONSOLE_LOGIN_URL = `${CONSOLE_URL}/sign-in`
 export const CONSOLE_REGISTER_URL = `${CONSOLE_URL}/sign-up`
@@ -39,16 +39,16 @@ export const CATEGORY_SLUGS = {
     plans: 'plans',
 } as const
 
-/** 默认模型（账号 #2 桌面端 Ultra 档 2026-11-01 实测可用），首个为首选 */
+/** 默认主流推荐模型，首个为示例与排序首选 */
 export const DEFAULT_MODELS = [
-    'gpt-6.1-sol',
-    'gpt-6-astra',
-    'gpt-6.1-terra',
-    'gpt-6-sol',
-    'gpt-6-luna',
-    'gpt-5.6-sol',
-    'gpt-5.6-terra',
-    'gpt-5.6-luna',
+    'gpt-5.4',
+    'claude-sonnet-4-6',
+    'claude-opus-4-6',
+    'gemini-2.5-pro',
+    'deepseek-v3',
+    'deepseek-r1',
+    'grok-4',
+    'gpt-4.1',
 ] as const
 
 /** 上游已拒绝、不再使用的模型，即使 new-api 返回也不展示 */

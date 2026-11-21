@@ -12,7 +12,7 @@
     <div class="nt-account-link__icon" aria-hidden="true">
       <AlertTriangle v-if="hasPendingOrders" :size="18" />
       <CheckCircle2 v-else-if="isLinked" :size="18" />
-      <Link2 v-else :size="18" />
+      <Sparkles v-else :size="18" />
     </div>
 
     <div class="nt-account-link__body">
@@ -23,33 +23,63 @@
         </span>
       </div>
       <p>{{ descriptionText }}</p>
+
+      <div v-if="isLinked" class="nt-account-link__shortcuts" role="group" :aria-label="t('needtoken.apiAccountLink.shortcutsLabel')">
+        <button
+          v-for="item in quickLinks"
+          :key="item.target"
+          type="button"
+          class="nt-account-link__chip"
+          :disabled="busy"
+          @click="handleSSO(item.target)"
+        >
+          <LoaderCircle v-if="ssoLoading && ssoTarget === item.target" :size="12" class="nt-account-link__spin" aria-hidden="true" />
+          <component :is="item.icon" v-else :size="12" aria-hidden="true" />
+          <span>{{ t(item.labelKey) }}</span>
+          <ArrowUpRight :size="11" aria-hidden="true" />
+        </button>
+      </div>
+
       <p v-if="errorMessage" class="nt-account-link__error" role="alert">
         {{ errorMessage || t('needtoken.apiAccountLink.startFailed') }}
       </p>
     </div>
 
     <div class="nt-account-link__actions">
+      <template v-if="!isLinked">
+        <button
+          type="button"
+          class="nt-account-link__cta"
+          :disabled="busy"
+          @click="handleSSO('/dashboard')"
+        >
+          <LoaderCircle v-if="ssoLoading" :size="15" class="nt-account-link__spin" aria-hidden="true" />
+          <Zap v-else :size="15" aria-hidden="true" />
+          <span>{{ ssoLoading ? t('needtoken.apiAccountLink.ssoRedirecting') : ctaLabel }}</span>
+        </button>
+        <button
+          type="button"
+          class="nt-account-link__secondary"
+          :disabled="busy"
+          @click="handleManualBind"
+        >
+          <LoaderCircle v-if="starting" :size="13" class="nt-account-link__spin" aria-hidden="true" />
+          <Link2 v-else :size="13" aria-hidden="true" />
+          <span>{{ starting ? t('needtoken.apiAccountLink.redirecting') : t('needtoken.apiAccountLink.bindExistingAction') }}</span>
+        </button>
+      </template>
+
       <button
-        v-if="!isLinked"
-        type="button"
-        class="nt-account-link__cta"
-        :disabled="starting"
-        @click="handleStart"
-      >
-        <LoaderCircle v-if="starting" :size="15" class="nt-account-link__spin" aria-hidden="true" />
-        <Link2 v-else :size="15" aria-hidden="true" />
-        <span>{{ starting ? t('needtoken.apiAccountLink.redirecting') : ctaLabel }}</span>
-      </button>
-      <a
         v-else
-        :href="CONSOLE_URL"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="nt-account-link__console"
+        type="button"
+        class="nt-account-link__cta is-sso"
+        :disabled="busy"
+        @click="handleSSO('/dashboard')"
       >
-        <span>{{ t('needtoken.plans.console') }}</span>
-        <ArrowUpRight :size="14" aria-hidden="true" />
-      </a>
+        <LoaderCircle v-if="ssoLoading && ssoTarget === '/dashboard'" :size="15" class="nt-account-link__spin" aria-hidden="true" />
+        <ArrowUpRight v-else :size="15" aria-hidden="true" />
+        <span>{{ ssoLoading && ssoTarget === '/dashboard' ? t('needtoken.apiAccountLink.ssoRedirecting') : t('needtoken.apiAccountLink.enterConsoleSSO') }}</span>
+      </button>
     </div>
   </section>
 </template>
@@ -57,12 +87,23 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Link2, LoaderCircle } from 'lucide-vue-next'
+import {
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  CheckCircle2,
+  CreditCard,
+  KeyRound,
+  Link2,
+  LoaderCircle,
+  Sparkles,
+  Zap,
+} from 'lucide-vue-next'
 import { useUserAuthStore } from '../../../stores/userAuth'
 import { useAppStore } from '../../../stores/app'
 import { getActiveTemplate } from '../../registry'
-import { CONSOLE_URL } from '../config'
 import { resetApiAccountLinkCache, useApiAccountLink } from '../composables/useApiAccountLink'
+import type { ApiConsoleTargetPath } from '../lib/apiAccountLinkPolicy'
 
 const props = withDefaults(
   defineProps<{
@@ -71,7 +112,7 @@ const props = withDefaults(
     onlyWhenActionNeeded?: boolean
   }>(),
   {
-    nextPath: '/plans',
+    nextPath: '/me',
     compact: false,
     onlyWhenActionNeeded: false,
   },
@@ -80,7 +121,13 @@ const props = withDefaults(
 const { t } = useI18n()
 const userAuth = useUserAuthStore()
 const appStore = useAppStore()
-const { status, starting, errorMessage, load, beginLinking } = useApiAccountLink()
+const { status, starting, ssoLoading, ssoTarget, errorMessage, load, beginLinking, openApiConsoleSSO } = useApiAccountLink()
+
+const quickLinks: readonly { target: ApiConsoleTargetPath; labelKey: string; icon: typeof KeyRound }[] = [
+  { target: '/keys', labelKey: 'needtoken.apiAccountLink.shortcutKeys', icon: KeyRound },
+  { target: '/dashboard', labelKey: 'needtoken.apiAccountLink.shortcutDashboard', icon: Activity },
+  { target: '/subscriptions', labelKey: 'needtoken.apiAccountLink.shortcutSubscriptions', icon: CreditCard },
+]
 
 watch(
   () => [userAuth.isAuthenticated, appStore.isResellerTenant] as const,
@@ -97,6 +144,7 @@ watch(
 const isLinked = computed(() => Boolean(status.value?.linked))
 const pendingOrders = computed(() => status.value?.pending_orders ?? 0)
 const hasPendingOrders = computed(() => !isLinked.value && pendingOrders.value > 0)
+const busy = computed(() => starting.value || ssoLoading.value)
 
 const visible = computed(() => {
   if (getActiveTemplate() !== 'needtoken' || appStore.isResellerTenant || !userAuth.isAuthenticated) {
@@ -134,10 +182,14 @@ const descriptionText = computed(() => {
 const ctaLabel = computed(() =>
   hasPendingOrders.value
     ? t('needtoken.apiAccountLink.bindNowToActivate')
-    : t('needtoken.apiAccountLink.bindAction'),
+    : t('needtoken.apiAccountLink.oneClickOpenConsole'),
 )
 
-const handleStart = () => {
+const handleSSO = (target: ApiConsoleTargetPath) => {
+  void openApiConsoleSSO(target, props.nextPath)
+}
+
+const handleManualBind = () => {
   void beginLinking(props.nextPath)
 }
 </script>
@@ -145,11 +197,11 @@ const handleStart = () => {
 <style scoped>
 .nt-account-link {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--nt-accent-border, hsl(var(--border)));
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--nt-accent-subtle, hsl(var(--card)));
   color: var(--ui-text-primary, hsl(var(--foreground)));
 }
@@ -162,15 +214,16 @@ const handleStart = () => {
   background: rgba(245, 158, 11, 0.08);
 }
 .nt-account-link.is-linked {
-  border-color: rgba(16, 185, 129, 0.32);
+  border-color: rgba(16, 185, 129, 0.34);
   background: rgba(16, 185, 129, 0.06);
 }
 .nt-account-link__icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
+  margin-top: 2px;
   flex: none;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.6);
@@ -196,8 +249,8 @@ const handleStart = () => {
   gap: 8px;
 }
 .nt-account-link__head h3 {
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 13.5px;
+  font-weight: 680;
   line-height: 1.4;
 }
 .nt-account-link__badge {
@@ -217,46 +270,93 @@ const handleStart = () => {
   line-height: 1.65;
   color: var(--ui-text-secondary, hsl(var(--muted-foreground)));
 }
+.nt-account-link__shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+.nt-account-link__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border, hsl(var(--border)));
+  border-radius: 999px;
+  background: var(--ui-bg-elevated, hsl(var(--card)));
+  color: var(--ui-text-secondary, hsl(var(--foreground)));
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.nt-account-link__chip:hover:not(:disabled) {
+  border-color: var(--ui-accent, hsl(var(--primary)));
+  color: var(--ui-accent, hsl(var(--primary)));
+}
+.nt-account-link__chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .nt-account-link__error {
   color: #dc2626 !important;
   font-weight: 500;
 }
 .nt-account-link__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
   flex: none;
 }
 .nt-account-link__cta {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
+  min-height: 38px;
+  padding: 0 15px;
   border: 0;
   border-radius: 10px;
   background: var(--ui-accent, hsl(var(--primary)));
   color: #fff;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
   cursor: pointer;
-  transition: opacity 120ms ease;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.nt-account-link__cta.is-sso {
+  background: #059669;
 }
 .nt-account-link.is-warning .nt-account-link__cta {
   background: #d97706;
 }
 .nt-account-link__cta:hover:not(:disabled) {
-  opacity: 0.9;
+  opacity: 0.92;
 }
-.nt-account-link__cta:disabled {
+.nt-account-link__cta:disabled,
+.nt-account-link__secondary:disabled {
   opacity: 0.65;
   cursor: not-allowed;
 }
-.nt-account-link__console {
+.nt-account-link__secondary {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ui-accent, hsl(var(--primary)));
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-muted, hsl(var(--muted-foreground)));
+  font-size: 11.5px;
+  font-weight: 500;
   white-space: nowrap;
+  cursor: pointer;
+}
+.nt-account-link__secondary:hover:not(:disabled) {
+  color: var(--ui-accent, hsl(var(--primary)));
 }
 .nt-account-link__spin {
   animation: nt-link-spin 1s linear infinite;
@@ -264,14 +364,25 @@ const handleStart = () => {
 @keyframes nt-link-spin {
   to { transform: rotate(360deg); }
 }
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .nt-account-link {
     flex-wrap: wrap;
     align-items: flex-start;
   }
   .nt-account-link__actions {
     width: 100%;
-    padding-left: 48px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-left: 50px;
+  }
+}
+@media (max-width: 480px) {
+  .nt-account-link__actions {
+    padding-left: 0;
+  }
+  .nt-account-link__cta {
+    width: 100%;
   }
 }
 </style>

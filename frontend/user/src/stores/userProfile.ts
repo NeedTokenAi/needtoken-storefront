@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { memberLevelAPI, userOrderAPI, userProfileAPI } from '../api'
+import { memberLevelAPI, userOrderAPI, userProfileAPI, walletAPI } from '../api'
 import type {
     ChangeEmailPayload,
     ChangeUserPasswordPayload,
@@ -42,8 +42,10 @@ export const useUserProfileStore = defineStore('user-profile', () => {
     const telegramBinding = ref<TelegramBindingData | null>(null)
     const googleBinding = ref<GoogleBindingData | null>(null)
     const memberLevels = ref<PublicMemberLevel[]>([])
+    const walletAccount = ref<{ balance?: string; currency?: string } | null>(null)
 
     const loadingProfile = ref(false)
+    const loadingWallet = ref(false)
     const savingProfile = ref(false)
     const loadingOrders = ref(false)
     const loadingLoginLogs = ref(false)
@@ -66,6 +68,36 @@ export const useUserProfileStore = defineStore('user-profile', () => {
         }
         return profile.value?.email || '-'
     })
+
+    const walletBalance = computed(() => {
+        const raw = String(walletAccount.value?.balance ?? '').trim()
+        return raw || '0.00'
+    })
+
+    const loadWalletAccount = async () => {
+        if (!userAuthStore.isAuthenticated) {
+            walletAccount.value = null
+            return false
+        }
+        loadingWallet.value = true
+        try {
+            const response = await walletAPI.account()
+            walletAccount.value = (response.data.data || null) as { balance?: string; currency?: string } | null
+            return true
+        } catch {
+            return false
+        } finally {
+            loadingWallet.value = false
+        }
+    }
+
+    const syncWalletAccount = (next: { balance?: string; currency?: string } | null | undefined) => {
+        if (!next) return
+        walletAccount.value = {
+            ...(walletAccount.value || {}),
+            ...next,
+        }
+    }
 
     const currentLevel = computed(() => {
         const levelId = profile.value?.member_level_id
@@ -421,6 +453,11 @@ export const useUserProfileStore = defineStore('user-profile', () => {
 
     return {
         profile,
+        walletAccount,
+        walletBalance,
+        loadingWallet,
+        loadWalletAccount,
+        syncWalletAccount,
         recentOrders,
         ordersTotal,
         recentLoginLogs,

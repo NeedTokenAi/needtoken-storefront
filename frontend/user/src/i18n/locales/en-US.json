@@ -1013,7 +1013,9 @@
       "errors": {
         "codeRequired": "Please enter gift card code first",
         "redeemFailed": "Failed to redeem gift card, please try again later"
-      }
+      },
+      "walletBalanceLabel": "Current Storefront Balance",
+      "walletDeductionNotice": "Redeemed gift card funds are credited directly to your storefront balance and can offset any product or API plan at checkout."
     },
     "apiPanel": {
       "title": "API Integration",
@@ -1838,7 +1840,8 @@
       "faq": "FAQ",
       "environment": "Environment check",
       "appleIds": "Free Apple IDs",
-      "authEntry": "Sign in / Sign up"
+      "authEntry": "Sign in / Sign up",
+      "apiConsole": "API Console"
     },
     "theme": {
       "label": "Appearance",
@@ -2017,7 +2020,8 @@
         "input": "Input",
         "output": "Output",
         "perCall": "Per call",
-        "unit": "Billing unit / conditions"
+        "unit": "Billing unit / conditions",
+        "cacheHit": "Cache Hit"
       },
       "perCallShort": "call",
       "buy": "Buy a plan",
@@ -2043,7 +2047,25 @@
         "task": "Pricing depends on task usage, duration or specifications. It is not converted to a token rate here.",
         "multimodal": "Cache, image or audio usage has separate conditions. Check the full pricing rules in the console.",
         "unknown": "This billing method cannot be accurately summarized here. Check the console for a quote."
-      }
+      },
+      "eyebrow": "MODEL SQUARE · LIVE PRICING",
+      "statsModels": "{count} Live Models · {vendors} Vendors",
+      "groupSwitcherLabel": "Billing Group Switcher",
+      "groupSwitcherTitle": "Billing Group & Multiplier",
+      "groupRecommended": "Recommended Group",
+      "groupRecommendedHint": "Showing recommended group rates per model; click any group to recalculate live",
+      "groupExpandAll": "All Group Offers",
+      "groupExpandAllHint": "Showing every model × group offer for cross-group comparison",
+      "groupMultiplier": "Group Multiplier ×{ratio}",
+      "billingFilterLabel": "Billing Type Filter",
+      "billingAll": "All Billing",
+      "billingToken": "Per Token",
+      "billingPerCall": "Per Call",
+      "perCallBadge": "Per Call",
+      "copyModelId": "Copy model ID {model}",
+      "copyIdShort": "Copy Model ID",
+      "copied": "Copied",
+      "callInConsole": "Call in Console"
     },
     "plans": {
       "title": "API Plans",
@@ -2150,7 +2172,35 @@
         "quota": "Top up as needed",
         "usage": "Track your usage"
       },
-      "quotaNote": "Quota, validity, and request limits follow your purchased plan."
+      "quotaNote": "Quota, validity, and request limits follow your purchased plan.",
+      "protocolsEyebrow": "NATIVE PROTOCOLS · ZERO FRICTION",
+      "protocolsTitle": "Four Native Protocols, Zero-Code Drop-In",
+      "protocolsIntro": "Unified enterprise AI gateway preserving native reasoning, tool use, streaming, and prompt caching—just set Base URL and API Key.",
+      "protocolCards": {
+        "openai": {
+          "title": "OpenAI Responses & Chat Native",
+          "desc": "Full support for /v1/responses and /v1/chat/completions with reasoning tokens, tool calling, and structured outputs."
+        },
+        "anthropic": {
+          "title": "Anthropic Messages Native",
+          "desc": "100% compatible with /v1/messages, Extended Thinking, and Prompt Caching—connect Claude Code with zero translation overhead."
+        },
+        "gemini": {
+          "title": "Google Gemini Native Protocol",
+          "desc": "Native /v1beta/models multimodal generation, long-context reasoning, and official Google GenAI SDK compatibility."
+        },
+        "ecosystem": {
+          "title": "Plug-and-Play Client Ecosystem",
+          "desc": "Works out of the box with Claude Code, Cursor, Codex CLI, OpenCode, Cherry Studio, and NextChat with full per-request usage logs."
+        }
+      },
+      "hotModelsEyebrow": "LIVE CATALOG · LIVE RATES",
+      "hotModelsTitle": "Popular Models Live Pricing",
+      "hotModelsIntro": "Live rates synced from the public gateway pricing catalog (recommended group), billed per 1M tokens with prompt cache discounts.",
+      "viewAllModels": "Explore All Models",
+      "protocolsCol": "Protocols",
+      "inspectModel": "Inspect →",
+      "hotModelsFallbackHint": "Select any model to inspect live group multipliers and input/output rates in Model Square."
     },
     "homeServices": {
       "seoTitle": "Recharges, ready-made products and API plans",
@@ -2615,11 +2665,11 @@
     "apiAccountLink": {
       "title": "API account link status",
       "unlinkedHeading": "NeedToken API account not linked yet",
-      "unlinkedDescription": "API plans are delivered directly to your linked API account while keeping your existing balance and usage intact. Link now in one click, or complete linking after payment for automatic activation.",
+      "unlinkedDescription": "Verified emails provision and link your API Console account in one click with no duplicate sign-up; existing standalone gateway accounts can also sign in to link securely.",
       "pendingHeading": "{count} paid API plan order(s) waiting for account linking",
       "pendingDescription": "Approve linking in the API console to immediately activate your paid plan(s) and issue your managed API key.",
       "linkedHeading": "NeedToken API account linked",
-      "linkedDescription": "API plans purchased with this storefront account will activate automatically on your linked API account.",
+      "linkedDescription": "Your storefront and API Console accounts are linked. Purchased plans activate automatically and you can open the console via passwordless SSO.",
       "bindAction": "Link API account",
       "bindNowToActivate": "Link now to activate",
       "redirecting": "Opening API console…",
@@ -2633,7 +2683,15 @@
       "callbackContinue": "Continue",
       "callbackFailedTitle": "API account linking did not finish",
       "callbackFailedDesc": "The authorization response was invalid or expired. Please start linking again.",
-      "callbackMissingParams": "Missing authorization callback parameters. Return to the storefront and click link again."
+      "callbackMissingParams": "Missing authorization callback parameters. Return to the storefront and click link again.",
+      "oneClickOpenConsole": "One-Click Activate & Enter API Console",
+      "bindExistingAction": "Link Existing Gateway Account",
+      "enterConsoleSSO": "Enter API Console (Passwordless SSO)",
+      "ssoRedirecting": "Opening Console…",
+      "shortcutsLabel": "API Console Shortcuts",
+      "shortcutKeys": "Manage API Keys",
+      "shortcutDashboard": "Usage & Quota",
+      "shortcutSubscriptions": "My Subscriptions"
     },
     "claudeEnvironment": {
       "eyebrow": "CLAUDE CODE · NETWORK & ENVIRONMENT",
@@ -3578,7 +3636,21 @@
       "configureTool": "Configure {name}",
       "quickConfigTitle": "Import directly from your key list",
       "quickConfigHint": "Sign in to the API console and choose “Import to CC Switch” in the API key list. If it is unavailable, copy the parameters below and add the provider manually.",
-      "quickConfig": "Quick setup"
+      "quickConfig": "Quick setup",
+      "enterConsoleAction": "Enter API Console",
+      "metrics": {
+        "label": "Live Gateway Metrics",
+        "modelsLabel": "Live Models",
+        "modelsSub": "Synced from live gateway catalog",
+        "vendorsLabel": "Model Vendors",
+        "vendorsSub": "OpenAI · Anthropic · Google · DeepSeek",
+        "protocolsLabel": "Native Protocols",
+        "protocolsSub": "Responses · Chat · Messages · Gemini",
+        "poolLabel": "Supply Pool Health",
+        "poolOnlineSub": "Healthy supply groups online",
+        "poolStandby": "Managed Routing",
+        "poolStandbySub": "Multi-channel failover routing"
+      }
     },
     "purchaseFlow": {
       "backToPlans": "Back to plans",

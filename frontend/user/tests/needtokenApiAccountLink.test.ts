@@ -4,6 +4,8 @@ import {
   isSafeAuthorizeUrl,
   parseAccountLinkFragment,
   resolveReturnRoute,
+  sanitizeConsoleNextPath,
+  sanitizeConsoleTargetPath,
   sanitizeLinkNextPath,
 } from '../src/templates/needtoken/lib/apiAccountLinkPolicy.ts'
 
@@ -22,6 +24,8 @@ test('parseAccountLinkFragment extracts valid challenge_id and approval', () => 
 test('sanitizeLinkNextPath prevents open redirect and maps member paths', () => {
   assert.equal(sanitizeLinkNextPath(''), '/plans')
   assert.equal(sanitizeLinkNextPath('/plans'), '/plans')
+  assert.equal(sanitizeLinkNextPath('/api-services'), '/api-services')
+  assert.equal(sanitizeLinkNextPath('/models'), '/models')
   assert.equal(sanitizeLinkNextPath('/checkout'), '/checkout')
   assert.equal(sanitizeLinkNextPath('/orders/NT-20261120'), '/orders/NT-20261120')
   assert.equal(sanitizeLinkNextPath('/me'), '/profile')
@@ -31,10 +35,25 @@ test('sanitizeLinkNextPath prevents open redirect and maps member paths', () => 
   assert.equal(sanitizeLinkNextPath('/orders/../../admin'), '/plans')
 })
 
+test('sanitizeConsoleTargetPath and sanitizeConsoleNextPath enforce console SSO allowlists', () => {
+  assert.equal(sanitizeConsoleTargetPath(''), '/dashboard')
+  assert.equal(sanitizeConsoleTargetPath('/keys'), '/keys')
+  assert.equal(sanitizeConsoleTargetPath('/subscriptions'), '/subscriptions')
+  assert.equal(sanitizeConsoleTargetPath('/playground'), '/playground')
+  assert.equal(sanitizeConsoleTargetPath('/admin'), '/dashboard')
+  assert.equal(sanitizeConsoleTargetPath('https://evil.example'), '/dashboard')
+
+  assert.equal(sanitizeConsoleNextPath(''), '/me')
+  assert.equal(sanitizeConsoleNextPath('/me'), '/me')
+  assert.equal(sanitizeConsoleNextPath('/api-services'), '/api-services')
+  assert.equal(sanitizeConsoleNextPath('https://evil.example'), '/me')
+})
+
 test('resolveReturnRoute maps safe paths and rejects external URLs', () => {
   assert.equal(resolveReturnRoute('/plans'), '/plans')
   assert.equal(resolveReturnRoute('/checkout'), '/checkout')
   assert.equal(resolveReturnRoute('/profile'), '/me')
+  assert.equal(resolveReturnRoute('/me'), '/me')
   assert.equal(resolveReturnRoute('/orders'), '/me/orders')
   assert.equal(resolveReturnRoute('/orders/ORD_99'), '/orders/ORD_99')
   assert.equal(resolveReturnRoute('https://evil.example'), '/me/orders')
@@ -43,6 +62,7 @@ test('resolveReturnRoute maps safe paths and rejects external URLs', () => {
 
 test('isSafeAuthorizeUrl accepts only credential-free http(s) URLs', () => {
   assert.equal(isSafeAuthorizeUrl('https://api.needtoken.ai/account-link?challenge=v1.a.b'), true)
+  assert.equal(isSafeAuthorizeUrl('https://api.needtoken.ai/oauth?redirect=%2Fdashboard#needtoken_ticket=t1'), true)
   assert.equal(isSafeAuthorizeUrl('http://localhost:3000/account-link?challenge=v1.a.b'), true)
   assert.equal(isSafeAuthorizeUrl('javascript:alert(1)'), false)
   assert.equal(isSafeAuthorizeUrl('https://user:pass@api.needtoken.ai/account-link'), false)

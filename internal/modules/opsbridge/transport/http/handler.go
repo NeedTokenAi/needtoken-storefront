@@ -233,6 +233,55 @@ func (h *Handler) UpdateCouponStatus(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *Handler) GiftCards(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	page, _ := strconv.Atoi(c.Query("page"))
+	size, _ := strconv.Atoi(c.Query("page_size"))
+	var redeemedUserID uint
+	if rawUID := c.Query("redeemed_user_id"); rawUID != "" {
+		parsed, err := strconv.ParseUint(rawUID, 10, 64)
+		if err != nil || parsed == 0 {
+			fail(c, opscontract.ErrInvalidInput)
+			return
+		}
+		redeemedUserID = uint(parsed)
+	}
+	result, err := h.bridge.GiftCards(
+		page,
+		size,
+		c.Query("code"),
+		c.Query("status"),
+		c.Query("batch_no"),
+		redeemedUserID,
+	)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) GenerateGiftCards(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.GenerateGiftCardsInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.GenerateGiftCards(req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *Handler) Pricing(c *gin.Context) {
 	if h.bridge == nil {
 		fail(c, opscontract.ErrNotConfigured)
