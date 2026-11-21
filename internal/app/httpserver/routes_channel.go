@@ -38,6 +38,7 @@ func registerChannelRoutes(
 		channelAPI.GET("/needtoken-ops/catalog/categories", opsHandler.Categories)
 		channelAPI.PATCH("/needtoken-ops/catalog/categories/:id", opsHandler.UpdateCategory)
 		channelAPI.GET("/needtoken-ops/catalog/products", opsHandler.Products)
+		channelAPI.POST("/needtoken-ops/catalog/products", opsHandler.CreateProduct)
 		channelAPI.PATCH("/needtoken-ops/catalog/products/:id", opsHandler.UpdateProduct)
 		channelAPI.PATCH("/needtoken-ops/catalog/skus/:id", opsHandler.UpdateSKU)
 		channelAPI.GET("/needtoken-ops/coupons", opsHandler.Coupons)

@@ -117,14 +117,31 @@ func (f *fakeCatRepo) Update(c *categorydomain.Category) error {
 
 type fakeProdRepo struct {
 	productcontract.Repository
-	prod  *productdomain.Product
-	quick map[string]interface{}
+	prod    *productdomain.Product
+	created []*productdomain.Product
+	quick   map[string]interface{}
 }
 
 func (f *fakeProdRepo) List(productcontract.ListFilter) ([]productdomain.Product, int64, error) {
 	return []productdomain.Product{*f.prod}, 1, nil
 }
 func (f *fakeProdRepo) GetAdminByID(string) (*productdomain.Product, error) { return f.prod, nil }
+func (f *fakeProdRepo) CountBySlug(slug string, _ *string) (int64, error) {
+	if f.prod != nil && f.prod.Slug == slug {
+		return 1, nil
+	}
+	for _, p := range f.created {
+		if p.Slug == slug {
+			return 1, nil
+		}
+	}
+	return 0, nil
+}
+func (f *fakeProdRepo) Create(item *productdomain.Product) error {
+	item.ID = uint(100 + len(f.created) + 1)
+	f.created = append(f.created, item)
+	return nil
+}
 func (f *fakeProdRepo) QuickUpdate(_ string, fields map[string]interface{}) error {
 	f.quick = fields
 	return nil
@@ -132,13 +149,19 @@ func (f *fakeProdRepo) QuickUpdate(_ string, fields map[string]interface{}) erro
 
 type fakeSKURepo struct {
 	productcontract.SKURepository
-	sku *productdomain.ProductSKU
+	sku     *productdomain.ProductSKU
+	created []*productdomain.ProductSKU
 }
 
 func (f *fakeSKURepo) ListByProduct(uint, bool) ([]productdomain.ProductSKU, error) {
 	return []productdomain.ProductSKU{*f.sku}, nil
 }
 func (f *fakeSKURepo) GetByID(uint) (*productdomain.ProductSKU, error) { return f.sku, nil }
+func (f *fakeSKURepo) Create(s *productdomain.ProductSKU) error {
+	s.ID = uint(200 + len(f.created) + 1)
+	f.created = append(f.created, s)
+	return nil
+}
 func (f *fakeSKURepo) Update(s *productdomain.ProductSKU) error {
 	f.sku = s
 	return nil
@@ -229,5 +252,30 @@ func TestOpsBridgeCatalogAndCouponManagement(t *testing.T) {
 	listed, err := svc.Coupons(1, 20, "", nil)
 	if err != nil || listed.Total != 1 {
 		t.Fatalf("Coupons list failed: %+v err=%v", listed, err)
+	}
+
+	stockVal := 25
+	createdProd, err := svc.CreateProduct(opscontract.CreateProductInput{
+		CategoryID:       1,
+		Slug:             "claude-pro-1m",
+		Title:            map[string]string{"zh-CN": "Claude Pro 月卡", "en-US": "Claude Pro 1M"},
+		PriceAmount:      "29.90",
+		CostPriceAmount:  "20.00",
+		FulfillmentType:  constants.FulfillmentTypeManual,
+		ManualStockTotal: &stockVal,
+		SKUCode:          "CLAUDE-PRO-1M",
+	})
+	if err != nil || createdProd.ID == 0 || createdProd.Slug != "claude-pro-1m" || createdProd.PriceAmount != "29.90" || len(createdProd.SKUs) != 1 || createdProd.SKUs[0].SKUCode != "CLAUDE-PRO-1M" {
+		t.Fatalf("CreateProduct failed: %+v err=%v", createdProd, err)
+	}
+	if _, err := svc.CreateProduct(opscontract.CreateProductInput{
+		CategoryID: 1, Slug: "claude-pro-1m", Title: map[string]string{"zh-CN": "重复"}, PriceAmount: "10",
+	}); !errors.Is(err, opscontract.ErrConflict) {
+		t.Fatalf("duplicate product slug must return ErrConflict, got %v", err)
+	}
+	if _, err := svc.CreateProduct(opscontract.CreateProductInput{
+		CategoryID: 999, Slug: "bad-cat", Title: map[string]string{"zh-CN": "坏分类"}, PriceAmount: "10",
+	}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("missing category must return ErrInvalidInput, got %v", err)
 	}
 }

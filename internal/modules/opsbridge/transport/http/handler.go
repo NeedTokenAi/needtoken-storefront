@@ -90,6 +90,24 @@ func (h *Handler) Products(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *Handler) CreateProduct(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.CreateProductInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.CreateProduct(req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *Handler) UpdateProduct(c *gin.Context) {
 	if h.bridge == nil {
 		fail(c, opscontract.ErrNotConfigured)
