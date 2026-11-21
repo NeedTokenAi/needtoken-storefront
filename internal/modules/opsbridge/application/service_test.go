@@ -142,6 +142,10 @@ func (f *fakeProdRepo) Create(item *productdomain.Product) error {
 	f.created = append(f.created, item)
 	return nil
 }
+func (f *fakeProdRepo) Update(item *productdomain.Product) error {
+	f.prod = item
+	return nil
+}
 func (f *fakeProdRepo) QuickUpdate(_ string, fields map[string]interface{}) error {
 	f.quick = fields
 	return nil
@@ -157,6 +161,17 @@ func (f *fakeSKURepo) ListByProduct(uint, bool) ([]productdomain.ProductSKU, err
 	return []productdomain.ProductSKU{*f.sku}, nil
 }
 func (f *fakeSKURepo) GetByID(uint) (*productdomain.ProductSKU, error) { return f.sku, nil }
+func (f *fakeSKURepo) GetByProductAndCode(_ uint, code string) (*productdomain.ProductSKU, error) {
+	if f.sku != nil && f.sku.SKUCode == code {
+		return f.sku, nil
+	}
+	for _, s := range f.created {
+		if s.SKUCode == code {
+			return s, nil
+		}
+	}
+	return nil, nil
+}
 func (f *fakeSKURepo) Create(s *productdomain.ProductSKU) error {
 	s.ID = uint(200 + len(f.created) + 1)
 	f.created = append(f.created, s)
@@ -164,6 +179,45 @@ func (f *fakeSKURepo) Create(s *productdomain.ProductSKU) error {
 }
 func (f *fakeSKURepo) Update(s *productdomain.ProductSKU) error {
 	f.sku = s
+	return nil
+}
+
+type fakePricingStore struct {
+	siteCurrency    string
+	displayCurrency string
+	usdCnyRate      string
+	connRate        float64
+	connMarkup      float64
+}
+
+func (f *fakePricingStore) GetSitePricing() (string, string, string, string, error) {
+	return f.siteCurrency, f.displayCurrency, f.usdCnyRate, "2026-11-21T12:00:00Z", nil
+}
+func (f *fakePricingStore) UpdateSitePricing(site, display, rate *string) error {
+	if site != nil {
+		f.siteCurrency = *site
+	}
+	if display != nil {
+		f.displayCurrency = *display
+	}
+	if rate != nil {
+		f.usdCnyRate = *rate
+	}
+	return nil
+}
+func (f *fakePricingStore) ListConnectionPricing() ([]opscontract.ConnectionPricing, error) {
+	return []opscontract.ConnectionPricing{{
+		ID: 1, Name: "dujiao_next", Protocol: "dujiao-next", Status: "active",
+		ExchangeRate: "7.25", PriceMarkupPercent: "10", PriceRoundingMode: "none", AutoSyncPrice: true,
+	}}, nil
+}
+func (f *fakePricingStore) UpdateConnectionPricing(_ uint, rate, markup *float64, _ *string, _ *bool) error {
+	if rate != nil {
+		f.connRate = *rate
+	}
+	if markup != nil {
+		f.connMarkup = *markup
+	}
 	return nil
 }
 
@@ -277,5 +331,51 @@ func TestOpsBridgeCatalogAndCouponManagement(t *testing.T) {
 		CategoryID: 999, Slug: "bad-cat", Title: map[string]string{"zh-CN": "坏分类"}, PriceAmount: "10",
 	}); !errors.Is(err, opscontract.ErrInvalidInput) {
 		t.Fatalf("missing category must return ErrInvalidInput, got %v", err)
+	}
+
+	// Full product edit + SKU create/full edit + pricing settings
+	newSlug := "chatgpt-plus-v2"
+	newProdPrice := "145.00"
+	newProdCost := "100.00"
+	fullUpdated, err := svc.UpdateProduct("10", opscontract.UpdateProductInput{
+		Slug:            &newSlug,
+		Title:           map[string]string{"zh-CN": "ChatGPT Plus 升级版", "en-US": "ChatGPT Plus V2"},
+		Description:     map[string]string{"zh-CN": "官方直充"},
+		PriceAmount:     &newProdPrice,
+		CostPriceAmount: &newProdCost,
+	})
+	if err != nil || fullUpdated.Slug != "chatgpt-plus-v2" || fullUpdated.PriceAmount != "145.00" || fullUpdated.CostPriceAmount != "100.00" || fullUpdated.Description["zh-CN"] != "官方直充" {
+		t.Fatalf("full UpdateProduct failed: %+v err=%v", fullUpdated, err)
+	}
+
+	newSKUCode := "QUARTERLY"
+	newSKUCost := "18.50"
+	newSKUSort := 5
+	editedSKU, err := svc.UpdateSKU(101, opscontract.UpdateSKUInput{SKUCode: &newSKUCode, CostPriceAmount: &newSKUCost, SortOrder: &newSKUSort})
+	if err != nil || editedSKU.SKUCode != "QUARTERLY" || editedSKU.CostPriceAmount != "18.50" || editedSKU.SortOrder != 5 {
+		t.Fatalf("full UpdateSKU failed: %+v err=%v", editedSKU, err)
+	}
+
+	addedSKU, err := svc.CreateSKU(10, opscontract.CreateSKUInput{SKUCode: "yearly", PriceAmount: "199.00", CostPriceAmount: "120.00"})
+	if err != nil || addedSKU.SKUCode != "YEARLY" || addedSKU.PriceAmount != "199.00" {
+		t.Fatalf("CreateSKU failed: %+v err=%v", addedSKU, err)
+	}
+
+	pricingStore := &fakePricingStore{siteCurrency: "CNY", displayCurrency: "CNY", usdCnyRate: "7.20"}
+	svc.WithPricing(pricingStore)
+	newDisplay := "USD"
+	newRate := "7.30"
+	connID := uint(1)
+	connRate := 7.35
+	connMarkup := 15.0
+	pricingRes, err := svc.UpdatePricing(opscontract.UpdatePricingInput{
+		DefaultDisplayCurrency: &newDisplay,
+		USDCNYRate:             &newRate,
+		ConnectionID:           &connID,
+		ExchangeRate:           &connRate,
+		PriceMarkupPercent:     &connMarkup,
+	})
+	if err != nil || pricingRes.DefaultDisplayCurrency != "USD" || pricingRes.USDCNYRate != "7.30" || pricingStore.connRate != 7.35 || pricingStore.connMarkup != 15.0 {
+		t.Fatalf("UpdatePricing failed: %+v store=%+v err=%v", pricingRes, pricingStore, err)
 	}
 }

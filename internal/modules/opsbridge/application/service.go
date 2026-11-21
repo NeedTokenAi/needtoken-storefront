@@ -32,6 +32,7 @@ type Service struct {
 	products     productcontract.Repository
 	skus         productcontract.SKURepository
 	coupons      couponcontract.Repository
+	pricing      opscontract.PricingStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -56,6 +57,11 @@ func NewWithCatalog(
 		skus:         skus,
 		coupons:      coupons,
 	}
+}
+
+func (s *Service) WithPricing(pricing opscontract.PricingStore) *Service {
+	s.pricing = pricing
+	return s
 }
 
 func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) {
@@ -260,6 +266,7 @@ func mapProduct(p productdomain.Product, skus []productdomain.ProductSKU) opscon
 		CategoryID:        p.CategoryID,
 		Slug:              p.Slug,
 		Title:             stringMap(p.TitleJSON),
+		Description:       stringMap(p.DescriptionJSON),
 		PriceAmount:       p.PriceAmount.String(),
 		CostPriceAmount:   p.CostPriceAmount.String(),
 		PurchaseType:      p.PurchaseType,
@@ -520,7 +527,11 @@ func (s *Service) UpdateProduct(id string, input opscontract.UpdateProductInput)
 	if s.products == nil {
 		return nil, opscontract.ErrNotConfigured
 	}
-	if strings.TrimSpace(id) == "" || (input.IsActive == nil && input.SortOrder == nil) {
+	id = strings.TrimSpace(id)
+	hasFullFields := input.CategoryID != nil || input.Slug != nil || len(input.Title) > 0 || input.Description != nil ||
+		input.PriceAmount != nil || input.CostPriceAmount != nil || input.PurchaseType != nil ||
+		input.FulfillmentType != nil || input.ManualStockTotal != nil
+	if id == "" || (!hasFullFields && input.IsActive == nil && input.SortOrder == nil) {
 		return nil, opscontract.ErrInvalidInput
 	}
 	prod, err := s.products.GetAdminByID(id)
@@ -530,17 +541,125 @@ func (s *Service) UpdateProduct(id string, input opscontract.UpdateProductInput)
 	if prod == nil {
 		return nil, opscontract.ErrNotFound
 	}
-	fields := map[string]interface{}{}
-	if input.IsActive != nil {
-		fields["is_active"] = *input.IsActive
-		prod.IsActive = *input.IsActive
-	}
-	if input.SortOrder != nil {
-		fields["sort_order"] = *input.SortOrder
-		prod.SortOrder = *input.SortOrder
-	}
-	if err := s.products.QuickUpdate(id, fields); err != nil {
-		return nil, err
+	if !hasFullFields {
+		fields := map[string]interface{}{}
+		if input.IsActive != nil {
+			fields["is_active"] = *input.IsActive
+			prod.IsActive = *input.IsActive
+		}
+		if input.SortOrder != nil {
+			fields["sort_order"] = *input.SortOrder
+			prod.SortOrder = *input.SortOrder
+		}
+		if err := s.products.QuickUpdate(id, fields); err != nil {
+			return nil, err
+		}
+	} else {
+		if input.CategoryID != nil {
+			if *input.CategoryID == 0 || s.categories == nil {
+				return nil, opscontract.ErrInvalidInput
+			}
+			cat, catErr := s.categories.GetByID(strconv.FormatUint(uint64(*input.CategoryID), 10))
+			if catErr != nil {
+				return nil, catErr
+			}
+			if cat == nil {
+				return nil, opscontract.ErrInvalidInput
+			}
+			prod.CategoryID = *input.CategoryID
+		}
+		if input.Slug != nil {
+			slug := strings.ToLower(strings.TrimSpace(*input.Slug))
+			if slug == "" || len(slug) > 120 {
+				return nil, opscontract.ErrInvalidInput
+			}
+			for _, r := range slug {
+				if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+					return nil, opscontract.ErrInvalidInput
+				}
+			}
+			if slug != prod.Slug {
+				excludeID := strconv.FormatUint(uint64(prod.ID), 10)
+				count, cntErr := s.products.CountBySlug(slug, &excludeID)
+				if cntErr != nil {
+					return nil, cntErr
+				}
+				if count > 0 {
+					return nil, opscontract.ErrConflict
+				}
+				prod.Slug = slug
+			}
+		}
+		if len(input.Title) > 0 {
+			title := jsonmap.JSON{}
+			for k, v := range input.Title {
+				if trimmed := strings.TrimSpace(v); trimmed != "" {
+					title[strings.TrimSpace(k)] = trimmed
+				}
+			}
+			if len(title) == 0 {
+				return nil, opscontract.ErrInvalidInput
+			}
+			prod.TitleJSON = title
+		}
+		if input.Description != nil {
+			desc := jsonmap.JSON{}
+			for k, v := range input.Description {
+				if trimmed := strings.TrimSpace(v); trimmed != "" {
+					desc[strings.TrimSpace(k)] = trimmed
+				}
+			}
+			prod.DescriptionJSON = desc
+		}
+		if input.PriceAmount != nil {
+			dec, pErr := decimal.NewFromString(strings.TrimSpace(*input.PriceAmount))
+			if pErr != nil || !dec.IsPositive() {
+				return nil, opscontract.ErrInvalidInput
+			}
+			prod.PriceAmount = money.FromDecimal(dec.Round(2))
+		}
+		if input.CostPriceAmount != nil {
+			rawCost := strings.TrimSpace(*input.CostPriceAmount)
+			if rawCost == "" {
+				prod.CostPriceAmount = money.FromDecimal(decimal.Zero)
+			} else {
+				dec, cErr := decimal.NewFromString(rawCost)
+				if cErr != nil || dec.IsNegative() {
+					return nil, opscontract.ErrInvalidInput
+				}
+				prod.CostPriceAmount = money.FromDecimal(dec.Round(2))
+			}
+		}
+		if input.PurchaseType != nil {
+			pt := strings.TrimSpace(*input.PurchaseType)
+			if pt != constants.ProductPurchaseMember && pt != constants.ProductPurchaseGuest {
+				return nil, opscontract.ErrInvalidInput
+			}
+			prod.PurchaseType = pt
+		}
+		if input.FulfillmentType != nil {
+			ft := strings.TrimSpace(*input.FulfillmentType)
+			if ft != constants.FulfillmentTypeManual && ft != constants.FulfillmentTypeAuto {
+				return nil, opscontract.ErrInvalidInput
+			}
+			prod.FulfillmentType = ft
+		}
+		if input.ManualStockTotal != nil {
+			if *input.ManualStockTotal < constants.ManualStockUnlimited {
+				return nil, opscontract.ErrInvalidInput
+			}
+			prod.ManualStockTotal = *input.ManualStockTotal
+		}
+		if input.IsActive != nil {
+			prod.IsActive = *input.IsActive
+		}
+		if input.SortOrder != nil {
+			prod.SortOrder = *input.SortOrder
+		}
+		prod.UpdatedAt = time.Now().UTC()
+		if err := s.products.Update(prod); err != nil {
+			return nil, err
+		}
 	}
 	skus := prod.SKUs
 	if len(skus) == 0 && s.skus != nil {
@@ -552,11 +671,75 @@ func (s *Service) UpdateProduct(id string, input opscontract.UpdateProductInput)
 	return &out, nil
 }
 
+func (s *Service) CreateSKU(productID uint, input opscontract.CreateSKUInput) (*opscontract.ProductSKU, error) {
+	if s.products == nil || s.skus == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if productID == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	prod, err := s.products.GetAdminByID(strconv.FormatUint(uint64(productID), 10))
+	if err != nil {
+		return nil, err
+	}
+	if prod == nil {
+		return nil, opscontract.ErrNotFound
+	}
+	code := strings.ToUpper(strings.TrimSpace(input.SKUCode))
+	if code == "" || len(code) > 64 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if existing, err := s.skus.GetByProductAndCode(productID, code); err != nil {
+		return nil, err
+	} else if existing != nil {
+		return nil, opscontract.ErrConflict
+	}
+	priceDec, err := decimal.NewFromString(strings.TrimSpace(input.PriceAmount))
+	if err != nil || !priceDec.IsPositive() {
+		return nil, opscontract.ErrInvalidInput
+	}
+	costDec := decimal.Zero
+	if rawCost := strings.TrimSpace(input.CostPriceAmount); rawCost != "" {
+		costDec, err = decimal.NewFromString(rawCost)
+		if err != nil || costDec.IsNegative() {
+			return nil, opscontract.ErrInvalidInput
+		}
+	}
+	manualStock := 0
+	if input.ManualStockTotal != nil {
+		manualStock = *input.ManualStockTotal
+	}
+	if manualStock < constants.ManualStockUnlimited {
+		return nil, opscontract.ErrInvalidInput
+	}
+	active := true
+	if input.IsActive != nil {
+		active = *input.IsActive
+	}
+	now := time.Now().UTC()
+	sku := &productdomain.ProductSKU{
+		ProductID:        productID,
+		SKUCode:          code,
+		PriceAmount:      money.FromDecimal(priceDec.Round(2)),
+		CostPriceAmount:  money.FromDecimal(costDec.Round(2)),
+		ManualStockTotal: manualStock,
+		IsActive:         active,
+		SortOrder:        input.SortOrder,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if err := s.skus.Create(sku); err != nil {
+		return nil, err
+	}
+	out := mapSKU(*sku)
+	return &out, nil
+}
+
 func (s *Service) UpdateSKU(id uint, input opscontract.UpdateSKUInput) (*opscontract.ProductSKU, error) {
 	if s.skus == nil {
 		return nil, opscontract.ErrNotConfigured
 	}
-	if id == 0 || (input.PriceAmount == nil && input.ManualStockTotal == nil && input.IsActive == nil) {
+	if id == 0 || (input.SKUCode == nil && input.PriceAmount == nil && input.CostPriceAmount == nil && input.ManualStockTotal == nil && input.SortOrder == nil && input.IsActive == nil) {
 		return nil, opscontract.ErrInvalidInput
 	}
 	sku, err := s.skus.GetByID(id)
@@ -566,6 +749,20 @@ func (s *Service) UpdateSKU(id uint, input opscontract.UpdateSKUInput) (*opscont
 	if sku == nil {
 		return nil, opscontract.ErrNotFound
 	}
+	if input.SKUCode != nil {
+		code := strings.ToUpper(strings.TrimSpace(*input.SKUCode))
+		if code == "" || len(code) > 64 {
+			return nil, opscontract.ErrInvalidInput
+		}
+		if code != sku.SKUCode {
+			if existing, err := s.skus.GetByProductAndCode(sku.ProductID, code); err != nil {
+				return nil, err
+			} else if existing != nil && existing.ID != sku.ID {
+				return nil, opscontract.ErrConflict
+			}
+			sku.SKUCode = code
+		}
+	}
 	if input.PriceAmount != nil {
 		dec, err := decimal.NewFromString(strings.TrimSpace(*input.PriceAmount))
 		if err != nil || dec.IsNegative() {
@@ -573,11 +770,26 @@ func (s *Service) UpdateSKU(id uint, input opscontract.UpdateSKUInput) (*opscont
 		}
 		sku.PriceAmount = money.FromDecimal(dec.Round(2))
 	}
+	if input.CostPriceAmount != nil {
+		rawCost := strings.TrimSpace(*input.CostPriceAmount)
+		if rawCost == "" {
+			sku.CostPriceAmount = money.FromDecimal(decimal.Zero)
+		} else {
+			dec, err := decimal.NewFromString(rawCost)
+			if err != nil || dec.IsNegative() {
+				return nil, opscontract.ErrInvalidInput
+			}
+			sku.CostPriceAmount = money.FromDecimal(dec.Round(2))
+		}
+	}
 	if input.ManualStockTotal != nil {
 		if *input.ManualStockTotal < -1 {
 			return nil, opscontract.ErrInvalidInput
 		}
 		sku.ManualStockTotal = *input.ManualStockTotal
+	}
+	if input.SortOrder != nil {
+		sku.SortOrder = *input.SortOrder
 	}
 	if input.IsActive != nil {
 		sku.IsActive = *input.IsActive
@@ -594,6 +806,58 @@ func (s *Service) UpdateSKU(id uint, input opscontract.UpdateSKUInput) (*opscont
 	}
 	out := mapSKU(*sku)
 	return &out, nil
+}
+
+func (s *Service) Pricing() (*opscontract.PricingSettings, error) {
+	if s.pricing == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	siteCurrency, displayCurrency, usdCnyRate, rateUpdatedAt, err := s.pricing.GetSitePricing()
+	if err != nil {
+		return nil, err
+	}
+	conns, err := s.pricing.ListConnectionPricing()
+	if err != nil {
+		return nil, err
+	}
+	if conns == nil {
+		conns = []opscontract.ConnectionPricing{}
+	}
+	return &opscontract.PricingSettings{
+		Source:                 "storefront",
+		CollectedAt:            time.Now().UTC(),
+		Freshness:              "fresh",
+		SiteCurrency:           siteCurrency,
+		DefaultDisplayCurrency: displayCurrency,
+		USDCNYRate:             usdCnyRate,
+		RateUpdatedAt:          rateUpdatedAt,
+		Connections:            conns,
+	}, nil
+}
+
+func (s *Service) UpdatePricing(input opscontract.UpdatePricingInput) (*opscontract.PricingSettings, error) {
+	if s.pricing == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	hasSite := input.SiteCurrency != nil || input.DefaultDisplayCurrency != nil || input.USDCNYRate != nil
+	hasConn := input.ConnectionID != nil && *input.ConnectionID > 0 && (input.ExchangeRate != nil || input.PriceMarkupPercent != nil || input.PriceRoundingMode != nil || input.AutoSyncPrice != nil)
+	if !hasSite && !hasConn {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if hasSite {
+		if err := s.pricing.UpdateSitePricing(input.SiteCurrency, input.DefaultDisplayCurrency, input.USDCNYRate); err != nil {
+			return nil, err
+		}
+	}
+	if hasConn {
+		if input.ExchangeRate != nil && (*input.ExchangeRate <= 0 || *input.ExchangeRate > 1000) {
+			return nil, opscontract.ErrInvalidInput
+		}
+		if err := s.pricing.UpdateConnectionPricing(*input.ConnectionID, input.ExchangeRate, input.PriceMarkupPercent, input.PriceRoundingMode, input.AutoSyncPrice); err != nil {
+			return nil, err
+		}
+	}
+	return s.Pricing()
 }
 
 func (s *Service) Coupons(page, pageSize int, code string, isActive *bool) (*opscontract.CouponsResult, error) {
