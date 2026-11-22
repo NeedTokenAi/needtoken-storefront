@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	reseller "github.com/dujiao-next/internal/modules/reseller/contract"
 	"github.com/gin-gonic/gin"
 )
 
@@ -140,5 +142,129 @@ func TestCachingAndTenMinuteStaleFallback(t *testing.T) {
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/pool-status", nil))
 	if rec.Code != http.StatusOK || rec.Header().Get("X-Storefront-Stale") != "1" {
 		t.Fatalf("pool-status stale: code=%d stale=%q", rec.Code, rec.Header().Get("X-Storefront-Stale"))
+	}
+}
+
+func TestRankingsValidationPerPeriodCacheSingleflightAndTenantIsolation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var hitsByPeriod sync.Map
+	var failUpstream atomic.Bool
+	slowGate := make(chan struct{})
+	var gateOnce sync.Once
+	var delayToday atomic.Bool
+
+	upstreamSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/public/rankings" {
+			http.NotFound(w, r)
+			return
+		}
+		period := r.URL.Query().Get("period")
+		if period == "today" && delayToday.Load() {
+			<-slowGate
+		}
+		if failUpstream.Load() {
+			http.Error(w, "upstream error", http.StatusBadGateway)
+			return
+		}
+		val, _ := hitsByPeriod.LoadOrStore(period, &atomic.Int32{})
+		val.(*atomic.Int32).Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":{"models":[{"rank":1,"model_name":"gpt-5.4","vendor":"OpenAI","total_tokens":120000,"share":0.5,"growth_pct":12.5}],"vendors":[],"top_movers":[],"top_droppers":[]}}`))
+	}))
+	defer upstreamSrv.Close()
+
+	now := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
+	h := NewHandler(&stubResolver{baseURL: upstreamSrv.URL, configured: true}, Options{
+		HTTPClient: upstreamSrv.Client(),
+		Now:        func() time.Time { return now },
+	})
+	router := gin.New()
+	RegisterPublicRoutes(router.Group("/api/v1/public"), h)
+
+	// Invalid period rejected with 400.
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings?period=decade", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("invalid period status = %d, want 400", rec.Code)
+	}
+
+	// Missing period defaults to "week", cached for 3 minutes.
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("default rankings status = %d, want 200", rec.Code)
+	}
+	now = now.Add(2 * time.Minute)
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings?period=week", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cached week rankings status = %d", rec.Code)
+	}
+	weekHits, _ := hitsByPeriod.Load("week")
+	if weekHits.(*atomic.Int32).Load() != 1 {
+		t.Fatalf("week hits = %d, want 1", weekHits.(*atomic.Int32).Load())
+	}
+
+	// Independent cache slot for "month".
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings?period=month", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("month rankings status = %d", rec.Code)
+	}
+	monthHits, _ := hitsByPeriod.Load("month")
+	if monthHits.(*atomic.Int32).Load() != 1 {
+		t.Fatalf("month hits = %d, want 1", monthHits.(*atomic.Int32).Load())
+	}
+
+	// Past 3m TTL while upstream fails -> serves 10m stale snapshot with X-Storefront-Stale: 1.
+	failUpstream.Store(true)
+	now = now.Add(2 * time.Minute) // total +4m since week fetch
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings?period=week", nil))
+	if rec.Code != http.StatusOK || rec.Header().Get("X-Storefront-Stale") != "1" {
+		t.Fatalf("stale rankings fallback: code=%d stale=%q", rec.Code, rec.Header().Get("X-Storefront-Stale"))
+	}
+
+	// Past 10m stale window while upstream fails -> returns 503.
+	now = now.Add(8 * time.Minute) // total +12m
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings?period=week", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expired stale rankings status = %d, want 503", rec.Code)
+	}
+
+	// Singleflight deduplication on concurrent cold misses for "today".
+	failUpstream.Store(false)
+	delayToday.Store(true)
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings?period=today", nil))
+			if w.Code != http.StatusOK {
+				t.Errorf("concurrent today rankings status = %d", w.Code)
+			}
+		}()
+	}
+	time.Sleep(25 * time.Millisecond)
+	gateOnce.Do(func() { close(slowGate) })
+	wg.Wait()
+	todayHits, _ := hitsByPeriod.Load("today")
+	if todayHits.(*atomic.Int32).Load() != 1 {
+		t.Fatalf("singleflight today hits = %d, want 1", todayHits.(*atomic.Int32).Load())
+	}
+
+	// Non-main (reseller) tenant returns empty safe snapshot without hitting upstream.
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/public/api-rankings?period=year", nil)
+	resellerCtx := reseller.WithTenantContext(req.Context(), reseller.ResellerTenantContext("shop.example.com", 9, 99, "shop.example.com"))
+	rec = httptest.NewRecorder()
+	router.ServeHTTP(rec, req.WithContext(resellerCtx))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("reseller rankings status = %d, want 200", rec.Code)
+	}
+	if _, loaded := hitsByPeriod.Load("year"); loaded {
+		t.Fatalf("reseller tenant must not hit Glue rankings upstream")
 	}
 }

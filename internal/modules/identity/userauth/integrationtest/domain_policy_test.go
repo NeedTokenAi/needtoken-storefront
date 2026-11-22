@@ -123,6 +123,9 @@ func TestRegisterAllowsExactEmailDomain(t *testing.T) {
 	if user == nil || user.Email != "buyer@qq.com" || token == "" {
 		t.Fatalf("unexpected register result user=%+v token=%q", user, token)
 	}
+	if user.EmailVerifiedAt != nil {
+		t.Fatalf("registration without email verification proof must leave EmailVerifiedAt nil, got %v", user.EmailVerifiedAt)
+	}
 }
 
 func TestSendVerifyCodeRejectsEmailDomainBeforeEmailSend(t *testing.T) {
@@ -210,5 +213,44 @@ func TestSendVerifyCodeFailedSendDoesNotBlockResend(t *testing.T) {
 	sender.fail = false
 	if err := svc.SendVerifyCode(context.Background(), "resend@example.com", constants.VerifyPurposeRegister, constants.LocaleZhCN, ""); err != nil {
 		t.Fatalf("resend after failed send should succeed, got %v", err)
+	}
+}
+
+func TestUnverifiedRegistrationLoginFollowsEmailVerificationSetting(t *testing.T) {
+	svc, settings, _ := newRegistrationDomainPolicyAuthService(t)
+	if _, err := settings.Update(constants.SettingKeyRegistrationConfig, map[string]any{
+		constants.SettingFieldEmailVerificationEnabled: false,
+	}); err != nil {
+		t.Fatalf("disable email verification failed: %v", err)
+	}
+
+	user, token, _, err := svc.Register("unverified-login@example.com", "Secret123", "", "", true, false)
+	if err != nil || user == nil || token == "" {
+		t.Fatalf("register without verification failed: user=%+v token=%q err=%v", user, token, err)
+	}
+	if user.EmailVerifiedAt != nil {
+		t.Fatalf("expected EmailVerifiedAt to remain nil, got %v", user.EmailVerifiedAt)
+	}
+
+	if _, err := svc.LoginStep1("unverified-login@example.com", "WrongPass1", false); !errors.Is(err, userauthapp.ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials for wrong password, got %v", err)
+	}
+
+	loginRes, err := svc.LoginStep1("unverified-login@example.com", "Secret123", false)
+	if err != nil || loginRes == nil || loginRes.Token == "" || loginRes.User == nil {
+		t.Fatalf("login with verification disabled failed: res=%+v err=%v", loginRes, err)
+	}
+	if loginRes.User.EmailVerifiedAt != nil {
+		t.Fatalf("login must not forge EmailVerifiedAt, got %v", loginRes.User.EmailVerifiedAt)
+	}
+
+	if _, err := settings.Update(constants.SettingKeyRegistrationConfig, map[string]any{
+		constants.SettingFieldEmailVerificationEnabled: true,
+	}); err != nil {
+		t.Fatalf("enable email verification failed: %v", err)
+	}
+
+	if _, err := svc.LoginStep1("unverified-login@example.com", "Secret123", false); !errors.Is(err, userauthapp.ErrEmailNotVerified) {
+		t.Fatalf("expected ErrEmailNotVerified once email verification is enabled, got %v", err)
 	}
 }

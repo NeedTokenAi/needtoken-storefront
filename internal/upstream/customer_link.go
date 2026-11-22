@@ -63,6 +63,44 @@ type CustomerConsoleSSOResult struct {
 	AwakenedOrders int    `json:"awakened_orders"`
 }
 
+type CustomerAutoLinkInput struct {
+	StorefrontUserID   string `json:"storefront_user_id,omitempty"`
+	MerchantCustomerID string `json:"merchant_customer_id,omitempty"`
+	Email              string `json:"email"`
+	EmailVerified      bool   `json:"email_verified"`
+	DisplayName        string `json:"display_name,omitempty"`
+	Username           string `json:"username,omitempty"`
+}
+
+type CustomerAutoLinkResult struct {
+	Linked         bool   `json:"linked"`
+	Status         string `json:"status"`
+	NativeUserID   int    `json:"native_user_id,omitempty"`
+	AwakenedOrders int    `json:"awakened_orders,omitempty"`
+}
+
+type CustomerAPISubscriptionSummary struct {
+	ID                  int64  `json:"id"`
+	PlanID              int    `json:"plan_id"`
+	PlanTitle           string `json:"plan_title,omitempty"`
+	Status              string `json:"status"`
+	AmountTotal         int64  `json:"amount_total"`
+	AmountUsed          int64  `json:"amount_used"`
+	StartTime           int64  `json:"start_time"`
+	EndTime             int64  `json:"end_time"`
+	AllowWalletOverflow bool   `json:"allow_wallet_overflow"`
+}
+
+type CustomerAPISummaryResult struct {
+	Linked              bool                             `json:"linked"`
+	NativeUserID        int                              `json:"native_user_id,omitempty"`
+	Quota               int64                            `json:"quota,omitempty"`
+	UsedQuota           int64                            `json:"used_quota,omitempty"`
+	RequestCount        int64                            `json:"request_count,omitempty"`
+	Group               string                           `json:"group,omitempty"`
+	ActiveSubscriptions []CustomerAPISubscriptionSummary `json:"active_subscriptions,omitempty"`
+}
+
 func (a *DujiaoNextAdapter) CustomerLinkStatus(ctx context.Context, merchantCustomerID string) (CustomerLinkStatus, error) {
 	var result struct {
 		OK bool `json:"ok"`
@@ -156,6 +194,55 @@ func (a *DujiaoNextAdapter) ConsoleSSOCustomerLink(ctx context.Context, input Cu
 	return result.CustomerConsoleSSOResult, nil
 }
 
+func (a *DujiaoNextAdapter) AutoLink(ctx context.Context, req CustomerAutoLinkInput) (CustomerAutoLinkResult, error) {
+	var result struct {
+		OK *bool `json:"ok,omitempty"`
+		CustomerAutoLinkResult
+	}
+	payload := CustomerAutoLinkInput{
+		StorefrontUserID:   strings.TrimSpace(req.StorefrontUserID),
+		MerchantCustomerID: strings.TrimSpace(req.MerchantCustomerID),
+		Email:              strings.TrimSpace(req.Email),
+		EmailVerified:      req.EmailVerified,
+		DisplayName:        strings.TrimSpace(req.DisplayName),
+		Username:           strings.TrimSpace(req.Username),
+	}
+	if err := a.customerLinkRequest(ctx, http.MethodPost, "/api/v1/upstream/customer-links/auto-link", payload, &result); err != nil {
+		return CustomerAutoLinkResult{}, err
+	}
+	if result.OK != nil && !*result.OK {
+		return CustomerAutoLinkResult{}, ErrCustomerLinkUnavailable
+	}
+	out := result.CustomerAutoLinkResult
+	out.Status = strings.TrimSpace(out.Status)
+	if !out.Linked || out.Status == "existing_requires_link" {
+		// Never expose native account identity when manual two-sided confirmation is required.
+		out.Linked = false
+		out.NativeUserID = 0
+		out.AwakenedOrders = 0
+	}
+	return out, nil
+}
+
+func (a *DujiaoNextAdapter) APISummary(ctx context.Context, storefrontUserID string) (CustomerAPISummaryResult, error) {
+	var result struct {
+		OK *bool `json:"ok,omitempty"`
+		CustomerAPISummaryResult
+	}
+	path := "/api/v1/upstream/customer-links/api-summary?storefront_user_id=" + url.QueryEscape(strings.TrimSpace(storefrontUserID))
+	if err := a.customerLinkRequest(ctx, http.MethodGet, path, nil, &result); err != nil {
+		return CustomerAPISummaryResult{}, err
+	}
+	if result.OK != nil && !*result.OK {
+		return CustomerAPISummaryResult{}, ErrCustomerLinkUnavailable
+	}
+	out := result.CustomerAPISummaryResult
+	if !out.Linked {
+		return CustomerAPISummaryResult{Linked: false}, nil
+	}
+	return out, nil
+}
+
 // customerLinkRequest signs the exact request path (without query) and body with
 // merchant HMAC credentials, disables redirects/cookies, and bounds I/O so
 // challenge/approval tokens never leak through redirects or logs.
@@ -203,8 +290,8 @@ func (a *DujiaoNextAdapter) customerLinkRequest(ctx context.Context, method, pat
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 16385))
-	if err != nil || len(body) > 16384 {
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 65537))
+	if err != nil || len(body) > 65536 {
 		return ErrCustomerLinkUnavailable
 	}
 	if resp.StatusCode != http.StatusOK {

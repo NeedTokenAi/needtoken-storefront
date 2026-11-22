@@ -3,6 +3,7 @@ package application_test
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -112,8 +113,17 @@ func (f *fakeCatRepo) List() ([]categorydomain.Category, error) {
 	return out, nil
 }
 func (f *fakeCatRepo) GetByID(id string) (*categorydomain.Category, error) { return f.items[id], nil }
+func (f *fakeCatRepo) CountChildren(categoryID string) (int64, error) {
+	var count int64
+	for _, c := range f.items {
+		if c != nil && c.ParentID > 0 && strconv.FormatUint(uint64(c.ParentID), 10) == categoryID {
+			count++
+		}
+	}
+	return count, nil
+}
 func (f *fakeCatRepo) Update(c *categorydomain.Category) error {
-	f.items["1"] = c
+	f.items[strconv.FormatUint(uint64(c.ID), 10)] = c
 	return nil
 }
 
@@ -624,5 +634,191 @@ func TestRefundOrderBridgeValidationAndIdempotency(t *testing.T) {
 		Amount:      "90.00",
 	}); !errors.Is(err, opscontract.ErrConflict) {
 		t.Fatalf("tampered replay must return ErrConflict, got %v", err)
+	}
+}
+
+type multiSKURepo struct {
+	productcontract.SKURepository
+	items   map[uint]*productdomain.ProductSKU
+	deleted []uint
+}
+
+func (m *multiSKURepo) ListByProduct(productID uint, onlyActive bool) ([]productdomain.ProductSKU, error) {
+	out := make([]productdomain.ProductSKU, 0, len(m.items))
+	for _, sku := range m.items {
+		if sku.ProductID != productID {
+			continue
+		}
+		if onlyActive && !sku.IsActive {
+			continue
+		}
+		out = append(out, *sku)
+	}
+	return out, nil
+}
+func (m *multiSKURepo) GetByID(id uint) (*productdomain.ProductSKU, error) {
+	if s, ok := m.items[id]; ok {
+		cp := *s
+		return &cp, nil
+	}
+	return nil, nil
+}
+func (m *multiSKURepo) GetByProductAndCode(productID uint, code string) (*productdomain.ProductSKU, error) {
+	for _, s := range m.items {
+		if s.ProductID == productID && s.SKUCode == code {
+			cp := *s
+			return &cp, nil
+		}
+	}
+	return nil, nil
+}
+func (m *multiSKURepo) Update(s *productdomain.ProductSKU) error {
+	cp := *s
+	m.items[s.ID] = &cp
+	return nil
+}
+func (m *multiSKURepo) Delete(id uint) error {
+	m.deleted = append(m.deleted, id)
+	delete(m.items, id)
+	return nil
+}
+
+type fakeCardSecretCounter struct {
+	total     map[uint]int64
+	available map[uint]int64
+	used      map[uint]int64
+}
+
+func (f *fakeCardSecretCounter) CountByProduct(_ uint, skuID uint) (int64, int64, int64, error) {
+	return f.total[skuID], f.available[skuID], f.used[skuID], nil
+}
+
+type fakeProductDeleteStore struct {
+	errs    map[string]error
+	deleted []string
+}
+
+func (f *fakeProductDeleteStore) Delete(id string) error {
+	if err, ok := f.errs[id]; ok {
+		return err
+	}
+	f.deleted = append(f.deleted, id)
+	return nil
+}
+
+func TestOpsBridgeBugFixesAndSafeDeleteGuards(t *testing.T) {
+	// Parent category #1 has child category #2; products may only be assigned to leaf #2.
+	cats := &fakeCatRepo{items: map[string]*categorydomain.Category{
+		"1": {ID: 1, ParentID: 0, Slug: "ai-parent", NameJSON: jsonmap.JSON{"zh-CN": "AI 父类"}, IsActive: true},
+		"2": {ID: 2, ParentID: 1, Slug: "ai-child", NameJSON: jsonmap.JSON{"zh-CN": "AI 子类"}, IsActive: true},
+	}}
+	prod := &productdomain.Product{
+		ID:              10,
+		CategoryID:      2,
+		Slug:            "multi-sku-plan",
+		TitleJSON:       jsonmap.JSON{"zh-CN": "多规格商品"},
+		PriceAmount:     money.FromDecimal(decimal.NewFromInt(10)),
+		CostPriceAmount: money.FromDecimal(decimal.NewFromInt(5)),
+		FulfillmentType: constants.FulfillmentTypeAuto,
+		WholesalePrices: productdomain.WholesalePriceTiers{
+			{SKUID: 101, SKUCode: "BASIC", MinQuantity: 5, UnitPrice: money.FromDecimal(decimal.NewFromInt(8))},
+			{SKUID: 102, SKUCode: "PRO", MinQuantity: 5, UnitPrice: money.FromDecimal(decimal.NewFromInt(40))},
+		},
+		IsActive: true,
+	}
+	prods := &fakeProdRepo{prod: prod}
+	skus := &multiSKURepo{items: map[uint]*productdomain.ProductSKU{
+		101: {ID: 101, ProductID: 10, SKUCode: "BASIC", PriceAmount: money.FromDecimal(decimal.NewFromInt(10)), CostPriceAmount: money.FromDecimal(decimal.NewFromInt(5)), IsActive: true},
+		102: {ID: 102, ProductID: 10, SKUCode: "PRO", PriceAmount: money.FromDecimal(decimal.NewFromInt(50)), CostPriceAmount: money.FromDecimal(decimal.NewFromInt(30)), IsActive: true},
+	}}
+	secrets := &fakeCardSecretCounter{
+		total:     map[uint]int64{101: 2, 102: 3},
+		available: map[uint]int64{101: 1, 102: 0},
+		used:      map[uint]int64{101: 1, 102: 3},
+	}
+	delStore := &fakeProductDeleteStore{
+		errs: map[string]error{
+			"20": opscontract.ErrProductHasStock,
+			"21": opscontract.ErrProductHasOrderRecord,
+			"22": opscontract.ErrNotFound,
+		},
+	}
+	svc := application.NewWithCatalog(orders{}, payments{}, procurements{}, cats, prods, skus, nil).
+		WithCardSecretStock(secrets).
+		WithProductDeleteStore(delStore)
+
+	// Bug fix #1: reject assigning product to a parent category that has children.
+	if _, err := svc.CreateProduct(opscontract.CreateProductInput{
+		CategoryID: 1, Slug: "blocked-parent", Title: map[string]string{"zh-CN": "父分类禁止"}, PriceAmount: "10.00",
+	}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("CreateProduct on parent category with children must fail with ErrInvalidInput, got %v", err)
+	}
+	parentID := uint(1)
+	if _, err := svc.UpdateProduct("10", opscontract.UpdateProductInput{CategoryID: &parentID}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("UpdateProduct moving to parent category with children must fail with ErrInvalidInput, got %v", err)
+	}
+
+	// Bug fix #2: UpdateSKU recalculates product display price from lowest active SKU, not current SKU.
+	higherPrice := "60.00"
+	if _, err := svc.UpdateSKU(102, opscontract.UpdateSKUInput{PriceAmount: &higherPrice}); err != nil {
+		t.Fatalf("UpdateSKU 102 failed: %v", err)
+	}
+	if got := prods.quick["price_amount"].(money.Amount).String(); got != "10.00" {
+		t.Fatalf("product price_amount must stay lowest active SKU (10.00), got %s", got)
+	}
+	// Deactivating the cheaper SKU must promote the remaining active SKU price (60.00).
+	inactive := false
+	if _, err := svc.UpdateSKU(101, opscontract.UpdateSKUInput{IsActive: &inactive}); err != nil {
+		t.Fatalf("deactivate SKU 101 failed: %v", err)
+	}
+	if got := prods.quick["price_amount"].(money.Amount).String(); got != "60.00" {
+		t.Fatalf("deactivating cheaper SKU must recalculate product price_amount to 60.00, got %s", got)
+	}
+	// Re-activate 101 so both are active again.
+	active := true
+	if _, err := svc.UpdateSKU(101, opscontract.UpdateSKUInput{IsActive: &active}); err != nil {
+		t.Fatalf("reactivate SKU 101 failed: %v", err)
+	}
+
+	// DeleteSKU guard: auto-fulfillment SKU 101 still has available card secrets.
+	if err := svc.DeleteSKU(101); !errors.Is(err, opscontract.ErrSKUHasCardSecretStock) {
+		t.Fatalf("DeleteSKU with available secrets must return ErrSKUHasCardSecretStock, got %v", err)
+	}
+
+	// DeleteSKU succeeds for SKU 102 (all secrets used) and prunes dangling wholesale tier for 102.
+	if err := svc.DeleteSKU(102); err != nil {
+		t.Fatalf("DeleteSKU 102 should succeed, got %v", err)
+	}
+	if len(prods.prod.WholesalePrices) != 1 || prods.prod.WholesalePrices[0].SKUID != 101 {
+		t.Fatalf("dangling wholesale price for deleted SKU 102 must be pruned: %+v", prods.prod.WholesalePrices)
+	}
+	if prods.prod.PriceAmount.String() != "10.00" || prods.prod.CostPriceAmount.String() != "5.00" {
+		t.Fatalf("product price/cost should recalculate from remaining active SKU: price=%s cost=%s", prods.prod.PriceAmount.String(), prods.prod.CostPriceAmount.String())
+	}
+
+	// DeleteSKU guard: cannot delete the last remaining active SKU.
+	secrets.available[101] = 0
+	secrets.used[101] = 2
+	if err := svc.DeleteSKU(101); !errors.Is(err, opscontract.ErrProductRequiresActiveSKU) {
+		t.Fatalf("DeleteSKU removing last active SKU must return ErrProductRequiresActiveSKU, got %v", err)
+	}
+
+	// BatchDeleteProducts validates bounds (1..100) and reports per-item error codes.
+	if _, err := svc.BatchDeleteProducts(opscontract.BatchDeleteProductsInput{}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("empty batch delete must fail with ErrInvalidInput, got %v", err)
+	}
+	tooMany := make([]uint, 101)
+	if _, err := svc.BatchDeleteProducts(opscontract.BatchDeleteProductsInput{IDs: tooMany}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf(">100 batch delete must fail with ErrInvalidInput, got %v", err)
+	}
+	batchRes, err := svc.BatchDeleteProducts(opscontract.BatchDeleteProductsInput{IDs: []uint{19, 20, 21, 22}})
+	if err != nil {
+		t.Fatalf("BatchDeleteProducts failed: %v", err)
+	}
+	if batchRes.Total != 4 || batchRes.Succeeded != 1 || batchRes.Failed != 3 || len(batchRes.Errors) != 3 {
+		t.Fatalf("unexpected batch delete summary: %+v", batchRes)
+	}
+	if batchRes.Errors[0].Error != "product_has_stock" || batchRes.Errors[1].Error != "product_has_order_record" || batchRes.Errors[2].Error != "not_found" {
+		t.Fatalf("unexpected batch delete error codes: %+v", batchRes.Errors)
 	}
 }

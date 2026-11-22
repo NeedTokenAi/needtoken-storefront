@@ -374,10 +374,12 @@ func (s *Service) Register(email, password, code, inviteCode string, agreementAc
 		return nil, "", time.Time{}, ErrEmailExists
 	}
 
+	emailVerified := false
 	if emailVerificationEnabled || strings.TrimSpace(code) != "" {
 		if _, err := s.verifyCode(normalized, constants.VerifyPurposeRegister, code); err != nil {
 			return nil, "", time.Time{}, err
 		}
+		emailVerified = true
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -386,13 +388,17 @@ func (s *Service) Register(email, password, code, inviteCode string, agreementAc
 	}
 
 	now := time.Now()
+	var emailVerifiedAt *time.Time
+	if emailVerified {
+		emailVerifiedAt = &now
+	}
 	nickname := resolveNicknameFromEmail(normalized)
 	user := &userdomain.User{
 		Email:           normalized,
 		PasswordHash:    string(hashedPassword),
 		DisplayName:     nickname,
 		Status:          constants.UserStatusActive,
-		EmailVerifiedAt: &now,
+		EmailVerifiedAt: emailVerifiedAt,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -438,7 +444,17 @@ func (s *Service) LoginStep1(email, password string, rememberMe bool) (*UserLogi
 		return nil, ErrUserDisabled
 	}
 	if user.EmailVerifiedAt == nil {
-		return nil, ErrEmailNotVerified
+		emailVerificationEnabled := true
+		if s.settingService != nil {
+			enabled, err := s.settingService.GetEmailVerificationEnabled(true)
+			if err != nil {
+				return nil, err
+			}
+			emailVerificationEnabled = enabled
+		}
+		if emailVerificationEnabled {
+			return nil, ErrEmailNotVerified
+		}
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
 		return nil, ErrInvalidCredentials

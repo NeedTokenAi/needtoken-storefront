@@ -89,3 +89,45 @@ export function isSafeAuthorizeUrl(raw?: string | null): boolean {
     return false
   }
 }
+
+/** new-api raw quota units per $1.00 USD (QuotaPerUnit = 500,000). */
+export const API_QUOTA_PER_USD = 500_000
+
+export function formatApiQuotaUsd(rawQuota?: number | null): string {
+  const value = typeof rawQuota === 'number' && Number.isFinite(rawQuota) ? rawQuota : 0
+  const usd = Math.max(0, value) / API_QUOTA_PER_USD
+  if (usd > 0 && usd < 0.01) {
+    return `$${usd.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}`
+  }
+  return `$${usd.toFixed(2)}`
+}
+
+export function computeSubscriptionRemainingQuota(total?: number | null, used?: number | null): number {
+  const safeTotal = typeof total === 'number' && Number.isFinite(total) ? Math.max(0, total) : 0
+  const safeUsed = typeof used === 'number' && Number.isFinite(used) ? Math.max(0, used) : 0
+  return Math.max(0, safeTotal - safeUsed)
+}
+
+export function computeSubscriptionUsagePercent(total?: number | null, used?: number | null): number {
+  const safeTotal = typeof total === 'number' && Number.isFinite(total) ? Math.max(0, total) : 0
+  const safeUsed = typeof used === 'number' && Number.isFinite(used) ? Math.max(0, used) : 0
+  if (safeTotal <= 0) return 0
+  return Math.min(100, Math.round((safeUsed / safeTotal) * 100))
+}
+
+export function formatSubscriptionExpiry(endTimeSeconds?: number | null, locale = 'zh-CN'): string | null {
+  if (typeof endTimeSeconds !== 'number' || !Number.isFinite(endTimeSeconds) || endTimeSeconds <= 0) {
+    return null
+  }
+  const date = new Date(endTimeSeconds * 1000)
+  if (Number.isNaN(date.getTime())) return null
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date)
+  } catch {
+    return date.toISOString().slice(0, 10)
+  }
+}

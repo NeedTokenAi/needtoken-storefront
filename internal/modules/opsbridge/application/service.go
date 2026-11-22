@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,18 +31,22 @@ import (
 )
 
 type Service struct {
-	orders       ordercontract.Store
-	payments     paymentcontract.Store
-	procurements procurementcontract.Repository
-	categories   categorycontract.Repository
-	products     productcontract.Repository
-	skus         productcontract.SKURepository
-	coupons      couponcontract.Repository
-	giftCards    giftcardcontract.Repository
-	pricing      opscontract.PricingStore
-	acquiring    opscontract.AcquiringStore
-	upstream     opscontract.UpstreamStore
-	refunds      opscontract.OrderRefundStore
+	orders          ordercontract.Store
+	payments        paymentcontract.Store
+	procurements    procurementcontract.Repository
+	categories      categorycontract.Repository
+	categoryStore   opscontract.CategoryStore
+	products        productcontract.Repository
+	productDelete   opscontract.ProductDeleteStore
+	skus            productcontract.SKURepository
+	cardSecretStock opscontract.CardSecretStockCounter
+	skuDeleteUoW    opscontract.SKUDeleteUnitOfWork
+	coupons         couponcontract.Repository
+	giftCards       giftcardcontract.Repository
+	pricing         opscontract.PricingStore
+	acquiring       opscontract.AcquiringStore
+	upstream        opscontract.UpstreamStore
+	refunds         opscontract.OrderRefundStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -90,6 +95,26 @@ func (s *Service) WithUpstream(upstream opscontract.UpstreamStore) *Service {
 
 func (s *Service) WithOrderRefunds(refunds opscontract.OrderRefundStore) *Service {
 	s.refunds = refunds
+	return s
+}
+
+func (s *Service) WithCategoryStore(store opscontract.CategoryStore) *Service {
+	s.categoryStore = store
+	return s
+}
+
+func (s *Service) WithProductDeleteStore(store opscontract.ProductDeleteStore) *Service {
+	s.productDelete = store
+	return s
+}
+
+func (s *Service) WithCardSecretStock(counter opscontract.CardSecretStockCounter) *Service {
+	s.cardSecretStock = counter
+	return s
+}
+
+func (s *Service) WithSKUDeleteUoW(uow opscontract.SKUDeleteUnitOfWork) *Service {
+	s.skuDeleteUoW = uow
 	return s
 }
 
@@ -226,8 +251,14 @@ func (s *Service) Overview() (*opscontract.Overview, error) {
 	if s.categories != nil {
 		caps = append(caps, "categories.read", "categories.write")
 	}
+	if s.categoryStore != nil {
+		caps = append(caps, "categories.delete")
+	}
 	if s.products != nil && s.skus != nil {
-		caps = append(caps, "products.read", "products.write", "skus.write")
+		caps = append(caps, "products.read", "products.write", "skus.write", "skus.delete")
+	}
+	if s.productDelete != nil {
+		caps = append(caps, "products.delete")
 	}
 	if s.coupons != nil {
 		caps = append(caps, "coupons.read", "coupons.write")
@@ -273,6 +304,7 @@ func mapCategory(c categorydomain.Category) opscontract.Category {
 		ParentID:  c.ParentID,
 		Slug:      c.Slug,
 		Name:      stringMap(c.NameJSON),
+		Icon:      c.Icon,
 		SortOrder: c.SortOrder,
 		IsActive:  c.IsActive,
 		CreatedAt: c.CreatedAt,
@@ -362,11 +394,61 @@ func (s *Service) Categories() (*opscontract.CategoriesResult, error) {
 	}, nil
 }
 
+func normalizeOpsSlug(raw string) (string, error) {
+	slug := strings.ToLower(strings.TrimSpace(raw))
+	if slug == "" || len(slug) > 120 {
+		return "", opscontract.ErrInvalidInput
+	}
+	for _, r := range slug {
+		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+			return "", opscontract.ErrInvalidInput
+		}
+	}
+	return slug, nil
+}
+
+func normalizeLocalizedStringMap(raw map[string]string) map[string]any {
+	out := make(map[string]any, len(raw))
+	for k, v := range raw {
+		key := strings.TrimSpace(k)
+		val := strings.TrimSpace(v)
+		if key != "" && val != "" {
+			out[key] = val
+		}
+	}
+	return out
+}
+
+func (s *Service) CreateCategory(input opscontract.CreateCategoryInput) (*opscontract.Category, error) {
+	if s.categoryStore == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	slug, err := normalizeOpsSlug(input.Slug)
+	if err != nil {
+		return nil, err
+	}
+	nameMap := normalizeLocalizedStringMap(input.Name)
+	if len(nameMap) == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	icon := strings.TrimSpace(input.Icon)
+	if utf8.RuneCountInString(icon) > 255 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+	return s.categoryStore.Create(input.ParentID, slug, nameMap, icon, input.SortOrder, isActive)
+}
+
 func (s *Service) UpdateCategory(id string, input opscontract.UpdateCategoryInput) (*opscontract.Category, error) {
 	if s.categories == nil {
 		return nil, opscontract.ErrNotConfigured
 	}
-	if strings.TrimSpace(id) == "" || (input.SortOrder == nil && input.IsActive == nil) {
+	id = strings.TrimSpace(id)
+	hasCoreFields := input.ParentID != nil || input.Slug != nil || input.Name != nil || input.Icon != nil
+	if id == "" || (!hasCoreFields && input.SortOrder == nil && input.IsActive == nil) {
 		return nil, opscontract.ErrInvalidInput
 	}
 	cat, err := s.categories.GetByID(id)
@@ -376,17 +458,71 @@ func (s *Service) UpdateCategory(id string, input opscontract.UpdateCategoryInpu
 	if cat == nil {
 		return nil, opscontract.ErrNotFound
 	}
+	if s.categoryStore == nil {
+		if hasCoreFields {
+			return nil, opscontract.ErrNotConfigured
+		}
+		if input.SortOrder != nil {
+			cat.SortOrder = *input.SortOrder
+		}
+		if input.IsActive != nil {
+			cat.IsActive = *input.IsActive
+		}
+		if err := s.categories.Update(cat); err != nil {
+			return nil, err
+		}
+		out := mapCategory(*cat)
+		return &out, nil
+	}
+
+	parentID := cat.ParentID
+	if input.ParentID != nil {
+		parentID = *input.ParentID
+	}
+	slug := cat.Slug
+	if input.Slug != nil {
+		normalizedSlug, slugErr := normalizeOpsSlug(*input.Slug)
+		if slugErr != nil {
+			return nil, slugErr
+		}
+		slug = normalizedSlug
+	}
+	nameMap := map[string]any{}
+	for k, v := range cat.NameJSON {
+		nameMap[k] = v
+	}
+	if input.Name != nil {
+		normalizedName := normalizeLocalizedStringMap(input.Name)
+		if len(normalizedName) == 0 {
+			return nil, opscontract.ErrInvalidInput
+		}
+		nameMap = normalizedName
+	}
+	icon := cat.Icon
+	if input.Icon != nil {
+		trimmedIcon := strings.TrimSpace(*input.Icon)
+		if utf8.RuneCountInString(trimmedIcon) > 255 {
+			return nil, opscontract.ErrInvalidInput
+		}
+		icon = trimmedIcon
+	}
+	sortOrder := cat.SortOrder
 	if input.SortOrder != nil {
-		cat.SortOrder = *input.SortOrder
+		sortOrder = *input.SortOrder
 	}
-	if input.IsActive != nil {
-		cat.IsActive = *input.IsActive
+	return s.categoryStore.Update(id, parentID, slug, nameMap, icon, sortOrder, input.IsActive)
+}
+
+func (s *Service) DeleteCategory(id string) error {
+	if s.categoryStore == nil {
+		return opscontract.ErrNotConfigured
 	}
-	if err := s.categories.Update(cat); err != nil {
-		return nil, err
+	id = strings.TrimSpace(id)
+	parsed, err := strconv.ParseUint(id, 10, 64)
+	if err != nil || parsed == 0 {
+		return opscontract.ErrInvalidInput
 	}
-	out := mapCategory(*cat)
-	return &out, nil
+	return s.categoryStore.Delete(id)
 }
 
 func (s *Service) Products(page, pageSize int, categoryID, search string) (*opscontract.ProductsResult, error) {
@@ -439,12 +575,8 @@ func (s *Service) CreateProduct(input opscontract.CreateProductInput) (*opscontr
 	if input.CategoryID == 0 {
 		return nil, opscontract.ErrInvalidInput
 	}
-	cat, err := s.categories.GetByID(strconv.FormatUint(uint64(input.CategoryID), 10))
-	if err != nil {
+	if err := productdomain.ValidateCategoryAssignment(s.categories, input.CategoryID, 0, opscontract.ErrInvalidInput); err != nil {
 		return nil, err
-	}
-	if cat == nil {
-		return nil, opscontract.ErrInvalidInput
 	}
 	slug := strings.ToLower(strings.TrimSpace(input.Slug))
 	if slug == "" || len(slug) > 120 {
@@ -598,12 +730,8 @@ func (s *Service) UpdateProduct(id string, input opscontract.UpdateProductInput)
 			if *input.CategoryID == 0 || s.categories == nil {
 				return nil, opscontract.ErrInvalidInput
 			}
-			cat, catErr := s.categories.GetByID(strconv.FormatUint(uint64(*input.CategoryID), 10))
-			if catErr != nil {
+			if catErr := productdomain.ValidateCategoryAssignment(s.categories, *input.CategoryID, prod.CategoryID, opscontract.ErrInvalidInput); catErr != nil {
 				return nil, catErr
-			}
-			if cat == nil {
-				return nil, opscontract.ErrInvalidInput
 			}
 			prod.CategoryID = *input.CategoryID
 		}
@@ -710,6 +838,102 @@ func (s *Service) UpdateProduct(id string, input opscontract.UpdateProductInput)
 	return &out, nil
 }
 
+func (s *Service) DeleteProduct(id string) error {
+	if s.productDelete == nil {
+		return opscontract.ErrNotConfigured
+	}
+	id = strings.TrimSpace(id)
+	parsed, err := strconv.ParseUint(id, 10, 64)
+	if err != nil || parsed == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	return s.productDelete.Delete(id)
+}
+
+func batchDeleteErrorCode(err error) string {
+	var conflictErr *opscontract.ConflictError
+	switch {
+	case errors.As(err, &conflictErr):
+		return conflictErr.Code
+	case errors.Is(err, opscontract.ErrNotFound):
+		return "not_found"
+	case errors.Is(err, opscontract.ErrInvalidInput):
+		return "invalid_input"
+	case errors.Is(err, opscontract.ErrConflict):
+		return "conflict"
+	case errors.Is(err, opscontract.ErrNotConfigured):
+		return "not_configured"
+	default:
+		return "delete_failed"
+	}
+}
+
+func (s *Service) BatchDeleteProducts(input opscontract.BatchDeleteProductsInput) (*opscontract.BatchDeleteResult, error) {
+	if s.productDelete == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if len(input.IDs) == 0 || len(input.IDs) > 100 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	res := &opscontract.BatchDeleteResult{
+		Total:  len(input.IDs),
+		Errors: make([]opscontract.BatchDeleteError, 0),
+	}
+	for _, id := range input.IDs {
+		if id == 0 {
+			res.Failed++
+			res.Errors = append(res.Errors, opscontract.BatchDeleteError{ID: id, Error: "invalid_id"})
+			continue
+		}
+		if err := s.DeleteProduct(strconv.FormatUint(uint64(id), 10)); err != nil {
+			res.Failed++
+			res.Errors = append(res.Errors, opscontract.BatchDeleteError{ID: id, Error: batchDeleteErrorCode(err)})
+			continue
+		}
+		res.Succeeded++
+	}
+	return res, nil
+}
+
+func minActiveSKUPrices(skus []productdomain.ProductSKU) (minPrice money.Amount, minCost money.Amount, hasActive bool) {
+	for _, item := range skus {
+		if !item.IsActive {
+			continue
+		}
+		if !hasActive {
+			minPrice = item.PriceAmount
+			minCost = item.CostPriceAmount
+			hasActive = true
+			continue
+		}
+		if item.PriceAmount.Decimal.LessThan(minPrice.Decimal) {
+			minPrice = item.PriceAmount
+		}
+		if item.CostPriceAmount.Decimal.LessThan(minCost.Decimal) {
+			minCost = item.CostPriceAmount
+		}
+	}
+	return minPrice, minCost, hasActive
+}
+
+func (s *Service) syncProductPricesFromActiveSKUs(productID uint) {
+	if s.products == nil || s.skus == nil || productID == 0 {
+		return
+	}
+	allSKUs, err := s.skus.ListByProduct(productID, false)
+	if err != nil {
+		return
+	}
+	minPrice, minCost, hasActive := minActiveSKUPrices(allSKUs)
+	if !hasActive {
+		return
+	}
+	_ = s.products.QuickUpdate(strconv.FormatUint(uint64(productID), 10), map[string]interface{}{
+		"price_amount":      minPrice,
+		"cost_price_amount": minCost,
+	})
+}
+
 func (s *Service) CreateSKU(productID uint, input opscontract.CreateSKUInput) (*opscontract.ProductSKU, error) {
 	if s.products == nil || s.skus == nil {
 		return nil, opscontract.ErrNotConfigured
@@ -769,6 +993,9 @@ func (s *Service) CreateSKU(productID uint, input opscontract.CreateSKUInput) (*
 	}
 	if err := s.skus.Create(sku); err != nil {
 		return nil, err
+	}
+	if sku.IsActive {
+		s.syncProductPricesFromActiveSKUs(productID)
 	}
 	out := mapSKU(*sku)
 	return &out, nil
@@ -837,14 +1064,80 @@ func (s *Service) UpdateSKU(id uint, input opscontract.UpdateSKUInput) (*opscont
 	if err := s.skus.Update(sku); err != nil {
 		return nil, err
 	}
-	// Sync product display price when updating SKU price on single-SKU or lowest active SKU.
-	if input.PriceAmount != nil && s.products != nil {
-		_ = s.products.QuickUpdate(strconv.FormatUint(uint64(sku.ProductID), 10), map[string]interface{}{
-			"price_amount": sku.PriceAmount,
-		})
+	// Recalculate product display price from the lowest active SKU price.
+	if (input.PriceAmount != nil || input.CostPriceAmount != nil || input.IsActive != nil) && s.products != nil {
+		s.syncProductPricesFromActiveSKUs(sku.ProductID)
 	}
 	out := mapSKU(*sku)
 	return &out, nil
+}
+
+func (s *Service) DeleteSKU(id uint) error {
+	if s.skus == nil || s.products == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+
+	// Pre-transaction read-only validations (SQLite MaxOpenConns=1 safe).
+	sku, err := s.skus.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if sku == nil {
+		return opscontract.ErrNotFound
+	}
+	prod, err := s.products.GetAdminByID(strconv.FormatUint(uint64(sku.ProductID), 10))
+	if err != nil {
+		return err
+	}
+	if prod == nil {
+		return opscontract.ErrNotFound
+	}
+	allSKUs, err := s.skus.ListByProduct(sku.ProductID, false)
+	if err != nil {
+		return err
+	}
+	remaining := make([]productdomain.ProductSKU, 0, len(allSKUs))
+	for _, item := range allSKUs {
+		if item.ID == sku.ID {
+			continue
+		}
+		remaining = append(remaining, item)
+	}
+	minPrice, minCost, hasActive := minActiveSKUPrices(remaining)
+	if !hasActive {
+		return opscontract.ErrProductRequiresActiveSKU
+	}
+	if strings.TrimSpace(prod.FulfillmentType) == constants.FulfillmentTypeAuto {
+		if s.cardSecretStock == nil {
+			return opscontract.ErrNotConfigured
+		}
+		total, available, used, countErr := s.cardSecretStock.CountByProduct(prod.ID, sku.ID)
+		if countErr != nil {
+			return countErr
+		}
+		if available > 0 || total-used > 0 {
+			return opscontract.ErrSKUHasCardSecretStock
+		}
+	}
+
+	prod.WholesalePrices = productdomain.PruneWholesalePricesForSKUs(prod.WholesalePrices, remaining)
+	prod.PriceAmount = minPrice
+	prod.CostPriceAmount = minCost
+	prod.UpdatedAt = time.Now().UTC()
+
+	apply := func(txProducts productcontract.Repository, txSKUs productcontract.SKURepository) error {
+		if err := txSKUs.Delete(sku.ID); err != nil {
+			return err
+		}
+		return txProducts.Update(prod)
+	}
+	if s.skuDeleteUoW != nil {
+		return s.skuDeleteUoW.WithinTransaction(apply)
+	}
+	return apply(s.products, s.skus)
 }
 
 func (s *Service) Pricing() (*opscontract.PricingSettings, error) {

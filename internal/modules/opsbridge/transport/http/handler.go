@@ -57,6 +57,24 @@ func (h *Handler) Categories(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *Handler) CreateCategory(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.CreateCategoryInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.CreateCategory(req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *Handler) UpdateCategory(c *gin.Context) {
 	if h.bridge == nil {
 		fail(c, opscontract.ErrNotConfigured)
@@ -73,6 +91,24 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 		return
 	}
 	response.Success(c, result)
+}
+
+func (h *Handler) DeleteCategory(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	rawID := c.Param("id")
+	id, err := strconv.ParseUint(rawID, 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	if err := h.bridge.DeleteCategory(rawID); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, opscontract.DeleteResult{Deleted: true, ID: uint(id)})
 }
 
 func (h *Handler) Products(c *gin.Context) {
@@ -126,6 +162,42 @@ func (h *Handler) UpdateProduct(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *Handler) DeleteProduct(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	rawID := c.Param("id")
+	id, err := strconv.ParseUint(rawID, 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	if err := h.bridge.DeleteProduct(rawID); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, opscontract.DeleteResult{Deleted: true, ID: uint(id)})
+}
+
+func (h *Handler) BatchDeleteProducts(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.BatchDeleteProductsInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.BatchDeleteProducts(req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 func (h *Handler) CreateSKU(c *gin.Context) {
 	if h.bridge == nil {
 		fail(c, opscontract.ErrNotConfigured)
@@ -170,6 +242,23 @@ func (h *Handler) UpdateSKU(c *gin.Context) {
 		return
 	}
 	response.Success(c, result)
+}
+
+func (h *Handler) DeleteSKU(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	if err := h.bridge.DeleteSKU(uint(id)); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, opscontract.DeleteResult{Deleted: true, ID: uint(id)})
 }
 
 func (h *Handler) Coupons(c *gin.Context) {
@@ -472,11 +561,14 @@ func (h *Handler) RefundOrder(c *gin.Context) {
 
 func fail(c *gin.Context, err error) {
 	locale := i18n.ResolveLocale(c)
+	var conflictErr *opscontract.ConflictError
 	switch {
 	case errors.Is(err, opscontract.ErrInvalidInput):
 		response.ErrorWithHTTPStatus(c, http.StatusBadRequest, response.CodeBadRequest, i18n.T(locale, "error.bad_request"))
 	case errors.Is(err, opscontract.ErrNotFound):
 		response.ErrorWithHTTPStatus(c, http.StatusNotFound, response.CodeNotFound, i18n.T(locale, "error.not_found"))
+	case errors.As(err, &conflictErr):
+		response.ChannelError(c, http.StatusConflict, response.CodeBadRequest, conflictErr.Code, conflictErr.Code)
 	case errors.Is(err, opscontract.ErrConflict):
 		response.ErrorWithHTTPStatus(c, http.StatusConflict, response.CodeBadRequest, i18n.T(locale, "error.bad_request"))
 	default:

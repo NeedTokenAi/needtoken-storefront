@@ -26,6 +26,9 @@ export const API_PLANS_PATH = '/plans'
 /** 店面同源公开定价缓存接口（可通过 VITE_NEEDTOKEN_PRICING_URL 覆盖） */
 export const PRICING_URL = trimSlash(env.VITE_NEEDTOKEN_PRICING_URL || '/api/v1/public/api-pricing')
 
+/** 店面同源公开排行榜缓存接口（可通过 VITE_NEEDTOKEN_RANKINGS_URL 覆盖） */
+export const RANKINGS_URL = trimSlash(env.VITE_NEEDTOKEN_RANKINGS_URL || '/api/v1/public/api-rankings')
+
 /** 店面同源公开号池状态缓存接口（可通过 VITE_NEEDTOKEN_STATUS_URL 覆盖） */
 export const STATUS_URL = trimSlash(env.VITE_NEEDTOKEN_STATUS_URL || '/api/v1/public/pool-status')
 

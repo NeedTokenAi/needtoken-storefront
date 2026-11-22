@@ -12,6 +12,7 @@ import (
 	"github.com/dujiao-next/internal/modules/order/application/accountlink"
 	accountlinkhttp "github.com/dujiao-next/internal/modules/order/transport/http/accountlink"
 	siteconnectiondomain "github.com/dujiao-next/internal/modules/siteconnection/domain"
+	"github.com/dujiao-next/internal/telegramidentity"
 	"github.com/dujiao-next/internal/upstream"
 )
 
@@ -42,10 +43,11 @@ func (r memberIdentityReader) LookupMember(_ context.Context, userID uint) (acco
 	if user == nil {
 		return accountlink.MemberIdentity{UserID: userID, Active: false}, nil
 	}
+	email := strings.TrimSpace(user.Email)
 	return accountlink.MemberIdentity{
 		UserID:        user.ID,
-		Email:         strings.TrimSpace(user.Email),
-		EmailVerified: user.EmailVerifiedAt != nil,
+		Email:         email,
+		EmailVerified: user.EmailVerifiedAt != nil && email != "" && !telegramidentity.IsPlaceholderEmail(email),
 		DisplayName:   strings.TrimSpace(user.DisplayName),
 		Active:        user.Status == constants.UserStatusActive,
 	}, nil
@@ -193,6 +195,69 @@ func (b upstreamBridge) ConsoleSSO(ctx context.Context, input accountlink.Consol
 		NativeUserID:   res.NativeUserID,
 		AutoCreated:    res.AutoCreated,
 		AwakenedOrders: res.AwakenedOrders,
+	}, nil
+}
+
+func (b upstreamBridge) AutoLink(ctx context.Context, input accountlink.AutoLinkInput) (accountlink.AutoLinkResult, error) {
+	adapter, enabled, err := b.resolveAdapter()
+	if err != nil {
+		return accountlink.AutoLinkResult{}, err
+	}
+	if !enabled {
+		return accountlink.AutoLinkResult{Linked: false, Status: "disabled"}, nil
+	}
+	res, err := adapter.AutoLink(ctx, upstream.CustomerAutoLinkInput{
+		StorefrontUserID:   input.MerchantCustomerID,
+		MerchantCustomerID: input.MerchantCustomerID,
+		Email:              input.Email,
+		EmailVerified:      input.EmailVerified,
+		DisplayName:        input.DisplayName,
+	})
+	if err != nil {
+		return accountlink.AutoLinkResult{}, translateUpstreamError(err)
+	}
+	return accountlink.AutoLinkResult{
+		Linked:         res.Linked,
+		Status:         res.Status,
+		NativeUserID:   res.NativeUserID,
+		AwakenedOrders: res.AwakenedOrders,
+	}, nil
+}
+
+func (b upstreamBridge) APISummary(ctx context.Context, merchantCustomerID string) (accountlink.APISummaryResult, error) {
+	adapter, enabled, err := b.resolveAdapter()
+	if err != nil {
+		return accountlink.APISummaryResult{}, err
+	}
+	if !enabled {
+		return accountlink.APISummaryResult{Linked: false}, nil
+	}
+	res, err := adapter.APISummary(ctx, merchantCustomerID)
+	if err != nil {
+		return accountlink.APISummaryResult{}, translateUpstreamError(err)
+	}
+	subs := make([]accountlink.APISubscriptionSummary, 0, len(res.ActiveSubscriptions))
+	for _, sub := range res.ActiveSubscriptions {
+		subs = append(subs, accountlink.APISubscriptionSummary{
+			ID:                  sub.ID,
+			PlanID:              sub.PlanID,
+			PlanTitle:           sub.PlanTitle,
+			Status:              sub.Status,
+			AmountTotal:         sub.AmountTotal,
+			AmountUsed:          sub.AmountUsed,
+			StartTime:           sub.StartTime,
+			EndTime:             sub.EndTime,
+			AllowWalletOverflow: sub.AllowWalletOverflow,
+		})
+	}
+	return accountlink.APISummaryResult{
+		Linked:              res.Linked,
+		NativeUserID:        res.NativeUserID,
+		Quota:               res.Quota,
+		UsedQuota:           res.UsedQuota,
+		RequestCount:        res.RequestCount,
+		Group:               res.Group,
+		ActiveSubscriptions: subs,
 	}, nil
 }
 

@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/dujiao-next/internal/app/container"
 	"github.com/dujiao-next/internal/constants"
+	usercontract "github.com/dujiao-next/internal/modules/identity/user/contract"
+	userdomain "github.com/dujiao-next/internal/modules/identity/user/domain"
 	"github.com/dujiao-next/internal/modules/order/application/accountlink"
 	siteconnectionapp "github.com/dujiao-next/internal/modules/siteconnection/application"
 	siteconnectioncontract "github.com/dujiao-next/internal/modules/siteconnection/contract"
 	siteconnectiondomain "github.com/dujiao-next/internal/modules/siteconnection/domain"
+	"github.com/dujiao-next/internal/telegramidentity"
 )
 
 type stubConnRepo struct {
@@ -63,5 +67,42 @@ func TestUpstreamBridgeDisabledWhenNoConnectionsAndFailsClosedWhenAmbiguous(t *t
 	}
 	if _, err := b.Status(context.Background(), "needtoken-storefront:user:1"); !errors.Is(err, accountlink.ErrUnavailable) {
 		t.Fatalf("ambiguous active connections must fail closed, got %v", err)
+	}
+}
+
+type stubUserStore struct {
+	usercontract.Store
+	users map[uint]*userdomain.User
+}
+
+func (s *stubUserStore) GetByID(id uint) (*userdomain.User, error) {
+	return s.users[id], nil
+}
+
+func TestLookupMemberRejectsPlaceholderAndUnverifiedEmails(t *testing.T) {
+	now := time.Now().UTC()
+	reader := memberIdentityReader{
+		c: &container.Container{
+			UserStore: &stubUserStore{
+				users: map[uint]*userdomain.User{
+					1: {ID: 1, Email: telegramidentity.BuildPlaceholderEmail("12345"), Status: constants.UserStatusActive, EmailVerifiedAt: &now, DisplayName: "TG User"},
+					2: {ID: 2, Email: "unverified@example.com", Status: constants.UserStatusActive, EmailVerifiedAt: nil, DisplayName: "Unverified"},
+					3: {ID: 3, Email: "real@example.com", Status: constants.UserStatusActive, EmailVerifiedAt: &now, DisplayName: "Real User"},
+				},
+			},
+		},
+	}
+
+	tgMember, err := reader.LookupMember(context.Background(), 1)
+	if err != nil || tgMember.EmailVerified {
+		t.Fatalf("telegram placeholder email must never be treated as verified: member=%+v err=%v", tgMember, err)
+	}
+	unverified, err := reader.LookupMember(context.Background(), 2)
+	if err != nil || unverified.EmailVerified {
+		t.Fatalf("unverified email must have EmailVerified=false: member=%+v err=%v", unverified, err)
+	}
+	verified, err := reader.LookupMember(context.Background(), 3)
+	if err != nil || !verified.EmailVerified || verified.Email != "real@example.com" || !verified.Active {
+		t.Fatalf("verified real email should be accepted: member=%+v err=%v", verified, err)
 	}
 }

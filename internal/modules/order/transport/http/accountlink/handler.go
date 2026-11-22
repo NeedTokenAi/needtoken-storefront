@@ -24,11 +24,13 @@ func New(service *accountlink.Service) *Handler {
 
 func RegisterMemberReadRoutes(routes gin.IRoutes, h *Handler) {
 	routes.GET("/me/api-account-link", h.status)
+	routes.GET("/me/api-account-summary", h.apiSummary)
 }
 
 func RegisterMemberWriteRoutes(routes gin.IRoutes, h *Handler) {
 	routes.POST("/me/api-account-link/start", h.start)
 	routes.POST("/me/api-account-link/complete", h.complete)
+	routes.POST("/me/api-account-link/ensure", h.ensure)
 	routes.POST("/me/api-console-sso", h.consoleSSO)
 }
 
@@ -116,6 +118,54 @@ func (h *Handler) consoleSSO(c *gin.Context) {
 		return
 	}
 	result, err := h.service.ConsoleSSO(c.Request.Context(), userID, input.TargetPath, input.NextPath)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) ensure(c *gin.Context) {
+	h.privateHeaders(c)
+	tenant := reseller.TenantOrMain(c.Request.Context())
+	if tenant.Unavailable || tenant.ResellerID != nil {
+		response.Success(c, accountlink.AutoLinkResult{Linked: false, Status: "disabled"})
+		return
+	}
+	userID, ok := ginutil.GetUserID(c)
+	if !ok || userID == 0 {
+		h.fail(c, accountlink.ErrForbidden)
+		return
+	}
+	var empty struct{}
+	if !h.decodeJSON(c, &empty, true) {
+		return
+	}
+	result, err := h.service.Ensure(c.Request.Context(), userID)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) apiSummary(c *gin.Context) {
+	h.privateHeaders(c)
+	if c.Request.URL.RawQuery != "" {
+		h.fail(c, accountlink.ErrInvalid)
+		return
+	}
+	tenant := reseller.TenantOrMain(c.Request.Context())
+	if tenant.Unavailable || tenant.ResellerID != nil {
+		response.Success(c, accountlink.APISummaryResult{Linked: false})
+		return
+	}
+	userID, ok := ginutil.GetUserID(c)
+	if !ok || userID == 0 {
+		h.fail(c, accountlink.ErrForbidden)
+		return
+	}
+	result, err := h.service.APISummary(c.Request.Context(), userID)
 	if err != nil {
 		h.fail(c, err)
 		return
