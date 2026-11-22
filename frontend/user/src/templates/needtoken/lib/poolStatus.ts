@@ -5,12 +5,18 @@
 
 export type PoolLevel = 'available' | 'busy' | 'unavailable' | 'unknown'
 
+export interface PoolGroupPayload {
+    status?: string
+    uptime_pct?: number
+    history?: string[]
+}
+
 export interface PoolStatusResponse {
     ok?: boolean
     enabled?: boolean
     stale?: boolean
     updated_at?: string
-    groups?: Record<string, { status?: string }> | unknown[]
+    groups?: Record<string, PoolGroupPayload> | unknown[]
 }
 
 export interface PoolStatusView {
@@ -18,6 +24,8 @@ export interface PoolStatusView {
     stale: boolean
     updatedAt: Date | null
     levels: Record<string, PoolLevel>
+    uptimePct: Record<string, number>
+    history: Record<string, PoolLevel[]>
 }
 
 export interface PoolStatusSummary {
@@ -31,10 +39,20 @@ const LEVELS: PoolLevel[] = ['available', 'busy', 'unavailable', 'unknown']
 
 export const parsePoolStatus = (body: PoolStatusResponse | null | undefined): PoolStatusView => {
     const levels: Record<string, PoolLevel> = {}
+    const uptimePct: Record<string, number> = {}
+    const history: Record<string, PoolLevel[]> = {}
     if (body?.groups && typeof body.groups === 'object' && !Array.isArray(body.groups)) {
         for (const [group, value] of Object.entries(body.groups)) {
             const level = value?.status as PoolLevel
             levels[group] = LEVELS.includes(level) ? level : 'unknown'
+            if (typeof value?.uptime_pct === 'number' && Number.isFinite(value.uptime_pct) && value.uptime_pct >= 0 && value.uptime_pct <= 100) {
+                uptimePct[group] = Math.round(value.uptime_pct * 100) / 100
+            }
+            if (Array.isArray(value?.history) && value.history.length > 0) {
+                history[group] = value.history
+                    .slice(-30)
+                    .map(item => (LEVELS.includes(item as PoolLevel) ? (item as PoolLevel) : 'unknown'))
+            }
         }
     }
     const updatedAt = body?.updated_at ? new Date(body.updated_at) : null
@@ -43,6 +61,8 @@ export const parsePoolStatus = (body: PoolStatusResponse | null | undefined): Po
         stale: Boolean(body?.stale),
         updatedAt: updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt : null,
         levels,
+        uptimePct,
+        history,
     }
 }
 
@@ -51,6 +71,22 @@ export const levelFor = (view: PoolStatusView | null, group: string): PoolLevel 
     if (!view || !view.enabled) return null
     const level = view.levels[group]
     return level && level !== 'unknown' ? level : null
+}
+
+/** 某分组真实可用率（百分比 0-100），无数据时返回 null */
+export const uptimeFor = (view: PoolStatusView | null, group: string): number | null => {
+    if (!view || !view.enabled) return null
+    const pct = view.uptimePct[group]
+    return typeof pct === 'number' && Number.isFinite(pct) ? pct : null
+}
+
+/** 某分组真实历史采样槽（最多 30 条），无历史时若当前状态已知则返回单槽数组 */
+export const historyFor = (view: PoolStatusView | null, group: string): PoolLevel[] => {
+    if (!view || !view.enabled) return []
+    const slots = view.history[group]
+    if (Array.isArray(slots) && slots.length > 0) return slots
+    const current = levelFor(view, group)
+    return current ? [current] : []
 }
 
 /** 聚合号池整体健康快照，供 API 服务页指标条展示 */

@@ -703,6 +703,24 @@ type OrderRefundStore interface {
 	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)
 }
 
+type SLORevokeUserInput struct {
+	MerchantCustomerID string `json:"merchant_customer_id"`
+	Reason             string `json:"reason,omitempty"`
+}
+
+type SLORevokeUserResult struct {
+	Revoked bool `json:"revoked"`
+	UserID  uint `json:"user_id,omitempty"`
+}
+
+type UserSessionRevoker interface {
+	RevokeUserSessions(userID uint) (bool, error)
+}
+
+type SLORevokeHandler interface {
+	RevokeUserSLO(input SLORevokeUserInput) (*SLORevokeUserResult, error)
+}
+
 type ManualConfirmPaymentInput struct {
 	PaymentID   uint   `json:"payment_id,omitempty"`
 	ProviderRef string `json:"provider_ref,omitempty"`

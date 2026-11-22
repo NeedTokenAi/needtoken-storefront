@@ -64,3 +64,22 @@ test('preview code quotes request data and source links never contain credential
   assert.equal(API_INTEGRATIONS.filter(tool => tool.name === 'CC Switch').length, 1)
   assert.ok(!API_INTEGRATIONS.some(tool => tool.name === 'CC Proxy'))
 })
+
+test('newly added coding & desktop integrations strip /v1 where required and emit valid templates', () => {
+  assert.equal(integrationEndpoint('claudecode', endpoint), 'https://api.needtoken.example/gateway')
+  assert.equal(integrationEndpoint('geminicli', endpoint), 'https://api.needtoken.example/gateway')
+  assert.equal(integrationEndpoint('codex', endpoint), endpoint)
+  assert.equal(integrationEndpoint('cursor', endpoint), endpoint)
+  assert.equal(integrationEndpoint('cherrystudio', endpoint), endpoint)
+
+  const claudeCfg = JSON.parse(integrationTemplate('claudecode', endpoint, model)!)
+  assert.equal(claudeCfg.env.ANTHROPIC_BASE_URL, 'https://api.needtoken.example/gateway')
+  assert.equal(claudeCfg.env.ANTHROPIC_MODEL, model)
+
+  const codexCfg = integrationTemplate('codex', endpoint, model)!
+  assert.ok(codexCfg.includes(`base_url = "${endpoint}"`))
+  assert.ok(codexCfg.includes('wire_api = "responses"'))
+
+  const geminiCfg = integrationTemplate('geminicli', endpoint, model)!
+  assert.ok(geminiCfg.includes('GOOGLE_GEMINI_BASE_URL="https://api.needtoken.example/gateway"'))
+})

@@ -429,9 +429,9 @@ router.beforeEach(async (to, _from, next) => {
     }
 
     if (getActiveTemplate() === 'needtoken' && to.name === 'category-products') {
-        const kind = ({ plans: '', 'plans-personal': 'personal', 'plans-enterprise': 'enterprise' } as Record<string, string>)[String(to.params.slug)]
-        if (kind !== undefined) {
-            next({ path: '/plans', query: { ...to.query, ...(kind ? { kind } : {}) }, hash: to.hash, replace: true })
+        const slug = String(to.params.slug)
+        if (slug === 'plans' || slug === 'plans-personal' || slug === 'plans-enterprise') {
+            next({ path: '/plans', query: { ...to.query }, hash: to.hash, replace: true })
             return
         }
     }

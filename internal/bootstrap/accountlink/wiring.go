@@ -6,8 +6,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dujiao-next/internal/app/container"
+	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/modules/order/application/accountlink"
 	accountlinkhttp "github.com/dujiao-next/internal/modules/order/transport/http/accountlink"
@@ -23,8 +25,10 @@ func NewHandler(c *container.Container) *accountlinkhttp.Handler {
 			connID = uint(parsed)
 		}
 	}
+	reader := memberIdentityReader{c: c}
 	svc := accountlink.New(upstreamBridge{c: c, configuredConnectionID: connID}).
-		WithIdentityReader(memberIdentityReader{c: c})
+		WithIdentityReader(reader).
+		WithSessionRevoker(reader)
 	return accountlinkhttp.New(svc)
 }
 
@@ -51,6 +55,28 @@ func (r memberIdentityReader) LookupMember(_ context.Context, userID uint) (acco
 		DisplayName:   strings.TrimSpace(user.DisplayName),
 		Active:        user.Status == constants.UserStatusActive,
 	}, nil
+}
+
+func (r memberIdentityReader) RevokeUserSessions(ctx context.Context, userID uint) error {
+	if r.c == nil || r.c.UserStore == nil {
+		return nil
+	}
+	user, err := r.c.UserStore.GetByID(userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil
+	}
+	now := time.Now()
+	user.TokenVersion++
+	user.TokenInvalidBefore = &now
+	user.UpdatedAt = now
+	if err := r.c.UserStore.Update(user); err != nil {
+		return err
+	}
+	_ = cache.SetUserAuthState(ctx, cache.BuildUserAuthState(user))
+	return nil
 }
 
 type upstreamBridge struct {
@@ -259,6 +285,21 @@ func (b upstreamBridge) APISummary(ctx context.Context, merchantCustomerID strin
 		Group:               res.Group,
 		ActiveSubscriptions: subs,
 	}, nil
+}
+
+func (b upstreamBridge) StorefrontLogout(ctx context.Context, merchantCustomerID, reason string) (bool, error) {
+	adapter, enabled, err := b.resolveAdapter()
+	if err != nil {
+		return false, err
+	}
+	if !enabled {
+		return false, nil
+	}
+	revoked, err := adapter.StorefrontLogout(ctx, merchantCustomerID, reason)
+	if err != nil {
+		return false, translateUpstreamError(err)
+	}
+	return revoked, nil
 }
 
 func translateUpstreamError(err error) error {

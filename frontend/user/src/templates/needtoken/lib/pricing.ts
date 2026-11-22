@@ -31,6 +31,36 @@ export interface PricingModel {
     image_ratio?: number | null
     audio_ratio?: number | null
     audio_completion_ratio?: number | null
+    official_model_ratio?: number | null
+    official_completion_ratio?: number | null
+    official_model_price?: number | null
+}
+
+export interface OfficialPriceOverride {
+    input_usd?: number | null
+    output_usd?: number | null
+    cache_usd?: number | null
+    context_length?: string
+}
+
+export interface PublicPlanOffer {
+    id: number
+    title: string
+    subtitle?: string
+    price_usd: number
+    total_usd: number
+    multiplier: number
+    duration_unit?: string
+    duration_value?: number
+    allowed_groups?: string[]
+    upgrade_group?: string
+    allow_wallet_overflow?: boolean
+}
+
+export interface NeedtokenPricingMeta {
+    featured_models?: string[]
+    official_overrides?: Record<string, OfficialPriceOverride>
+    active_plans?: PublicPlanOffer[]
 }
 
 export interface PricingVendor {
@@ -53,6 +83,7 @@ export interface PricingResponse {
     usable_group?: Record<string, string>
     supported_endpoint?: Record<string, PricingEndpointMeta>
     pricing_version?: string
+    needtoken_meta?: NeedtokenPricingMeta
 }
 
 /**
@@ -94,6 +125,14 @@ export interface ModelOffer {
     outputPrice: number | null
     /** 美元 / 百万 tokens；仅当 quota_type=0 且配置了非负 cache_ratio 时有值 */
     cachePrice: number | null
+    /** 官方基准参考价（美元 / 百万 tokens，或 per_call）；无参考价时为 null */
+    officialInputPrice: number | null
+    officialOutputPrice: number | null
+    officialCachePrice: number | null
+    /** 相比官方基准价的折扣百分比（如 70 表示 70% off / 官方 3 折）；无折扣或无官方价时为 null */
+    discountPercent: number | null
+    /** 上下文长度展示（优先取 Ops 配置，其次按常见模型族推断） */
+    contextLength: string | null
     isDefault: boolean
     condition: PricingCondition | null
     /** Backend cache/schema marker; never treated as an immutable checkout quote. */
@@ -283,10 +322,39 @@ export const buildPricingGroups = (
  * 把 new-api 定价表展开成“模型 × 分组”的报价列表。
  * 同一模型在不同分组（供应线）价格不同，分开列出、不混算。
  */
+const inferContextLength = (modelName: string): string | null => {
+    const n = String(modelName || '').toLowerCase()
+    if (!n) return null
+    if (/gemini-(?:2\.|3\.|1\.5|pro|flash)/.test(n)) return '1M'
+    if (/claude-(?:opus-4|sonnet-4|haiku-4|3\.7|3\.5)/.test(n)) return '200K'
+    if (/gpt-(?:5|4\.1|4\.5)/.test(n)) return '1M'
+    if (/gpt-4o|o1|o3|o4|deepseek|grok/.test(n)) return '128K'
+    return null
+}
+
+export const effectiveDiscountPercent = (officialPrice: number | null, actualPrice: number | null): number | null => {
+    if (
+        officialPrice === null || actualPrice === null
+        || !Number.isFinite(officialPrice) || !Number.isFinite(actualPrice)
+        || officialPrice <= 0 || actualPrice < 0 || actualPrice >= officialPrice
+    ) {
+        return null
+    }
+    const pct = Math.round((1 - actualPrice / officialPrice) * 100)
+    return pct >= 1 && pct <= 99 ? pct : null
+}
+
+export const effectivePlanOfferPrice = (price: number | null, multiplier: number): number | null => {
+    if (price === null || !Number.isFinite(price) || price < 0) return null
+    if (!Number.isFinite(multiplier) || multiplier <= 1) return price
+    return price / multiplier
+}
+
 export const buildOffers = (response: PricingResponse, options: BuildOffersOptions): ModelOffer[] => {
     const models = Array.isArray(response.data) ? response.data : []
     const groupRatio = response.group_ratio || {}
     const usableGroup = response.usable_group || {}
+    const officialOverrides = response.needtoken_meta?.official_overrides || {}
     const vendors = new Map<number, string>()
     for (const v of response.vendors || []) {
         if (v && typeof v.id === 'number') {
@@ -308,6 +376,8 @@ export const buildOffers = (response: PricingResponse, options: BuildOffersOptio
         const tags = parseModelTags(model.tags)
         const description = typeof model.description === 'string' ? model.description.trim() : ''
         const vendor = resolveVendor(model, vendors)
+        const override = officialOverrides[model.model_name]
+        const contextLength = (override?.context_length && override.context_length.trim()) || inferContextLength(model.model_name)
 
         for (const group of groups) {
             const ratio = groupRatio[group] as number
@@ -328,6 +398,42 @@ export const buildOffers = (response: PricingResponse, options: BuildOffersOptio
                 ? input * rawCacheRatio
                 : null
 
+            // Official reference price resolution priority:
+            // 1. Explicit Ops override (official_overrides[model_name])
+            // 2. Built-in official_* ratio/price emitted by new-api /api/pricing
+            // 3. Fallback to model's own 1.0x baseline when group_ratio < 1 (discount group)
+            let officialInput: number | null = null
+            let officialOutput: number | null = null
+            let officialCache: number | null = null
+            if (!condition && valid) {
+                if (typeof override?.input_usd === 'number' && Number.isFinite(override.input_usd) && override.input_usd > 0) {
+                    officialInput = override.input_usd
+                } else if (perCall && typeof model.official_model_price === 'number' && Number.isFinite(model.official_model_price) && model.official_model_price > 0) {
+                    officialInput = model.official_model_price
+                } else if (!perCall && typeof model.official_model_ratio === 'number' && Number.isFinite(model.official_model_ratio) && model.official_model_ratio > 0) {
+                    officialInput = model.official_model_ratio * 2
+                } else if (ratio > 0 && ratio < 1) {
+                    officialInput = perCall ? model.model_price : model.model_ratio * 2
+                }
+
+                if (!perCall) {
+                    if (typeof override?.output_usd === 'number' && Number.isFinite(override.output_usd) && override.output_usd > 0) {
+                        officialOutput = override.output_usd
+                    } else if (officialInput !== null) {
+                        const offComp = (typeof model.official_completion_ratio === 'number' && Number.isFinite(model.official_completion_ratio) && model.official_completion_ratio > 0)
+                            ? model.official_completion_ratio
+                            : model.completion_ratio
+                        officialOutput = officialInput * offComp
+                    }
+                    if (typeof override?.cache_usd === 'number' && Number.isFinite(override.cache_usd) && override.cache_usd >= 0) {
+                        officialCache = override.cache_usd
+                    } else if (officialInput !== null && typeof rawCacheRatio === 'number' && Number.isFinite(rawCacheRatio) && rawCacheRatio >= 0) {
+                        officialCache = officialInput * rawCacheRatio
+                    }
+                }
+            }
+            const discountPercent = effectiveDiscountPercent(officialInput, valid ? input : null)
+
             offers.push({
                 key: `${model.model_name}@${group}`,
                 modelId: model.model_name,
@@ -341,6 +447,11 @@ export const buildOffers = (response: PricingResponse, options: BuildOffersOptio
                 inputPrice: valid ? input : null,
                 outputPrice: valid ? output : null,
                 cachePrice,
+                officialInputPrice: officialInput,
+                officialOutputPrice: officialOutput,
+                officialCachePrice: officialCache,
+                discountPercent,
+                contextLength,
                 isDefault: defaults.has(model.model_name),
                 condition: condition ?? (valid ? null : 'unknown'),
                 sourceVersion: model.pricing_version || response.pricing_version || null,

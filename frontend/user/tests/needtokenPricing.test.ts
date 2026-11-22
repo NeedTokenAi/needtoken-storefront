@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {
     buildOffers,
     buildPricingGroups,
+    effectiveDiscountPercent,
+    effectivePlanOfferPrice,
     filterOffers,
     formatUsd,
     inferVendorFromModelName,
@@ -198,4 +200,59 @@ test('only authoritative finite nonnegative group prices are shown and all group
     const overflow = buildOffers({ data: [{ ...model, model_ratio: Number.MAX_VALUE }], group_ratio: { pool: 10 } }, options)
     assert.equal(overflow[0]?.unit, 'conditional')
     assert.equal(overflow[0]?.inputPrice, null)
+})
+
+test('buildOffers computes official pricing, ops overrides, discount percent, and plan multiplier savings', () => {
+    const priced = buildOffers({
+        data: [
+            {
+                model_name: 'claude-sonnet-4-6',
+                quota_type: 0,
+                model_ratio: 1.5,
+                model_price: 0,
+                completion_ratio: 5,
+                cache_ratio: 0.1,
+                official_model_ratio: 2.5,
+                official_completion_ratio: 5,
+                enable_groups: ['pool'],
+            },
+            {
+                model_name: 'gpt-5.4',
+                quota_type: 0,
+                model_ratio: 1.0,
+                model_price: 0,
+                completion_ratio: 4,
+                enable_groups: ['pool'],
+            },
+        ],
+        group_ratio: { pool: 0.6 },
+        needtoken_meta: {
+            official_overrides: {
+                'gpt-5.4': { input_usd: 5, output_usd: 20, cache_usd: 0.5, context_length: '2M' },
+            },
+        },
+    }, options)
+
+    const claude = priced.find(o => o.modelId === 'claude-sonnet-4-6')!
+    // Actual input = 1.5 * 2 * 0.6 = 1.8; official input = 2.5 * 2 = 5 -> 64% off
+    assert.ok(Math.abs((claude.inputPrice ?? 0) - 1.8) < 1e-9)
+    assert.equal(claude.officialInputPrice, 5)
+    assert.equal(claude.officialOutputPrice, 25)
+    assert.equal(claude.discountPercent, 64)
+
+    const gpt = priced.find(o => o.modelId === 'gpt-5.4')!
+    // Actual input = 1.0 * 2 * 0.6 = 1.2; ops override official = 5 -> 76% off, context = 2M
+    assert.ok(Math.abs((gpt.inputPrice ?? 0) - 1.2) < 1e-9)
+    assert.equal(gpt.officialInputPrice, 5)
+    assert.equal(gpt.officialOutputPrice, 20)
+    assert.equal(gpt.officialCachePrice, 0.5)
+    assert.equal(gpt.contextLength, '2M')
+    assert.equal(gpt.discountPercent, 76)
+
+    // With 2x subscription plan multiplier: 1.2 / 2 = 0.6 vs $5 official -> 88% off
+    const planPrice = effectivePlanOfferPrice(gpt.inputPrice, 2)
+    assert.ok(Math.abs((planPrice ?? 0) - 0.6) < 1e-9)
+    assert.equal(effectiveDiscountPercent(gpt.officialInputPrice, planPrice), 88)
+    assert.equal(effectiveDiscountPercent(5, 5), null)
+    assert.equal(effectivePlanOfferPrice(1.2, 0.5), 1.2)
 })

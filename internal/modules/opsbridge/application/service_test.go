@@ -866,3 +866,27 @@ func TestOpsBridgeBugFixesAndSafeDeleteGuards(t *testing.T) {
 		t.Fatalf("unexpected batch delete error codes: %+v", batchRes.Errors)
 	}
 }
+
+type fakeSLORevoker struct {
+	revoked []uint
+}
+
+func (f *fakeSLORevoker) RevokeUserSessions(userID uint) (bool, error) {
+	f.revoked = append(f.revoked, userID)
+	return userID == 77, nil
+}
+
+func TestRevokeUserSLO(t *testing.T) {
+	revoker := &fakeSLORevoker{}
+	svc := application.New(nil, nil, nil).WithUserSessionRevoker(revoker)
+
+	for _, bad := range []string{"", "user:77", "needtoken-storefront:user:0", "needtoken-storefront:user:abc"} {
+		if _, err := svc.RevokeUserSLO(opscontract.SLORevokeUserInput{MerchantCustomerID: bad}); !errors.Is(err, opscontract.ErrInvalidInput) {
+			t.Fatalf("expected ErrInvalidInput for %q, got %v", bad, err)
+		}
+	}
+	res, err := svc.RevokeUserSLO(opscontract.SLORevokeUserInput{MerchantCustomerID: "needtoken-storefront:user:77"})
+	if err != nil || !res.Revoked || res.UserID != 77 || len(revoker.revoked) != 1 || revoker.revoked[0] != 77 {
+		t.Fatalf("expected SLO revoke for user 77, res=%+v err=%v revoked=%v", res, err, revoker.revoked)
+	}
+}

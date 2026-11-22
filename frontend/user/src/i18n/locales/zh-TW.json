@@ -1821,9 +1821,9 @@
       "home": "首頁",
       "recharge": "儲值服務",
       "rental": "成品訂購",
-      "plans": "API 套餐",
-      "models": "模型廣場",
-      "rankings": "消耗排行榜",
+      "plans": "Need 網關套餐",
+      "models": "模型",
+      "rankings": "排行榜",
       "docs": "API 文件",
       "blog": "部落格",
       "login": "登入",
@@ -1991,7 +1991,7 @@
       }
     },
     "models": {
-      "title": "模型廣場",
+      "title": "模型",
       "subtitle": "價格與模型列表取自 new-api 定價表；同一模型在不同供應線的價格分開列出，不混算。",
       "search": "搜尋模型 ID",
       "vendor": "廠商",
@@ -2066,12 +2066,16 @@
       "copyModelId": "複製模型 ID {model}",
       "copyIdShort": "複製模型 ID",
       "copied": "已複製",
-      "callInConsole": "去控制台調用"
+      "callInConsole": "去控制台調用",
+      "viewModeLabel": "檢視方式",
+      "viewTable": "比價表",
+      "viewCards": "卡片",
+      "empty": "未找到符合的模型"
     },
     "plans": {
-      "title": "API 套餐",
+      "title": "Need 網關套餐",
       "subtitle": "按需儲值，靈活選配 Token 額度。套餐在本站購買，APIKey 和用量在控制台管理。",
-      "buy": "選購 API 套餐",
+      "buy": "選購 Need 網關套餐",
       "console": "開啟 API 控制台",
       "what": {
         "title": "套餐由三部分組成",
@@ -2201,7 +2205,104 @@
       "viewAllModels": "前往模型廣場查看全部",
       "protocolsCol": "支援協定",
       "inspectModel": "查看詳情 →",
-      "hotModelsFallbackHint": "點擊任意模型前往模型廣場查看即時分組倍率與輸入/輸出單價。"
+      "hotModelsFallbackHint": "點擊任意模型前往模型廣場查看即時分組倍率與輸入/輸出單價。",
+      "steps": {
+        "title": "三步快速接入 NeedToken 網關",
+        "configure": {
+          "title": "設定",
+          "desc": "購買 Need 網關套餐或建立 API Key，按分組自動生效並支援多專享卡疊加"
+        },
+        "connect": {
+          "title": "連接",
+          "desc": "透過 OpenAI、Claude、Gemini、xAI 及多模態相容介面一鍵接入"
+        },
+        "monitor": {
+          "title": "監控",
+          "desc": "在儀表板透過即時分析追蹤用量、套餐餘量、成本與節點健康度"
+        }
+      },
+      "plansSection": {
+        "eyebrow": "NEED GATEWAY PLANS",
+        "title": "Need 網關套餐與優勢",
+        "subtitle": "統一以官方價格為透明基準，提供 2x–3x 高倍率套餐額度；支援不同模型自由混合呼叫或多專享卡同時疊加，超出套餐額度無縫按 API Key 餘額扣費。",
+        "viewAll": "查看全部套餐",
+        "fallbackHint": "目前正在同步最新在售套餐，您也可以直接前往 Need 網關套餐頁查看完整清單。",
+        "advantages": {
+          "officialBase": "官方價格透明基準",
+          "mixedModels": "多模型混合自由呼叫",
+          "multipliers": "2x / 3x 額度倍率放大",
+          "stackable": "多專享套餐並行疊加",
+          "overflow": "超出自動按 API Key 餘額扣費"
+        },
+        "tracks": {
+          "openai": {
+            "title": "OpenAI 專享",
+            "desc": "GPT-5 / Codex / o3 專線分組，2x 額度放大，編程與推理主力首選。"
+          },
+          "claude": {
+            "title": "Claude 專享",
+            "desc": "Claude Opus / Sonnet 原生快取協議，2x 倍率暢跑 Claude Code。"
+          },
+          "gemini": {
+            "title": "Gemini 專享",
+            "desc": "Gemini Pro / Flash 百萬上下文高速通道，穩定低延遲。"
+          },
+          "xai": {
+            "title": "xAI 專享",
+            "desc": "Grok 全系即時推理與搜尋能力，獨立分組精準計費。"
+          },
+          "image": {
+            "title": "圖片專項",
+            "desc": "主流生圖與修圖模型 2x 額度加成，按次透明結算。"
+          },
+          "video": {
+            "title": "影片專項",
+            "desc": "新一代影片生成模型專屬通道，大算力任務穩定交付。"
+          }
+        }
+      },
+      "routing": {
+        "eyebrow": "SMART ROUTING ARCHITECTURE",
+        "title": "一條統一路由，連接全部頂級模型與編程工具",
+        "subtitle": "無需分別維護多家供應商帳單與金鑰，自動完成智慧路由、Prompt Caching 複用與多節點故障轉移。",
+        "hubLabel": "Smart Routing",
+        "worksWithMore": "相容 10+ 主流編程 Agent 與用戶端",
+        "featuresLabel": "核心網關特性",
+        "clients": {
+          "claudeCode": "終端自主編程",
+          "codex": "OpenAI 編程助手",
+          "ccSwitch": "多源路由切換器",
+          "openClaw": "開源工作流 Agent"
+        },
+        "features": {
+          "smartRouting": "智慧路由",
+          "promptCaching": "Prompt Caching",
+          "autoFallbacks": "自動故障轉移",
+          "oneBill": "統一帳單",
+          "spendTracking": "即時消費追蹤",
+          "neverDowngraded": "原生滿血不降智"
+        }
+      },
+      "pricing": {
+        "eyebrow": "LIVE DYNAMIC PRICING",
+        "title": "即時模型價格與官方折扣對比",
+        "subtitle": "所有價格即時同步自 NeedToken 網關與號池系統，支援一鍵切換對比按量實價與高倍率套餐等效折後價。",
+        "modeLabel": "計價方式對比",
+        "paygMode": "按量實價",
+        "planMultiplierOption": "{mult} 套餐折後",
+        "paygHint": "目前展示網關即時按量價格（已含分組倍率折扣）與官方定價對比。",
+        "planHint": "按 {mult} 額度倍率套餐折算等效單價，超出自動扣 API Key 餘額。",
+        "quickStart": "Quick start",
+        "featuredTab": "Featured",
+        "searchPlaceholder": "搜尋模型，例如 claude、gpt-5.4、gemini…",
+        "colOfficialInput": "Input (官方)",
+        "colOfficialOutput": "Output (官方)",
+        "colNeedInput": "Input (NeedToken)",
+        "colNeedOutput": "Output (NeedToken)",
+        "colProvider": "路由分組",
+        "slaMonitoring": "即時監測中",
+        "viewFullCatalog": "查看全部 {count} 個模型與完整分組價目"
+      }
     },
     "homeServices": {
       "seoTitle": "儲值服務、成品訂購與 API 套餐",
@@ -2633,16 +2734,16 @@
     },
     "apiCatalog": {
       "titlePrefix": "選擇適合您的",
-      "subtitle": "為個人開發與團隊應用選擇 API 套餐。額度、有效期限和使用範圍以所選方案為準。",
+      "subtitle": "統一 Need 網關套餐，官方價格基準、2x–3x 額度倍率、多專享套餐並行疊加，超出自動按 API Key 餘額扣費。",
       "memberOnly": "會員專屬訂單",
       "quotaNote": "額度與期限明示",
       "usageNote": "API Key 與用量可查",
       "enterpriseNote": "企業方案諮詢",
-      "catalogTitle": "API 套餐目錄",
+      "catalogTitle": "Need 網關套餐目錄",
       "audiences": "套餐類型",
       "personal": "個人套餐",
       "enterprise": "企業套餐",
-      "search": "搜尋目前分類的 API 套餐",
+      "search": "搜尋 Need 網關套餐",
       "memberTitle": "請使用本站會員帳號購買",
       "memberDescription": "支援一鍵自助綁定您現有的 API 帳號，保留原有餘額與用量；可先綁定再下單，也支援先付款後至訂單頁完成綁定自動開通。",
       "login": "登入本站",
@@ -2654,14 +2755,17 @@
       "loginToChoose": "登入後選購",
       "memberDelivery": "會員訂單關聯 API 權益",
       "productFallback": "查看所選規格的額度、有效期限與使用說明。",
-      "howTitle": "從選購到使用，三步完成",
-      "step1Title": "登入並自助綁定帳號",
-      "step1Description": "登入本站後，一鍵跳轉 API 控制台確認授權即可完成綁定（亦支援付款後隨時補綁自動開通）。",
-      "step2Title": "選擇套餐並付款",
-      "step2Description": "核對額度、使用範圍、有效期限和訂單金額，再按頁面完成支付。",
-      "step3Title": "查看開通結果並接入",
-      "step3Description": "在訂單中查看開通結果；在已關聯帳號的 API 控制台查看新 Key、套餐額度與用量。",
-      "connectDescription": "使用套餐對應的 API Key 和介面地址接入應用；可用模型、額度與速率以套餐配置為準。"
+      "howTitle": "購買套餐，快速使用",
+      "step1Title": "選購套餐並付款",
+      "step1Description": "登入本站選購合適的專享或混合模型網關套餐，支援同時持有多個專享套餐疊加使用。",
+      "step2Title": "自動開通並取得 Key",
+      "step2Description": "付款後自動發放對應分組額度至您的 Need 網關帳號，一鍵免密進入控制台建立或查看 API Key。",
+      "step3Title": "統一介面快速使用",
+      "step3Description": "將 Base URL 與 API Key 填入 Claude Code、Codex、OpenCode 或 CC Switch，立即暢享低折高速呼叫。",
+      "connectDescription": "使用套餐對應的 API Key 和介面地址接入應用；可用模型、額度與速率以套餐配置為準。",
+      "categoriesLabel": "套餐分類",
+      "allPlans": "全部套餐",
+      "unifiedBadge": "Need 網關套餐 · 購買即自動開通，支援多專享卡疊加"
     },
     "apiAccountLink": {
       "title": "API 帳號綁定狀態",
@@ -2711,7 +2815,7 @@
     },
     "rankings": {
       "eyebrow": "NEED GATEWAY · REALTIME LEADERBOARD",
-      "title": "API 消耗排行榜",
+      "title": "排行榜",
       "subtitle": "基於 NeedToken 閘道真實 Token 消耗彙總，即時觀察熱門模型趨勢、廠商佔比與環比升降變化。",
       "updatedAt": "更新於 {time}",
       "periodLabel": "統計週期",
@@ -3687,6 +3791,56 @@
           "step2": "在 OpenClaw 的執行環境設定 NEEDTOKEN_API_KEY，將範本合併到 openclaw.json。",
           "step3": "選擇 needtoken 下的模型，重新載入設定後在助手中驗證呼叫。",
           "note": "下載檔案是合併用範本，請保留現有設定。範本使用 openai-completions；Agent 的工具呼叫能力須同時獲得模型與上游協定支援。"
+        },
+        "claudecode": {
+          "kind": "終端編程 Agent",
+          "summary": "原生 Anthropic Messages 協議直連",
+          "description": "在 Claude Code 中透過環境變數或 settings.json 設定 NeedToken 統一入口，支援 Claude 專享 2x 套餐與完整上下文快取。",
+          "get": "官方安裝",
+          "step1": "從 Anthropic 官方安裝最新版 Claude Code，準備好 NeedToken API Key。",
+          "step2": "將下方 env 片段寫入 ~/.claude/settings.json，或直接在終端匯出對應環境變數。",
+          "step3": "執行 claude 啟動會話，自動透過 NeedToken 智慧路由呼叫滿血模型。",
+          "note": "Claude Code 原生附加 /v1/messages，請使用不含 /v1 的根位址。"
+        },
+        "codex": {
+          "kind": "終端編程 Agent",
+          "summary": "OpenAI Responses 協議直連",
+          "description": "為 OpenAI Codex CLI 新增 NeedToken 自訂供應商，原生走 /v1/responses 協議並支援 OpenAI 專享 2x 套餐。",
+          "get": "官方安裝",
+          "step1": "安裝最新版 Codex CLI，並在環境中設定 NEEDTOKEN_API_KEY。",
+          "step2": "將下方設定合併至 ~/.codex/config.toml。",
+          "step3": "啟動 codex，發起一次程式碼生成或審查測試即可。",
+          "note": "支援 GPT-5 系列與推理模型，自動享有智慧故障轉移與用量追蹤。"
+        },
+        "geminicli": {
+          "kind": "終端編程 Agent",
+          "summary": "原生 Gemini 協議百萬上下文",
+          "description": "為 Google Gemini CLI 指定 NeedToken 代理位址，即刻體驗 Gemini 專享套餐與 1M 超長上下文視窗。",
+          "get": "官方安裝",
+          "step1": "安裝官方 Gemini CLI，準備好 NeedToken API Key。",
+          "step2": "在 shell 設定檔或目前終端匯出下方環境變數。",
+          "step3": "執行 gemini 指令進入互動模式並驗證回應。",
+          "note": "Gemini CLI 會自動拼接 /v1beta 路徑，請填寫根網域位址。"
+        },
+        "cursor": {
+          "kind": "AI 編程 IDE / 外掛",
+          "summary": "OpenAI 相容介面無縫接入",
+          "description": "在 Cursor、Cline、Roo Code 等編輯器中覆寫 OpenAI Base URL，一鍵切換多廠商旗艦模型。",
+          "get": "前往官網",
+          "step1": "開啟編輯器設定中的 Models / API Provider 面板。",
+          "step2": "填入下方 Base URL 與 NeedToken API Key，新增目標模型 ID。",
+          "step3": "開啟 Override OpenAI Base URL 並驗證連線。",
+          "note": "一組 API Key 即可同時呼叫 OpenAI、Claude、Gemini、xAI 與 DeepSeek。"
+        },
+        "cherrystudio": {
+          "kind": "桌面 AI 用戶端",
+          "summary": "多模型對話與知識庫助手",
+          "description": "在 Cherry Studio 中新增 NeedToken 作為 OpenAI 相容服務商，適合日常對話、繪圖與多模型對比。",
+          "get": "下載用戶端",
+          "step1": "開啟 Cherry Studio 設定 → 模型服務 → 新增自訂 OpenAI 服務商。",
+          "step2": "貼上下方 Base URL 與您的 NeedToken API Key。",
+          "step3": "點擊取得模型清單或手動填入模型 ID 即可開始使用。",
+          "note": "支援同步開啟圖片與影片專項模型，按需混用互不干擾。"
         }
       },
       "reference": "版面參考 · CC Switch 官方",
@@ -3708,7 +3862,11 @@
         "poolOnlineSub": "在線可用供給分組",
         "poolStandby": "統一調度",
         "poolStandbySub": "高可用多通道自動容災"
-      }
+      },
+      "createApiKeyAction": "建立 API Key",
+      "viewApiKeyAction": "查看 API Key",
+      "goDashboardAction": "前往儀表板",
+      "browsePlansAnchor": "選購套餐"
     },
     "purchaseFlow": {
       "backToPlans": "返回選方案",
@@ -3948,6 +4106,17 @@
         "connectCardTitle": "Anthropic 服務連通性",
         "advancedTitle": "終端指令碼校驗與去識別報告"
       }
+    },
+    "accountMenu": {
+      "gatewaySection": "Need 網關",
+      "dashboard": "網關儀表板",
+      "apiKeys": "API Key 管理",
+      "usageLogs": "用量日誌",
+      "storeSection": "商城中心",
+      "myOrders": "我的訂單",
+      "walletAndGift": "錢包與禮品卡",
+      "security": "帳號安全",
+      "signOut": "登出"
     }
   }
 }

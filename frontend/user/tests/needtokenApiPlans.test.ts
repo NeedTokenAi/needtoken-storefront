@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { apiPlanAudience, apiPlanMemberLoginPath, filterAPIPlanProducts, resolveAPIPlanScope } from '../src/templates/needtoken/lib/apiPlanCatalog.ts'
+import { apiPlanAudience, apiPlanMemberLoginPath, filterAPIPlanProducts, resolveAPIPlanScope, resolveUnifiedAPIPlanScope } from '../src/templates/needtoken/lib/apiPlanCatalog.ts'
 
 const categories = [
   { id: 1, slug: 'plans', parent_id: 0 }, { id: 2, slug: 'plans-personal', parent_id: 1 },
@@ -27,4 +27,18 @@ test('member login is storefront-local and returns to the selected SKU', () => {
   const path = apiPlanMemberLoginPath('api-pro', 27)
   assert.equal(path, '/auth/login?redirect=%2Fproducts%2Fapi-pro%3Fsku%3D27')
   assert.ok(!path.includes('api.needtoken.ai'))
+})
+
+test('resolveUnifiedAPIPlanScope unifies all plans under root and filters by optional subcategory slug', () => {
+  const allScope = resolveUnifiedAPIPlanScope(categories)
+  assert.equal(allScope.root?.id, 1)
+  assert.deepEqual(allScope.subcategories.map(c => c.slug), ['plans-personal', 'plans-enterprise'])
+  assert.deepEqual(allScope.categoryIds.sort((a, b) => a - b), [1, 2, 3, 4])
+
+  const subScope = resolveUnifiedAPIPlanScope(categories, 'plans-enterprise')
+  assert.equal(subScope.selected?.id, 3)
+  assert.deepEqual(subScope.categoryIds.sort((a, b) => a - b), [3, 4])
+
+  const missingRoot = resolveUnifiedAPIPlanScope(categories.filter(c => c.id !== 1))
+  assert.deepEqual(missingRoot.categoryIds, [])
 })

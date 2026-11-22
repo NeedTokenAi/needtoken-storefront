@@ -47,6 +47,7 @@ type Service struct {
 	acquiring       opscontract.AcquiringStore
 	upstream        opscontract.UpstreamStore
 	refunds         opscontract.OrderRefundStore
+	sessionRevoker  opscontract.UserSessionRevoker
 	orderEnricher   opscontract.OrderEnricher
 	orderActions    opscontract.OrderActionStore
 	users           opscontract.UserStore
@@ -133,6 +134,11 @@ func (s *Service) WithCardSecretStock(counter opscontract.CardSecretStockCounter
 
 func (s *Service) WithSKUDeleteUoW(uow opscontract.SKUDeleteUnitOfWork) *Service {
 	s.skuDeleteUoW = uow
+	return s
+}
+
+func (s *Service) WithUserSessionRevoker(revoker opscontract.UserSessionRevoker) *Service {
+	s.sessionRevoker = revoker
 	return s
 }
 
@@ -1951,6 +1957,32 @@ func (s *Service) RefundOrder(orderNo string, input opscontract.RefundOrderInput
 	input.Mode = mode
 	input.Amount = amtDec.Round(2).StringFixed(2)
 	return s.refunds.RefundOrder(orderNo, input)
+}
+
+const sloMerchantCustomerPrefix = "needtoken-storefront:user:"
+
+func (s *Service) RevokeUserSLO(input opscontract.SLORevokeUserInput) (*opscontract.SLORevokeUserResult, error) {
+	if s.sessionRevoker == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	raw := strings.TrimSpace(input.MerchantCustomerID)
+	idPart, ok := strings.CutPrefix(raw, sloMerchantCustomerPrefix)
+	if !ok || idPart == "" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	parsed, err := strconv.ParseUint(idPart, 10, strconv.IntSize)
+	if err != nil || parsed == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	userID := uint(parsed)
+	revoked, err := s.sessionRevoker.RevokeUserSessions(userID)
+	if err != nil {
+		return nil, err
+	}
+	return &opscontract.SLORevokeUserResult{
+		Revoked: revoked,
+		UserID:  userID,
+	}, nil
 }
 
 func (s *Service) Users(page, pageSize int, keyword, status string) (*opscontract.UsersResult, error) {

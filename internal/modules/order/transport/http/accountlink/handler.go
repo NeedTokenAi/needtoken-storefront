@@ -32,6 +32,7 @@ func RegisterMemberWriteRoutes(routes gin.IRoutes, h *Handler) {
 	routes.POST("/me/api-account-link/complete", h.complete)
 	routes.POST("/me/api-account-link/ensure", h.ensure)
 	routes.POST("/me/api-console-sso", h.consoleSSO)
+	routes.POST("/me/logout", h.logout)
 }
 
 func RegisterMemberRoutes(routes gin.IRoutes, h *Handler) {
@@ -166,6 +167,25 @@ func (h *Handler) apiSummary(c *gin.Context) {
 		return
 	}
 	result, err := h.service.APISummary(c.Request.Context(), userID)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) logout(c *gin.Context) {
+	h.privateHeaders(c)
+	userID, ok := ginutil.GetUserID(c)
+	if !ok || userID == 0 {
+		h.fail(c, accountlink.ErrForbidden)
+		return
+	}
+	var empty struct{}
+	if !h.decodeJSON(c, &empty, true) {
+		return
+	}
+	result, err := h.service.Logout(c.Request.Context(), userID)
 	if err != nil {
 		h.fail(c, err)
 		return
