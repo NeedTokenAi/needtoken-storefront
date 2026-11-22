@@ -1,7 +1,34 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { fetchResetFeed, parseResetFeed, RADAR_CHANNELS, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetActivityDays, resetCalendar, resetCalendarWithRecords, resetElapsedTime, resetFeedIsExpired, resetGapDays, resetRecordPage, resetSourceUrl, resetStatistics, type ResetRecord } from '../src/templates/needtoken/lib/resetRadar.ts'
+import {
+  ANTIGRAVITY_FEED_SOURCE,
+  channelResetFeedPath,
+  clearResetRadarClientCache,
+  CODEX_DIRECT_API_URL,
+  fetchChannelResetFeed,
+  fetchResetFeed,
+  geminiDailyResetSchedule,
+  parseCodexDirectPayload,
+  parseResetFeed,
+  parseTSalonPayload,
+  RADAR_CHANNELS,
+  RESET_FEED_MAX_AGE_MS,
+  RESET_FEED_PATH,
+  RESET_FEED_SOURCE,
+  resetActivityDays,
+  resetCalendar,
+  resetCalendarWithRecords,
+  resetElapsedTime,
+  resetFeedIsExpired,
+  resetGapDays,
+  resetRecordPage,
+  resetSourceUrl,
+  resetStatistics,
+  TSALON_DIRECT_API_URL,
+  TSALON_FEED_SOURCE,
+  type ResetRecord,
+} from '../src/templates/needtoken/lib/resetRadar.ts'
 
 // Synthetic contract fixtures. These do not verify a live upstream or account delivery.
 const fixtureRecord = (overrides: Record<string, unknown> = {}) => ({
@@ -244,7 +271,118 @@ test('radar channel tabs place Gemini directly before Grok and include complete 
           assert.equal(typeof placeholder[field], 'string', `missing placeholder.${channel.id}.${field} in ${locale}`)
           assert.ok(placeholder[field].trim().length > 0)
         }
+        assert.ok(radarV2.channels?.[channel.id]?.title?.trim(), `missing channel title for ${channel.id} in ${locale}`)
+        assert.ok(radarV2.channels?.[channel.id]?.subtitle?.trim(), `missing channel subtitle for ${channel.id} in ${locale}`)
       }
     }
+    assert.ok(radarV2.delivery?.direct && radarV2.delivery?.cached_proxy && radarV2.geminiDaily?.countdown, `missing live delivery/geminiDaily copy in ${locale}`)
   }
+})
+
+test('direct-first loader fetches Claude/Grok once via tsalon, populates sibling cache, and avoids backend hits', async () => {
+  clearResetRadarClientCache()
+  const store = new Map<string, string>()
+  const storage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => { store.set(k, v) },
+  }
+  const calls: string[] = []
+  const tsalonBody = {
+    status: 'ready',
+    claude: {
+      events: [{
+        id: 'claude-2120275296637321476', type: 'card', category: 'banked-card',
+        typeLabelZh: '重置卡', typeLabelEn: 'Reset card', scopeZh: '付费用户', scopeEn: 'Paid users',
+        reasonZh: 'Fable 5.2 上线补偿', reasonEn: 'Fable 5.2 launch credit',
+        landedAtBeijing: '2026-11-11 05:59', postUrl: 'https://x.com/ClaudeDevs/status/2120275296637321476',
+      }],
+    },
+    grok: {
+      events: [{
+        id: 'grok-2119871982946971659', type: 'reset', category: 'scheduled-global',
+        typeLabelZh: '全局重置', typeLabelEn: 'Global reset', scopeZh: '全部用户', scopeEn: 'All users',
+        reasonZh: '该记录未说明', reasonEn: 'Not specified in this record',
+        landedAtBeijing: '2026-11-10 03:17', postUrl: 'https://x.com/xai/status/2119871982946971659',
+      }],
+    },
+  }
+  const fetcher: typeof fetch = async (input) => {
+    const url = String(input)
+    calls.push(url)
+    if (url === TSALON_DIRECT_API_URL) return response(tsalonBody)
+    throw new Error(`unexpected fetch to ${url}`)
+  }
+  const now = Date.parse('2026-11-22T08:00:00Z')
+  const claudeFeed = await fetchChannelResetFeed('claude', new AbortController().signal, { fetcher, storage, now })
+  assert.equal(claudeFeed.delivery, 'direct')
+  assert.equal(claudeFeed.source_url, TSALON_FEED_SOURCE)
+  assert.equal(claudeFeed.records[0]?.text_zh, 'Fable 5.2 上线补偿')
+  assert.equal(claudeFeed.records[0]?.source.author, 'ClaudeDevs')
+
+  // Switching to Grok immediately hits sibling client cache with ZERO extra requests!
+  const grokFeed = await fetchChannelResetFeed('grok', new AbortController().signal, { fetcher, storage, now: now + 30_000 })
+  assert.equal(grokFeed.delivery, 'direct')
+  assert.equal(grokFeed.records[0]?.id, 'grok-2119871982946971659')
+  assert.deepEqual(calls, [TSALON_DIRECT_API_URL])
+})
+
+test('direct codex fetch succeeds directly and falls back cleanly to edge-cached endpoint when direct fails', async () => {
+  clearResetRadarClientCache()
+  const parsedDirect = parseCodexDirectPayload({
+    data: [{ id: '2120999993079451919', reset_type: 'banked', announced_at: '2026-11-12T21:59:39.000Z', text: 'Banked reset', source: { type: 'x_post', author: 'thsottiaux', url: 'https://x.com/thsottiaux/status/2120999993079451919' } }],
+    pagination: { has_more: true },
+  }, Date.parse('2026-11-22T08:00:00Z'))
+  assert.equal(parsedDirect.delivery, 'direct')
+  assert.equal(parsedDirect.records[0]?.type, 'banked')
+
+  const calls: string[] = []
+  const fetcher: typeof fetch = async (input) => {
+    const url = String(input)
+    calls.push(url)
+    if (url === CODEX_DIRECT_API_URL) throw new TypeError('network blocked')
+    if (url === channelResetFeedPath('codex')) {
+      return response({ status_code: 0, data: fixtureFeed() })
+    }
+    if (url === channelResetFeedPath('gemini')) {
+      return response({
+        status_code: 0,
+        data: {
+          source_url: ANTIGRAVITY_FEED_SOURCE,
+          fetched_at: '2026-11-22T08:00:00Z',
+          stale: false,
+          has_more: false,
+          records: [{
+            id: 'ag-1', type: 'regular', announced_at: '2026-11-21T09:18:53Z',
+            text: 'Reset Gemini quota on Antigravity', text_zh: '已重置 Antigravity Gemini 额度',
+            scope_zh: '全体用户', source: { type: 'x_post', author: '_mohansolo', url: 'https://x.com/_mohansolo/status/2124070033534161407' },
+          }],
+        },
+      })
+    }
+    throw new Error(`unexpected ${url}`)
+  }
+  const codexFallback = await fetchChannelResetFeed('codex', new AbortController().signal, { fetcher, storage: null, now: Date.parse('2026-11-22T08:00:00Z') })
+  assert.equal(codexFallback.delivery, 'cached_proxy')
+  assert.deepEqual(calls, [CODEX_DIRECT_API_URL, channelResetFeedPath('codex')])
+
+  const geminiFeed = await fetchChannelResetFeed('gemini', new AbortController().signal, { fetcher, storage: null, now: Date.parse('2026-11-22T08:00:00Z') })
+  assert.equal(geminiFeed.delivery, 'cached_proxy')
+  assert.equal(geminiFeed.records[0]?.text_zh, '已重置 Antigravity Gemini 额度')
+  assert.equal(parseTSalonPayload({ status: 'ready', claude: { events: [] } }).claude?.records.length, 0)
+})
+
+test('gemini daily RPD countdown computes Pacific winter (PST=16:00) and summer (PDT=15:00) schedules offline', () => {
+  // Nov 22, 2026 08:30 UTC = 00:30 PST (winter, UTC-8 -> 16:00 UTC+8)
+  const winter = geminiDailyResetSchedule(Date.parse('2026-11-22T08:30:00Z'))
+  assert.equal(winter.isPacificDst, false)
+  assert.equal(winter.resetHourBeijing, '16:00')
+  assert.equal(winter.hoursLeft, 23)
+  assert.equal(winter.minutesLeft, 30)
+
+  // Jul 15, 2026 08:30 UTC = 01:30 PDT (summer, UTC-7 -> 15:00 UTC+8)
+  const summer = geminiDailyResetSchedule(Date.parse('2026-07-15T08:30:00Z'))
+  assert.equal(summer.isPacificDst, true)
+  assert.equal(summer.resetHourBeijing, '15:00')
+  assert.equal(summer.hoursLeft, 22)
+  assert.equal(summer.minutesLeft, 30)
 })

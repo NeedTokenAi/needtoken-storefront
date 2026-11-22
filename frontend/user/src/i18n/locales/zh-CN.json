@@ -3733,7 +3733,35 @@
       },
       "types": {
         "regular": "全员重置",
-        "banked": "重置卡"
+        "banked": "重置卡",
+        "preview": "官方预告"
+      },
+      "delivery": {
+        "direct": "浏览器直连公开源",
+        "cached_proxy": "边缘缓存同步",
+        "cacheNote": "本地缓存 5 分钟 · 不高频请求后端",
+        "refresh": "刷新",
+        "sourcesLabel": "参考源"
+      },
+      "channels": {
+        "claude": {
+          "title": "Claude 重置雷达",
+          "subtitle": "追踪 Anthropic Claude 公开重置与重置卡公告记录，并同步参考 claude-resets.net 与 tsalon.tech 公开动态。"
+        },
+        "gemini": {
+          "title": "Gemini / Antigravity 重置雷达",
+          "subtitle": "追踪 Google Antigravity 公开 Gemini 额度重置公告，并实时计算 Gemini CLI / AI Studio 每日太平洋午夜清零倒计时。"
+        },
+        "grok": {
+          "title": "Grok 重置雷达",
+          "subtitle": "追踪 xAI Grok / SuperGrok 公开全局额度重置公告记录与历史间隔。"
+        }
+      },
+      "geminiDaily": {
+        "badge": "每日 RPD 固定清零（本地零请求计算）",
+        "countdown": "距下次每日清零约 {hours} 小时 {minutes} 分钟",
+        "dstRule": "当前北美夏令时（PDT）：太平洋午夜 00:00 = 每日北京时间 {time} 重置",
+        "stdRule": "当前北美冬令时（PST）：太平洋午夜 00:00 = 每日北京时间 {time} 重置"
       },
       "noResetDay": "当天无重置记录",
       "recordsTitle": "重置记录",
@@ -3757,36 +3785,36 @@
       "placeholder": {
         "claude": {
           "title": "Claude 雷达",
-          "subtitle": "追踪 Claude Pro / Max 额度窗口与官方异常补偿动态（实时追踪接入中）",
+          "subtitle": "追踪 Claude Pro / Max 额度窗口与官方异常补偿动态",
           "rulesTitle": "官方额度刷新规则参考",
           "rule1Title": "5 小时滚动窗口",
           "rule1Body": "对话与 Claude Code 会话额度按首次发消息起每 5 小时自动刷新，并非全员固定时间点统一清零。",
           "rule2Title": "每周使用上限",
           "rule2Body": "高强度使用受每周配额（Weekly Limit）约束，各账号按各自周期自动滚动恢复。",
-          "rule3Title": "实时雷达状态",
-          "rule3Body": "当前暂未接入第三方公开全员重置源，我们将于官方出现全员额度补偿或事件源稳定后第一时间上线实时记录。"
+          "rule3Title": "数据来源与同步",
+          "rule3Body": "优先由浏览器直连公开汇总源并启用 5 分钟本地缓存，同时支持一键跳转 claude-resets.net 与原帖核验。"
         },
         "gemini": {
           "title": "Gemini 雷达",
-          "subtitle": "追踪 Google AI Pro / Ultra 与 Gemini CLI 额度刷新及官方补偿动态（实时追踪接入中）",
+          "subtitle": "追踪 Google Antigravity 公开重置公告与每日 RPD 刷新倒计时",
           "rulesTitle": "官方额度刷新规则参考",
           "rule1Title": "网页与 App 滚动恢复",
           "rule1Body": "Gemini 网页端与 App 的高级模型额度按提示词长度与功能复杂度动态计算，通常按 5 小时滚动增量及周期上限自动恢复。",
           "rule2Title": "CLI 与每日配额刷新",
           "rule2Body": "Gemini CLI、Code Assist 与 AI Studio 每日请求限额（RPD）按太平洋时间（PT）午夜自动重置，与订阅网页端及独立计费 API 分开核算。",
-          "rule3Title": "实时雷达状态",
-          "rule3Body": "当前为占位展示，绝不虚构历史记录；待官方或公开全员重置公告源稳定接入后，自动展示完整日历与时间轴。"
+          "rule3Title": "Antigravity 公告与同步",
+          "rule3Body": "同步公开整理的 Antigravity（Varun Mohan）Gemini 额度重置记录，边缘缓存 10 分钟并附 X 原帖直达，绝不虚构记录。"
         },
         "grok": {
           "title": "Grok 雷达",
-          "subtitle": "追踪 SuperGrok / X Premium+ 额度刷新与官方补偿动态（实时追踪接入中）",
+          "subtitle": "追踪 SuperGrok / X Premium+ 额度刷新与官方补偿动态",
           "rulesTitle": "官方额度刷新规则参考",
           "rule1Title": "2 小时滑动窗口",
           "rule1Body": "Grok 对话、DeepSearch 与 Think 额度按 2 小时滑动窗口独立计算，到达窗口期后自动恢复。",
           "rule2Title": "分层额度策略",
           "rule2Body": "SuperGrok 与 SuperGrok Heavy 享有更高并发与额度上限，具体以 Grok 客户端提示为准。",
-          "rule3Title": "实时雷达状态",
-          "rule3Body": "当前为占位展示，绝不虚构历史记录；待公开重置公告源接入后自动展示完整日历与时间轴。"
+          "rule3Title": "数据来源与同步",
+          "rule3Body": "优先由浏览器直连公开汇总源并与 Claude 共享本地 5 分钟缓存，绝不虚构历史记录。"
         }
       }
     },

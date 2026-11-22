@@ -84,9 +84,9 @@
             >
               <p class="cal-tip-kind" :data-type="record.type">
                 <i aria-hidden="true"></i>
-                <span>{{ t(`needtoken.radarV2.types.${record.type}`) }}</span>
+                <span>{{ typeLabel(record.type) }}</span>
               </p>
-              <p class="cal-tip-text">{{ record.text }}</p>
+              <p class="cal-tip-text">{{ localizedRecordText(record) }}</p>
             </div>
           </template>
           <p v-else class="cal-tip-empty">{{ t('needtoken.radarV2.noResetDay') }}</p>
@@ -97,8 +97,8 @@
     <footer class="cal-footer">
       <p class="cal-total">{{ t('needtoken.radarV2.calendarTotal', { count: periodTotal }) }}</p>
       <div class="cal-legend">
-        <span><i class="legend-regular" aria-hidden="true"></i>{{ t('needtoken.radarV2.types.regular') }}</span>
-        <span><i class="legend-banked" aria-hidden="true"></i>{{ t('needtoken.radarV2.types.banked') }}</span>
+        <span><i class="legend-regular" aria-hidden="true"></i>{{ typeLabel('regular') }}</span>
+        <span><i class="legend-banked" aria-hidden="true"></i>{{ typeLabel('banked') }}</span>
       </div>
     </footer>
   </section>
@@ -112,9 +112,17 @@ import { resetCalendarWithRecords, type ResetCalendarRichDay, type ResetRecord }
 const props = defineProps<{
   records: readonly ResetRecord[]
   now: number
+  bankedLabel?: string
 }>()
 
 const { t, locale } = useI18n()
+function typeLabel(kind: ResetRecord['type']) {
+  if (kind === 'banked' && props.bankedLabel) return props.bankedLabel
+  return t(`needtoken.radarV2.types.${kind}`)
+}
+function localizedRecordText(record: ResetRecord) {
+  return locale.value.startsWith('zh') && record.text_zh ? record.text_zh : record.text
+}
 const weeks = computed(() => resetCalendarWithRecords(props.records, props.now))
 const periodTotal = computed(() =>
   weeks.value.flat().reduce((sum, day) => sum + day.regular + day.banked, 0),

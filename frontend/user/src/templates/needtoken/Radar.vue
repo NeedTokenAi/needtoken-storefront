@@ -32,27 +32,70 @@
       </button>
     </div>
 
-    <!-- Codex Live Radar Panel -->
+    <!-- Unified Live Radar Panel for Codex / Claude / Gemini / Grok -->
     <div
-      v-if="activeChannel === 'codex'"
       role="tabpanel"
-      aria-labelledby="radar-tab-codex"
+      :aria-labelledby="`radar-tab-${activeChannel}`"
       class="radar-panel"
     >
       <section class="radar-hero" :aria-busy="loading">
         <div class="hero-topline">
           <div v-if="usableFeed" class="radar-freshness" :data-stale="stale" role="status">
             <span class="freshness-mark" aria-hidden="true" />
-            <span>{{ t(stale ? 'needtoken.radarLive.stale' : 'needtoken.radarLayout.scope') }}</span>
-            <span class="poll-note">{{ t('needtoken.radarLayout.polling') }}</span>
+            <span>{{ deliveryLabel }}</span>
+            <span class="poll-note">{{ t('needtoken.radarV2.delivery.cacheNote') }}</span>
           </div>
           <span v-else class="tool-capability">{{ t('needtoken.radarLayout.scope') }}</span>
+
+          <div class="hero-source-actions">
+            <span class="source-links-label">{{ t('needtoken.radarV2.delivery.sourcesLabel') }}:</span>
+            <a
+              v-for="refLink in activeChannelMeta.referenceLinks"
+              :key="refLink.url"
+              :href="refLink.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="source-ref-link"
+            >
+              <span>{{ refLink.label }}</span>
+              <ArrowUpRight :size="12" aria-hidden="true" />
+            </a>
+            <button
+              type="button"
+              class="radar-refresh-btn"
+              :disabled="loading"
+              :aria-busy="loading"
+              @click="loadChannel(activeChannel, { force: true })"
+            >
+              <RotateCw :size="13" :class="{ 'is-spinning': loading }" aria-hidden="true" />
+              <span>{{ t('needtoken.radarV2.delivery.refresh') }}</span>
+            </button>
+          </div>
         </div>
 
         <header class="radar-heading">
-          <h1>{{ t('needtoken.radar.title') }}</h1>
-          <p>{{ t('needtoken.radarLayout.description') }}</p>
+          <div class="radar-heading-title">
+            <ProductBrandMark :brand="activeChannelMeta.brand" class="radar-heading-brand" />
+            <h1>{{ channelHeadingTitle }}</h1>
+          </div>
+          <p>{{ channelHeadingSubtitle }}</p>
         </header>
+
+        <!-- Gemini / AI Studio Pure Client-Side Daily RPD Countdown (0 network requests) -->
+        <div v-if="activeChannel === 'gemini'" class="gemini-daily-strip" role="status">
+          <div class="gemini-daily-left">
+            <span class="gemini-daily-badge">
+              <Clock3 :size="13" aria-hidden="true" />
+              {{ t('needtoken.radarV2.geminiDaily.badge') }}
+            </span>
+            <strong class="gemini-daily-countdown">
+              {{ t('needtoken.radarV2.geminiDaily.countdown', { hours: geminiDaily.hoursLeft, minutes: geminiDaily.minutesLeft }) }}
+            </strong>
+          </div>
+          <p class="gemini-daily-rule">
+            {{ t(geminiDaily.isPacificDst ? 'needtoken.radarV2.geminiDaily.dstRule' : 'needtoken.radarV2.geminiDaily.stdRule', { time: geminiDaily.resetHourBeijing }) }}
+          </p>
+        </div>
 
         <div v-if="loading && !feed" class="radar-loading" role="status" :aria-label="t('needtoken.common.loading')">
           <div class="skeleton-col">
@@ -69,7 +112,7 @@
             <h2>{{ t('needtoken.radarLive.unavailableTitle') }}</h2>
             <p>{{ t(expired ? 'needtoken.radarLive.expired' : 'needtoken.radarLive.unavailable') }}</p>
             <p v-if="feed" class="last-success">{{ t('needtoken.radarLive.lastSuccess', { date: slashDateTime(feed.fetched_at) }) }}</p>
-            <button type="button" class="radar-action" :aria-disabled="loading" :aria-busy="loading" @click="!loading && loadFeed()">
+            <button type="button" class="radar-action" :aria-disabled="loading" :aria-busy="loading" @click="!loading && loadChannel(activeChannel, { force: true })">
               {{ t(loading ? 'needtoken.common.loading' : 'needtoken.radarLive.retry') }}
             </button>
           </div>
@@ -102,10 +145,11 @@
               </div>
             </div>
 
-            <!-- Latest reset announcement card moved to top-right above the full-width calendar -->
+            <!-- Latest reset announcement card -->
             <article v-if="latest" class="latest-record-card" :data-record-id="latest.id" :data-type="latest.type">
               <div class="record-label">
-                <span class="record-kind" :data-type="latest.type">{{ t(`needtoken.radarV2.types.${latest.type}`) }}</span>
+                <span class="record-kind" :data-type="latest.type">{{ recordTypeLabel(latest.type) }}</span>
+                <span v-if="localizedScope(latest)" class="record-scope">{{ localizedScope(latest) }}</span>
                 <span class="record-origin">
                   {{ t(`needtoken.radarLive.sources.${latest.source.type}`) }}<span v-if="latest.source.author"> · @{{ latest.source.author }}</span>
                 </span>
@@ -114,7 +158,7 @@
                   <ArrowUpRight :size="14" aria-hidden="true" />
                 </a>
               </div>
-              <RadarRecordText :text="latest.text" />
+              <RadarRecordText :text="localizedText(latest)" />
               <span v-if="!latest.source.url" class="missing-source">{{ t('needtoken.radarLive.noSourceLink') }}</span>
             </article>
           </div>
@@ -123,10 +167,10 @@
 
       <!-- Full-width Reset Calendar -->
       <section v-if="usableFeed" class="radar-calendar-section">
-        <RadarCalendar :records="usableFeed.records" :now="now" />
+        <RadarCalendar :records="usableFeed.records" :now="now" :banked-label="activeChannel === 'gemini' ? t('needtoken.radarV2.types.preview') : undefined" />
       </section>
 
-      <!-- Two-column Reset Records + Reading Guide -->
+      <!-- Two-column Reset Records + Channel-Aware Reading Guide -->
       <section v-if="usableFeed" class="radar-records-layout" aria-labelledby="radar-records-heading">
         <div class="records-card">
           <div class="records-card-head">
@@ -166,13 +210,14 @@
 
               <div class="timeline-body">
                 <div class="timeline-meta">
-                  <span class="record-kind" :data-type="entry.type">{{ t(`needtoken.radarV2.types.${entry.type}`) }}</span>
+                  <span class="record-kind" :data-type="entry.type">{{ recordTypeLabel(entry.type) }}</span>
+                  <span v-if="localizedScope(entry)" class="record-scope">{{ localizedScope(entry) }}</span>
                   <span class="timeline-when">
                     {{ relativeAge(entry.announced_at) }} · <time :datetime="entry.announced_at">{{ slashDateTime(entry.announced_at) }}</time>
                   </span>
                 </div>
 
-                <RadarRecordText :text="entry.text" />
+                <RadarRecordText :text="localizedText(entry)" />
 
                 <div class="timeline-foot">
                   <a v-if="entry.source.url" :href="entry.source.url" target="_blank" rel="noopener noreferrer">
@@ -197,10 +242,12 @@
 
         <aside class="guide-card" aria-labelledby="radar-guide-heading">
           <div class="guide-head">
-            <h2 id="radar-guide-heading">{{ t('needtoken.radarV2.guideTitle') }}</h2>
+            <h2 id="radar-guide-heading">
+              {{ activeChannel === 'codex' ? t('needtoken.radarV2.guideTitle') : t(`needtoken.radarV2.placeholder.${activeChannel}.rulesTitle`) }}
+            </h2>
             <Info :size="16" aria-hidden="true" />
           </div>
-          <ul class="guide-list">
+          <ul v-if="activeChannel === 'codex'" class="guide-list">
             <li>
               <p class="guide-term"><i class="dot-regular" aria-hidden="true" />{{ t('needtoken.radarV2.guide.regularTitle') }}</p>
               <p class="guide-desc">{{ t('needtoken.radarV2.guide.regularBody') }}</p>
@@ -214,46 +261,23 @@
               <p class="guide-desc">{{ t('needtoken.radarV2.guide.timeBody') }}</p>
             </li>
           </ul>
+          <ul v-else class="guide-list">
+            <li v-for="(n, idx) in [1, 2, 3]" :key="n">
+              <p class="guide-term">
+                <i :class="idx === 0 ? 'dot-regular' : idx === 1 ? 'dot-banked' : 'dot-time'" aria-hidden="true" />
+                {{ t(`needtoken.radarV2.placeholder.${activeChannel}.rule${n}Title`) }}
+              </p>
+              <p class="guide-desc">{{ t(`needtoken.radarV2.placeholder.${activeChannel}.rule${n}Body`) }}</p>
+            </li>
+          </ul>
         </aside>
-      </section>
-    </div>
-
-    <!-- Placeholder Radar Panels (Claude / Gemini / Grok) -->
-    <div
-      v-else
-      role="tabpanel"
-      :aria-labelledby="`radar-tab-${activeChannel}`"
-      class="radar-panel"
-    >
-      <section class="placeholder-card">
-        <span class="placeholder-badge">
-          <Clock3 :size="13" aria-hidden="true" />
-          {{ t('needtoken.radarV2.comingSoonBadge') }}
-        </span>
-        <header class="placeholder-head">
-          <ProductBrandMark :brand="activeChannelMeta.brand" class="placeholder-brand" />
-          <div>
-            <h1>{{ t(`needtoken.radarV2.placeholder.${activeChannel}.title`) }}</h1>
-            <p>{{ t(`needtoken.radarV2.placeholder.${activeChannel}.subtitle`) }}</p>
-          </div>
-        </header>
-
-        <div class="placeholder-rules">
-          <h2>{{ t(`needtoken.radarV2.placeholder.${activeChannel}.rulesTitle`) }}</h2>
-          <div class="placeholder-grid">
-            <article v-for="n in [1, 2, 3]" :key="n" class="placeholder-rule">
-              <h3>{{ t(`needtoken.radarV2.placeholder.${activeChannel}.rule${n}Title`) }}</h3>
-              <p>{{ t(`needtoken.radarV2.placeholder.${activeChannel}.rule${n}Body`) }}</p>
-            </article>
-          </div>
-        </div>
       </section>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowUpRight, ChevronDown, Clock3, Info, RotateCw, Ticket } from 'lucide-vue-next'
 import ProductBrandMark from './components/ProductBrandMark.vue'
@@ -262,10 +286,11 @@ import RadarRecordText from './components/RadarRecordText.vue'
 import { useSlidingIndicator } from './composables/useSlidingIndicator'
 import { usePageSeo } from '../../composables/usePageSeo'
 import {
-  fetchResetFeed,
+  fetchChannelResetFeed,
+  geminiDailyResetSchedule,
   RADAR_CHANNELS,
-  RESET_FEED_MAX_AGE_MS,
-  RESET_FEED_POLL_MS,
+  readCachedChannelFeed,
+  RESET_CLIENT_CACHE_TTL_MS,
   RESET_RECORD_PAGE_SIZE,
   resetElapsedTime,
   resetFeedIsExpired,
@@ -277,7 +302,6 @@ import {
 } from './lib/resetRadar'
 
 const channels = RADAR_CHANNELS
-
 const { t, locale } = useI18n()
 const activeChannel = ref<RadarChannelId>('codex')
 const activeChannelMeta = computed(() => channels.find(c => c.id === activeChannel.value) ?? channels[0]!)
@@ -294,49 +318,85 @@ const { indicatorStyle: tabIndicatorStyle, indicatorReady: tabIndicatorReady } =
   [() => activeChannel.value, () => locale.value],
 )
 
-function selectChannel(id: RadarChannelId) {
-  activeChannel.value = id
-  const idx = channels.findIndex(c => c.id === id)
-  tabEls[idx]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-}
-
-function onTabKeydown(event: KeyboardEvent) {
-  const idx = channels.findIndex(c => c.id === activeChannel.value)
-  let next: number | null = null
-  if (event.key === 'ArrowRight') next = (idx + 1) % channels.length
-  else if (event.key === 'ArrowLeft') next = (idx - 1 + channels.length) % channels.length
-  else if (event.key === 'Home') next = 0
-  else if (event.key === 'End') next = channels.length - 1
-  if (next === null) return
-  event.preventDefault()
-  selectChannel(channels[next]!.id)
-  tabEls[next]?.focus()
-}
-
 const filters = ['all', 'regular', 'banked'] as const
 const filter = ref<typeof filters[number]>('all')
-const feed = ref<ResetFeed | null>(null)
-const loading = ref(true)
-const loadError = ref(false)
+const recordLimit = ref(RESET_RECORD_PAGE_SIZE)
 const now = ref(Date.now())
+
+const feedsByChannel = reactive<Record<RadarChannelId, ResetFeed | null>>({
+  codex: null,
+  claude: null,
+  gemini: null,
+  grok: null,
+})
+const loadingByChannel = reactive<Record<RadarChannelId, boolean>>({
+  codex: false,
+  claude: false,
+  gemini: false,
+  grok: false,
+})
+const errorByChannel = reactive<Record<RadarChannelId, boolean>>({
+  codex: false,
+  claude: false,
+  gemini: false,
+  grok: false,
+})
+
+const feed = computed(() => feedsByChannel[activeChannel.value])
+const loading = computed(() => loadingByChannel[activeChannel.value])
+const loadError = computed(() => errorByChannel[activeChannel.value])
 const expired = computed(() => Boolean(feed.value && resetFeedIsExpired(feed.value, now.value)))
 const usableFeed = computed(() => (expired.value ? null : feed.value))
 const stale = computed(() => Boolean(usableFeed.value && (usableFeed.value.stale || loadError.value)))
 const latest = computed(() => usableFeed.value?.records[0])
-const recordLimit = ref(RESET_RECORD_PAGE_SIZE)
 const filteredRecords = computed(() =>
   usableFeed.value?.records.filter(row => filter.value === 'all' || row.type === filter.value) || [],
 )
 const recordPage = computed(() => resetRecordPage(usableFeed.value?.records || [], filter.value, recordLimit.value))
 const visibleRecords = computed(() => recordPage.value.records)
 const remainingCount = computed(() => recordPage.value.remaining)
-watch(filter, () => { recordLimit.value = RESET_RECORD_PAGE_SIZE })
-
 const elapsed = computed(() => resetElapsedTime(latest.value?.announced_at || '', now.value))
+const geminiDaily = computed(() => geminiDailyResetSchedule(now.value))
+
+const channelHeadingTitle = computed(() =>
+  activeChannel.value === 'codex'
+    ? t('needtoken.radar.title')
+    : t(`needtoken.radarV2.channels.${activeChannel.value}.title`),
+)
+const channelHeadingSubtitle = computed(() =>
+  activeChannel.value === 'codex'
+    ? t('needtoken.radarLayout.description')
+    : t(`needtoken.radarV2.channels.${activeChannel.value}.subtitle`),
+)
+const deliveryLabel = computed(() => {
+  if (stale.value) return t('needtoken.radarLive.stale')
+  if (usableFeed.value?.delivery === 'direct') return t('needtoken.radarV2.delivery.direct')
+  if (usableFeed.value?.delivery === 'cached_proxy') return t('needtoken.radarV2.delivery.cached_proxy')
+  return t('needtoken.radarLayout.scope')
+})
+
+watch(filter, () => { recordLimit.value = RESET_RECORD_PAGE_SIZE })
+watch(activeChannel, () => {
+  filter.value = 'all'
+  recordLimit.value = RESET_RECORD_PAGE_SIZE
+})
+
+function recordTypeLabel(kind: ResetRecord['type']) {
+  if (activeChannel.value === 'gemini' && kind === 'banked') return t('needtoken.radarV2.types.preview')
+  return t(`needtoken.radarV2.types.${kind}`)
+}
 
 function filterLabel(kind: typeof filters[number]) {
   if (kind === 'all') return t('needtoken.radarLive.filters.all')
-  return t(`needtoken.radarV2.types.${kind}`)
+  return recordTypeLabel(kind)
+}
+
+function localizedText(entry: ResetRecord) {
+  return locale.value.startsWith('zh') && entry.text_zh ? entry.text_zh : entry.text
+}
+
+function localizedScope(entry: ResetRecord) {
+  return locale.value.startsWith('zh') ? (entry.scope_zh || entry.scope || '') : (entry.scope || entry.scope_zh || '')
 }
 
 function slashDateTime(value: string) {
@@ -372,70 +432,86 @@ function gapLabel(entry: ResetRecord, idx: number) {
   return t('needtoken.radarV2.gapDays', { count: gap })
 }
 
-let generation = 0
 let disposed = false
-let lastAttemptAt = 0
-let controller: AbortController | null = null
-let pollTimer: ReturnType<typeof setTimeout> | undefined
-let expiryTimer: ReturnType<typeof setTimeout> | undefined
+const generations: Record<RadarChannelId, number> = { codex: 0, claude: 0, gemini: 0, grok: 0 }
+const controllers: Partial<Record<RadarChannelId, AbortController>> = {}
+let clockTimer: ReturnType<typeof setInterval> | undefined
 
-function clearPoll() {
-  if (pollTimer !== undefined) clearTimeout(pollTimer)
-  pollTimer = undefined
-}
+async function loadChannel(channel: RadarChannelId, options: { force?: boolean } = {}) {
+  if (disposed) return
+  const currentNow = Date.now()
+  now.value = currentNow
 
-function scheduleExpiry(snapshot: ResetFeed) {
-  if (expiryTimer !== undefined) clearTimeout(expiryTimer)
-  expiryTimer = setTimeout(() => {
-    now.value = Date.now()
-  }, Math.max(0, Date.parse(snapshot.fetched_at) + RESET_FEED_MAX_AGE_MS - Date.now()))
-}
+  if (!options.force) {
+    const cached = readCachedChannelFeed(channel, currentNow)
+    if (cached) {
+      feedsByChannel[channel] = cached
+      errorByChannel[channel] = false
+      loadingByChannel[channel] = false
+      return
+    }
+  }
 
-function scheduleNext() {
-  clearPoll()
-  if (disposed || document.hidden) return
-  pollTimer = setTimeout(() => {
-    void loadFeed()
-  }, Math.max(0, RESET_FEED_POLL_MS - (Date.now() - lastAttemptAt)))
-}
+  controllers[channel]?.abort()
+  const requestGen = ++generations[channel]
+  const ctrl = new AbortController()
+  controllers[channel] = ctrl
+  loadingByChannel[channel] = true
 
-async function loadFeed() {
-  if (disposed || document.hidden) return
-  clearPoll()
-  controller?.abort()
-  const request = ++generation
-  const activeController = new AbortController()
-  controller = activeController
-  lastAttemptAt = Date.now()
-  now.value = lastAttemptAt
-  loading.value = true
-  const timeout = setTimeout(() => activeController.abort(), 15_000)
   try {
-    const result = await fetchResetFeed(activeController.signal)
-    if (!disposed && request === generation) {
-      feed.value = result
-      loadError.value = false
-      scheduleExpiry(result)
+    const result = await fetchChannelResetFeed(channel, ctrl.signal, { force: options.force })
+    if (!disposed && requestGen === generations[channel]) {
+      feedsByChannel[channel] = result
+      errorByChannel[channel] = false
+      // Sync sibling caches populated by shared direct fetch (e.g. Claude + Grok).
+      for (const ch of channels) {
+        if (ch.id === channel) continue
+        const siblingCached = readCachedChannelFeed(ch.id, Date.now())
+        if (siblingCached && !feedsByChannel[ch.id]) {
+          feedsByChannel[ch.id] = siblingCached
+        }
+      }
     }
   } catch {
-    if (!disposed && request === generation) loadError.value = true
+    if (!disposed && requestGen === generations[channel]) {
+      errorByChannel[channel] = true
+    }
   } finally {
-    clearTimeout(timeout)
-    if (!disposed && request === generation) {
-      controller = null
+    if (!disposed && requestGen === generations[channel]) {
+      controllers[channel] = undefined
       now.value = Date.now()
-      loading.value = false
-      scheduleNext()
+      loadingByChannel[channel] = false
     }
   }
 }
 
+function selectChannel(id: RadarChannelId) {
+  activeChannel.value = id
+  const idx = channels.findIndex(c => c.id === id)
+  tabEls[idx]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  void loadChannel(id)
+}
+
+function onTabKeydown(event: KeyboardEvent) {
+  const idx = channels.findIndex(c => c.id === activeChannel.value)
+  let next: number | null = null
+  if (event.key === 'ArrowRight') next = (idx + 1) % channels.length
+  else if (event.key === 'ArrowLeft') next = (idx - 1 + channels.length) % channels.length
+  else if (event.key === 'Home') next = 0
+  else if (event.key === 'End') next = channels.length - 1
+  if (next === null) return
+  event.preventDefault()
+  selectChannel(channels[next]!.id)
+  tabEls[next]?.focus()
+}
+
 function handleVisibilityChange() {
   now.value = Date.now()
-  if (document.hidden) clearPoll()
-  else if (!loading.value && (!feed.value || expired.value || Date.now() - lastAttemptAt >= RESET_FEED_POLL_MS)) void loadFeed()
-  else if (!loading.value) scheduleNext()
-  else if (lastAttemptAt === 0) void loadFeed()
+  if (document.hidden) return
+  const currentFeed = feedsByChannel[activeChannel.value]
+  if (!loadingByChannel[activeChannel.value] && (!currentFeed || now.value - Date.parse(currentFeed.fetched_at) >= RESET_CLIENT_CACHE_TTL_MS)) {
+    void loadChannel(activeChannel.value)
+  }
 }
 
 usePageSeo({
@@ -446,15 +522,20 @@ usePageSeo({
 
 onMounted(() => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  void loadFeed()
+  // Local clock tick only (0 network requests) to keep elapsed & daily countdown fresh.
+  clockTimer = setInterval(() => {
+    if (!document.hidden) now.value = Date.now()
+  }, 30_000)
+  void loadChannel(activeChannel.value)
 })
 
 onUnmounted(() => {
   disposed = true
-  generation++
-  controller?.abort()
-  clearPoll()
-  if (expiryTimer !== undefined) clearTimeout(expiryTimer)
+  for (const ch of channels) {
+    generations[ch.id]++
+    controllers[ch.id]?.abort()
+  }
+  if (clockTimer !== undefined) clearInterval(clockTimer)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
@@ -568,8 +649,11 @@ onUnmounted(() => {
 
 .hero-topline {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  margin-bottom: 12px;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 14px;
 }
 
 .tool-capability,
@@ -599,6 +683,77 @@ onUnmounted(() => {
 .radar-freshness[data-stale="true"] { color: var(--nt-warning-ink); }
 .radar-freshness[data-stale="true"] .freshness-mark { background: var(--nt-warning-ink); }
 
+.hero-source-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.source-links-label {
+  color: var(--ui-text-muted);
+}
+
+.source-ref-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-bg-elevated);
+  color: var(--ui-text-secondary);
+  text-decoration: none;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.source-ref-link:hover {
+  border-color: var(--nt-accent-border-strong);
+  color: var(--ui-accent);
+}
+
+.radar-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-bg-elevated);
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.radar-refresh-btn:hover:not(:disabled) {
+  border-color: var(--nt-accent-border-strong);
+  color: var(--ui-accent);
+}
+.radar-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.is-spinning {
+  animation: nt-radar-spin 0.9s linear infinite;
+}
+@keyframes nt-radar-spin {
+  to { transform: rotate(360deg); }
+}
+
+.radar-heading-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.radar-heading-brand {
+  width: 30px;
+  height: 30px;
+}
+.radar-heading-brand :deep(.product-brand-symbol) {
+  width: 26px;
+  height: 26px;
+}
+
 .radar-heading h1 {
   color: var(--ui-text-primary);
   font-size: clamp(26px, 3vw, 36px);
@@ -612,6 +767,51 @@ onUnmounted(() => {
   color: var(--ui-text-secondary);
   font-size: 14px;
   line-height: 1.6;
+}
+
+/* Gemini daily RPD countdown strip */
+.gemini-daily-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--nt-brand-gemini, #3b7ef0) 26%, var(--ui-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--nt-brand-gemini, #3b7ef0) 6%, var(--ui-bg-elevated));
+}
+
+.gemini-daily-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.gemini-daily-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--nt-brand-gemini, #3b7ef0) 14%, transparent);
+  color: var(--nt-brand-gemini, #3b7ef0);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.gemini-daily-countdown {
+  color: var(--ui-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.gemini-daily-rule {
+  color: var(--ui-text-secondary);
+  font-size: 12.5px;
 }
 
 .radar-overview {
@@ -719,6 +919,18 @@ onUnmounted(() => {
 .record-kind[data-type="banked"] {
   color: var(--rd-banked);
   background: var(--rd-banked-bg);
+}
+
+.record-scope {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: var(--nt-surface-subtle);
+  color: var(--ui-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
 }
 
 .record-origin,
@@ -992,94 +1204,6 @@ onUnmounted(() => {
   line-height: 1.65;
 }
 
-/* Placeholder panels (Claude / Gemini / Grok) */
-.placeholder-card {
-  padding: 32px;
-  border: 1px solid var(--ui-border);
-  border-radius: 22px;
-  background: var(--ui-bg-elevated);
-  box-shadow: var(--nt-card-shadow);
-}
-
-.placeholder-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--nt-accent-border);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.placeholder-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 18px;
-}
-
-.placeholder-brand {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
-  background: var(--nt-surface-subtle);
-}
-
-.placeholder-head h1 {
-  color: var(--ui-text-primary);
-  font-size: clamp(22px, 2.5vw, 28px);
-  font-weight: 600;
-}
-
-.placeholder-head p {
-  margin-top: 4px;
-  color: var(--ui-text-secondary);
-  font-size: 14px;
-}
-
-.placeholder-rules {
-  margin-top: 28px;
-  padding-top: 24px;
-  border-top: 1px solid var(--ui-border);
-}
-
-.placeholder-rules h2 {
-  color: var(--ui-text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 16px;
-}
-
-.placeholder-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.placeholder-rule {
-  padding: 18px 20px;
-  border: 1px solid var(--ui-border);
-  border-radius: 14px;
-  background: var(--nt-surface-subtle);
-}
-
-.placeholder-rule h3 {
-  color: var(--ui-text-primary);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.placeholder-rule p {
-  margin-top: 8px;
-  color: var(--ui-text-secondary);
-  font-size: 13px;
-  line-height: 1.65;
-}
-
 /* Loading & error states */
 .stale-note {
   margin-top: 16px;
@@ -1150,9 +1274,6 @@ onUnmounted(() => {
   .guide-card {
     position: static;
   }
-  .placeholder-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {
@@ -1160,8 +1281,7 @@ onUnmounted(() => {
     padding: 20px 16px 48px;
   }
   .records-card,
-  .guide-card,
-  .placeholder-card {
+  .guide-card {
     padding: 18px 16px;
     border-radius: 16px;
   }

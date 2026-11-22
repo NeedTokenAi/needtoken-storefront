@@ -75,3 +75,60 @@ func TestResetHandlerLocalizesUnavailableWithoutUpstreamDetails(t *testing.T) {
 		t.Fatal("unavailable messages are not localized")
 	}
 }
+
+type multiChannelReaderFixture struct {
+	snapshots map[string]diagnosticscontract.ResetFeedSnapshot
+}
+
+func (f multiChannelReaderFixture) Latest(ctx context.Context) (diagnosticscontract.ResetFeedSnapshot, error) {
+	return f.LatestForChannel(ctx, "codex")
+}
+
+func (f multiChannelReaderFixture) LatestForChannel(_ context.Context, channel string) (diagnosticscontract.ResetFeedSnapshot, error) {
+	if snap, ok := f.snapshots[channel]; ok {
+		return snap, nil
+	}
+	return diagnosticscontract.ResetFeedSnapshot{}, diagnosticscontract.ErrResetFeedUnavailable
+}
+
+func TestChannelResetHandlerSetsEdgeCacheHeadersAndRejectsUnknownChannel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	now := time.Date(2026, 11, 22, 8, 0, 0, 0, time.UTC)
+	router := gin.New()
+	handler := NewResetHandler(multiChannelReaderFixture{
+		snapshots: map[string]diagnosticscontract.ResetFeedSnapshot{
+			"claude": {SourceURL: "https://www.tsalon.tech/whenreset/", FetchedAt: now, Records: []diagnosticscontract.ResetRecord{{ID: "c1", Type: "banked", AnnouncedAt: now, Text: "Claude reset card", TextZH: "Claude 重置卡"}}},
+			"gemini": {SourceURL: "https://yidinghuiziyou.com/ai/antigravity-reset/", FetchedAt: now, Records: []diagnosticscontract.ResetRecord{{ID: "g1", Type: "regular", AnnouncedAt: now, Text: "Antigravity reset", TextZH: "Antigravity 全员重置"}}},
+		},
+	})
+	RegisterChannelResetRoutes(router.Group("/api/v1/public/tools"), handler)
+
+	for _, tc := range []struct {
+		channel string
+		wantCC  string
+		wantID  string
+	}{
+		{"claude", "s-maxage=300", "c1"},
+		{"gemini", "s-maxage=600", "g1"},
+	} {
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/public/tools/resets/"+tc.channel, nil))
+		if rec.Code != 200 || !strings.Contains(rec.Header().Get("Cache-Control"), tc.wantCC) || !strings.Contains(rec.Body.String(), tc.wantID) {
+			t.Fatalf("channel %s unexpected response: code=%d cc=%q body=%s", tc.channel, rec.Code, rec.Header().Get("Cache-Control"), rec.Body.String())
+		}
+	}
+
+	// Unknown channel rejected with 400 + no-store.
+	bad := httptest.NewRecorder()
+	router.ServeHTTP(bad, httptest.NewRequest(http.MethodGet, "/api/v1/public/tools/resets/unknown", nil))
+	if bad.Code != 400 || !strings.Contains(bad.Header().Get("Cache-Control"), "no-store") {
+		t.Fatalf("expected 400 no-store for unknown channel, got %d %q", bad.Code, bad.Header().Get("Cache-Control"))
+	}
+
+	// Unavailable channel never cached publicly.
+	unavail := httptest.NewRecorder()
+	router.ServeHTTP(unavail, httptest.NewRequest(http.MethodGet, "/api/v1/public/tools/resets/grok", nil))
+	if !strings.Contains(unavail.Header().Get("Cache-Control"), "no-store") || !strings.Contains(unavail.Body.String(), `"status_code":503`) {
+		t.Fatalf("expected 503 no-store for unavailable channel, got %d %q %s", unavail.Code, unavail.Header().Get("Cache-Control"), unavail.Body.String())
+	}
+}
