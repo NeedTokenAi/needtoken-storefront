@@ -66,6 +66,7 @@ func registerChannelRoutes(
 		channelAPI.GET("/needtoken-ops/upstream/connections/:id/catalog", opsHandler.UpstreamCatalog)
 		channelAPI.POST("/needtoken-ops/upstream/connections/:id/import", opsHandler.ImportUpstreamProducts)
 		channelAPI.POST("/needtoken-ops/orders/:order_no/refund", opsHandler.RefundOrder)
+		channelAPI.POST("/needtoken-ops/slo/revoke-user", opsHandler.RevokeUserSLO)
 		telegramtransport.RegisterChannelBotRoutes(channelAPI, channelTelegramBotHandler)
 		channeltransport.RegisterRoutes(channelAPI, channelHandler)
 		affiliatetransport.RegisterChannelRoutes(channelAPI, channelAffiliateHandler)

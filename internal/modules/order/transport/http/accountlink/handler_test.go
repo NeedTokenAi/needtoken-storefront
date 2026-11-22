@@ -15,10 +15,29 @@ import (
 )
 
 type fakeBridge struct {
-	gotRef  string
-	gotSSO  accountlink.ConsoleSSOInput
-	gotAuto accountlink.AutoLinkInput
-	err     error
+	gotRef        string
+	gotSSO        accountlink.ConsoleSSOInput
+	gotAuto       accountlink.AutoLinkInput
+	gotLogoutRef  string
+	logoutRevoked bool
+	err           error
+}
+
+func (f *fakeBridge) StorefrontLogout(_ context.Context, ref, _ string) (bool, error) {
+	f.gotLogoutRef = ref
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.logoutRevoked, nil
+}
+
+type fakeSessionRevoker struct {
+	revokedIDs []uint
+}
+
+func (f *fakeSessionRevoker) RevokeUserSessions(_ context.Context, userID uint) error {
+	f.revokedIDs = append(f.revokedIDs, userID)
+	return nil
 }
 
 func (f *fakeBridge) Status(_ context.Context, ref string) (accountlink.Status, error) {
@@ -238,5 +257,25 @@ func TestAccountLinkMemberHTTPFlowAndSecurityHeaders(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &summaryReseller)
 	if summaryReseller.StatusCode != 0 || summaryReseller.Data.Linked {
 		t.Fatalf("reseller api-summary must degrade gracefully: %+v", summaryReseller)
+	}
+}
+
+func TestMemberLogoutSLO(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	bridge := &fakeBridge{logoutRevoked: true}
+	revoker := &fakeSessionRevoker{}
+	svc := accountlink.New(bridge).WithIdentityReader(fakeIdentity{}).WithSessionRevoker(revoker)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(42))
+		c.Next()
+	})
+	RegisterMemberRoutes(r, New(svc))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/me/logout", nil)
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || len(revoker.revokedIDs) != 1 || revoker.revokedIDs[0] != 42 || bridge.gotLogoutRef != "needtoken-storefront:user:42" {
+		t.Fatalf("logout SLO failed: code=%d revoked=%v logoutRef=%s body=%s", w.Code, revoker.revokedIDs, bridge.gotLogoutRef, w.Body.String())
 	}
 }

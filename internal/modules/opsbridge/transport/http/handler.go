@@ -14,12 +14,16 @@ import (
 type Handler struct {
 	reader opscontract.Reader
 	bridge opscontract.Bridge
+	slo    opscontract.SLORevokeHandler
 }
 
 func New(reader opscontract.Reader) *Handler {
 	h := &Handler{reader: reader}
 	if b, ok := reader.(opscontract.Bridge); ok {
 		h.bridge = b
+	}
+	if s, ok := reader.(opscontract.SLORevokeHandler); ok {
+		h.slo = s
 	}
 	return h
 }
@@ -592,6 +596,24 @@ func (h *Handler) RefundOrder(c *gin.Context) {
 		return
 	}
 	result, err := h.bridge.RefundOrder(c.Param("order_no"), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) RevokeUserSLO(c *gin.Context) {
+	if h.slo == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.SLORevokeUserInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.slo.RevokeUserSLO(req)
 	if err != nil {
 		fail(c, err)
 		return

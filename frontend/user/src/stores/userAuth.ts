@@ -227,7 +227,63 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         setUser(nextUser)
     }
 
-    const logout = (redirect = '/auth/login') => {
+    let lastSessionCheckAt = 0
+    let sessionCheckInflight: Promise<boolean> | null = null
+
+    const verifySession = async (force = false): Promise<boolean> => {
+        const currentToken = token.value
+        if (!currentToken) return false
+        const now = Date.now()
+        if (!force && now - lastSessionCheckAt < 15_000) return true
+        if (sessionCheckInflight) return sessionCheckInflight
+        lastSessionCheckAt = now
+        const base = import.meta.env.VITE_API_BASE_URL || ''
+        sessionCheckInflight = fetch(`${base}/api/v1/me`, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json',
+                Authorization: `Bearer ${currentToken}`,
+            },
+            cache: 'no-store',
+        })
+            .then(async (res) => {
+                if (res.status === 401) {
+                    clearAuth()
+                    return false
+                }
+                if (!res.ok) return true
+                const body = await res.json().catch(() => null)
+                if (body && body.status_code === 401) {
+                    clearAuth()
+                    return false
+                }
+                return true
+            })
+            .catch(() => true)
+            .finally(() => {
+                sessionCheckInflight = null
+            })
+        return sessionCheckInflight
+    }
+
+    const logout = async (redirect = '/auth/login') => {
+        const currentToken = token.value
+        if (currentToken) {
+            // Best-effort server-side SLO (bumps TokenVersion & revokes linked new-api session).
+            const base = import.meta.env.VITE_API_BASE_URL || ''
+            await Promise.race([
+                fetch(`${base}/api/v1/me/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${currentToken}`,
+                    },
+                    body: '{}',
+                    keepalive: true,
+                }).catch(() => undefined),
+                new Promise(resolve => setTimeout(resolve, 1200)),
+            ])
+        }
         clearAuth()
         router.push(redirect)
     }
@@ -254,6 +310,8 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         completeInviteRegistration,
         forgotPassword,
         syncUserProfile,
+        verifySession,
+        clearAuth,
         logout,
     }
 })

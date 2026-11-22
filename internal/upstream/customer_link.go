@@ -243,6 +243,27 @@ func (a *DujiaoNextAdapter) APISummary(ctx context.Context, storefrontUserID str
 	return out, nil
 }
 
+func (a *DujiaoNextAdapter) StorefrontLogout(ctx context.Context, merchantCustomerID, reason string) (bool, error) {
+	var result struct {
+		OK      bool `json:"ok"`
+		Revoked bool `json:"revoked"`
+	}
+	payload := struct {
+		MerchantCustomerID string `json:"merchant_customer_id"`
+		Reason             string `json:"reason,omitempty"`
+	}{
+		MerchantCustomerID: strings.TrimSpace(merchantCustomerID),
+		Reason:             strings.TrimSpace(reason),
+	}
+	if err := a.customerLinkRequest(ctx, http.MethodPost, "/api/v1/upstream/customer-links/logout", payload, &result); err != nil {
+		return false, err
+	}
+	if !result.OK {
+		return false, ErrCustomerLinkUnavailable
+	}
+	return result.Revoked, nil
+}
+
 // customerLinkRequest signs the exact request path (without query) and body with
 // merchant HMAC credentials, disables redirects/cookies, and bounds I/O so
 // challenge/approval tokens never leak through redirects or logs.

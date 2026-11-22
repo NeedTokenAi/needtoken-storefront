@@ -120,6 +120,19 @@ type IdentityReader interface {
 	LookupMember(ctx context.Context, userID uint) (MemberIdentity, error)
 }
 
+type SessionRevoker interface {
+	RevokeUserSessions(ctx context.Context, userID uint) error
+}
+
+type LogoutBridge interface {
+	StorefrontLogout(ctx context.Context, merchantCustomerID, reason string) (bool, error)
+}
+
+type LogoutResult struct {
+	LoggedOut       bool `json:"logged_out"`
+	UpstreamRevoked bool `json:"upstream_revoked"`
+}
+
 type Bridge interface {
 	Status(ctx context.Context, merchantCustomerID string) (Status, error)
 	Start(ctx context.Context, merchantCustomerID, nextPath string) (Challenge, error)
@@ -138,6 +151,7 @@ type ensureFlight struct {
 type Service struct {
 	bridge         Bridge
 	identity       IdentityReader
+	sessionRevoker SessionRevoker
 	ensureMu       sync.Mutex
 	ensureInflight map[uint]*ensureFlight
 }
@@ -151,6 +165,11 @@ func New(bridge Bridge) *Service {
 
 func (s *Service) WithIdentityReader(reader IdentityReader) *Service {
 	s.identity = reader
+	return s
+}
+
+func (s *Service) WithSessionRevoker(revoker SessionRevoker) *Service {
+	s.sessionRevoker = revoker
 	return s
 }
 
@@ -400,6 +419,27 @@ func (s *Service) APISummary(ctx context.Context, userID uint) (APISummaryResult
 	}
 	if !res.Linked {
 		return APISummaryResult{Linked: false}, nil
+	}
+	return res, nil
+}
+
+// Logout revokes the member's storefront JWT session (TokenVersion bump) and
+// best-effort propagates single logout to glue -> new-api outside any DB tx.
+func (s *Service) Logout(ctx context.Context, userID uint) (LogoutResult, error) {
+	ref, err := merchantCustomerID(userID)
+	if err != nil {
+		return LogoutResult{}, err
+	}
+	if s.sessionRevoker != nil {
+		if err := s.sessionRevoker.RevokeUserSessions(ctx, userID); err != nil {
+			return LogoutResult{}, ErrUnavailable
+		}
+	}
+	res := LogoutResult{LoggedOut: true}
+	if lb, ok := s.bridge.(LogoutBridge); ok && lb != nil {
+		if revoked, err := lb.StorefrontLogout(ctx, ref, "storefront_logout"); err == nil && revoked {
+			res.UpstreamRevoked = true
+		}
 	}
 	return res, nil
 }

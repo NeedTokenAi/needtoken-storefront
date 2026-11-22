@@ -23,6 +23,7 @@ export const userAuthAPI = {
     completeInviteRegistration: (data: { invite_ticket: string; invite_code: string }) =>
         userApi.post('/auth/invite/complete', data),
     forgotPassword: (data: any) => userApi.post('/auth/forgot-password', data),
+    logout: () => userApi.post('/me/logout', {}, { silentBusinessError: true }),
 }
 
 export const userTotpAPI = {

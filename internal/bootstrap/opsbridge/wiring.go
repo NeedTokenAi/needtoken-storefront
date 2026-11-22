@@ -1,6 +1,7 @@
 package opsbridge
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dujiao-next/internal/app/container"
+	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/constants"
 	categoryapp "github.com/dujiao-next/internal/modules/catalog/category/application"
@@ -18,6 +20,7 @@ import (
 	productadmin "github.com/dujiao-next/internal/modules/catalog/product/application/admin"
 	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
 	productgormstore "github.com/dujiao-next/internal/modules/catalog/product/store/gormstore"
+	usercontract "github.com/dujiao-next/internal/modules/identity/user/contract"
 	opsapp "github.com/dujiao-next/internal/modules/opsbridge/application"
 	opscontract "github.com/dujiao-next/internal/modules/opsbridge/contract"
 	opstransport "github.com/dujiao-next/internal/modules/opsbridge/transport/http"
@@ -97,6 +100,9 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 			orders:  c.OrderStore,
 			refunds: c.OrderRefundService,
 		})
+	}
+	if c.UserStore != nil {
+		svc.WithUserSessionRevoker(&userSessionRevokerAdapter{users: c.UserStore})
 	}
 	return opstransport.New(svc)
 }
@@ -1100,4 +1106,30 @@ func (a *orderRefundStoreAdapter) RefundOrder(orderNo string, input opscontract.
 		SettlementStatus: "settled",
 		OperationID:      opID,
 	}, nil
+}
+
+type userSessionRevokerAdapter struct {
+	users usercontract.Store
+}
+
+func (a *userSessionRevokerAdapter) RevokeUserSessions(userID uint) (bool, error) {
+	if a == nil || a.users == nil || userID == 0 {
+		return false, nil
+	}
+	user, err := a.users.GetByID(userID)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, nil
+	}
+	now := time.Now()
+	user.TokenVersion++
+	user.TokenInvalidBefore = &now
+	user.UpdatedAt = now
+	if err := a.users.Update(user); err != nil {
+		return false, err
+	}
+	_ = cache.SetUserAuthState(context.Background(), cache.BuildUserAuthState(user))
+	return true, nil
 }
