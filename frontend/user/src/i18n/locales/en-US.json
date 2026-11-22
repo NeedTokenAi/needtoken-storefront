@@ -3798,13 +3798,12 @@
         "direct": "Direct browser feed",
         "cached_proxy": "Edge-cached sync",
         "cacheNote": "5m client cache · minimal origin load",
-        "refresh": "Refresh",
-        "sourcesLabel": "Sources"
+        "refresh": "Refresh"
       },
       "channels": {
         "claude": {
           "title": "Claude Reset Radar",
-          "subtitle": "Live public Anthropic Claude quota reset and reset-card announcements, with quick links to claude-resets.net and tsalon.tech."
+          "subtitle": "Live public Anthropic Claude quota reset and reset-card announcements and interval history."
         },
         "gemini": {
           "title": "Gemini / Antigravity Reset Radar",
@@ -3850,7 +3849,7 @@
           "rule2Title": "Weekly usage limits",
           "rule2Body": "Heavy usage is also governed by rolling weekly limits that recover automatically per account schedule.",
           "rule3Title": "Source & sync strategy",
-          "rule3Body": "Loads directly in your browser from the public feed with a 5-minute client cache and direct links to claude-resets.net and source posts."
+          "rule3Body": "Syncs public Anthropic Claude quota reset announcements with a 5-minute client cache—never fabricated."
         },
         "gemini": {
           "title": "Gemini Radar",
@@ -3872,7 +3871,7 @@
           "rule2Title": "Tiered allowances",
           "rule2Body": "SuperGrok and SuperGrok Heavy provide higher rate limits; check the Grok client for live remaining quota.",
           "rule3Title": "Source & sync strategy",
-          "rule3Body": "Loads directly in your browser from the public feed and shares the 5-minute client cache with Claude without extra requests."
+          "rule3Body": "Syncs xAI official announcements and public Grok / SuperGrok quota reset records with a 5-minute client cache—never fabricated."
         }
       }
     },

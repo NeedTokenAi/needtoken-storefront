@@ -15,41 +15,13 @@ export type RadarChannelId = 'codex' | 'claude' | 'gemini' | 'grok'
 export interface RadarChannelMeta {
   id: RadarChannelId
   brand: 'gpt' | 'claude' | 'gemini' | 'grok'
-  referenceLinks: ReadonlyArray<{ label: string; url: string }>
 }
 
 export const RADAR_CHANNELS: ReadonlyArray<RadarChannelMeta> = [
-  {
-    id: 'codex',
-    brand: 'gpt',
-    referenceLinks: [
-      { label: 'codex-resets.com', url: RESET_FEED_SOURCE },
-      { label: 'tsalon.tech', url: TSALON_FEED_SOURCE },
-    ],
-  },
-  {
-    id: 'claude',
-    brand: 'claude',
-    referenceLinks: [
-      { label: 'claude-resets.net', url: CLAUDE_RESETS_REFERENCE },
-      { label: 'tsalon.tech', url: TSALON_FEED_SOURCE },
-    ],
-  },
-  {
-    id: 'gemini',
-    brand: 'gemini',
-    referenceLinks: [
-      { label: 'yidinghuiziyou.com', url: ANTIGRAVITY_FEED_SOURCE },
-      { label: 'tsalon.tech', url: TSALON_FEED_SOURCE },
-    ],
-  },
-  {
-    id: 'grok',
-    brand: 'grok',
-    referenceLinks: [
-      { label: 'tsalon.tech', url: TSALON_FEED_SOURCE },
-    ],
-  },
+  { id: 'codex', brand: 'gpt' },
+  { id: 'claude', brand: 'claude' },
+  { id: 'gemini', brand: 'gemini' },
+  { id: 'grok', brand: 'grok' },
 ]
 
 export function channelResetFeedPath(channel: RadarChannelId): string {

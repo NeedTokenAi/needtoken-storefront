@@ -3798,13 +3798,12 @@
         "direct": "浏览器直连公开源",
         "cached_proxy": "边缘缓存同步",
         "cacheNote": "本地缓存 5 分钟 · 不高频请求后端",
-        "refresh": "刷新",
-        "sourcesLabel": "参考源"
+        "refresh": "刷新"
       },
       "channels": {
         "claude": {
           "title": "Claude 重置雷达",
-          "subtitle": "追踪 Anthropic Claude 公开重置与重置卡公告记录，并同步参考 claude-resets.net 与 tsalon.tech 公开动态。"
+          "subtitle": "追踪 Anthropic Claude 公开重置与重置卡公告记录与历史间隔。"
         },
         "gemini": {
           "title": "Gemini / Antigravity 重置雷达",
@@ -3850,7 +3849,7 @@
           "rule2Title": "每周使用上限",
           "rule2Body": "高强度使用受每周配额（Weekly Limit）约束，各账号按各自周期自动滚动恢复。",
           "rule3Title": "数据来源与同步",
-          "rule3Body": "优先由浏览器直连公开汇总源并启用 5 分钟本地缓存，同时支持一键跳转 claude-resets.net 与原帖核验。"
+          "rule3Body": "同步 Anthropic Claude 公开重置与补偿公告记录，启用 5 分钟本地缓存，绝不虚构历史记录。"
         },
         "gemini": {
           "title": "Gemini 雷达",
@@ -3872,7 +3871,7 @@
           "rule2Title": "分层额度策略",
           "rule2Body": "SuperGrok 与 SuperGrok Heavy 享有更高并发与额度上限，具体以 Grok 客户端提示为准。",
           "rule3Title": "数据来源与同步",
-          "rule3Body": "优先由浏览器直连公开汇总源并与 Claude 共享本地 5 分钟缓存，绝不虚构历史记录。"
+          "rule3Body": "同步 xAI 官方公告与公开追踪的 Grok / SuperGrok 额度重置记录，启用 5 分钟本地缓存，绝不虚构历史记录。"
         }
       }
     },
