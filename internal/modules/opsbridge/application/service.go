@@ -47,6 +47,7 @@ type Service struct {
 	acquiring       opscontract.AcquiringStore
 	upstream        opscontract.UpstreamStore
 	refunds         opscontract.OrderRefundStore
+	users           opscontract.UserStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -85,6 +86,11 @@ func (s *Service) WithGiftCards(giftCards giftcardcontract.Repository) *Service 
 
 func (s *Service) WithAcquiring(acquiring opscontract.AcquiringStore) *Service {
 	s.acquiring = acquiring
+	return s
+}
+
+func (s *Service) WithUsers(users opscontract.UserStore) *Service {
+	s.users = users
 	return s
 }
 
@@ -1657,4 +1663,119 @@ func (s *Service) RefundOrder(orderNo string, input opscontract.RefundOrderInput
 	input.Mode = mode
 	input.Amount = amtDec.Round(2).StringFixed(2)
 	return s.refunds.RefundOrder(orderNo, input)
+}
+
+func (s *Service) Users(page, pageSize int, keyword, status string) (*opscontract.UsersResult, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status != "" && status != constants.UserStatusActive && status != constants.UserStatusDisabled {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.users.ListUsers(page, pageSize, strings.TrimSpace(keyword), status)
+}
+
+func (s *Service) CreateUser(input opscontract.CreateUserInput) (*opscontract.StorefrontUser, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	input.Email = strings.TrimSpace(input.Email)
+	if input.Email == "" || len(input.Password) < 8 || len(input.Password) > 128 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if st := strings.ToLower(strings.TrimSpace(input.Status)); st != "" {
+		if st != constants.UserStatusActive && st != constants.UserStatusDisabled {
+			return nil, opscontract.ErrInvalidInput
+		}
+		input.Status = st
+	} else {
+		input.Status = constants.UserStatusActive
+	}
+	return s.users.CreateUser(input)
+}
+
+func (s *Service) UpdateUser(id uint, input opscontract.UpdateUserInput) (*opscontract.StorefrontUser, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if input.Password != nil && *input.Password != "" {
+		if len(*input.Password) < 8 || len(*input.Password) > 128 {
+			return nil, opscontract.ErrInvalidInput
+		}
+	}
+	if input.Status != nil {
+		st := strings.ToLower(strings.TrimSpace(*input.Status))
+		if st != constants.UserStatusActive && st != constants.UserStatusDisabled {
+			return nil, opscontract.ErrInvalidInput
+		}
+		input.Status = &st
+	}
+	return s.users.UpdateUser(id, input)
+}
+
+func (s *Service) DeleteUser(id uint) error {
+	if s.users == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	return s.users.DeleteUser(id)
+}
+
+func (s *Service) AdjustUserWallet(id uint, input opscontract.AdjustUserWalletInput) (*opscontract.WalletAdjustmentResult, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	op := strings.ToLower(strings.TrimSpace(input.Operation))
+	if op != "credit" && op != "debit" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	amtDec, err := decimal.NewFromString(strings.TrimSpace(input.Amount))
+	if err != nil || amtDec.Round(2).LessThanOrEqual(decimal.Zero) {
+		return nil, opscontract.ErrInvalidInput
+	}
+	input.Operation = op
+	input.Amount = amtDec.Round(2).StringFixed(2)
+	return s.users.AdjustUserWallet(id, input)
+}
+
+func (s *Service) ClearUserTOTP(id uint) error {
+	if s.users == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	return s.users.ClearUserTOTP(id)
+}
+
+func (s *Service) UnbindUserOAuth(id uint, provider string) error {
+	if s.users == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider != "telegram" && provider != "google" {
+		return opscontract.ErrInvalidInput
+	}
+	return s.users.UnbindUserOAuth(id, provider)
 }

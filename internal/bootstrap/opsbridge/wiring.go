@@ -98,6 +98,15 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 			refunds: c.OrderRefundService,
 		})
 	}
+	if c.UserStore != nil {
+		svc.WithUsers(&userStoreAdapter{
+			users:    c.UserStore,
+			wallets:  c.WalletService,
+			oauth:    c.ExternalIdentityStore,
+			userAuth: c.UserAuthService,
+			settings: c.SettingService,
+		})
+	}
 	return opstransport.New(svc)
 }
 

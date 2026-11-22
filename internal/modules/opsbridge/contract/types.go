@@ -654,6 +654,86 @@ type OrderRefundStore interface {
 	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)
 }
 
+type StorefrontUser struct {
+	ID             uint       `json:"id"`
+	Email          string     `json:"email"`
+	DisplayName    string     `json:"display_name"`
+	Locale         string     `json:"locale"`
+	Status         string     `json:"status"`
+	MemberLevelID  uint       `json:"member_level_id"`
+	WalletBalance  string     `json:"wallet_balance"`
+	WalletCurrency string     `json:"wallet_currency"`
+	TotalRecharged string     `json:"total_recharged"`
+	TotalSpent     string     `json:"total_spent"`
+	AdminNote      string     `json:"admin_note,omitempty"`
+	TOTPEnabled    bool       `json:"totp_enabled"`
+	EmailVerified  bool       `json:"email_verified"`
+	OAuthProviders []string   `json:"oauth_providers,omitempty"`
+	LastLoginAt    *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type UsersResult struct {
+	Source      string           `json:"source"`
+	CollectedAt time.Time        `json:"collected_at"`
+	Freshness   string           `json:"freshness"`
+	Users       []StorefrontUser `json:"users"`
+	Total       int64            `json:"total"`
+	Page        int              `json:"page"`
+	PageSize    int              `json:"page_size"`
+}
+
+type CreateUserInput struct {
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	DisplayName   string `json:"display_name,omitempty"`
+	Locale        string `json:"locale,omitempty"`
+	Status        string `json:"status,omitempty"`
+	MemberLevelID uint   `json:"member_level_id,omitempty"`
+	EmailVerified *bool  `json:"email_verified,omitempty"`
+	AdminNote     string `json:"admin_note,omitempty"`
+}
+
+type UpdateUserInput struct {
+	Email         *string `json:"email,omitempty"`
+	Password      *string `json:"password,omitempty"`
+	DisplayName   *string `json:"display_name,omitempty"`
+	Locale        *string `json:"locale,omitempty"`
+	Status        *string `json:"status,omitempty"`
+	MemberLevelID *uint   `json:"member_level_id,omitempty"`
+	EmailVerified *bool   `json:"email_verified,omitempty"`
+	AdminNote     *string `json:"admin_note,omitempty"`
+}
+
+type AdjustUserWalletInput struct {
+	Operation string `json:"operation"`
+	Amount    string `json:"amount"`
+	Currency  string `json:"currency,omitempty"`
+	Remark    string `json:"remark,omitempty"`
+}
+
+type WalletAdjustmentResult struct {
+	Source        string    `json:"source"`
+	CollectedAt   time.Time `json:"collected_at"`
+	UserID        uint      `json:"user_id"`
+	Balance       string    `json:"balance"`
+	Currency      string    `json:"currency"`
+	TransactionID uint      `json:"transaction_id"`
+	Direction     string    `json:"direction"`
+	Amount        string    `json:"amount"`
+}
+
+type UserStore interface {
+	ListUsers(page, pageSize int, keyword, status string) (*UsersResult, error)
+	CreateUser(input CreateUserInput) (*StorefrontUser, error)
+	UpdateUser(id uint, input UpdateUserInput) (*StorefrontUser, error)
+	DeleteUser(id uint) error
+	AdjustUserWallet(id uint, input AdjustUserWalletInput) (*WalletAdjustmentResult, error)
+	ClearUserTOTP(id uint) error
+	UnbindUserOAuth(id uint, provider string) error
+}
+
 type Reader interface {
 	Orders(page, pageSize int) (*OrdersResult, error)
 	Overview() (*Overview, error)
@@ -691,4 +771,11 @@ type Bridge interface {
 	UpstreamCatalog(connectionID uint) (*UpstreamCatalogResult, error)
 	ImportUpstreamProducts(connectionID uint, input ImportUpstreamProductsInput) (*ImportUpstreamProductsResult, error)
 	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)
+	Users(page, pageSize int, keyword, status string) (*UsersResult, error)
+	CreateUser(input CreateUserInput) (*StorefrontUser, error)
+	UpdateUser(id uint, input UpdateUserInput) (*StorefrontUser, error)
+	DeleteUser(id uint) error
+	AdjustUserWallet(id uint, input AdjustUserWalletInput) (*WalletAdjustmentResult, error)
+	ClearUserTOTP(id uint) error
+	UnbindUserOAuth(id uint, provider string) error
 }
