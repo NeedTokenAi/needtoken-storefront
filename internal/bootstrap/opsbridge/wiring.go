@@ -106,6 +106,17 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 			userAuth: c.UserAuthService,
 			settings: c.SettingService,
 		})
+		svc.WithOrderEnricher(&orderEnricherAdapter{users: c.UserStore})
+	}
+	if c.OrderStore != nil || c.ProcurementOrderService != nil {
+		svc.WithOrderActions(&orderActionStoreAdapter{
+			orders:       c.OrderStore,
+			orderService: c.OrderService,
+			payments:     c.PaymentStore,
+			paymentSvc:   c.PaymentService,
+			fulfillments: c.FulfillmentService,
+			procurements: c.ProcurementOrderService,
+		})
 	}
 	return opstransport.New(svc)
 }

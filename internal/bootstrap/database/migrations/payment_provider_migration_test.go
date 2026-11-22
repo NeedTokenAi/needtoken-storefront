@@ -2,11 +2,15 @@ package migrations
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/dujiao-next/internal/constants"
+	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
+	orderstore "github.com/dujiao-next/internal/modules/order/infrastructure/gormstore"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	settingsstore "github.com/dujiao-next/internal/modules/settings/infrastructure/gormstore"
 	"github.com/dujiao-next/internal/platform/database/gormdb"
@@ -14,6 +18,7 @@ import (
 	"github.com/dujiao-next/internal/shared/money"
 	"github.com/glebarez/sqlite"
 	"github.com/shopspring/decimal"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -344,4 +349,185 @@ func TestEnsurePaymentChannelBepusdtConfigMigration_NormalizesLegacyChannels(t *
 	if !migrationDone(marker.ValueJSON) || marker.ValueJSON["migrated_count"] != float64(len(tests)+1) {
 		t.Fatalf("unexpected marker: %v", marker.ValueJSON)
 	}
+}
+
+// legacyOrderBeforeDeviceMeta 模拟升级前缺少 user_agent / client_fingerprint 列的旧版本 orders 表结构。
+type legacyOrderBeforeDeviceMeta struct {
+	ID          uint         `gorm:"primarykey"`
+	OrderNo     string       `gorm:"uniqueIndex;not null"`
+	UserID      uint         `gorm:"index;not null"`
+	GuestEmail  string       `gorm:"index"`
+	Status      string       `gorm:"index;not null"`
+	Currency    string       `gorm:"not null"`
+	TotalAmount money.Amount `gorm:"type:decimal(20,2);not null;default:0"`
+	ClientIP    string       `gorm:"type:varchar(64)"`
+	CreatedAt   time.Time    `gorm:"index"`
+	UpdatedAt   time.Time    `gorm:"index"`
+	DeletedAt   *time.Time   `gorm:"index"`
+}
+
+func (legacyOrderBeforeDeviceMeta) TableName() string { return "orders" }
+
+func verifyOrderDeviceMetaFreshAndUpgrade(t *testing.T, driver string, openDB func(label string) *gorm.DB) {
+	t.Helper()
+
+	// 1. Fresh DB: full AutoMigrate twice for idempotency
+	freshDB := openDB("fresh")
+	gormdb.DB = freshDB
+	if err := AutoMigrate(); err != nil {
+		t.Fatalf("fresh AutoMigrate #1 failed: %v", err)
+	}
+	if err := AutoMigrate(); err != nil {
+		t.Fatalf("fresh AutoMigrate #2 failed: %v", err)
+	}
+	if !freshDB.Migrator().HasColumn(&orderdomain.Order{}, "user_agent") ||
+		!freshDB.Migrator().HasColumn(&orderdomain.Order{}, "client_fingerprint") {
+		t.Fatalf("fresh DB missing user_agent or client_fingerprint columns")
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	freshOrder := orderdomain.Order{
+		OrderNo:           "DJ-FRESH-META-001",
+		UserID:            1,
+		Status:            constants.OrderStatusPendingPayment,
+		Currency:          "CNY",
+		TotalAmount:       money.FromDecimal(decimal.NewFromInt(88)),
+		OnlinePaidAmount:  money.FromDecimal(decimal.NewFromInt(88)),
+		ClientIP:          "203.0.113.10",
+		UserAgent:         "Mozilla/5.0 TestBrowser/1.0",
+		ClientFingerprint: "fp_0123456789abcdef0123456789abcdef",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if err := freshDB.Create(&freshOrder).Error; err != nil {
+		t.Fatalf("create fresh order failed: %v", err)
+	}
+	var reloaded orderdomain.Order
+	if err := freshDB.First(&reloaded, "order_no = ?", freshOrder.OrderNo).Error; err != nil {
+		t.Fatalf("reload fresh order failed: %v", err)
+	}
+	if reloaded.UserAgent != freshOrder.UserAgent || reloaded.ClientFingerprint != freshOrder.ClientFingerprint {
+		t.Fatalf("fresh order device meta mismatch: got ua=%q fp=%q", reloaded.UserAgent, reloaded.ClientFingerprint)
+	}
+	// Verify cross-DB ListAdmin multi-dimensional filters execute cleanly on both SQLite and PostgreSQL
+	oStore := orderstore.New(freshDB, driver)
+	if rows, total, err := oStore.ListAdmin(ordercontract.ListFilter{
+		Page:            1,
+		PageSize:        20,
+		Keyword:         "fp_0123456789",
+		BuyerType:       "member",
+		ClientIP:        "203.0.113",
+		CategoryID:      0,
+		FulfillmentType: "",
+		PaymentChannel:  "",
+		ExceptionOnly:   false,
+	}); err != nil || total != 1 || len(rows) != 1 {
+		t.Fatalf("ListAdmin keyword/member/clientIP filter failed on %s: total=%d rows=%d err=%v", driver, total, len(rows), err)
+	}
+	if _, _, err := oStore.ListAdmin(ordercontract.ListFilter{
+		Page:            1,
+		PageSize:        20,
+		CategoryID:      999,
+		FulfillmentType: constants.FulfillmentTypeManual,
+		PaymentChannel:  "stripe",
+		ExceptionOnly:   true,
+	}); err != nil {
+		t.Fatalf("ListAdmin exception/category/channel SQL failed on %s: %v", driver, err)
+	}
+
+	// 2. Upgrade from legacy schema without user_agent/client_fingerprint, preserving existing rows and uniqueness
+	upgradeDB := openDB("upgrade")
+	gormdb.DB = upgradeDB
+	if err := upgradeDB.AutoMigrate(&legacyOrderBeforeDeviceMeta{}); err != nil {
+		t.Fatalf("seed legacy orders table failed: %v", err)
+	}
+	if upgradeDB.Migrator().HasColumn(&orderdomain.Order{}, "user_agent") {
+		t.Fatalf("legacy orders table unexpectedly already had user_agent")
+	}
+	legacy := legacyOrderBeforeDeviceMeta{
+		OrderNo:     "DJ-LEGACY-001",
+		UserID:      2,
+		Status:      constants.OrderStatusPaid,
+		Currency:    "CNY",
+		TotalAmount: money.FromDecimal(decimal.NewFromInt(55)),
+		ClientIP:    "198.51.100.22",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := upgradeDB.Create(&legacy).Error; err != nil {
+		t.Fatalf("insert legacy order failed: %v", err)
+	}
+	if err := AutoMigrate(); err != nil {
+		t.Fatalf("upgrade AutoMigrate #1 failed: %v", err)
+	}
+	if err := AutoMigrate(); err != nil {
+		t.Fatalf("upgrade AutoMigrate #2 failed: %v", err)
+	}
+	var upgraded orderdomain.Order
+	if err := upgradeDB.First(&upgraded, "order_no = ?", legacy.OrderNo).Error; err != nil {
+		t.Fatalf("reload legacy order after upgrade failed: %v", err)
+	}
+	if upgraded.TotalAmount.String() != "55.00" || upgraded.ClientIP != "198.51.100.22" || upgraded.UserAgent != "" || upgraded.ClientFingerprint != "" {
+		t.Fatalf("upgraded legacy order corrupted: %+v", upgraded)
+	}
+	// Unique index on order_no must stay enforced
+	dup := orderdomain.Order{
+		OrderNo:     legacy.OrderNo,
+		UserID:      3,
+		Status:      constants.OrderStatusPendingPayment,
+		Currency:    "CNY",
+		TotalAmount: money.FromDecimal(decimal.NewFromInt(10)),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := upgradeDB.Create(&dup).Error; err == nil {
+		t.Fatalf("expected unique constraint error on duplicate order_no after upgrade")
+	}
+}
+
+func TestOrderDeviceMetaMigrationSQLite(t *testing.T) {
+	prev := gormdb.DB
+	t.Cleanup(func() { gormdb.DB = prev })
+	verifyOrderDeviceMetaFreshAndUpgrade(t, "sqlite", func(label string) *gorm.DB {
+		dsn := fmt.Sprintf("file:order_device_meta_%s_%d?mode=memory&cache=shared", label, time.Now().UnixNano())
+		db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open sqlite %s: %v", label, err)
+		}
+		return db
+	})
+}
+
+func TestOrderDeviceMetaMigrationPostgres(t *testing.T) {
+	baseDSN := strings.TrimSpace(os.Getenv("NEEDTOKEN_STOREFRONT_TEST_POSTGRES_DSN"))
+	if baseDSN == "" {
+		baseDSN = strings.TrimSpace(os.Getenv("TEST_POSTGRES_DSN"))
+	}
+	if baseDSN == "" {
+		t.Skip("NEEDTOKEN_STOREFRONT_TEST_POSTGRES_DSN / TEST_POSTGRES_DSN not set")
+	}
+	prev := gormdb.DB
+	t.Cleanup(func() { gormdb.DB = prev })
+	verifyOrderDeviceMetaFreshAndUpgrade(t, "postgres", func(label string) *gorm.DB {
+		schema := fmt.Sprintf("nt_order_meta_%s_%d", label, time.Now().UnixNano())
+		adminDB, err := gorm.Open(postgres.Open(baseDSN), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open postgres admin: %v", err)
+		}
+		if err := adminDB.Exec("CREATE SCHEMA " + schema).Error; err != nil {
+			t.Fatalf("create schema %s: %v", schema, err)
+		}
+		t.Cleanup(func() {
+			_ = adminDB.Exec("DROP SCHEMA IF EXISTS " + schema + " CASCADE").Error
+		})
+		sep := "?"
+		if strings.Contains(baseDSN, "?") {
+			sep = "&"
+		}
+		scopedDSN := baseDSN + sep + "search_path=" + schema
+		db, err := gorm.Open(postgres.Open(scopedDSN), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open postgres schema %s: %v", schema, err)
+		}
+		return db
+	})
 }

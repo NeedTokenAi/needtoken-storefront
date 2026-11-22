@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dujiao-next/internal/modules/order/invoice"
 
@@ -150,6 +151,8 @@ type CreateOrderInput struct {
 	AffiliateCode       string
 	AffiliateVisitorKey string
 	ClientIP            string
+	UserAgent           string
+	ClientFingerprint   string
 	ManualFormData      map[string]jsonmap.JSON
 	SkipRiskControl     bool // 完全跳过风控（下游订单）
 	SkipIPRiskControl   bool // 跳过 IP 维度风控（渠道/Bot 订单）
@@ -167,6 +170,8 @@ type CreateGuestOrderInput struct {
 	AffiliateCode       string
 	AffiliateVisitorKey string
 	ClientIP            string
+	UserAgent           string
+	ClientFingerprint   string
 	ManualFormData      map[string]jsonmap.JSON
 }
 
@@ -243,6 +248,8 @@ func (s *OrderService) CreateOrder(input CreateOrderInput) (*orderdomain.Order, 
 		AffiliateCode:       input.AffiliateCode,
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
+		UserAgent:           input.UserAgent,
+		ClientFingerprint:   input.ClientFingerprint,
 		ManualFormData:      input.ManualFormData,
 		SkipRiskControl:     input.SkipRiskControl,
 		SkipIPRiskControl:   input.SkipIPRiskControl,
@@ -272,6 +279,8 @@ func (s *OrderService) CreateGuestOrder(input CreateGuestOrderInput) (*orderdoma
 		AffiliateCode:       input.AffiliateCode,
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
+		UserAgent:           input.UserAgent,
+		ClientFingerprint:   input.ClientFingerprint,
 		IsGuest:             true,
 		ManualFormData:      input.ManualFormData,
 	})
@@ -289,6 +298,8 @@ type orderCreateParams struct {
 	AffiliateCode            string
 	AffiliateVisitorKey      string
 	ClientIP                 string
+	UserAgent                string
+	ClientFingerprint        string
 	RiskIP                   string
 	RiskPaymentExpireMinutes int
 	RiskCheckResult          orderriskcontract.CheckResult
@@ -548,6 +559,8 @@ func (s *OrderService) createOrder(input orderCreateParams) (*orderdomain.Order,
 		AffiliateCode:           affiliateCode,
 		ExpiresAt:               &expiresAt,
 		ClientIP:                strings.TrimSpace(input.ClientIP),
+		UserAgent:               trimOrderClientMeta(input.UserAgent, 512),
+		ClientFingerprint:       trimOrderClientMeta(input.ClientFingerprint, 128),
 		RiskIP:                  input.RiskIP,
 		CreatedAt:               now,
 		UpdatedAt:               now,
@@ -606,6 +619,8 @@ func (s *OrderService) createOrder(input orderCreateParams) (*orderdomain.Order,
 				AffiliateCode:           affiliateCode,
 				ExpiresAt:               &expiresAt,
 				ClientIP:                order.ClientIP,
+				UserAgent:               order.UserAgent,
+				ClientFingerprint:       order.ClientFingerprint,
 				RiskIP:                  order.RiskIP,
 				CreatedAt:               now,
 				UpdatedAt:               now,
@@ -828,4 +843,19 @@ func validateGuestPassword(password string) error {
 		return ErrGuestPasswordTooShort
 	}
 	return nil
+}
+
+func trimOrderClientMeta(raw string, maxBytes int) string {
+	trimmed := strings.TrimSpace(raw)
+	if maxBytes <= 0 || len(trimmed) <= maxBytes {
+		return trimmed
+	}
+	for len(trimmed) > maxBytes {
+		_, size := utf8.DecodeLastRuneInString(trimmed)
+		if size <= 0 {
+			break
+		}
+		trimmed = trimmed[:len(trimmed)-size]
+	}
+	return trimmed
 }

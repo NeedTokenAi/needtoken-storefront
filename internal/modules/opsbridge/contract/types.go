@@ -37,16 +37,21 @@ var (
 )
 
 type Payment struct {
-	ID                 uint       `json:"id"`
-	ProviderType       string     `json:"provider_type,omitempty"`
-	ChannelType        string     `json:"channel_type,omitempty"`
-	PaymentEnvironment string     `json:"payment_environment,omitempty"`
-	Status             string     `json:"status"`
-	Amount             string     `json:"amount"`
-	Currency           string     `json:"currency"`
-	ProviderRef        string     `json:"provider_ref,omitempty"`
-	PaidAt             *time.Time `json:"paid_at,omitempty"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 uint           `json:"id"`
+	ProviderType       string         `json:"provider_type,omitempty"`
+	ChannelType        string         `json:"channel_type,omitempty"`
+	PaymentEnvironment string         `json:"payment_environment,omitempty"`
+	Status             string         `json:"status"`
+	Amount             string         `json:"amount"`
+	FeeAmount          string         `json:"fee_amount,omitempty"`
+	Currency           string         `json:"currency"`
+	ExceptionCode      string         `json:"exception_code,omitempty"`
+	GatewayOrderNo     string         `json:"gateway_order_no,omitempty"`
+	ProviderRef        string         `json:"provider_ref,omitempty"`
+	CallbackAt         *time.Time     `json:"callback_at,omitempty"`
+	CallbackSummary    map[string]any `json:"callback_summary,omitempty"`
+	PaidAt             *time.Time     `json:"paid_at,omitempty"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 }
 type Refund struct {
 	ID               uint      `json:"id"`
@@ -62,6 +67,8 @@ type Procurement struct {
 	ID              uint      `json:"id"`
 	Status          string    `json:"status"`
 	UpstreamOrderNo string    `json:"upstream_order_no,omitempty"`
+	ErrorMessage    string    `json:"error_message,omitempty"`
+	RetryCount      int       `json:"retry_count,omitempty"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 type Reservation struct {
@@ -78,30 +85,72 @@ type Reservation struct {
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
+type OrderItemSummary struct {
+	ID              uint              `json:"id"`
+	OrderID         uint              `json:"order_id,omitempty"`
+	ProductID       uint              `json:"product_id"`
+	CategoryID      uint              `json:"category_id,omitempty"`
+	SKUID           uint              `json:"sku_id,omitempty"`
+	SKUCode         string            `json:"sku_code,omitempty"`
+	Title           map[string]string `json:"title,omitempty"`
+	FulfillmentType string            `json:"fulfillment_type,omitempty"`
+	Quantity        int               `json:"quantity"`
+	UnitPrice       string            `json:"unit_price,omitempty"`
+	TotalPrice      string            `json:"total_price,omitempty"`
+	Tags            []string          `json:"tags,omitempty"`
+}
 type Order struct {
-	Reservations       []Reservation `json:"reservations"`
-	Children           []Order       `json:"children"`
-	Procurements       []Procurement `json:"procurements"`
-	ID                 uint          `json:"id"`
-	OrderNo            string        `json:"order_no"`
-	ParentID           *uint         `json:"parent_id,omitempty"`
-	MerchantCustomerID string        `json:"merchant_customer_id,omitempty"`
-	Status             string        `json:"status"`
-	Currency           string        `json:"currency"`
-	OriginalAmount     string        `json:"original_amount,omitempty"`
-	DiscountAmount     string        `json:"discount_amount,omitempty"`
-	CouponID           *uint         `json:"coupon_id,omitempty"`
-	TotalAmount        string        `json:"total_amount"`
-	RefundedAmount     string        `json:"refunded_amount"`
-	PaymentStatus      string        `json:"payment_status"`
-	FulfillmentStatus  string        `json:"fulfillment_status"`
-	EntitlementStatus  string        `json:"entitlement_status"`
-	Payments           []Payment     `json:"payments"`
-	Refunds            []Refund      `json:"refunds"`
-	Procurement        *Procurement  `json:"procurement,omitempty"`
-	PaidAt             *time.Time    `json:"paid_at,omitempty"`
-	CreatedAt          time.Time     `json:"created_at"`
-	UpdatedAt          time.Time     `json:"updated_at"`
+	Reservations       []Reservation      `json:"reservations"`
+	Children           []Order            `json:"children"`
+	Procurements       []Procurement      `json:"procurements"`
+	Items              []OrderItemSummary `json:"items"`
+	ID                 uint               `json:"id"`
+	OrderNo            string             `json:"order_no"`
+	ParentID           *uint              `json:"parent_id,omitempty"`
+	UserID             uint               `json:"user_id,omitempty"`
+	BuyerType          string             `json:"buyer_type,omitempty"`
+	BuyerEmail         string             `json:"buyer_email,omitempty"`
+	BuyerName          string             `json:"buyer_name,omitempty"`
+	MerchantCustomerID string             `json:"merchant_customer_id,omitempty"`
+	SourceDomain       string             `json:"source_domain,omitempty"`
+	ClientIP           string             `json:"client_ip,omitempty"`
+	UserAgent          string             `json:"user_agent,omitempty"`
+	ClientFingerprint  string             `json:"client_fingerprint,omitempty"`
+	Status             string             `json:"status"`
+	Currency           string             `json:"currency"`
+	OriginalAmount     string             `json:"original_amount,omitempty"`
+	DiscountAmount     string             `json:"discount_amount,omitempty"`
+	CouponID           *uint              `json:"coupon_id,omitempty"`
+	TotalAmount        string             `json:"total_amount"`
+	WalletPaidAmount   string             `json:"wallet_paid_amount,omitempty"`
+	OnlinePaidAmount   string             `json:"online_paid_amount,omitempty"`
+	RefundedAmount     string             `json:"refunded_amount"`
+	PaymentStatus      string             `json:"payment_status"`
+	FulfillmentStatus  string             `json:"fulfillment_status"`
+	EntitlementStatus  string             `json:"entitlement_status"`
+	HasException       bool               `json:"has_exception"`
+	ExceptionReasons   []string           `json:"exception_reasons,omitempty"`
+	Payments           []Payment          `json:"payments"`
+	Refunds            []Refund           `json:"refunds"`
+	Procurement        *Procurement       `json:"procurement,omitempty"`
+	PaidAt             *time.Time         `json:"paid_at,omitempty"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}
+type OrdersFilter struct {
+	Page            int
+	PageSize        int
+	Status          string
+	OrderNo         string
+	Keyword         string
+	CategoryID      uint
+	FulfillmentType string
+	BuyerType       string
+	PaymentChannel  string
+	ClientIP        string
+	ExceptionOnly   bool
+	CreatedFrom     *time.Time
+	CreatedTo       *time.Time
 }
 type OrdersResult struct {
 	Source      string    `json:"source"`
@@ -654,6 +703,69 @@ type OrderRefundStore interface {
 	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)
 }
 
+type ManualConfirmPaymentInput struct {
+	PaymentID   uint   `json:"payment_id,omitempty"`
+	ProviderRef string `json:"provider_ref,omitempty"`
+	Remark      string `json:"remark,omitempty"`
+}
+
+type ManualConfirmPaymentResult struct {
+	Source        string    `json:"source"`
+	CollectedAt   time.Time `json:"collected_at"`
+	OrderNo       string    `json:"order_no"`
+	PaymentID     uint      `json:"payment_id"`
+	PaymentStatus string    `json:"payment_status"`
+	OrderStatus   string    `json:"order_status"`
+}
+
+type ManualFulfillOrderInput struct {
+	TargetOrderID uint   `json:"target_order_id,omitempty"`
+	Payload       string `json:"payload"`
+}
+
+type ManualFulfillOrderResult struct {
+	Source        string    `json:"source"`
+	CollectedAt   time.Time `json:"collected_at"`
+	OrderNo       string    `json:"order_no"`
+	TargetOrderID uint      `json:"target_order_id"`
+	FulfillmentID uint      `json:"fulfillment_id"`
+	Status        string    `json:"status"`
+}
+
+type UpdateOrderStatusInput struct {
+	Status string `json:"status"`
+}
+
+type UpdateOrderStatusResult struct {
+	Source      string    `json:"source"`
+	CollectedAt time.Time `json:"collected_at"`
+	OrderNo     string    `json:"order_no"`
+	Status      string    `json:"status"`
+}
+
+type RetryProcurementResult struct {
+	Source        string    `json:"source"`
+	CollectedAt   time.Time `json:"collected_at"`
+	ProcurementID uint      `json:"procurement_id"`
+	Status        string    `json:"status"`
+}
+
+type OrderBuyerInfo struct {
+	Email       string
+	DisplayName string
+}
+
+type OrderEnricher interface {
+	LookupBuyers(userIDs []uint) (map[uint]OrderBuyerInfo, error)
+}
+
+type OrderActionStore interface {
+	ManualConfirmPayment(orderNo string, input ManualConfirmPaymentInput) (*ManualConfirmPaymentResult, error)
+	ManualFulfillOrder(orderNo string, input ManualFulfillOrderInput) (*ManualFulfillOrderResult, error)
+	UpdateOrderStatus(orderNo string, input UpdateOrderStatusInput) (*UpdateOrderStatusResult, error)
+	RetryProcurement(id uint) (*RetryProcurementResult, error)
+}
+
 type StorefrontUser struct {
 	ID             uint       `json:"id"`
 	Email          string     `json:"email"`
@@ -771,6 +883,11 @@ type Bridge interface {
 	UpstreamCatalog(connectionID uint) (*UpstreamCatalogResult, error)
 	ImportUpstreamProducts(connectionID uint, input ImportUpstreamProductsInput) (*ImportUpstreamProductsResult, error)
 	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)
+	OrdersFiltered(filter OrdersFilter) (*OrdersResult, error)
+	ManualConfirmPayment(orderNo string, input ManualConfirmPaymentInput) (*ManualConfirmPaymentResult, error)
+	ManualFulfillOrder(orderNo string, input ManualFulfillOrderInput) (*ManualFulfillOrderResult, error)
+	UpdateOrderStatus(orderNo string, input UpdateOrderStatusInput) (*UpdateOrderStatusResult, error)
+	RetryProcurement(id uint) (*RetryProcurementResult, error)
 	Users(page, pageSize int, keyword, status string) (*UsersResult, error)
 	CreateUser(input CreateUserInput) (*StorefrontUser, error)
 	UpdateUser(id uint, input UpdateUserInput) (*StorefrontUser, error)

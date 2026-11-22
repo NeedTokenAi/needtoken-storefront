@@ -2,7 +2,11 @@ package orderhttp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strings"
+	"unicode/utf8"
 
 	paymentpresenter "github.com/dujiao-next/internal/modules/payment/transport/presenter"
 
@@ -110,6 +114,7 @@ func (h *CreateHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	userAgent, fingerprint := extractClientDeviceMetadata(c)
 	order, err := h.orders.CreateOrder(CreateOrderInput{
 		UserID:              uid,
 		Tenant:              tenantFromRequest(c),
@@ -118,6 +123,8 @@ func (h *CreateHandler) CreateOrder(c *gin.Context) {
 		AffiliateCode:       req.AffiliateCode,
 		AffiliateVisitorKey: req.AffiliateVisitorKey,
 		ClientIP:            c.ClientIP(),
+		UserAgent:           userAgent,
+		ClientFingerprint:   fingerprint,
 		ManualFormData:      req.ManualFormData,
 		InvoiceRequest:      req.InvoiceRequest,
 	})
@@ -142,6 +149,7 @@ func (h *CreateHandler) CreateGuestOrder(c *gin.Context) {
 		return
 	}
 
+	userAgent, fingerprint := extractClientDeviceMetadata(c)
 	order, err := h.orders.CreateGuestOrder(CreateGuestOrderInput{
 		Email:               req.Email,
 		OrderPassword:       req.OrderPassword,
@@ -152,6 +160,8 @@ func (h *CreateHandler) CreateGuestOrder(c *gin.Context) {
 		AffiliateCode:       req.AffiliateCode,
 		AffiliateVisitorKey: req.AffiliateVisitorKey,
 		ClientIP:            c.ClientIP(),
+		UserAgent:           userAgent,
+		ClientFingerprint:   fingerprint,
 		ManualFormData:      req.ManualFormData,
 		InvoiceRequest:      req.InvoiceRequest,
 	})
@@ -177,6 +187,7 @@ func (h *CreateHandler) CreateOrderAndPay(c *gin.Context) {
 		return
 	}
 
+	userAgent, fingerprint := extractClientDeviceMetadata(c)
 	order, err := h.orders.CreateOrder(CreateOrderInput{
 		UserID:              uid,
 		Tenant:              tenantFromRequest(c),
@@ -185,6 +196,8 @@ func (h *CreateHandler) CreateOrderAndPay(c *gin.Context) {
 		AffiliateCode:       req.AffiliateCode,
 		AffiliateVisitorKey: req.AffiliateVisitorKey,
 		ClientIP:            c.ClientIP(),
+		UserAgent:           userAgent,
+		ClientFingerprint:   fingerprint,
 		ManualFormData:      req.ManualFormData,
 		InvoiceRequest:      req.InvoiceRequest,
 	})
@@ -218,6 +231,7 @@ func (h *CreateHandler) CreateGuestOrderAndPay(c *gin.Context) {
 		return
 	}
 
+	userAgent, fingerprint := extractClientDeviceMetadata(c)
 	order, err := h.orders.CreateGuestOrder(CreateGuestOrderInput{
 		Email:               req.Email,
 		OrderPassword:       req.OrderPassword,
@@ -228,6 +242,8 @@ func (h *CreateHandler) CreateGuestOrderAndPay(c *gin.Context) {
 		AffiliateCode:       req.AffiliateCode,
 		AffiliateVisitorKey: req.AffiliateVisitorKey,
 		ClientIP:            c.ClientIP(),
+		UserAgent:           userAgent,
+		ClientFingerprint:   fingerprint,
 		ManualFormData:      req.ManualFormData,
 		InvoiceRequest:      req.InvoiceRequest,
 	})
@@ -326,4 +342,57 @@ func (h *CreateHandler) respondCreateAndPay(c *gin.Context, order *orderdomain.O
 		resp["expires_at"] = result.Payment.ExpiredAt
 	}
 	response.Success(c, resp)
+}
+
+func extractClientDeviceMetadata(c *gin.Context) (string, string) {
+	if c == nil || c.Request == nil {
+		return "", ""
+	}
+	ua := truncateUTF8Bytes(strings.TrimSpace(c.Request.UserAgent()), 512)
+	for _, header := range []string{"X-Client-Fingerprint", "X-Device-Fingerprint"} {
+		if raw := sanitizeFingerprint(c.GetHeader(header)); raw != "" {
+			return ua, raw
+		}
+	}
+	acceptLang := strings.TrimSpace(c.GetHeader("Accept-Language"))
+	secUA := strings.TrimSpace(c.GetHeader("Sec-CH-UA"))
+	secPlatform := strings.TrimSpace(c.GetHeader("Sec-CH-UA-Platform"))
+	secMobile := strings.TrimSpace(c.GetHeader("Sec-CH-UA-Mobile"))
+	if ua == "" && acceptLang == "" && secUA == "" && secPlatform == "" && secMobile == "" {
+		return "", ""
+	}
+	sum := sha256.Sum256([]byte(strings.Join([]string{ua, acceptLang, secUA, secPlatform, secMobile}, "|")))
+	return ua, "fp_" + hex.EncodeToString(sum[:16])
+}
+
+func sanitizeFingerprint(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if len(trimmed) < 8 {
+		return ""
+	}
+	var b strings.Builder
+	for i := 0; i < len(trimmed) && b.Len() < 128; i++ {
+		ch := trimmed[i]
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.' || ch == ':' {
+			b.WriteByte(ch)
+		}
+	}
+	if b.Len() < 8 {
+		return ""
+	}
+	return b.String()
+}
+
+func truncateUTF8Bytes(s string, maxBytes int) string {
+	if maxBytes <= 0 || len(s) <= maxBytes {
+		return s
+	}
+	for len(s) > maxBytes {
+		_, size := utf8.DecodeLastRuneInString(s)
+		if size <= 0 {
+			break
+		}
+		s = s[:len(s)-size]
+	}
+	return s
 }
