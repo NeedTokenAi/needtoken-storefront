@@ -1,6 +1,6 @@
 <template>
   <div class="reset-radar">
-    <!-- Radar Channel Tabs (Codex / Claude / Grok; extensible for Gemini) -->
+    <!-- Radar Channel Tabs (Codex / Claude / Gemini / Grok) -->
     <div
       ref="tabRailEl"
       class="radar-tabs"
@@ -218,7 +218,7 @@
       </section>
     </div>
 
-    <!-- Placeholder Radar Panels (Claude / Grok) -->
+    <!-- Placeholder Radar Panels (Claude / Gemini / Grok) -->
     <div
       v-else
       role="tabpanel"
@@ -263,6 +263,7 @@ import { useSlidingIndicator } from './composables/useSlidingIndicator'
 import { usePageSeo } from '../../composables/usePageSeo'
 import {
   fetchResetFeed,
+  RADAR_CHANNELS,
   RESET_FEED_MAX_AGE_MS,
   RESET_FEED_POLL_MS,
   RESET_RECORD_PAGE_SIZE,
@@ -270,17 +271,12 @@ import {
   resetFeedIsExpired,
   resetGapDays,
   resetRecordPage,
+  type RadarChannelId,
   type ResetFeed,
   type ResetRecord,
 } from './lib/resetRadar'
 
-type RadarChannelId = 'codex' | 'claude' | 'grok'
-
-const channels: ReadonlyArray<{ id: RadarChannelId; brand: 'gpt' | 'claude' | 'grok' }> = [
-  { id: 'codex', brand: 'gpt' },
-  { id: 'claude', brand: 'claude' },
-  { id: 'grok', brand: 'grok' },
-]
+const channels = RADAR_CHANNELS
 
 const { t, locale } = useI18n()
 const activeChannel = ref<RadarChannelId>('codex')
@@ -996,7 +992,7 @@ onUnmounted(() => {
   line-height: 1.65;
 }
 
-/* Placeholder panels (Claude / Grok) */
+/* Placeholder panels (Claude / Gemini / Grok) */
 .placeholder-card {
   padding: 32px;
   border: 1px solid var(--ui-border);

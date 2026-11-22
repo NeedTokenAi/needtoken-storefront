@@ -3766,6 +3766,17 @@
           "rule3Title": "实时雷达状态",
           "rule3Body": "当前暂未接入第三方公开全员重置源，我们将于官方出现全员额度补偿或事件源稳定后第一时间上线实时记录。"
         },
+        "gemini": {
+          "title": "Gemini 雷达",
+          "subtitle": "追踪 Google AI Pro / Ultra 与 Gemini CLI 额度刷新及官方补偿动态（实时追踪接入中）",
+          "rulesTitle": "官方额度刷新规则参考",
+          "rule1Title": "网页与 App 滚动恢复",
+          "rule1Body": "Gemini 网页端与 App 的高级模型额度按提示词长度与功能复杂度动态计算，通常按 5 小时滚动增量及周期上限自动恢复。",
+          "rule2Title": "CLI 与每日配额刷新",
+          "rule2Body": "Gemini CLI、Code Assist 与 AI Studio 每日请求限额（RPD）按太平洋时间（PT）午夜自动重置，与订阅网页端及独立计费 API 分开核算。",
+          "rule3Title": "实时雷达状态",
+          "rule3Body": "当前为占位展示，绝不虚构历史记录；待官方或公开全员重置公告源稳定接入后，自动展示完整日历与时间轴。"
+        },
         "grok": {
           "title": "Grok 雷达",
           "subtitle": "追踪 SuperGrok / X Premium+ 额度刷新与官方补偿动态（实时追踪接入中）",

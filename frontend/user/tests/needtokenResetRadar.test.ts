@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fetchResetFeed, parseResetFeed, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetActivityDays, resetCalendar, resetCalendarWithRecords, resetElapsedTime, resetFeedIsExpired, resetGapDays, resetRecordPage, resetSourceUrl, resetStatistics, type ResetRecord } from '../src/templates/needtoken/lib/resetRadar.ts'
+import { readFileSync } from 'node:fs'
+import { fetchResetFeed, parseResetFeed, RADAR_CHANNELS, RESET_FEED_MAX_AGE_MS, RESET_FEED_PATH, RESET_FEED_SOURCE, resetActivityDays, resetCalendar, resetCalendarWithRecords, resetElapsedTime, resetFeedIsExpired, resetGapDays, resetRecordPage, resetSourceUrl, resetStatistics, type ResetRecord } from '../src/templates/needtoken/lib/resetRadar.ts'
 
 // Synthetic contract fixtures. These do not verify a live upstream or account delivery.
 const fixtureRecord = (overrides: Record<string, unknown> = {}) => ({
@@ -221,4 +222,29 @@ test('rich reset calendar attaches day records, marks today, and calculates inte
   assert.equal(flat.find(day => day.date === '2026-11-19')?.isToday, true)
   assert.equal(resetGapDays(rows[0]!.announced_at, rows[1]!.announced_at), 11)
   assert.equal(resetGapDays(rows[0]!.announced_at, undefined), null)
+})
+
+test('radar channel tabs place Gemini directly before Grok and include complete trilingual placeholder copy', () => {
+  assert.deepEqual(
+    RADAR_CHANNELS.map(channel => `${channel.id}:${channel.brand}`),
+    ['codex:gpt', 'claude:claude', 'gemini:gemini', 'grok:grok'],
+  )
+  const requiredFields = ['title', 'subtitle', 'rulesTitle', 'rule1Title', 'rule1Body', 'rule2Title', 'rule2Body', 'rule3Title', 'rule3Body']
+  for (const locale of ['zh-CN', 'zh-TW', 'en-US']) {
+    const messages = JSON.parse(readFileSync(new URL(`../src/i18n/locales/${locale}.json`, import.meta.url), 'utf8'))
+    const radarV2 = messages.needtoken?.radarV2
+    assert.ok(radarV2, `missing needtoken.radarV2 in ${locale}`)
+    for (const channel of RADAR_CHANNELS) {
+      assert.equal(typeof radarV2.tabs?.[channel.id], 'string', `missing tab label for ${channel.id} in ${locale}`)
+      assert.ok(radarV2.tabs[channel.id].trim().length > 0)
+      if (channel.id !== 'codex') {
+        const placeholder = radarV2.placeholder?.[channel.id]
+        assert.ok(placeholder, `missing placeholder copy for ${channel.id} in ${locale}`)
+        for (const field of requiredFields) {
+          assert.equal(typeof placeholder[field], 'string', `missing placeholder.${channel.id}.${field} in ${locale}`)
+          assert.ok(placeholder[field].trim().length > 0)
+        }
+      }
+    }
+  }
 })
