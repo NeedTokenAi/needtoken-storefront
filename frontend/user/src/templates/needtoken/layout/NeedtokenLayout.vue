@@ -48,17 +48,68 @@
             </Transition>
           </div>
           <ThemeToggle class="max-[479px]:hidden" />
-          <button
-            v-if="authStore.isAuthenticated && !appStore.isResellerTenant"
-            type="button"
-            class="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-[13px] font-semibold text-foreground hover:border-primary/40 hover:text-primary max-[639px]:hidden"
-            :disabled="ssoLoading"
-            @click="openConsoleFromHeader"
-          >
-            <span>{{ t('needtoken.nav.apiConsole') }}</span>
-            <ArrowUpRight class="h-3.5 w-3.5 opacity-70" />
-          </button>
-          <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('navbar.personalCenter') }}</RouterLink>
+          <div v-if="authStore.isAuthenticated" ref="accountEl" class="relative" @focusout="onAccountFocusOut">
+            <button
+              type="button"
+              class="nt-account-trigger inline-flex h-9 max-w-[180px] items-center gap-2 rounded-full border border-border bg-card pl-1.5 pr-2.5 text-[13px] font-semibold text-foreground hover:border-primary/40 hover:text-primary"
+              :aria-expanded="accountOpen"
+              aria-controls="nt-account-menu"
+              @click="toggleAccountMenu"
+            >
+              <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground" aria-hidden="true">{{ userInitial }}</span>
+              <span class="truncate max-[479px]:hidden">{{ userDisplayName }}</span>
+              <ChevronDown class="h-3.5 w-3.5 shrink-0 opacity-70 transition-transform" :class="accountOpen ? 'rotate-180' : ''" aria-hidden="true" />
+            </button>
+            <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
+              <div v-if="accountOpen" id="nt-account-menu" class="nt-account-menu absolute right-0 top-[calc(100%+10px)] z-[60] w-[276px] rounded-2xl border border-border bg-card p-2">
+                <div class="border-b border-border px-3 py-2.5">
+                  <p class="truncate text-[13.5px] font-semibold text-foreground">{{ userDisplayName }}</p>
+                  <p v-if="userEmail" class="mt-0.5 truncate text-[11.5px] text-muted-foreground">{{ userEmail }}</p>
+                </div>
+
+                <div v-if="!appStore.isResellerTenant" class="border-b border-border py-1.5">
+                  <div class="flex items-center justify-between px-3 py-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{{ t('needtoken.accountMenu.gatewaySection') }}</span>
+                    <span v-if="gatewayBalanceDisplay" class="nt-mono rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{{ gatewayBalanceDisplay }}</span>
+                  </div>
+                  <button type="button" class="nt-account-item" :disabled="ssoLoading" @click="openConsolePath('/dashboard')">
+                    <span class="inline-flex items-center gap-2"><LayoutDashboard class="h-4 w-4 text-primary" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.dashboard') }}</span></span>
+                    <ArrowUpRight class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+                  </button>
+                  <button type="button" class="nt-account-item" :disabled="ssoLoading" @click="openConsolePath('/keys')">
+                    <span class="inline-flex items-center gap-2"><KeyRound class="h-4 w-4 text-primary" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.apiKeys') }}</span></span>
+                    <ArrowUpRight class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+                  </button>
+                  <button type="button" class="nt-account-item" :disabled="ssoLoading" @click="openConsolePath('/usage-logs')">
+                    <span class="inline-flex items-center gap-2"><Activity class="h-4 w-4 text-primary" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.usageLogs') }}</span></span>
+                    <ArrowUpRight class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div class="border-b border-border py-1.5">
+                  <span class="block px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{{ t('needtoken.accountMenu.storeSection') }}</span>
+                  <RouterLink to="/me" class="nt-account-item" @click="closeMenus">
+                    <span class="inline-flex items-center gap-2"><UserRound class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('navbar.personalCenter') }}</span></span>
+                  </RouterLink>
+                  <RouterLink to="/me/orders" class="nt-account-item" @click="closeMenus">
+                    <span class="inline-flex items-center gap-2"><ShoppingBag class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.myOrders') }}</span></span>
+                  </RouterLink>
+                  <RouterLink to="/me/wallet" class="nt-account-item" @click="closeMenus">
+                    <span class="inline-flex items-center gap-2"><Wallet class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.walletAndGift') }}</span></span>
+                  </RouterLink>
+                  <RouterLink to="/me/security" class="nt-account-item" @click="closeMenus">
+                    <span class="inline-flex items-center gap-2"><ShieldCheck class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.security') }}</span></span>
+                  </RouterLink>
+                </div>
+
+                <div class="pt-1.5">
+                  <button type="button" class="nt-account-item text-red-600 hover:bg-red-500/10 dark:text-red-400" @click="handleLogout">
+                    <span class="inline-flex items-center gap-2"><LogOut class="h-4 w-4" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.signOut') }}</span></span>
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
           <RouterLink v-else :to="loginTarget" class="nt-auth-entry inline-flex min-h-9 items-center whitespace-nowrap rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90">{{ t('needtoken.nav.authEntry') }}</RouterLink>
 
           <div ref="moreEl" class="relative hidden max-[1239px]:block" @focusout="onMoreFocusOut">
@@ -87,11 +138,21 @@
                 </div>
               </template>
               <RouterLink to="/guest/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ t('navbar.guestOrders') }}</RouterLink>
-              <button v-if="authStore.isAuthenticated && !appStore.isResellerTenant" type="button" class="flex items-center justify-between rounded px-3 py-2 text-left text-sm font-semibold text-primary hover:bg-secondary" :disabled="ssoLoading" @click="closeMenus(); openConsoleFromHeader()">
-                <span>{{ t('needtoken.nav.apiConsole') }}</span>
-                <ArrowUpRight class="h-3.5 w-3.5" />
-              </button>
-              <RouterLink v-if="authStore.isAuthenticated" to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
+              <template v-if="authStore.isAuthenticated">
+                <span v-if="!appStore.isResellerTenant" class="mt-1 border-t border-border px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('needtoken.accountMenu.gatewaySection') }}</span>
+                <button v-if="!appStore.isResellerTenant" type="button" class="flex items-center justify-between rounded px-3 py-2 text-left text-sm font-semibold text-primary hover:bg-secondary" :disabled="ssoLoading" @click="openConsolePath('/dashboard')">
+                  <span>{{ t('needtoken.accountMenu.dashboard') }}</span>
+                  <ArrowUpRight class="h-3.5 w-3.5" />
+                </button>
+                <button v-if="!appStore.isResellerTenant" type="button" class="flex items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :disabled="ssoLoading" @click="openConsolePath('/keys')">
+                  <span>{{ t('needtoken.accountMenu.apiKeys') }}</span>
+                  <ArrowUpRight class="h-3.5 w-3.5" />
+                </button>
+                <span class="mt-1 border-t border-border px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('needtoken.accountMenu.storeSection') }}</span>
+                <RouterLink to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
+                <RouterLink to="/me/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('needtoken.accountMenu.myOrders') }}</RouterLink>
+                <button type="button" class="rounded px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10 dark:text-red-400" @click="handleLogout">{{ t('needtoken.accountMenu.signOut') }}</button>
+              </template>
               <span class="px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('needtoken.theme.label') }}</span>
               <div class="px-2 pb-1"><ThemeToggle variant="menu" /></div>
               <span class="px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('navbar.selectLanguage') }}</span>
@@ -116,8 +177,23 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import { ArrowUpRight, ChevronDown, ClipboardList, Languages, Menu, X } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  Activity,
+  ArrowUpRight,
+  ChevronDown,
+  ClipboardList,
+  KeyRound,
+  Languages,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  ShoppingBag,
+  UserRound,
+  Wallet,
+  X,
+} from 'lucide-vue-next'
 import { useAppStore } from '../../../stores/app'
 import { useUserAuthStore } from '../../../stores/userAuth'
 import { getImageUrl } from '../../../utils/image'
@@ -139,13 +215,56 @@ import '../styles/needtoken.css'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const appStore = useAppStore()
 const authStore = useUserAuthStore()
-const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
+const { summary: apiSummary, ssoLoading, loadSummary, openApiConsoleSSO } = useApiAccountLink()
 const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/me'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
-const openConsoleFromHeader = () => {
-  void openApiConsoleSSO('/dashboard', route.path.startsWith('/auth/') ? '/me' : route.path)
+const accountOpen = ref(false)
+const accountEl = ref<HTMLElement | null>(null)
+const userDisplayName = computed(() => {
+  const nick = String(authStore.user?.nickname || authStore.user?.display_name || '').trim()
+  if (nick) return nick
+  const email = String(authStore.user?.email || '').trim()
+  if (email.includes('@')) return email.split('@')[0]!
+  return t('navbar.personalCenter')
+})
+const userEmail = computed(() => String(authStore.user?.email || '').trim())
+const userInitial = computed(() => userDisplayName.value.slice(0, 1).toUpperCase() || 'N')
+const gatewayBalanceDisplay = computed(() => {
+  const sum = apiSummary.value
+  if (!sum?.linked || typeof sum.quota !== 'number') return ''
+  return `$${(sum.quota / 500000).toFixed(2)}`
+})
+const openConsolePath = (targetPath: '/dashboard' | '/keys' | '/usage-logs') => {
+  closeMenus()
+  void openApiConsoleSSO(targetPath, route.path.startsWith('/auth/') ? '/me' : route.path)
+}
+const toggleAccountMenu = () => {
+  accountOpen.value = !accountOpen.value
+  openGroup.value = null
+  langOpen.value = false
+  if (accountOpen.value && !appStore.isResellerTenant) {
+    void loadSummary()
+  }
+}
+const onAccountFocusOut = (event: FocusEvent) => {
+  if (!(event.relatedTarget instanceof Node) || !accountEl.value?.contains(event.relatedTarget)) {
+    accountOpen.value = false
+  }
+}
+const handleLogout = async () => {
+  closeMenus()
+  await authStore.logout('/')
+}
+const syncSessionOnResume = () => {
+  if (document.visibilityState === 'hidden' || !authStore.isAuthenticated) return
+  void authStore.verifySession().then((valid) => {
+    if (!valid && route.path.startsWith('/me')) {
+      void router.replace({ path: '/auth/login', query: { redirect: route.fullPath } })
+    }
+  })
 }
 const scopeEl = ref<HTMLElement | null>(null)
 const navRailEl = ref<HTMLElement | null>(null)
@@ -241,6 +360,7 @@ function closeMenus() {
   openGroup.value = null
   mobileGroup.value = null
   langOpen.value = false
+  accountOpen.value = false
 }
 function onGroupFocusOut(event: FocusEvent, key: string) {
   if (!(event.relatedTarget instanceof Node) || !groupEls.get(key)?.contains(event.relatedTarget)) openGroup.value = null
@@ -296,6 +416,7 @@ const onDocClick = (e: MouseEvent) => {
   const target = e.target as Node
   if (langOpen.value && langEl.value && !langEl.value.contains(target)) langOpen.value = false
   if (moreOpen.value && moreEl.value && !moreEl.value.contains(target)) moreOpen.value = false
+  if (accountOpen.value && accountEl.value && !accountEl.value.contains(target)) accountOpen.value = false
   if (openGroup.value && !groupEls.get(openGroup.value)?.contains(target)) openGroup.value = null
 }
 
@@ -304,12 +425,19 @@ useTheme()
 onMounted(() => {
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', onDocumentKeydown)
+  document.addEventListener('visibilitychange', syncSessionOnResume)
+  window.addEventListener('focus', syncSessionOnResume)
   document.body.classList.add('nt-tokens')
+  if (authStore.isAuthenticated) {
+    void authStore.verifySession()
+  }
 })
 onUnmounted(() => {
   appStore.setStorefrontBrandOverride(previousBrandOverride)
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onDocumentKeydown)
+  document.removeEventListener('visibilitychange', syncSessionOnResume)
+  window.removeEventListener('focus', syncSessionOnResume)
   document.body.classList.remove('nt-tokens')
 })
 </script>
@@ -331,7 +459,10 @@ onUnmounted(() => {
 .nt-nav-dropdown-link:hover { color: var(--ui-accent); background: var(--ui-bg-soft); }
 .nt-nav-dropdown-link.is-disabled { color: var(--ui-text-muted); cursor: default; }
 .nt-nav-dropdown-link.is-disabled em, .nt-mobile-disabled em { font-style: normal; font-size: 11px; color: var(--nt-warning-ink); }
-.nt-language-options, .nt-mobile-navigation { box-shadow: var(--nt-popover-shadow); transform-origin: top right; }
+.nt-language-options, .nt-mobile-navigation, .nt-account-menu { box-shadow: var(--nt-popover-shadow); transform-origin: top right; }
+.nt-account-item { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; padding: 7px 10px; border-radius: 9px; font-size: 13px; color: var(--ui-text-primary); text-align: left; }
+.nt-account-item:hover:not(:disabled) { background: var(--ui-bg-soft); color: var(--ui-accent); }
+.nt-account-item:disabled { opacity: .6; cursor: not-allowed; }
 .nt-mobile-navigation { max-height: calc(100dvh - 90px); overflow-y: auto; overscroll-behavior: contain; }
 .nt-auth-entry:active { transform: scale(0.97); transition-duration: var(--nt-duration-press); }
 .nt-menu-enter-active { transition: opacity 180ms var(--nt-ease-emphasized), transform 220ms var(--nt-ease-spring-soft); }

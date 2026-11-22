@@ -9,24 +9,47 @@
         </h1>
         <p class="api-hero-intro">{{ t('needtoken.apiConnect.heroIntro') }}</p>
 
+        <!-- 直显可一键复制的 API 接口地址 -->
+        <div class="api-endpoint-bar">
+          <span class="api-endpoint-tag">API Base URL</span>
+          <code class="api-endpoint-url">{{ API_BASE_URL }}</code>
+          <button
+            type="button"
+            class="api-endpoint-copy"
+            :aria-label="t('needtoken.apiConnect.copyEndpoint')"
+            @click="copyBaseUrl"
+          >
+            <Check v-if="copiedEndpoint" :size="15" aria-hidden="true" />
+            <Copy v-else :size="15" aria-hidden="true" />
+            <span>{{ copiedEndpoint ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
+          </button>
+        </div>
+
         <div class="api-hero-actions">
-          <RouterLink to="/plans" class="primary">
-            <span>{{ t('needtoken.apiUse.buy') }}</span>
-            <ArrowRight :size="16" aria-hidden="true" />
-          </RouterLink>
+          <button
+            type="button"
+            class="primary"
+            :disabled="ssoLoading"
+            @click="handleApiKeyAction"
+          >
+            <LoaderCircle v-if="ssoLoading && pendingTarget === '/keys'" :size="16" class="spin" aria-hidden="true" />
+            <KeyRound v-else :size="16" aria-hidden="true" />
+            <span>{{ userAuth.isAuthenticated ? t('needtoken.apiConnect.viewApiKeyAction') : t('needtoken.apiConnect.createApiKeyAction') }}</span>
+            <ArrowUpRight :size="15" aria-hidden="true" />
+          </button>
           <button
             type="button"
             class="console-btn"
             :disabled="ssoLoading"
             @click="handleOpenConsole"
           >
-            <LoaderCircle v-if="ssoLoading" :size="16" class="spin" aria-hidden="true" />
-            <Terminal v-else :size="16" aria-hidden="true" />
-            <span>{{ t('needtoken.apiConnect.enterConsoleAction') }}</span>
+            <LoaderCircle v-if="ssoLoading && pendingTarget === '/dashboard'" :size="16" class="spin" aria-hidden="true" />
+            <LayoutDashboard v-else :size="16" aria-hidden="true" />
+            <span>{{ t('needtoken.apiConnect.goDashboardAction') }}</span>
             <ArrowUpRight :size="15" aria-hidden="true" />
           </button>
-          <a href="#api-connect" class="ghost-link">
-            <span>{{ t('needtoken.apiConnect.start') }}</span>
+          <a href="#gateway-plans" class="ghost-link">
+            <span>{{ t('needtoken.apiConnect.browsePlansAnchor') }}</span>
             <ArrowDown :size="15" aria-hidden="true" />
           </a>
         </div>
@@ -70,7 +93,14 @@
               {{ tab.label }}
             </button>
           </div>
-          <span>{{ t('needtoken.apiConnect.requestExample') }}</span>
+          <div class="preview-code-meta">
+            <span>{{ t('needtoken.apiConnect.requestExample') }}</span>
+            <button type="button" class="preview-copy-btn" @click="copySnippet">
+              <Check v-if="copiedSnippet" :size="13" aria-hidden="true" />
+              <Copy v-else :size="13" aria-hidden="true" />
+              <span>{{ copiedSnippet ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
+            </button>
+          </div>
         </div>
         <pre :key="previewKind" class="preview-code" tabindex="0" :aria-label="t('needtoken.apiConnect.requestExample')"><code>{{ previewSnippet }}</code></pre>
         <div class="preview-footer">
@@ -119,10 +149,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { ArrowDown, ArrowRight, ArrowUpRight, Braces, Cpu, KeyRound, LoaderCircle, Terminal } from 'lucide-vue-next'
+import { ArrowDown, ArrowRight, ArrowUpRight, Braces, Check, Copy, Cpu, KeyRound, LayoutDashboard, LoaderCircle, Terminal } from 'lucide-vue-next'
 import { useUserAuthStore } from '../../../stores/userAuth'
 import { useAppStore } from '../../../stores/app'
 import { API_BASE_URL, CONSOLE_URL, DEFAULT_MODELS } from '../config'
@@ -190,6 +220,47 @@ const poolStatusSub = computed(() => {
   return t('needtoken.apiConnect.metrics.poolOnlineSub')
 })
 
+const pendingTarget = ref<'/keys' | '/dashboard' | ''>('')
+const copiedEndpoint = ref(false)
+const copiedSnippet = ref(false)
+let copyEndpointTimer: ReturnType<typeof setTimeout> | undefined
+let copySnippetTimer: ReturnType<typeof setTimeout> | undefined
+
+const copyBaseUrl = async () => {
+  if (copyEndpointTimer) clearTimeout(copyEndpointTimer)
+  try {
+    await navigator.clipboard.writeText(API_BASE_URL)
+    copiedEndpoint.value = true
+    copyEndpointTimer = setTimeout(() => { copiedEndpoint.value = false }, 1800)
+  } catch {
+    copiedEndpoint.value = false
+  }
+}
+
+const copySnippet = async () => {
+  if (copySnippetTimer) clearTimeout(copySnippetTimer)
+  try {
+    await navigator.clipboard.writeText(previewSnippet.value)
+    copiedSnippet.value = true
+    copySnippetTimer = setTimeout(() => { copiedSnippet.value = false }, 1800)
+  } catch {
+    copiedSnippet.value = false
+  }
+}
+
+const handleApiKeyAction = () => {
+  if (appStore.isResellerTenant) {
+    window.open(`${CONSOLE_URL}/keys`, '_blank', 'noopener,noreferrer')
+    return
+  }
+  if (!userAuth.isAuthenticated) {
+    void router.push({ path: '/auth/login', query: { redirect: '/api-services' } })
+    return
+  }
+  pendingTarget.value = '/keys'
+  void openApiConsoleSSO('/keys', '/api-services')
+}
+
 const handleOpenConsole = () => {
   if (appStore.isResellerTenant) {
     window.open(CONSOLE_URL, '_blank', 'noopener,noreferrer')
@@ -199,12 +270,18 @@ const handleOpenConsole = () => {
     void router.push({ path: '/auth/login', query: { redirect: '/api-services' } })
     return
   }
+  pendingTarget.value = '/dashboard'
   void openApiConsoleSSO('/dashboard', '/api-services')
 }
 
 onMounted(() => {
   void pricing.ensureLoaded()
   void pool.ensureLoaded()
+})
+
+onUnmounted(() => {
+  if (copyEndpointTimer) clearTimeout(copyEndpointTimer)
+  if (copySnippetTimer) clearTimeout(copySnippetTimer)
 })
 </script>
 
@@ -215,14 +292,24 @@ onMounted(() => {
 .api-hero-label { color: var(--ui-accent); font-size: 12.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .api-hero h1 { margin-top: 16px; font-size: clamp(34px, 4vw, 52px); line-height: 1.15; letter-spacing: -.035em; font-weight: 650; text-wrap: balance; }
 .api-hero h1 span { display: block; margin-top: 8px; color: var(--ui-accent); }
-.api-hero-intro { margin-top: 20px; max-width: 36em; color: var(--ui-text-secondary); font-size: 15.5px; line-height: 1.82; text-wrap: pretty; }
-.api-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 28px; }
+.api-hero-intro { margin-top: 18px; max-width: 38em; color: var(--ui-text-secondary); font-size: 15.5px; line-height: 1.8; text-wrap: pretty; }
+.api-endpoint-bar { display: flex; align-items: center; gap: 10px; margin-top: 22px; padding: 6px 8px 6px 12px; border: 1px solid var(--ui-border-strong); border-radius: 12px; background: var(--ui-bg-elevated); max-width: 520px; }
+.api-endpoint-tag { flex: none; padding: 2px 8px; border-radius: 6px; background: var(--ui-accent-soft, rgba(16, 185, 129, 0.1)); color: var(--ui-accent); font: 600 11px var(--nt-font-mono); }
+.api-endpoint-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 13px var(--nt-font-mono); color: var(--ui-text-primary); }
+.api-endpoint-copy { display: inline-flex; flex: none; align-items: center; gap: 5px; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--ui-border); background: var(--ui-bg-soft); color: var(--ui-text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; }
+.api-endpoint-copy:hover { border-color: var(--ui-accent); color: var(--ui-accent); }
+.api-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
 .api-hero-actions a,
 .api-hero-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; padding: 11px 18px; border: 1px solid var(--ui-border-strong); border-radius: 11px; color: var(--ui-text-primary); background: var(--ui-bg-elevated); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: color 160ms, background 160ms, border-color 160ms, transform 160ms; }
 .api-hero-actions a:hover,
 .api-hero-actions button:hover:not(:disabled) { border-color: var(--nt-accent-border-strong, var(--ui-accent)); background: var(--ui-bg-soft); }
-.api-hero-actions a.primary { color: var(--ui-text-on-accent); border-color: var(--ui-accent); background: var(--ui-accent); }
-.api-hero-actions a.primary:hover { background: var(--ui-accent-hover); }
+.api-hero-actions a.primary,
+.api-hero-actions button.primary { color: var(--ui-text-on-accent); border-color: var(--ui-accent); background: var(--ui-accent); }
+.api-hero-actions a.primary:hover,
+.api-hero-actions button.primary:hover:not(:disabled) { background: var(--ui-accent-hover); }
+.preview-code-meta { display: inline-flex; align-items: center; gap: 8px; }
+.preview-copy-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--ui-border); background: var(--ui-bg-soft); color: var(--ui-text-secondary); font-size: 11px; font-weight: 500; cursor: pointer; }
+.preview-copy-btn:hover { color: var(--ui-accent); border-color: var(--ui-accent); }
 .api-hero-actions .console-btn { border-color: var(--nt-accent-border, var(--ui-border-strong)); color: var(--ui-accent); background: var(--nt-accent-subtle, var(--ui-bg-elevated)); }
 .api-hero-actions .ghost-link { border-color: transparent; background: transparent; color: var(--ui-text-secondary); padding-inline: 12px; }
 .api-hero-actions button:disabled { opacity: .65; cursor: not-allowed; }

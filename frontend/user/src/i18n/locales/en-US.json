@@ -1821,9 +1821,9 @@
       "home": "Home",
       "recharge": "Top-up services",
       "rental": "Accounts",
-      "plans": "API plans",
+      "plans": "Need Gateway Plans",
       "models": "Models",
-      "rankings": "Rankings",
+      "rankings": "Leaderboard",
       "docs": "API Docs",
       "blog": "Blog",
       "login": "Log in",
@@ -2066,12 +2066,16 @@
       "copyModelId": "Copy model ID {model}",
       "copyIdShort": "Copy Model ID",
       "copied": "Copied",
-      "callInConsole": "Call in Console"
+      "callInConsole": "Call in Console",
+      "viewModeLabel": "View mode",
+      "viewTable": "Compare Table",
+      "viewCards": "Cards",
+      "empty": "No matching models found"
     },
     "plans": {
-      "title": "API Plans",
+      "title": "Need Gateway Plans",
       "subtitle": "Top up as needed and choose your Token allowance. Buy plans here; manage your APIKey and usage in the console.",
-      "buy": "Browse API plans",
+      "buy": "Browse Need Gateway Plans",
       "console": "Open API console",
       "what": {
         "title": "What a plan contains",
@@ -2201,7 +2205,104 @@
       "viewAllModels": "Explore All Models",
       "protocolsCol": "Protocols",
       "inspectModel": "Inspect →",
-      "hotModelsFallbackHint": "Select any model to inspect live group multipliers and input/output rates in Model Square."
+      "hotModelsFallbackHint": "Select any model to inspect live group multipliers and input/output rates in Model Square.",
+      "steps": {
+        "title": "Three steps to ship with NeedToken Gateway",
+        "configure": {
+          "title": "Configure",
+          "desc": "Buy a Need Gateway Plan or create an API Key with stackable dedicated packs"
+        },
+        "connect": {
+          "title": "Connect",
+          "desc": "Route through OpenAI, Claude, Gemini, xAI, and multimodal compatible APIs"
+        },
+        "monitor": {
+          "title": "Monitor",
+          "desc": "Track usage, plan balances, spend, and live pool SLA in real time"
+        }
+      },
+      "plansSection": {
+        "eyebrow": "NEED GATEWAY PLANS",
+        "title": "Need Gateway Plans & Advantages",
+        "subtitle": "Anchored to official list pricing with 2x–3x quota multipliers. Mix models freely or stack dedicated packs side by side, with seamless overflow to your API Key balance.",
+        "viewAll": "View All Plans",
+        "fallbackHint": "Live catalog items are syncing — open the Need Gateway Plans page to view all available offers.",
+        "advantages": {
+          "officialBase": "Official List-Price Baseline",
+          "mixedModels": "Multi-Model Mixed Calling",
+          "multipliers": "2x / 3x Quota Multipliers",
+          "stackable": "Stackable Dedicated Packs",
+          "overflow": "Auto Overflow to Key Balance"
+        },
+        "tracks": {
+          "openai": {
+            "title": "OpenAI Dedicated",
+            "desc": "GPT-5 / Codex / o3 route with 2x quota boost for heavy coding & reasoning."
+          },
+          "claude": {
+            "title": "Claude Dedicated",
+            "desc": "Opus & Sonnet native caching route with 2x quota built for Claude Code."
+          },
+          "gemini": {
+            "title": "Gemini Dedicated",
+            "desc": "High-speed Gemini Pro & Flash route with 1M context window."
+          },
+          "xai": {
+            "title": "xAI Dedicated",
+            "desc": "Dedicated Grok reasoning and real-time search capacity."
+          },
+          "image": {
+            "title": "Image Pack",
+            "desc": "2x quota boost for flagship image generation & editing models."
+          },
+          "video": {
+            "title": "Video Pack",
+            "desc": "Dedicated high-compute route for next-gen video generation models."
+          }
+        }
+      },
+      "routing": {
+        "eyebrow": "SMART ROUTING ARCHITECTURE",
+        "title": "One unified router for flagship models and coding agents",
+        "subtitle": "Skip managing fragmented provider bills and keys — get smart routing, prompt caching, and automatic failover out of the box.",
+        "hubLabel": "Smart Routing",
+        "worksWithMore": "Works with 10+ coding agents and clients",
+        "featuresLabel": "Core gateway capabilities",
+        "clients": {
+          "claudeCode": "Autonomous Terminal Coder",
+          "codex": "OpenAI Coding Agent",
+          "ccSwitch": "Multi-Provider Switcher",
+          "openClaw": "Open Agent Workflow"
+        },
+        "features": {
+          "smartRouting": "Smart Routing",
+          "promptCaching": "Prompt Caching",
+          "autoFallbacks": "Auto Fallbacks",
+          "oneBill": "One Bill",
+          "spendTracking": "Spend Tracking",
+          "neverDowngraded": "Never Downgraded"
+        }
+      },
+      "pricing": {
+        "eyebrow": "LIVE DYNAMIC PRICING",
+        "title": "Live Model Pricing & Official Discount Comparison",
+        "subtitle": "Synced live from NeedToken Gateway and pool health probes. Toggle between pay-as-you-go rates and effective multiplied plan pricing.",
+        "modeLabel": "Pricing mode comparison",
+        "paygMode": "Pay-as-you-go",
+        "planMultiplierOption": "{mult} Plan Effective",
+        "paygHint": "Showing live gateway pay-as-you-go rates (with group discounts) vs official list pricing.",
+        "planHint": "Showing effective per-1M rates under a {mult} quota multiplier plan; usage beyond plan quota overflows seamlessly to Key balance.",
+        "quickStart": "Quick start",
+        "featuredTab": "Featured",
+        "searchPlaceholder": "Search models, e.g. claude, gpt-5.4, gemini...",
+        "colOfficialInput": "Input (List)",
+        "colOfficialOutput": "Output (List)",
+        "colNeedInput": "Input (NeedToken)",
+        "colNeedOutput": "Output (NeedToken)",
+        "colProvider": "Route Group",
+        "slaMonitoring": "Monitoring",
+        "viewFullCatalog": "View all {count} models & group rates"
+      }
     },
     "homeServices": {
       "seoTitle": "Recharges, ready-made products and API plans",
@@ -2633,16 +2734,16 @@
     },
     "apiCatalog": {
       "titlePrefix": "Choose your ",
-      "subtitle": "Choose an API plan for personal development or team applications. Quota, validity and access follow the selected plan.",
+      "subtitle": "Unified Need Gateway Plans built on official list pricing with 2x–3x quota multipliers, stackable model packs, and seamless pay-as-you-go overflow.",
       "memberOnly": "Member orders",
       "quotaNote": "Quota and validity shown",
       "usageNote": "Manage keys and usage",
       "enterpriseNote": "Enterprise support",
-      "catalogTitle": "API plan catalog",
+      "catalogTitle": "Need Gateway Plans Catalog",
       "audiences": "Plan audience",
       "personal": "Personal plans",
       "enterprise": "Enterprise plans",
-      "search": "Search API plans in this category",
+      "search": "Search Need Gateway Plans",
       "memberTitle": "Buy with your storefront member account",
       "memberDescription": "Link your existing API account in one click with your balance and usage intact. Link before checkout, or link right after payment to activate automatically.",
       "login": "Sign in here",
@@ -2654,14 +2755,17 @@
       "loginToChoose": "Sign in to choose",
       "memberDelivery": "Member orders link API access",
       "productFallback": "Review the quota, validity and instructions for the selected option.",
-      "howTitle": "From purchase to use in three steps",
-      "step1Title": "Sign in and link your account",
-      "step1Description": "Sign in here and approve linking in the API console in one click (or finish linking after payment for automatic activation).",
-      "step2Title": "Choose a plan and pay",
-      "step2Description": "Check the quota, scope, validity and order amount before completing payment.",
-      "step3Title": "Check activation and connect",
-      "step3Description": "Check activation in your order. View the new key, subscription quota and usage in the linked account’s API console.",
-      "connectDescription": "Connect your application with the plan's API key and endpoint. Models, quotas and rate limits follow the plan configuration."
+      "howTitle": "Buy a plan, start shipping",
+      "step1Title": "Choose a plan & checkout",
+      "step1Description": "Sign in to select dedicated or mixed-model gateway plans. Multiple dedicated packs stack cleanly on the same account.",
+      "step2Title": "Instant quota & API Key",
+      "step2Description": "Quota is provisioned automatically to your linked Need Gateway account. Jump into the console via SSO to create or copy your API Key.",
+      "step3Title": "Connect via unified endpoint",
+      "step3Description": "Drop the Base URL and API Key into Claude Code, Codex, OpenCode, or CC Switch to call flagship models right away.",
+      "connectDescription": "Connect your application with the plan's API key and endpoint. Models, quotas and rate limits follow the plan configuration.",
+      "categoriesLabel": "Plan Categories",
+      "allPlans": "All Plans",
+      "unifiedBadge": "Need Gateway Plans · Instant activation & stackable dedicated packs"
     },
     "apiAccountLink": {
       "title": "API account link status",
@@ -2711,7 +2815,7 @@
     },
     "rankings": {
       "eyebrow": "NEED GATEWAY · REALTIME LEADERBOARD",
-      "title": "API Usage Rankings",
+      "title": "Leaderboard",
       "subtitle": "Live token consumption leaderboard across NeedToken Gateway — track top models, vendor share, and period-over-period movers.",
       "updatedAt": "Updated {time}",
       "periodLabel": "Time range",
@@ -3687,6 +3791,56 @@
           "step2": "Set NEEDTOKEN_API_KEY in the OpenClaw runtime environment and merge the template into openclaw.json.",
           "step3": "Choose the needtoken model, reload the configuration, and verify one request in the assistant.",
           "note": "The download is a template to merge with your existing configuration. It uses openai-completions; agent tool calling requires support from both the model and upstream protocol."
+        },
+        "claudecode": {
+          "kind": "Terminal Coding Agent",
+          "summary": "Native Anthropic Messages protocol",
+          "description": "Point Claude Code at the NeedToken gateway via environment variables or settings.json with full prompt caching and Claude 2x plans.",
+          "get": "Install CLI",
+          "step1": "Install the latest Claude Code CLI and grab your NeedToken API Key.",
+          "step2": "Add the env snippet below to ~/.claude/settings.json or export it in your shell.",
+          "step3": "Run claude to start coding through NeedToken Smart Routing.",
+          "note": "Claude Code appends /v1/messages automatically, so use the root origin without /v1."
+        },
+        "codex": {
+          "kind": "Terminal Coding Agent",
+          "summary": "Native OpenAI Responses wire API",
+          "description": "Add NeedToken as a custom provider in OpenAI Codex CLI using /v1/responses and OpenAI 2x dedicated packs.",
+          "get": "Install CLI",
+          "step1": "Install the latest Codex CLI and export NEEDTOKEN_API_KEY in your shell.",
+          "step2": "Merge the configuration snippet below into ~/.codex/config.toml.",
+          "step3": "Launch codex and run a quick task to verify connectivity.",
+          "note": "Supports GPT-5 and reasoning models with automatic failover and spend tracking."
+        },
+        "geminicli": {
+          "kind": "Terminal Coding Agent",
+          "summary": "Native Gemini 1M context window",
+          "description": "Configure Google Gemini CLI with the NeedToken base URL to access Gemini dedicated packs and 1M-token context.",
+          "get": "Install CLI",
+          "step1": "Install Google Gemini CLI and prepare your NeedToken API Key.",
+          "step2": "Export the environment variables below in your shell profile.",
+          "step3": "Run gemini to start an interactive session.",
+          "note": "Gemini CLI appends /v1beta automatically, so use the root domain without /v1."
+        },
+        "cursor": {
+          "kind": "AI Coding IDE / Extension",
+          "summary": "Drop-in OpenAI-compatible endpoint",
+          "description": "Override the OpenAI Base URL in Cursor, Cline, or Roo Code to switch seamlessly across top providers.",
+          "get": "Official Site",
+          "step1": "Open Models or API Provider settings inside your IDE.",
+          "step2": "Paste the Base URL and NeedToken API Key, then add your model ID.",
+          "step3": "Enable Override OpenAI Base URL and verify the connection.",
+          "note": "One API Key unlocks OpenAI, Claude, Gemini, xAI, and DeepSeek models."
+        },
+        "cherrystudio": {
+          "kind": "Desktop AI Client",
+          "summary": "Multi-model chat & workspace",
+          "description": "Add NeedToken as an OpenAI-compatible provider in Cherry Studio for daily chat, vision, image, and model comparison.",
+          "get": "Download App",
+          "step1": "Open Cherry Studio Settings -> Model Providers -> Add OpenAI-compatible provider.",
+          "step2": "Paste the Base URL and your NeedToken API Key.",
+          "step3": "Fetch models or add model IDs manually to start chatting.",
+          "note": "Works seamlessly alongside image and video specialized packs."
         }
       },
       "reference": "Layout reference · CC Switch official",
@@ -3708,7 +3862,11 @@
         "poolOnlineSub": "Healthy supply groups online",
         "poolStandby": "Managed Routing",
         "poolStandbySub": "Multi-channel failover routing"
-      }
+      },
+      "createApiKeyAction": "Create API Key",
+      "viewApiKeyAction": "View API Keys",
+      "goDashboardAction": "Open Dashboard",
+      "browsePlansAnchor": "Explore Plans"
     },
     "purchaseFlow": {
       "backToPlans": "Back to plans",
@@ -3948,6 +4106,17 @@
         "connectCardTitle": "Anthropic Connectivity",
         "advancedTitle": "CLI Verification & Redacted Report"
       }
+    },
+    "accountMenu": {
+      "gatewaySection": "Need Gateway",
+      "dashboard": "Gateway Dashboard",
+      "apiKeys": "API Keys",
+      "usageLogs": "Usage Logs",
+      "storeSection": "Storefront",
+      "myOrders": "My Orders",
+      "walletAndGift": "Wallet & Gift Cards",
+      "security": "Account Security",
+      "signOut": "Sign Out"
     }
   }
 }

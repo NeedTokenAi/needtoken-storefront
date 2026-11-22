@@ -49,6 +49,7 @@ high_risk_cases=(
   "frontend/user/src/templates/needtoken/AccountLinkCallback.vue"
   "frontend/user/src/router/index.ts"
   "frontend/user/src/api/order.ts"
+  "frontend/user/src/api/auth.ts"
   "frontend/user/src/stores/userAuth.ts"
   "frontend/user/src/stores/userProfile.ts"
   "frontend/user/src/composables/usePersonalCenter.ts"

@@ -1,6 +1,14 @@
 import { computed, ref } from 'vue'
 import { BLOCKED_MODELS, DEFAULT_MODELS, PRICING_URL, SUPPLY_LINE_BY_GROUP } from '../config'
-import { buildOffers, buildPricingGroups, type ModelOffer, type PricingGroupOption, type PricingResponse } from './pricing'
+import {
+    buildOffers,
+    buildPricingGroups,
+    type ModelOffer,
+    type NeedtokenPricingMeta,
+    type PricingGroupOption,
+    type PricingResponse,
+    type PublicPlanOffer,
+} from './pricing'
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -12,6 +20,7 @@ const loadedAt = ref<Date | null>(null)
 const sourceVersion = ref<string | null>(null)
 const isStale = ref(false)
 const response = ref<PricingResponse | null>(null)
+const meta = ref<NeedtokenPricingMeta | null>(null)
 let inflight: Promise<void> | null = null
 
 const load = async (): Promise<void> => {
@@ -23,6 +32,7 @@ const load = async (): Promise<void> => {
         const body = (await res.json()) as PricingResponse
         if (body.success === false) throw new Error('pricing not available')
         response.value = body
+        meta.value = body.needtoken_meta || null
         offers.value = buildOffers(body, {
             defaultModels: DEFAULT_MODELS,
             blockedModels: BLOCKED_MODELS,
@@ -45,6 +55,14 @@ export const usePricing = () => {
         inflight = load().finally(() => { inflight = null })
         return inflight
     }
+    const featuredModels = computed<string[]>(() => {
+        const configured = meta.value?.featured_models?.filter(m => typeof m === 'string' && m.trim()) || []
+        return configured.length > 0 ? configured : [...DEFAULT_MODELS]
+    })
+    const activePlans = computed<PublicPlanOffer[]>(() => {
+        const list = meta.value?.active_plans
+        return Array.isArray(list) ? list : []
+    })
     return {
         offers,
         groups,
@@ -53,6 +71,9 @@ export const usePricing = () => {
         sourceVersion,
         isStale,
         response,
+        meta,
+        featuredModels,
+        activePlans,
         isLoading: computed(() => state.value === 'loading' || state.value === 'idle'),
         ensureLoaded,
         reload: () => { if (!inflight) inflight = load().finally(() => { inflight = null }); return inflight },

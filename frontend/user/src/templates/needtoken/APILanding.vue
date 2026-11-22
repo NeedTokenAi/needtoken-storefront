@@ -1,122 +1,95 @@
 <template>
   <div class="api-landing">
+    <!-- 1. Hero 区域（直显 API 地址 + 创建/查看 API Key + 前往仪表盘 + 保留截图 4 请求预览卡） -->
     <ApiGatewayHero />
 
-    <ApiAccountLinkBanner class="mb-10" next-path="/api-services" />
+    <ApiAccountLinkBanner class="mb-8" next-path="/api-services" />
 
-    <!-- 核心协议与企业级特性矩阵 -->
-    <section class="api-protocols" aria-labelledby="api-protocols-title">
-      <header class="section-head">
-        <div>
-          <span class="section-eyebrow">{{ t('needtoken.apiServices.protocolsEyebrow') }}</span>
-          <h2 id="api-protocols-title">{{ t('needtoken.apiServices.protocolsTitle') }}</h2>
-          <p>{{ t('needtoken.apiServices.protocolsIntro') }}</p>
-        </div>
-      </header>
-
-      <div class="protocol-grid">
-        <article v-for="card in protocolCards" :key="card.key" class="protocol-card">
-          <div class="protocol-card-top">
-            <span class="protocol-icon" aria-hidden="true"><component :is="card.icon" :size="19" /></span>
-            <code class="protocol-endpoint">{{ card.endpoint }}</code>
+    <!-- 2. 三步使用步骤（参考截图 6） -->
+    <section class="api-steps-section" aria-labelledby="api-steps-title">
+      <h2 id="api-steps-title" class="sr-only">{{ t('needtoken.apiServices.steps.title') }}</h2>
+      <ol class="steps-grid">
+        <li v-for="(step, idx) in steps" :key="step.key" class="step-card">
+          <div class="step-icon-wrap" aria-hidden="true">
+            <component :is="step.icon" :size="24" :stroke-width="1.6" />
+            <span class="step-badge">{{ idx + 1 }}</span>
           </div>
-          <h3>{{ t(`needtoken.apiServices.protocolCards.${card.key}.title`) }}</h3>
-          <p>{{ t(`needtoken.apiServices.protocolCards.${card.key}.desc`) }}</p>
-          <div class="protocol-tags">
-            <span v-for="client in card.clients" :key="client">{{ client }}</span>
-          </div>
-        </article>
-      </div>
+          <h3>{{ t(`needtoken.apiServices.steps.${step.key}.title`) }}</h3>
+          <p>{{ t(`needtoken.apiServices.steps.${step.key}.desc`) }}</p>
+        </li>
+      </ol>
     </section>
 
-    <!-- 热门模型实时价格速览表 -->
-    <section class="api-hot-models" aria-labelledby="api-hot-models-title">
+    <!-- 3. Need 网关套餐与优势直购区 -->
+    <section id="gateway-plans" class="api-plans-section" aria-labelledby="gateway-plans-title">
       <header class="section-head">
         <div>
-          <span class="section-eyebrow">{{ t('needtoken.apiServices.hotModelsEyebrow') }}</span>
-          <h2 id="api-hot-models-title">{{ t('needtoken.apiServices.hotModelsTitle') }}</h2>
-          <p>{{ t('needtoken.apiServices.hotModelsIntro') }}</p>
+          <span class="section-eyebrow">{{ t('needtoken.apiServices.plansSection.eyebrow') }}</span>
+          <h2 id="gateway-plans-title">{{ t('needtoken.apiServices.plansSection.title') }}</h2>
+          <p>{{ t('needtoken.apiServices.plansSection.subtitle') }}</p>
         </div>
-        <RouterLink to="/models" class="view-all-link">
-          <span>{{ t('needtoken.apiServices.viewAllModels') }}</span>
+        <RouterLink to="/plans" class="view-all-link">
+          <span>{{ t('needtoken.apiServices.plansSection.viewAll') }}</span>
           <ArrowRight :size="15" aria-hidden="true" />
         </RouterLink>
       </header>
 
-      <div v-if="featuredOffers.length > 0" class="hot-table-wrap">
-        <table class="hot-table">
-          <thead>
-            <tr>
-              <th>{{ t('needtoken.models.columns.model') }}</th>
-              <th>{{ t('needtoken.models.vendor') }}</th>
-              <th>{{ t('needtoken.apiServices.protocolsCol') }}</th>
-              <th>{{ t('needtoken.models.columns.input') }}</th>
-              <th>{{ t('needtoken.models.columns.output') }}</th>
-              <th>{{ t('needtoken.models.columns.cacheHit') }}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in featuredOffers" :key="item.key">
-              <td>
-                <div class="model-cell">
-                  <code class="model-id">{{ item.modelId }}</code>
-                  <button
-                    type="button"
-                    class="copy-btn"
-                    :aria-label="t('needtoken.models.copyModelId', { model: item.modelId })"
-                    @click="copyModel(item.modelId)"
-                  >
-                    <Check v-if="copiedId === item.modelId" :size="13" />
-                    <Copy v-else :size="13" />
-                  </button>
-                </div>
-              </td>
-              <td class="muted-col">{{ item.vendor }}</td>
-              <td>
-                <div class="ep-badges">
-                  <span v-for="ep in (item.endpoints.length ? item.endpoints.slice(0, 3) : [{ key: 'chat', label: 'Chat', path: '/v1/chat/completions' }])" :key="ep.label">
-                    {{ ep.label }}
-                  </span>
-                </div>
-              </td>
-              <template v-if="item.unit === 'per_call'">
-                <td colspan="3" class="price-col">
-                  <strong>{{ formatUsd(item.inputPrice) }}</strong>
-                  <small> / {{ t('needtoken.models.perCallShort') }}</small>
-                </td>
-              </template>
-              <template v-else-if="item.unit === 'per_million_tokens'">
-                <td class="price-col"><strong>{{ formatUsd(item.inputPrice) }}</strong><small>/1M</small></td>
-                <td class="price-col"><strong>{{ formatUsd(item.outputPrice) }}</strong><small>/1M</small></td>
-                <td class="price-col cache-col">{{ item.cachePrice !== null ? `${formatUsd(item.cachePrice)}/1M` : '—' }}</td>
-              </template>
-              <template v-else>
-                <td colspan="3" class="muted-col">{{ t('needtoken.models.conditionalPrice') }}</td>
-              </template>
-              <td class="action-col">
-                <RouterLink :to="{ path: '/models', query: { q: item.modelId } }" class="table-action">
-                  {{ t('needtoken.apiServices.inspectModel') }}
-                </RouterLink>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- 核心套餐矩阵亮点：官方定价基准 · 多模型混合 · 2x/3x 倍率 · 多专享卡叠加 · 超额自动扣余额 -->
+      <div class="plan-advantage-bar">
+        <span v-for="adv in planAdvantages" :key="adv.key" class="adv-pill">
+          <component :is="adv.icon" :size="14" aria-hidden="true" />
+          <span>{{ t(`needtoken.apiServices.plansSection.advantages.${adv.key}`) }}</span>
+        </span>
       </div>
 
-      <div v-else class="hot-fallback">
-        <div class="hot-fallback-chips">
-          <RouterLink v-for="m in DEFAULT_MODELS.slice(0, 6)" :key="m" :to="{ path: '/models', query: { q: m } }" class="fallback-chip">
-            <code>{{ m }}</code>
-            <ArrowUpRight :size="13" aria-hidden="true" />
+      <div class="plan-tracks-grid">
+        <article v-for="track in planTracks" :key="track.key" class="plan-track-card">
+          <div class="plan-track-top">
+            <strong>{{ t(`needtoken.apiServices.plansSection.tracks.${track.key}.title`) }}</strong>
+            <span v-if="track.badge" class="track-badge">{{ track.badge }}</span>
+          </div>
+          <p>{{ t(`needtoken.apiServices.plansSection.tracks.${track.key}.desc`) }}</p>
+        </article>
+      </div>
+
+      <!-- 实时在售 Need 网关套餐商品卡片直购 -->
+      <div class="live-plans-wrap">
+        <div v-if="planCatalog.categoriesLoading.value || planCatalog.loading.value" class="live-plans-grid" role="status" aria-busy="true">
+          <div v-for="n in 3" :key="n" class="plan-skeleton" />
+        </div>
+        <div v-else-if="planCatalog.products.value.length > 0" class="live-plans-grid">
+          <ServiceProductCard
+            v-for="product in planCatalog.products.value.slice(0, 6)"
+            :key="product.id"
+            :product="product"
+            kind="recharge"
+            member-only
+            :category-label="t('needtoken.nav.plans')"
+            :cta-label="t(userAuth.isAuthenticated ? 'needtoken.apiCatalog.choose' : 'needtoken.apiCatalog.loginToChoose')"
+            :delivery-text="t('needtoken.apiCatalog.memberDelivery')"
+            :description-fallback="t('needtoken.apiCatalog.productFallback')"
+          />
+        </div>
+        <div v-else class="live-plans-empty">
+          <p>{{ t('needtoken.apiServices.plansSection.fallbackHint') }}</p>
+          <RouterLink to="/plans" class="view-all-link">
+            <span>{{ t('needtoken.apiServices.plansSection.viewAll') }}</span>
+            <ArrowRight :size="15" aria-hidden="true" />
           </RouterLink>
         </div>
-        <p>{{ t('needtoken.apiServices.hotModelsFallbackHint') }}</p>
       </div>
     </section>
 
-    <ApiIntegrationGuide />
+    <!-- 4. 智能路由可视化架构图（参考截图 9） -->
+    <ApiSmartRoutingShowcase />
 
+    <!-- 5. 动态模型精选折扣卡片（图 7）与全模型实时比价表（图 8） -->
+    <ApiPricingShowcase @quick-start="onQuickStartModel" />
+
+    <!-- 6. CC Switch 双栏场景配置工作台（图 5） -->
+    <ApiIntegrationGuide :initial-model="selectedGuideModel" />
+
+    <!-- 7. 费用计算器 -->
     <section class="api-usage" :aria-label="t('needtoken.apiUse.calculatorTitle')">
       <ApiCostCalculator />
     </section>
@@ -124,73 +97,61 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
+import { defineAsyncComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowRight, ArrowUpRight, Blocks, Braces, Check, Copy, Sparkles, Terminal } from 'lucide-vue-next'
+import {
+  ArrowRight,
+  BarChart3,
+  Layers,
+  Repeat,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Wallet,
+  Zap,
+} from 'lucide-vue-next'
 import { usePageSeo } from '../../composables/usePageSeo'
-import { DEFAULT_MODELS } from './config'
-import { formatUsd, selectOffersByGroup, sortOffers } from './lib/pricing'
-import { usePricing } from './lib/usePricing'
+import { useUserAuthStore } from '../../stores/userAuth'
+import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
 import ApiGatewayHero from './components/ApiGatewayHero.vue'
 import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
+import ApiSmartRoutingShowcase from './components/ApiSmartRoutingShowcase.vue'
+import ApiPricingShowcase from './components/ApiPricingShowcase.vue'
 import ApiIntegrationGuide from './components/ApiIntegrationGuide.vue'
+import ServiceProductCard from './components/ServiceProductCard.vue'
 
 const ApiCostCalculator = defineAsyncComponent(() => import('./components/ApiCostCalculator.vue'))
 const { t } = useI18n()
-const pricing = usePricing()
-const copiedId = ref('')
-let copyTimer: ReturnType<typeof setTimeout> | undefined
+const userAuth = useUserAuthStore()
+const planCatalog = useApiPlanCatalog({ pageSize: 6, syncRoute: false })
+const selectedGuideModel = ref('')
 
-const protocolCards = [
-  {
-    key: 'openai',
-    endpoint: '/v1/responses · /v1/chat/completions',
-    icon: Braces,
-    clients: ['Codex CLI', 'Cursor', 'OpenAI SDK'],
-  },
-  {
-    key: 'anthropic',
-    endpoint: '/v1/messages',
-    icon: Terminal,
-    clients: ['Claude Code', 'Anthropic SDK', 'Cline'],
-  },
-  {
-    key: 'gemini',
-    endpoint: '/v1beta/models',
-    icon: Sparkles,
-    clients: ['Gemini CLI', 'Google GenAI SDK'],
-  },
-  {
-    key: 'ecosystem',
-    endpoint: 'Zero-Code Drop-In',
-    icon: Blocks,
-    clients: ['Cherry Studio', 'NextChat', 'OpenCode', 'CC Switch'],
-  },
+const steps = [
+  { key: 'configure', icon: Settings },
+  { key: 'connect', icon: Zap },
+  { key: 'monitor', icon: BarChart3 },
 ] as const
 
-const featuredOffers = computed(() => {
-  const deduped = selectOffersByGroup(pricing.offers.value, '')
-  return sortOffers(deduped, 'default', DEFAULT_MODELS).slice(0, 6)
-})
+const planAdvantages = [
+  { key: 'officialBase', icon: ShieldCheck },
+  { key: 'mixedModels', icon: Layers },
+  { key: 'multipliers', icon: Sparkles },
+  { key: 'stackable', icon: Repeat },
+  { key: 'overflow', icon: Wallet },
+] as const
 
-const copyModel = async (modelId: string) => {
-  if (copyTimer) clearTimeout(copyTimer)
-  try {
-    await navigator.clipboard.writeText(modelId)
-    copiedId.value = modelId
-    copyTimer = setTimeout(() => { copiedId.value = '' }, 1500)
-  } catch {
-    copiedId.value = ''
-  }
+const planTracks = [
+  { key: 'openai', badge: '2x' },
+  { key: 'claude', badge: '2x' },
+  { key: 'gemini', badge: '专享' },
+  { key: 'xai', badge: '专享' },
+  { key: 'image', badge: '2x' },
+  { key: 'video', badge: '专项' },
+] as const
+
+const onQuickStartModel = (modelId: string) => {
+  selectedGuideModel.value = modelId
 }
-
-onMounted(() => {
-  void pricing.ensureLoaded()
-})
-
-onUnmounted(() => {
-  if (copyTimer) clearTimeout(copyTimer)
-})
 
 usePageSeo({
   title: () => t('needtoken.nav.plans'),
@@ -200,57 +161,116 @@ usePageSeo({
 </script>
 
 <style scoped>
-.api-landing { width: min(1200px, calc(100% - 48px)); margin-inline: auto; padding-bottom: 40px; }
-.api-protocols, .api-hot-models { padding-block: 48px; border-top: 1px solid var(--ui-border); }
+.api-landing { width: min(1200px, calc(100% - 48px)); margin-inline: auto; padding-bottom: 44px; }
+
+/* 3 步使用步骤区（参考图 6） */
+.api-steps-section { padding-block: 36px 44px; border-top: 1px solid var(--ui-border); }
+.steps-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; list-style: none; padding: 0; margin: 0; }
+.step-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 16px; }
+.step-icon-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  border: 1px solid var(--nt-accent-border, var(--ui-border));
+  background: var(--nt-accent-subtle, var(--ui-bg-soft));
+  color: var(--ui-accent);
+}
+.step-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  font: 700 12px var(--nt-font-mono);
+}
+.dark .step-badge { background: var(--ui-accent); color: var(--ui-text-on-accent); }
+.step-card h3 { margin-top: 16px; font-size: 16px; font-weight: 700; color: var(--ui-text-primary); }
+.step-card p { margin-top: 8px; max-width: 30ch; font-size: 13px; line-height: 1.7; color: var(--ui-text-secondary); }
+
+/* Need 网关套餐与优势直购区 */
+.api-plans-section { padding-block: 48px; border-top: 1px solid var(--ui-border); scroll-margin-top: 86px; }
 .section-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
-.section-eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ui-accent); }
-.section-head h2 { margin-top: 8px; font-size: clamp(24px, 2.8vw, 32px); font-weight: 650; letter-spacing: -.025em; color: var(--ui-text-primary); }
-.section-head p { margin-top: 8px; max-width: 66ch; font-size: 14px; line-height: 1.75; color: var(--ui-text-secondary); }
+.section-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ui-accent); }
+.section-head h2 { margin-top: 8px; font-size: clamp(24px, 2.8vw, 32px); font-weight: 700; letter-spacing: -.025em; color: var(--ui-text-primary); }
+.section-head p { margin-top: 8px; max-width: 68ch; font-size: 14px; line-height: 1.75; color: var(--ui-text-secondary); }
 .view-all-link { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border: 1px solid var(--ui-border-strong); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--ui-accent); background: var(--ui-bg-elevated); }
 .view-all-link:hover { border-color: var(--ui-accent); background: var(--ui-bg-soft); }
 
-.protocol-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
-.protocol-card { display: flex; flex-direction: column; gap: 10px; padding: 22px 24px; border: 1px solid var(--ui-border); border-radius: 18px; background: var(--ui-bg-elevated); transition: border-color 160ms; }
-.protocol-card:hover { border-color: var(--nt-accent-border-strong, var(--ui-border-strong)); }
-.protocol-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.protocol-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--ui-border); background: var(--ui-bg-soft); color: var(--ui-accent); }
-.protocol-endpoint { padding: 3px 9px; border-radius: 999px; background: var(--ui-bg-soft); color: var(--ui-text-secondary); font: 11.5px var(--nt-font-mono); }
-.protocol-card h3 { margin-top: 4px; font-size: 17px; font-weight: 650; color: var(--ui-text-primary); }
-.protocol-card p { font-size: 13px; line-height: 1.75; color: var(--ui-text-secondary); }
-.protocol-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 8px; }
-.protocol-tags span { padding: 2px 9px; border-radius: 6px; border: 1px solid var(--ui-border); font-size: 11.5px; color: var(--ui-text-muted); background: var(--ui-bg-soft); }
+.plan-advantage-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.adv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--nt-accent-border, var(--ui-border));
+  background: var(--nt-accent-subtle, var(--ui-bg-soft));
+  color: var(--ui-text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.adv-pill svg { color: var(--ui-accent); flex: none; }
 
-.hot-table-wrap { margin-top: 22px; overflow-x: auto; border: 1px solid var(--ui-border); border-radius: 18px; background: var(--ui-bg-elevated); }
-.hot-table { width: 100%; min-width: 680px; border-collapse: collapse; text-align: left; font-size: 13px; }
-.hot-table th { padding: 13px 16px; border-bottom: 1px solid var(--ui-border); font-size: 12px; font-weight: 600; color: var(--ui-text-muted); background: var(--ui-bg-soft); }
-.hot-table td { padding: 13px 16px; border-bottom: 1px solid var(--ui-border); vertical-align: middle; }
-.hot-table tbody tr:last-child td { border-bottom: 0; }
-.model-cell { display: inline-flex; align-items: center; gap: 6px; }
-.model-id { font: 600 13px var(--nt-font-mono); color: var(--ui-text-primary); }
-.copy-btn { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--ui-text-muted); }
-.copy-btn:hover { color: var(--ui-accent); background: var(--ui-bg-soft); }
-.muted-col { color: var(--ui-text-secondary); }
-.ep-badges { display: flex; flex-wrap: wrap; gap: 5px; }
-.ep-badges span { padding: 2px 7px; border-radius: 5px; border: 1px solid var(--ui-border); font: 11px var(--nt-font-mono); color: var(--ui-text-muted); }
-.price-col { font-family: var(--nt-font-mono); color: var(--ui-text-primary); white-space: nowrap; }
-.price-col small { color: var(--ui-text-muted); font-size: 11px; margin-left: 2px; }
-.cache-col { color: #059669; }
-.dark .cache-col { color: #34d399; }
-.action-col { text-align: right; white-space: nowrap; }
-.table-action { font-size: 12px; font-weight: 600; color: var(--ui-accent); }
-.table-action:hover { text-decoration: underline; }
+.plan-tracks-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.plan-track-card {
+  padding: 13px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-bg-elevated);
+}
+.plan-track-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.plan-track-top strong { font-size: 13px; font-weight: 700; color: var(--ui-text-primary); }
+.track-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  color: var(--ui-text-on-accent);
+  font: 700 10.5px var(--nt-font-mono);
+}
+.plan-track-card p { margin-top: 6px; font-size: 11.5px; line-height: 1.55; color: var(--ui-text-muted); }
 
-.hot-fallback { margin-top: 22px; padding: 22px; border: 1px solid var(--ui-border); border-radius: 18px; background: var(--ui-bg-elevated); }
-.hot-fallback-chips { display: flex; flex-wrap: wrap; gap: 10px; }
-.fallback-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--ui-border); border-radius: 999px; font: 12.5px var(--nt-font-mono); color: var(--ui-text-primary); background: var(--ui-bg-soft); }
-.fallback-chip:hover { border-color: var(--ui-accent); color: var(--ui-accent); }
-.hot-fallback p { margin-top: 12px; font-size: 12.5px; color: var(--ui-text-muted); }
+.live-plans-wrap { margin-top: 22px; }
+.live-plans-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.plan-skeleton { min-height: 290px; border-radius: 18px; border: 1px solid var(--ui-border); background: var(--ui-bg-soft); }
+.live-plans-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 20px;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: 16px;
+  background: var(--ui-bg-elevated);
+  text-align: center;
+  color: var(--ui-text-secondary);
+  font-size: 13.5px;
+}
 
 .api-usage { padding-top: 48px; border-top: 1px solid var(--ui-border); }
 .api-usage :deep(.nt-api-cost) { margin-top: 0; }
+
+@media (max-width: 1024px) {
+  .plan-tracks-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .live-plans-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 760px) {
   .api-landing { width: calc(100% - 32px); padding-bottom: 24px; }
-  .api-protocols, .api-hot-models, .api-usage { padding-block: 32px; }
-  .protocol-grid { grid-template-columns: minmax(0, 1fr); }
+  .steps-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .plan-tracks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .live-plans-grid { grid-template-columns: minmax(0, 1fr); }
+  .api-plans-section, .api-usage { padding-block: 32px; }
 }
 </style>

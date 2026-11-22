@@ -10,9 +10,31 @@
 
     <section id="api-plan-catalog" class="api-plan-catalog" :aria-label="t('needtoken.apiCatalog.catalogTitle')">
       <div class="api-plan-toolbar">
-        <nav class="api-plan-tabs" :aria-label="t('needtoken.apiCatalog.audiences')">
-          <button v-for="kind in audiences" :key="kind" type="button" :aria-pressed="audience === kind" :class="{ active: audience === kind }" @click="selectAudience(kind)"><component :is="kind === 'personal' ? UserRound : Building2" :size="16" aria-hidden="true" />{{ t(`needtoken.apiCatalog.${kind}`) }}</button>
+        <nav v-if="subcategories.length > 0" class="api-plan-tabs" :aria-label="t('needtoken.apiCatalog.categoriesLabel')">
+          <button
+            type="button"
+            :aria-pressed="selectedCategorySlug === ''"
+            :class="{ active: selectedCategorySlug === '' }"
+            @click="selectCategory('')"
+          >
+            <Layers :size="15" aria-hidden="true" />
+            <span>{{ t('needtoken.apiCatalog.allPlans') }}</span>
+          </button>
+          <button
+            v-for="cat in subcategories"
+            :key="cat.id"
+            type="button"
+            :aria-pressed="selectedCategorySlug === (cat.slug || '')"
+            :class="{ active: selectedCategorySlug === (cat.slug || '') }"
+            @click="selectCategory(cat.slug || '')"
+          >
+            <span>{{ localizedCategoryName(cat) }}</span>
+          </button>
         </nav>
+        <div v-else class="api-plan-unified-badge">
+          <Sparkles :size="15" aria-hidden="true" />
+          <span>{{ t('needtoken.apiCatalog.unifiedBadge') }}</span>
+        </div>
         <CatalogueTools v-model="searchQuery" :search-label="t('needtoken.apiCatalog.search')" :count="!loading && !categoriesLoading && !loadError && !categoriesError ? totalProducts : null" :loading="categoriesLoading || loading" @search="submitSearch">
           <button v-if="userAuth.isAuthenticated && !appStore.isResellerTenant" type="button" class="api-plan-console" :disabled="ssoLoading" @click="openConsoleFromPlans">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></button>
           <a v-else :href="CONSOLE_URL" class="api-plan-console" rel="noopener">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
@@ -25,7 +47,7 @@
       <div v-if="categoriesLoading || loading" class="api-plan-grid" role="status" aria-busy="true" :aria-label="t('needtoken.common.loading')"><div v-for="index in 6" :key="index" class="api-plan-skeleton"><div /><div /><div /><div /></div></div>
       <div v-else-if="categoriesError || loadError" class="api-plan-state" role="alert"><PackageSearch :size="30" aria-hidden="true" /><h3>{{ t('needtoken.catalogServices.loadError') }}</h3><button type="button" @click="categoriesError ? loadCategories() : loadProducts()">{{ t('needtoken.common.retry') }}</button></div>
       <div v-else-if="!products.length" class="api-plan-state" role="status"><PackageSearch :size="30" aria-hidden="true" /><h3>{{ t(searchQuery ? 'needtoken.catalogServices.emptySearch' : 'needtoken.apiCatalog.empty') }}</h3><p>{{ t('needtoken.apiLanding.publicBrowse') }}</p><p>{{ t('needtoken.apiCatalog.emptyDescription') }}</p><button v-if="searchQuery" type="button" @click="clearSearch">{{ t('products.clearFilters') }}</button><a v-else :href="businessEmailHref">{{ t('needtoken.apiCatalog.businessContact') }}<ArrowUpRight :size="14" aria-hidden="true" /></a></div>
-      <template v-else><div class="api-plan-grid"><ServiceProductCard v-for="product in products" :key="product.id" :product="product" kind="recharge" member-only :category-label="t(`needtoken.apiCatalog.${audience}`)" :cta-label="t(userAuth.isAuthenticated ? 'needtoken.apiCatalog.choose' : 'needtoken.apiCatalog.loginToChoose')" :delivery-text="t('needtoken.apiCatalog.memberDelivery')" :description-fallback="t('needtoken.apiCatalog.productFallback')" /></div><PaginationNav :current-page="page" :total-pages="totalPages" :loading="loading" compact @change-page="changePage" /></template>
+      <template v-else><div class="api-plan-grid"><ServiceProductCard v-for="product in products" :key="product.id" :product="product" kind="recharge" member-only :category-label="activeCategoryLabel" :cta-label="t(userAuth.isAuthenticated ? 'needtoken.apiCatalog.choose' : 'needtoken.apiCatalog.loginToChoose')" :delivery-text="t('needtoken.apiCatalog.memberDelivery')" :description-fallback="t('needtoken.apiCatalog.productFallback')" /></div><PaginationNav :current-page="page" :total-pages="totalPages" :loading="loading" compact @change-page="changePage" /></template>
     </section>
 
     <section class="api-plan-how" :aria-label="t('needtoken.apiCatalog.howTitle')"><h2>{{ t('needtoken.apiCatalog.howTitle') }}</h2><ol><li v-for="n in 3" :key="n"><span>0{{ n }}</span><div><h3>{{ t(`needtoken.apiCatalog.step${n}Title`) }}</h3><p>{{ t(`needtoken.apiCatalog.step${n}Description`) }}</p></div></li></ol></section>
@@ -36,10 +58,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowUpRight, Building2, ChevronDown, Clock3, FileText, KeyRound, LockKeyhole, PackageSearch, UserRound } from 'lucide-vue-next'
+import { ArrowUpRight, ChevronDown, Clock3, FileText, KeyRound, Layers, LockKeyhole, PackageSearch, Sparkles } from 'lucide-vue-next'
 import { usePageSeo } from '../../composables/usePageSeo'
 import { useUserAuthStore } from '../../stores/userAuth'
 import { useAppStore } from '../../stores/app'
+import type { PublicCategory } from '../../utils/category'
 import PaginationNav from '../../components/PaginationNav.vue'
 import { API_BASE_URL, CONSOLE_URL } from './config'
 import CodeBlock from './components/CodeBlock.vue'
@@ -51,18 +74,47 @@ import { useApiAccountLink } from './composables/useApiAccountLink'
 import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
 import { normalizeNeedtokenSupport, supportEmailHref } from './lib/supportConfig'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const userAuth = useUserAuthStore()
 const appStore = useAppStore()
 const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
 const openConsoleFromPlans = () => {
   void openApiConsoleSSO('/dashboard', '/plans')
 }
-const { audience, categoriesLoading, categoriesError, products, loading, loadError, totalPages, totalProducts, page, searchQuery, loadCategories, loadProducts, selectAudience, changePage, submitSearch, clearSearch } = useApiPlanCatalog()
-const audiences = ['personal', 'enterprise'] as const
+const {
+  selectedCategorySlug,
+  subcategories,
+  scope,
+  categoriesLoading,
+  categoriesError,
+  products,
+  loading,
+  loadError,
+  totalPages,
+  totalProducts,
+  page,
+  searchQuery,
+  loadCategories,
+  loadProducts,
+  selectCategory,
+  changePage,
+  submitSearch,
+  clearSearch,
+} = useApiPlanCatalog({ pageSize: 12 })
+
+const localizedCategoryName = (cat: PublicCategory): string => {
+  const nameObj = (cat as any).name
+  if (typeof nameObj === 'string' && nameObj.trim()) return nameObj.trim()
+  if (nameObj && typeof nameObj === 'object') {
+    const loc = String(locale.value || 'zh-CN')
+    return String(nameObj[loc] || nameObj['zh-CN'] || nameObj['en-US'] || Object.values(nameObj)[0] || cat.slug)
+  }
+  return String(cat.slug || '')
+}
+const activeCategoryLabel = computed(() => (scope.value.selected ? localizedCategoryName(scope.value.selected) : t('needtoken.nav.plans')))
 const notes = ['memberOnly', 'quotaNote', 'usageNote', 'enterpriseNote']
 const noteIcons = [LockKeyhole, Clock3, KeyRound, FileText]
-const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: `/plans?kind=${audience.value}#api-plan-catalog` } }))
+const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: '/plans#api-plan-catalog' } }))
 const businessEmailHref = computed(() => supportEmailHref(normalizeNeedtokenSupport(appStore.config?.needtoken_support).businessEmail))
 usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('needtoken.apiCatalog.subtitle'), canonicalPath: () => '/plans' })
 </script>
@@ -81,6 +133,7 @@ usePageSeo({ title: () => t('needtoken.plans.title'), description: () => t('need
 .api-plan-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 12px; border-top: 1px solid var(--ui-border); }
 .api-plan-console { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 40px; color: var(--ui-accent); font-size: 12px; }
 .api-plan-tabs { display: flex; flex: 1; gap: 9px; min-width: 0; overflow-x: auto; padding: 4px; margin: -4px; scrollbar-width: thin; }
+.api-plan-unified-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border: 1px solid var(--nt-accent-border); border-radius: 10px; background: var(--nt-accent-subtle); color: var(--ui-accent); font-size: 13px; font-weight: 600; }
 .api-plan-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-bg-elevated); color: var(--ui-text-secondary); font-size: 13px; white-space: nowrap; }
 .api-plan-tabs button.active { color: var(--ui-accent); border-color: var(--nt-accent-border-strong); background: var(--ui-accent-soft); }
 .api-plan-tabs button:focus-visible, .api-plan-console:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }

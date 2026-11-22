@@ -15,14 +15,15 @@ const validId = (value: unknown): number => {
 
 export const apiPlanAudience = (value: unknown): APIPlanAudience => value === 'enterprise' ? 'enterprise' : 'personal'
 
-/** API plan categories are explicitly assigned, never guessed from product titles. */
-export function resolveAPIPlanScope(categories: PublicCategory[], audience: APIPlanAudience, rootSlug = 'plans'): APIPlanScope {
-  const root = categories.find(row => row.slug === rootSlug && !validId(row.parent_id)) || null
-  if (!root) return { root: null, category: null, categoryIds: [] }
-  const slugs = [`${rootSlug}-${audience}`, `api-${audience}`, audience]
-  const category = slugs.map(slug => categories.find(row => row.slug === slug && row.parent_id === root.id)).find(Boolean) || null
-  if (!category) return { root, category: null, categoryIds: [] }
-  const ids = new Set([category.id])
+export interface UnifiedAPIPlanScope {
+  root: PublicCategory | null
+  subcategories: PublicCategory[]
+  selected: PublicCategory | null
+  categoryIds: number[]
+}
+
+function collectDescendantIds(categories: PublicCategory[], startIds: number[]): number[] {
+  const ids = new Set(startIds.filter(id => validId(id) > 0))
   let changed = true
   while (changed) {
     changed = false
@@ -33,10 +34,39 @@ export function resolveAPIPlanScope(categories: PublicCategory[], audience: APIP
       }
     }
   }
-  return { root, category, categoryIds: [...ids] }
+  return [...ids]
 }
 
-export function filterAPIPlanProducts(products: ServiceProduct[], scope: APIPlanScope): ServiceProduct[] {
+/** Unified Need Gateway Plans scope under rootSlug ('plans'), optional subcategory filter by slug. */
+export function resolveUnifiedAPIPlanScope(
+  categories: PublicCategory[],
+  selectedSubSlug = '',
+  rootSlug = 'plans',
+): UnifiedAPIPlanScope {
+  const root = categories.find(row => row.slug === rootSlug && !validId(row.parent_id)) || null
+  if (!root) return { root: null, subcategories: [], selected: null, categoryIds: [] }
+  const subcategories = categories
+    .filter(row => validId(row.id) && Number(row.parent_id) === root.id)
+    .sort((a, b) => (Number((b as any).sort_order) || 0) - (Number((a as any).sort_order) || 0) || a.id - b.id)
+  const trimmedSlug = String(selectedSubSlug || '').trim()
+  const selected = trimmedSlug ? (subcategories.find(row => row.slug === trimmedSlug) || null) : null
+  const categoryIds = selected
+    ? collectDescendantIds(categories, [selected.id])
+    : collectDescendantIds(categories, [root.id])
+  return { root, subcategories, selected, categoryIds }
+}
+
+/** API plan categories are explicitly assigned, never guessed from product titles. */
+export function resolveAPIPlanScope(categories: PublicCategory[], audience: APIPlanAudience, rootSlug = 'plans'): APIPlanScope {
+  const root = categories.find(row => row.slug === rootSlug && !validId(row.parent_id)) || null
+  if (!root) return { root: null, category: null, categoryIds: [] }
+  const slugs = [`${rootSlug}-${audience}`, `api-${audience}`, audience]
+  const category = slugs.map(slug => categories.find(row => row.slug === slug && row.parent_id === root.id)).find(Boolean) || null
+  if (!category) return { root, category: null, categoryIds: [] }
+  return { root, category, categoryIds: collectDescendantIds(categories, [category.id]) }
+}
+
+export function filterAPIPlanProducts(products: ServiceProduct[], scope: { categoryIds: number[] }): ServiceProduct[] {
   const ids = new Set(scope.categoryIds)
   return products.filter(product => ids.has(validId(product.category_id)))
 }
