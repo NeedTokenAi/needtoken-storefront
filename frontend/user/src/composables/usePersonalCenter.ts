@@ -12,7 +12,7 @@ import type { PublicMemberLevel } from '../api'
 import { useLocalized } from './useProduct'
 import { formatSkuSpecValues } from '../utils/sku'
 
-export type PersonalSection = 'overview' | 'profile' | 'security' | 'orders' | 'wallet' | 'giftCard' | 'affiliate' | 'reseller' | 'api'
+export type PersonalSection = 'overview' | 'keys' | 'usage' | 'assets' | 'profile' | 'security' | 'orders' | 'wallet' | 'giftCard' | 'affiliate' | 'reseller' | 'api'
 
 export interface PersonalSectionItem {
   key: PersonalSection
@@ -43,6 +43,9 @@ export function usePersonalCenter(sectionGetter: () => PersonalSection) {
 
   const sectionRouteMap: Record<PersonalSection, string> = {
     overview: '/me',
+    keys: '/me/keys',
+    usage: '/me/usage',
+    assets: '/me/assets',
     profile: '/me/profile',
     security: '/me/security',
     orders: '/me/orders',

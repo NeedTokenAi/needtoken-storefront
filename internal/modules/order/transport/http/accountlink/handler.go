@@ -6,6 +6,9 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/dujiao-next/internal/modules/order/application/accountlink"
 	reseller "github.com/dujiao-next/internal/modules/reseller/contract"
@@ -25,6 +28,9 @@ func New(service *accountlink.Service) *Handler {
 func RegisterMemberReadRoutes(routes gin.IRoutes, h *Handler) {
 	routes.GET("/me/api-account-link", h.status)
 	routes.GET("/me/api-account-summary", h.apiSummary)
+	routes.GET("/me/gateway/tokens", h.gatewayListTokens)
+	routes.GET("/me/gateway/logs", h.gatewayListLogs)
+	routes.GET("/me/gateway/usage", h.gatewayUsage)
 }
 
 func RegisterMemberWriteRoutes(routes gin.IRoutes, h *Handler) {
@@ -33,6 +39,9 @@ func RegisterMemberWriteRoutes(routes gin.IRoutes, h *Handler) {
 	routes.POST("/me/api-account-link/ensure", h.ensure)
 	routes.POST("/me/api-console-sso", h.consoleSSO)
 	routes.POST("/me/logout", h.logout)
+	routes.POST("/me/gateway/tokens", h.gatewayCreateToken)
+	routes.PUT("/me/gateway/tokens/:token_id", h.gatewayUpdateToken)
+	routes.DELETE("/me/gateway/tokens/:token_id", h.gatewayDeleteToken)
 }
 
 func RegisterMemberRoutes(routes gin.IRoutes, h *Handler) {
@@ -193,6 +202,136 @@ func (h *Handler) logout(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *Handler) gatewayConsoleUser(c *gin.Context) (uint, bool) {
+	h.privateHeaders(c)
+	tenant := reseller.TenantOrMain(c.Request.Context())
+	if tenant.Unavailable || tenant.ResellerID != nil {
+		h.fail(c, accountlink.ErrForbidden)
+		return 0, false
+	}
+	userID, ok := ginutil.GetUserID(c)
+	if !ok || userID == 0 {
+		h.fail(c, accountlink.ErrForbidden)
+		return 0, false
+	}
+	return userID, true
+}
+
+func (h *Handler) readGatewayJSONBody(c *gin.Context) ([]byte, bool) {
+	if c.GetHeader("Content-Encoding") != "" {
+		h.fail(c, accountlink.ErrInvalid)
+		return nil, false
+	}
+	media, _, err := mime.ParseMediaType(c.GetHeader("Content-Type"))
+	if err != nil || media != "application/json" {
+		h.fail(c, accountlink.ErrInvalid)
+		return nil, false
+	}
+	raw, err := io.ReadAll(io.LimitReader(c.Request.Body, 16<<10+1))
+	if err != nil || len(raw) == 0 || len(raw) > 16<<10 || !json.Valid(raw) {
+		h.fail(c, accountlink.ErrInvalid)
+		return nil, false
+	}
+	return raw, true
+}
+
+func (h *Handler) respondGatewayData(c *gin.Context, data json.RawMessage, err error) {
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	var payload any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		h.fail(c, accountlink.ErrUnavailable)
+		return
+	}
+	response.Success(c, payload)
+}
+
+func (h *Handler) gatewayListTokens(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/tokens", nil, nil)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewayCreateToken(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	raw, ok := h.readGatewayJSONBody(c)
+	if !ok {
+		return
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodPost, "/tokens", nil, raw)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewayUpdateToken(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	tokenID, err := strconv.Atoi(strings.TrimSpace(c.Param("token_id")))
+	if err != nil || tokenID <= 0 {
+		h.fail(c, accountlink.ErrInvalid)
+		return
+	}
+	raw, ok := h.readGatewayJSONBody(c)
+	if !ok {
+		return
+	}
+	data, callErr := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodPut, "/tokens/"+strconv.Itoa(tokenID), nil, raw)
+	h.respondGatewayData(c, data, callErr)
+}
+
+func (h *Handler) gatewayDeleteToken(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	tokenID, err := strconv.Atoi(strings.TrimSpace(c.Param("token_id")))
+	if err != nil || tokenID <= 0 {
+		h.fail(c, accountlink.ErrInvalid)
+		return
+	}
+	data, callErr := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodDelete, "/tokens/"+strconv.Itoa(tokenID), nil, nil)
+	h.respondGatewayData(c, data, callErr)
+}
+
+func (h *Handler) gatewayListLogs(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	q := url.Values{}
+	for _, key := range []string{"p", "page_size", "model_name", "token_name", "group", "type", "start_timestamp", "end_timestamp"} {
+		if val := strings.TrimSpace(c.Query(key)); val != "" {
+			q.Set(key, val)
+		}
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/logs", q, nil)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewayUsage(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	q := url.Values{}
+	for _, key := range []string{"days", "start_timestamp", "end_timestamp"} {
+		if val := strings.TrimSpace(c.Query(key)); val != "" {
+			q.Set(key, val)
+		}
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/usage", q, nil)
+	h.respondGatewayData(c, data, err)
+}
+
 func (h *Handler) memberOnMainTenant(c *gin.Context) (uint, bool) {
 	tenant := reseller.TenantOrMain(c.Request.Context())
 	if tenant.Unavailable || tenant.ResellerID != nil {
@@ -252,6 +391,8 @@ func (h *Handler) fail(c *gin.Context, err error) {
 		code, key = response.CodeForbidden, "error.api_account_link_forbidden"
 	case errors.Is(err, accountlink.ErrConflict):
 		code, key = response.CodeBadRequest, "error.api_account_link_conflict"
+	case errors.Is(err, accountlink.ErrNotLinked):
+		code, key = response.CodeNotFound, "error.api_account_link_expired"
 	}
 	ginutil.RespondError(c, code, key, nil)
 }

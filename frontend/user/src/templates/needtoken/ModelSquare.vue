@@ -303,7 +303,6 @@
                 <button
                   type="button"
                   class="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] font-semibold text-primary hover:border-primary/50 hover:bg-primary/5"
-                  :disabled="ssoLoading"
                   @click="invokeModelInConsole(offer.modelId)"
                 >
                   <span>{{ t('needtoken.models.callInConsole') }}</span>
@@ -445,11 +444,9 @@
         <div class="mt-auto flex flex-wrap items-center gap-2 pt-4">
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
-            :disabled="ssoLoading"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90"
             @click="invokeModelInConsole(offer.modelId)"
           >
-            <LoaderCircle v-if="ssoLoading && invokingModel === offer.modelId" class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
             <span>{{ t('needtoken.models.callInConsole') }}</span>
             <ArrowUpRight class="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -520,7 +517,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpRight, Check, Copy, LoaderCircle } from 'lucide-vue-next'
+import { ArrowUpRight, Check, Copy } from 'lucide-vue-next'
 import { usePageSeo } from '../../composables/usePageSeo'
 import { useUserAuthStore } from '../../stores/userAuth'
 import { useAppStore } from '../../stores/app'
@@ -541,7 +538,6 @@ import {
 import { usePricing } from './lib/usePricing'
 import { historyFor, levelFor, uptimeFor, type PoolLevel } from './lib/poolStatus'
 import { usePoolStatus } from './lib/usePoolStatus'
-import { useApiAccountLink } from './composables/useApiAccountLink'
 import NeedtokenSelect from './components/NeedtokenSelect.vue'
 
 const { t } = useI18n()
@@ -551,7 +547,6 @@ const userAuth = useUserAuthStore()
 const appStore = useAppStore()
 const pricing = usePricing()
 const pool = usePoolStatus()
-const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
 
 usePageSeo({
   title: () => t('needtoken.models.title'),
@@ -585,7 +580,6 @@ const viewMode = ref<'table' | 'cards'>('table')
 const priceMultiplier = ref<number>(1)
 const compare = ref<string[]>([])
 const copiedModelId = ref('')
-const invokingModel = ref('')
 let copyTimer: ReturnType<typeof setTimeout> | undefined
 
 const planMultiplierOptions = computed(() => {
@@ -750,18 +744,16 @@ const copyModelId = async (modelId: string) => {
   }
 }
 
-const invokeModelInConsole = async (modelId: string) => {
+const invokeModelInConsole = (_modelId: string) => {
   if (appStore.isResellerTenant) {
     window.open(`${CONSOLE_URL}/playground`, '_blank', 'noopener,noreferrer')
     return
   }
   if (!userAuth.isAuthenticated) {
-    void router.push({ path: '/auth/login', query: { redirect: `/models?q=${encodeURIComponent(modelId)}` } })
+    void router.push({ path: '/auth/login', query: { redirect: '/me/keys' } })
     return
   }
-  invokingModel.value = modelId
-  await openApiConsoleSSO('/playground', '/models')
-  invokingModel.value = ''
+  void router.push('/me/keys')
 }
 
 onMounted(() => {

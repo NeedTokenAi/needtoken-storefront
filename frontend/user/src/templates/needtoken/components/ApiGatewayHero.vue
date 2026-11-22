@@ -29,24 +29,20 @@
           <button
             type="button"
             class="primary"
-            :disabled="ssoLoading"
             @click="handleApiKeyAction"
           >
-            <LoaderCircle v-if="ssoLoading && pendingTarget === '/keys'" :size="16" class="spin" aria-hidden="true" />
-            <KeyRound v-else :size="16" aria-hidden="true" />
+            <KeyRound :size="16" aria-hidden="true" />
             <span>{{ userAuth.isAuthenticated ? t('needtoken.apiConnect.viewApiKeyAction') : t('needtoken.apiConnect.createApiKeyAction') }}</span>
-            <ArrowUpRight :size="15" aria-hidden="true" />
+            <ArrowRight :size="15" aria-hidden="true" />
           </button>
           <button
             type="button"
             class="console-btn"
-            :disabled="ssoLoading"
             @click="handleOpenConsole"
           >
-            <LoaderCircle v-if="ssoLoading && pendingTarget === '/dashboard'" :size="16" class="spin" aria-hidden="true" />
-            <LayoutDashboard v-else :size="16" aria-hidden="true" />
+            <LayoutDashboard :size="16" aria-hidden="true" />
             <span>{{ t('needtoken.apiConnect.goDashboardAction') }}</span>
-            <ArrowUpRight :size="15" aria-hidden="true" />
+            <ArrowRight :size="15" aria-hidden="true" />
           </button>
           <a href="#gateway-plans" class="ghost-link">
             <span>{{ t('needtoken.apiConnect.browsePlansAnchor') }}</span>
@@ -152,7 +148,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { ArrowDown, ArrowRight, ArrowUpRight, Braces, Check, Copy, Cpu, KeyRound, LayoutDashboard, LoaderCircle, Terminal } from 'lucide-vue-next'
+import { ArrowDown, ArrowRight, Braces, Check, Copy, Cpu, KeyRound, LayoutDashboard, Terminal } from 'lucide-vue-next'
 import { useUserAuthStore } from '../../../stores/userAuth'
 import { useAppStore } from '../../../stores/app'
 import { API_BASE_URL, CONSOLE_URL, DEFAULT_MODELS } from '../config'
@@ -160,7 +156,6 @@ import { apiPreviewCode } from '../lib/apiIntegrations'
 import { usePricing } from '../lib/usePricing'
 import { summarizePoolStatus } from '../lib/poolStatus'
 import { usePoolStatus } from '../lib/usePoolStatus'
-import { useApiAccountLink } from '../composables/useApiAccountLink'
 
 type HeroPreviewKind = 'responses' | 'curl' | 'anthropic' | 'python'
 
@@ -170,7 +165,6 @@ const userAuth = useUserAuthStore()
 const appStore = useAppStore()
 const pricing = usePricing()
 const pool = usePoolStatus()
-const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
 
 const previewTabs: readonly { id: HeroPreviewKind; label: string }[] = [
   { id: 'responses', label: 'Responses' },
@@ -220,7 +214,6 @@ const poolStatusSub = computed(() => {
   return t('needtoken.apiConnect.metrics.poolOnlineSub')
 })
 
-const pendingTarget = ref<'/keys' | '/dashboard' | ''>('')
 const copiedEndpoint = ref(false)
 const copiedSnippet = ref(false)
 let copyEndpointTimer: ReturnType<typeof setTimeout> | undefined
@@ -254,11 +247,10 @@ const handleApiKeyAction = () => {
     return
   }
   if (!userAuth.isAuthenticated) {
-    void router.push({ path: '/auth/login', query: { redirect: '/api-services' } })
+    void router.push({ path: '/auth/login', query: { redirect: '/me/keys' } })
     return
   }
-  pendingTarget.value = '/keys'
-  void openApiConsoleSSO('/keys', '/api-services')
+  void router.push('/me/keys')
 }
 
 const handleOpenConsole = () => {
@@ -267,11 +259,10 @@ const handleOpenConsole = () => {
     return
   }
   if (!userAuth.isAuthenticated) {
-    void router.push({ path: '/auth/login', query: { redirect: '/api-services' } })
+    void router.push({ path: '/auth/login', query: { redirect: '/me' } })
     return
   }
-  pendingTarget.value = '/dashboard'
-  void openApiConsoleSSO('/dashboard', '/api-services')
+  void router.push('/me')
 }
 
 onMounted(() => {

@@ -72,30 +72,30 @@
                     <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{{ t('needtoken.accountMenu.gatewaySection') }}</span>
                     <span v-if="gatewayBalanceDisplay" class="nt-mono rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{{ gatewayBalanceDisplay }}</span>
                   </div>
-                  <button type="button" class="nt-account-item" :disabled="ssoLoading" @click="openConsolePath('/dashboard')">
+                  <RouterLink to="/me" class="nt-account-item" @click="closeMenus">
                     <span class="inline-flex items-center gap-2"><LayoutDashboard class="h-4 w-4 text-primary" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.dashboard') }}</span></span>
-                    <ArrowUpRight class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
-                  </button>
-                  <button type="button" class="nt-account-item" :disabled="ssoLoading" @click="openConsolePath('/keys')">
+                  </RouterLink>
+                  <RouterLink to="/me/keys" class="nt-account-item" @click="closeMenus">
                     <span class="inline-flex items-center gap-2"><KeyRound class="h-4 w-4 text-primary" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.apiKeys') }}</span></span>
-                    <ArrowUpRight class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
-                  </button>
-                  <button type="button" class="nt-account-item" :disabled="ssoLoading" @click="openConsolePath('/usage-logs')">
+                  </RouterLink>
+                  <RouterLink to="/me/usage" class="nt-account-item" @click="closeMenus">
                     <span class="inline-flex items-center gap-2"><Activity class="h-4 w-4 text-primary" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.usageLogs') }}</span></span>
-                    <ArrowUpRight class="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
-                  </button>
+                  </RouterLink>
                 </div>
 
                 <div class="border-b border-border py-1.5">
                   <span class="block px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{{ t('needtoken.accountMenu.storeSection') }}</span>
-                  <RouterLink to="/me" class="nt-account-item" @click="closeMenus">
+                  <RouterLink v-if="appStore.isResellerTenant" to="/me" class="nt-account-item" @click="closeMenus">
                     <span class="inline-flex items-center gap-2"><UserRound class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('navbar.personalCenter') }}</span></span>
                   </RouterLink>
                   <RouterLink to="/me/orders" class="nt-account-item" @click="closeMenus">
                     <span class="inline-flex items-center gap-2"><ShoppingBag class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.myOrders') }}</span></span>
                   </RouterLink>
-                  <RouterLink to="/me/wallet" class="nt-account-item" @click="closeMenus">
-                    <span class="inline-flex items-center gap-2"><Wallet class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.walletAndGift') }}</span></span>
+                  <RouterLink to="/me/assets" class="nt-account-item" @click="closeMenus">
+                    <span class="inline-flex items-center gap-2"><Wallet class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.memberConsole.nav.assets') }}</span></span>
+                  </RouterLink>
+                  <RouterLink to="/me/affiliate" class="nt-account-item" @click="closeMenus">
+                    <span class="inline-flex items-center gap-2"><Megaphone class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.memberConsole.nav.affiliate') }}</span></span>
                   </RouterLink>
                   <RouterLink to="/me/security" class="nt-account-item" @click="closeMenus">
                     <span class="inline-flex items-center gap-2"><ShieldCheck class="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span>{{ t('needtoken.accountMenu.security') }}</span></span>
@@ -140,17 +140,14 @@
               <RouterLink to="/guest/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="moreOpen = false">{{ t('navbar.guestOrders') }}</RouterLink>
               <template v-if="authStore.isAuthenticated">
                 <span v-if="!appStore.isResellerTenant" class="mt-1 border-t border-border px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('needtoken.accountMenu.gatewaySection') }}</span>
-                <button v-if="!appStore.isResellerTenant" type="button" class="flex items-center justify-between rounded px-3 py-2 text-left text-sm font-semibold text-primary hover:bg-secondary" :disabled="ssoLoading" @click="openConsolePath('/dashboard')">
-                  <span>{{ t('needtoken.accountMenu.dashboard') }}</span>
-                  <ArrowUpRight class="h-3.5 w-3.5" />
-                </button>
-                <button v-if="!appStore.isResellerTenant" type="button" class="flex items-center justify-between rounded px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" :disabled="ssoLoading" @click="openConsolePath('/keys')">
-                  <span>{{ t('needtoken.accountMenu.apiKeys') }}</span>
-                  <ArrowUpRight class="h-3.5 w-3.5" />
-                </button>
+                <RouterLink v-if="!appStore.isResellerTenant" to="/me" class="rounded px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary" @click="closeMenus">{{ t('needtoken.accountMenu.dashboard') }}</RouterLink>
+                <RouterLink v-if="!appStore.isResellerTenant" to="/me/keys" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('needtoken.accountMenu.apiKeys') }}</RouterLink>
+                <RouterLink v-if="!appStore.isResellerTenant" to="/me/usage" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('needtoken.accountMenu.usageLogs') }}</RouterLink>
                 <span class="mt-1 border-t border-border px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('needtoken.accountMenu.storeSection') }}</span>
-                <RouterLink to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
+                <RouterLink v-if="appStore.isResellerTenant" to="/me" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('navbar.personalCenter') }}</RouterLink>
                 <RouterLink to="/me/orders" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('needtoken.accountMenu.myOrders') }}</RouterLink>
+                <RouterLink to="/me/assets" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('needtoken.memberConsole.nav.assets') }}</RouterLink>
+                <RouterLink to="/me/affiliate" class="rounded px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground" @click="closeMenus">{{ t('needtoken.memberConsole.nav.affiliate') }}</RouterLink>
                 <button type="button" class="rounded px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10 dark:text-red-400" @click="handleLogout">{{ t('needtoken.accountMenu.signOut') }}</button>
               </template>
               <span class="px-3 pb-1 pt-2 text-xs text-muted-foreground">{{ t('needtoken.theme.label') }}</span>
@@ -187,6 +184,7 @@ import {
   Languages,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   ShieldCheck,
   ShoppingBag,
@@ -207,6 +205,8 @@ import SupportWidget from '../components/SupportWidget.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import { useNeedtokenEffects } from '../composables/useNeedtokenEffects'
 import { useApiAccountLink } from '../composables/useApiAccountLink'
+import { computeCombinedApiQuota } from '../lib/gatewayConsoleHelpers'
+import { formatApiQuotaUsd } from '../lib/apiAccountLinkPolicy'
 import { useSlidingIndicator } from '../composables/useSlidingIndicator'
 import { prefetchStorefrontRoute } from '../../../router'
 import { normalizeNeedtokenSupport } from '../lib/supportConfig'
@@ -218,7 +218,7 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const authStore = useUserAuthStore()
-const { summary: apiSummary, ssoLoading, loadSummary, openApiConsoleSSO } = useApiAccountLink()
+const { summary: apiSummary, loadSummary } = useApiAccountLink()
 const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/me'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
 const accountOpen = ref(false)
@@ -234,13 +234,9 @@ const userEmail = computed(() => String(authStore.user?.email || '').trim())
 const userInitial = computed(() => userDisplayName.value.slice(0, 1).toUpperCase() || 'N')
 const gatewayBalanceDisplay = computed(() => {
   const sum = apiSummary.value
-  if (!sum?.linked || typeof sum.quota !== 'number') return ''
-  return `$${(sum.quota / 500000).toFixed(2)}`
+  if (!sum?.linked) return ''
+  return formatApiQuotaUsd(computeCombinedApiQuota(sum.quota, sum.active_subscriptions))
 })
-const openConsolePath = (targetPath: '/dashboard' | '/keys' | '/usage-logs') => {
-  closeMenus()
-  void openApiConsoleSSO(targetPath, route.path.startsWith('/auth/') ? '/me' : route.path)
-}
 const toggleAccountMenu = () => {
   accountOpen.value = !accountOpen.value
   openGroup.value = null

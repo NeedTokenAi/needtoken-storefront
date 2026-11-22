@@ -197,6 +197,27 @@ const router = createRouter({
             meta: { requiresUserAuth: true }
         },
         {
+            path: '/me/keys',
+            name: 'personal-center-keys',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'keys' },
+            meta: { requiresUserAuth: true }
+        },
+        {
+            path: '/me/usage',
+            name: 'personal-center-usage',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'usage' },
+            meta: { requiresUserAuth: true }
+        },
+        {
+            path: '/me/assets',
+            name: 'personal-center-assets',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'assets' },
+            meta: { requiresUserAuth: true }
+        },
+        {
             path: '/me/profile',
             name: 'personal-center-profile',
             component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),

@@ -36,8 +36,8 @@
           <span>{{ t('needtoken.apiCatalog.unifiedBadge') }}</span>
         </div>
         <CatalogueTools v-model="searchQuery" :search-label="t('needtoken.apiCatalog.search')" :count="!loading && !categoriesLoading && !loadError && !categoriesError ? totalProducts : null" :loading="categoriesLoading || loading" @search="submitSearch">
-          <button v-if="userAuth.isAuthenticated && !appStore.isResellerTenant" type="button" class="api-plan-console" :disabled="ssoLoading" @click="openConsoleFromPlans">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></button>
-          <a v-else :href="CONSOLE_URL" class="api-plan-console" rel="noopener">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
+          <a v-if="appStore.isResellerTenant" :href="CONSOLE_URL" class="api-plan-console" rel="noopener">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></a>
+          <RouterLink v-else :to="userAuth.isAuthenticated ? '/me' : { path: '/auth/login', query: { redirect: '/me' } }" class="api-plan-console">{{ t('needtoken.plans.console') }}<ArrowUpRight :size="14" aria-hidden="true" /></RouterLink>
         </CatalogueTools>
       </div>
 
@@ -70,17 +70,12 @@ import ServiceProductCard from './components/ServiceProductCard.vue'
 import CatalogueTools from './components/CatalogueTools.vue'
 import StandardExchangeRate from './components/StandardExchangeRate.vue'
 import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
-import { useApiAccountLink } from './composables/useApiAccountLink'
 import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
 import { normalizeNeedtokenSupport, supportEmailHref } from './lib/supportConfig'
 
 const { t, locale } = useI18n()
 const userAuth = useUserAuthStore()
 const appStore = useAppStore()
-const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
-const openConsoleFromPlans = () => {
-  void openApiConsoleSSO('/dashboard', '/plans')
-}
 const {
   selectedCategorySlug,
   subcategories,

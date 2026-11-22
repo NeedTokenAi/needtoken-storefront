@@ -53,6 +53,7 @@ export interface ApiSubscriptionSummary {
   id: number
   plan_id: number
   plan_title?: string
+  allowed_groups?: string
   status: string
   amount_total: number
   amount_used: number

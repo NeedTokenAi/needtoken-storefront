@@ -15,7 +15,8 @@
           <div v-for="column in columns" :key="column.key" class="nt-footer-column">
             <h2>{{ column.title }}</h2>
             <RouterLink v-for="link in column.links" :key="link.path" :to="link.path">{{ link.label }}</RouterLink>
-            <a v-if="column.key === 'help'" :href="CONSOLE_URL" rel="noopener">{{ t('needtoken.footer.console') }}<ArrowUpRight :size="12" aria-hidden="true" /></a>
+            <a v-if="column.key === 'help' && appStore.isResellerTenant" :href="CONSOLE_URL" rel="noopener">{{ t('needtoken.footer.console') }}<ArrowUpRight :size="12" aria-hidden="true" /></a>
+            <RouterLink v-else-if="column.key === 'help'" to="/me">{{ t('needtoken.footer.console') }}<ArrowUpRight :size="12" aria-hidden="true" /></RouterLink>
           </div>
         </nav>
 

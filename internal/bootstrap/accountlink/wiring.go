@@ -2,7 +2,9 @@ package accountlinkwiring
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -268,6 +270,7 @@ func (b upstreamBridge) APISummary(ctx context.Context, merchantCustomerID strin
 			ID:                  sub.ID,
 			PlanID:              sub.PlanID,
 			PlanTitle:           sub.PlanTitle,
+			AllowedGroups:       sub.AllowedGroups,
 			Status:              sub.Status,
 			AmountTotal:         sub.AmountTotal,
 			AmountUsed:          sub.AmountUsed,
@@ -302,8 +305,25 @@ func (b upstreamBridge) StorefrontLogout(ctx context.Context, merchantCustomerID
 	return revoked, nil
 }
 
+func (b upstreamBridge) GatewayConsoleRequest(ctx context.Context, method, merchantCustomerID, subPath string, query url.Values, rawBody []byte) (json.RawMessage, error) {
+	adapter, enabled, err := b.resolveAdapter()
+	if err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return nil, accountlink.ErrUnavailable
+	}
+	data, err := adapter.CustomerConsoleRequest(ctx, method, merchantCustomerID, subPath, query, rawBody)
+	if err != nil {
+		return nil, translateUpstreamError(err)
+	}
+	return data, nil
+}
+
 func translateUpstreamError(err error) error {
 	switch {
+	case errors.Is(err, upstream.ErrCustomerLinkNotLinked):
+		return accountlink.ErrNotLinked
 	case errors.Is(err, upstream.ErrCustomerLinkInvalid):
 		return accountlink.ErrInvalid
 	case errors.Is(err, upstream.ErrCustomerLinkExpired):
