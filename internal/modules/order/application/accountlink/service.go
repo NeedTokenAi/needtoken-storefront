@@ -2,6 +2,7 @@ package accountlink
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"regexp"
@@ -18,6 +19,7 @@ var (
 	ErrExpired     = errors.New("api account link expired")
 	ErrConflict    = errors.New("api account link conflict")
 	ErrForbidden   = errors.New("api account link forbidden")
+	ErrNotLinked   = errors.New("api account link not linked")
 )
 
 var safeNextPath = regexp.MustCompile(`^/(|me|plans|api-services|models|checkout|profile|orders|orders/[A-Za-z0-9_-]{1,64})$`)
@@ -90,6 +92,7 @@ type APISubscriptionSummary struct {
 	ID                  int64  `json:"id"`
 	PlanID              int    `json:"plan_id"`
 	PlanTitle           string `json:"plan_title,omitempty"`
+	AllowedGroups       string `json:"allowed_groups,omitempty"`
 	Status              string `json:"status"`
 	AmountTotal         int64  `json:"amount_total"`
 	AmountUsed          int64  `json:"amount_used"`
@@ -126,6 +129,10 @@ type SessionRevoker interface {
 
 type LogoutBridge interface {
 	StorefrontLogout(ctx context.Context, merchantCustomerID, reason string) (bool, error)
+}
+
+type GatewayConsoleBridge interface {
+	GatewayConsoleRequest(ctx context.Context, method, merchantCustomerID, subPath string, query url.Values, rawBody []byte) (json.RawMessage, error)
 }
 
 type LogoutResult struct {
@@ -442,4 +449,26 @@ func (s *Service) Logout(ctx context.Context, userID uint) (LogoutResult, error)
 		}
 	}
 	return res, nil
+}
+
+// GatewayConsole proxies an authenticated member's API Keys / Logs / Usage request
+// to the gateway through glue. If the member has not yet been linked, it attempts
+// one transparent Ensure() auto-link and retries once so newly registered members
+// can use the embedded console immediately without manual linking.
+func (s *Service) GatewayConsole(ctx context.Context, userID uint, method, subPath string, query url.Values, rawBody []byte) (json.RawMessage, error) {
+	ref, err := merchantCustomerID(userID)
+	if err != nil {
+		return nil, err
+	}
+	cb, ok := s.bridge.(GatewayConsoleBridge)
+	if !ok || cb == nil {
+		return nil, ErrUnavailable
+	}
+	data, err := cb.GatewayConsoleRequest(ctx, method, ref, subPath, query, rawBody)
+	if errors.Is(err, ErrNotLinked) {
+		if ensured, ensureErr := s.Ensure(ctx, userID); ensureErr == nil && ensured.Linked {
+			return cb.GatewayConsoleRequest(ctx, method, ref, subPath, query, rawBody)
+		}
+	}
+	return data, err
 }

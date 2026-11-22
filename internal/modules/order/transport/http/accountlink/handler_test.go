@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -15,12 +16,32 @@ import (
 )
 
 type fakeBridge struct {
-	gotRef        string
-	gotSSO        accountlink.ConsoleSSOInput
-	gotAuto       accountlink.AutoLinkInput
-	gotLogoutRef  string
-	logoutRevoked bool
-	err           error
+	gotRef           string
+	gotSSO           accountlink.ConsoleSSOInput
+	gotAuto          accountlink.AutoLinkInput
+	gotLogoutRef     string
+	logoutRevoked    bool
+	consoleCalls     []string
+	failFirstNotLink bool
+	consoleCallCount int
+	err              error
+}
+
+func (f *fakeBridge) GatewayConsoleRequest(_ context.Context, method, ref, subPath string, query url.Values, rawBody []byte) (json.RawMessage, error) {
+	f.gotRef = ref
+	f.consoleCallCount++
+	if f.failFirstNotLink && f.consoleCallCount == 1 {
+		return nil, accountlink.ErrNotLinked
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	entry := method + " " + subPath
+	if len(query) > 0 {
+		entry += "?" + query.Encode()
+	}
+	f.consoleCalls = append(f.consoleCalls, entry)
+	return json.RawMessage(`{"items":[],"total":0}`), nil
 }
 
 func (f *fakeBridge) StorefrontLogout(_ context.Context, ref, _ string) (bool, error) {
@@ -277,5 +298,63 @@ func TestMemberLogoutSLO(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK || len(revoker.revokedIDs) != 1 || revoker.revokedIDs[0] != 42 || bridge.gotLogoutRef != "needtoken-storefront:user:42" {
 		t.Fatalf("logout SLO failed: code=%d revoked=%v logoutRef=%s body=%s", w.Code, revoker.revokedIDs, bridge.gotLogoutRef, w.Body.String())
+	}
+}
+
+func TestGatewayConsoleMemberRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	bridge := &fakeBridge{failFirstNotLink: true}
+	svc := accountlink.New(bridge).WithIdentityReader(fakeIdentity{})
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", uint(88))
+		c.Next()
+	})
+	RegisterMemberRoutes(r, New(svc))
+
+	// First call hits ErrNotLinked -> transparently invokes AutoLink/Ensure and retries once!
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, httptest.NewRequest(http.MethodGet, "/me/gateway/tokens", nil))
+	if w1.Code != http.StatusOK || bridge.gotAuto.MerchantCustomerID != "needtoken-storefront:user:88" {
+		t.Fatalf("expected transparent auto-link retry on /me/gateway/tokens, code=%d auto=%+v body=%s", w1.Code, bridge.gotAuto, w1.Body.String())
+	}
+
+	// Create, update, delete, logs, usage routes work cleanly.
+	createReq := httptest.NewRequest(http.MethodPost, "/me/gateway/tokens", bytes.NewBufferString(`{"name":"CLI"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, createReq)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("create token failed: code=%d body=%s", w2.Code, w2.Body.String())
+	}
+
+	updReq := httptest.NewRequest(http.MethodPut, "/me/gateway/tokens/9", bytes.NewBufferString(`{"status":2}`))
+	updReq.Header.Set("Content-Type", "application/json")
+	w3 := httptest.NewRecorder()
+	r.ServeHTTP(w3, updReq)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("update token failed: code=%d body=%s", w3.Code, w3.Body.String())
+	}
+
+	w4 := httptest.NewRecorder()
+	r.ServeHTTP(w4, httptest.NewRequest(http.MethodDelete, "/me/gateway/tokens/9", nil))
+	if w4.Code != http.StatusOK {
+		t.Fatalf("delete token failed: code=%d body=%s", w4.Code, w4.Body.String())
+	}
+
+	w5 := httptest.NewRecorder()
+	r.ServeHTTP(w5, httptest.NewRequest(http.MethodGet, "/me/gateway/logs?p=1&page_size=20&model_name=claude-sonnet-4-6&drop=1", nil))
+	if w5.Code != http.StatusOK {
+		t.Fatalf("logs failed: code=%d body=%s", w5.Code, w5.Body.String())
+	}
+
+	w6 := httptest.NewRecorder()
+	r.ServeHTTP(w6, httptest.NewRequest(http.MethodGet, "/me/gateway/usage?days=7", nil))
+	if w6.Code != http.StatusOK {
+		t.Fatalf("usage failed: code=%d body=%s", w6.Code, w6.Body.String())
+	}
+
+	if len(bridge.consoleCalls) != 6 || bridge.consoleCalls[4] != "GET /logs?model_name=claude-sonnet-4-6&p=1&page_size=20" {
+		t.Fatalf("unexpected console proxy calls: %v", bridge.consoleCalls)
 	}
 }

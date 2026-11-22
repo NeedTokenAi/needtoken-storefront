@@ -29,10 +29,10 @@
             <span>{{ t('needtoken.apiAccountLink.callbackContinue') }}</span>
             <ArrowRight :size="15" aria-hidden="true" />
           </button>
-          <a :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer" class="nt-link-cb__secondary">
-            <span>{{ t('needtoken.plans.console') }}</span>
+          <RouterLink to="/me/keys" class="nt-link-cb__secondary">
+            <span>{{ t('needtoken.memberConsole.nav.keys') }}</span>
             <ArrowUpRight :size="14" aria-hidden="true" />
-          </a>
+          </RouterLink>
         </div>
       </template>
 
@@ -58,7 +58,6 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AlertCircle, ArrowRight, ArrowUpRight, CheckCircle2, LoaderCircle } from 'lucide-vue-next'
-import { CONSOLE_URL } from './config'
 import {
   completeApiAccountLinkRequest,
   startApiAccountLinkRequest,

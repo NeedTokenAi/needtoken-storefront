@@ -19,6 +19,7 @@ var (
 	ErrCustomerLinkExpired     = errors.New("customer link expired")
 	ErrCustomerLinkConflict    = errors.New("customer link conflict")
 	ErrCustomerLinkForbidden   = errors.New("customer link forbidden")
+	ErrCustomerLinkNotLinked   = errors.New("customer link not linked")
 )
 
 type CustomerLinkStatus struct {
@@ -83,6 +84,7 @@ type CustomerAPISubscriptionSummary struct {
 	ID                  int64  `json:"id"`
 	PlanID              int    `json:"plan_id"`
 	PlanTitle           string `json:"plan_title,omitempty"`
+	AllowedGroups       string `json:"allowed_groups,omitempty"`
 	Status              string `json:"status"`
 	AmountTotal         int64  `json:"amount_total"`
 	AmountUsed          int64  `json:"amount_used"`
@@ -264,6 +266,76 @@ func (a *DujiaoNextAdapter) StorefrontLogout(ctx context.Context, merchantCustom
 	return result.Revoked, nil
 }
 
+// CustomerConsoleRequest forwards an authenticated storefront member's gateway
+// console request (/tokens, /logs, /usage) to glue's trusted customer-link proxy.
+func (a *DujiaoNextAdapter) CustomerConsoleRequest(ctx context.Context, method, merchantCustomerID, subPath string, query url.Values, rawBody []byte) (json.RawMessage, error) {
+	base, err := url.Parse(a.baseURL)
+	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Host == "" || base.User != nil || base.Path != "" || base.RawQuery != "" || base.Fragment != "" {
+		return nil, ErrCustomerLinkUnavailable
+	}
+	if !strings.HasPrefix(subPath, "/") {
+		subPath = "/" + subPath
+	}
+	signPath := "/api/v1/upstream/customer-links/console" + subPath
+	q := url.Values{}
+	for k, vals := range query {
+		for _, v := range vals {
+			q.Add(k, v)
+		}
+	}
+	q.Set("merchant_customer_id", strings.TrimSpace(merchantCustomerID))
+	fullPath := signPath + "?" + q.Encode()
+
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	var bodyReader io.Reader
+	if len(rawBody) > 0 {
+		bodyReader = bytes.NewReader(rawBody)
+	}
+	req, err := http.NewRequestWithContext(reqCtx, method, a.baseURL+fullPath, bodyReader)
+	if err != nil {
+		return nil, ErrCustomerLinkUnavailable
+	}
+	now := time.Now().Unix()
+	req.Header.Set(HeaderApiKey, a.apiKey)
+	req.Header.Set(HeaderTimestamp, strconv.FormatInt(now, 10))
+	req.Header.Set(HeaderSignature, Sign(a.apiSecret, method, signPath, now, rawBody))
+	req.Header.Set("Accept", "application/json")
+	if len(rawBody) > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	client := *a.client
+	client.Jar = nil
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, ErrCustomerLinkUnavailable
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, (1<<20)+1))
+	if err != nil || len(body) > (1<<20) {
+		return nil, ErrCustomerLinkUnavailable
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, mapCustomerLinkError(resp.StatusCode, body)
+	}
+	var env struct {
+		OK   bool            `json:"ok"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil || !env.OK {
+		return nil, ErrCustomerLinkUnavailable
+	}
+	if len(env.Data) == 0 {
+		return json.RawMessage(`{}`), nil
+	}
+	return env.Data, nil
+}
+
 // customerLinkRequest signs the exact request path (without query) and body with
 // merchant HMAC credentials, disables redirects/cookies, and bounds I/O so
 // challenge/approval tokens never leak through redirects or logs.
@@ -331,6 +403,8 @@ func mapCustomerLinkError(statusCode int, body []byte) error {
 	}
 	_ = json.Unmarshal(body, &payload)
 	switch payload.ErrorCode {
+	case "not_linked":
+		return ErrCustomerLinkNotLinked
 	case "invalid_request":
 		return ErrCustomerLinkInvalid
 	case "link_challenge_expired", "link_challenge_not_found":

@@ -11,20 +11,18 @@
           {{ t('needtoken.apiConnect.reference') }}
           <ArrowUpRight :size="13" aria-hidden="true" />
         </a>
-        <button
-          v-if="userAuth.isAuthenticated && !appStore.isResellerTenant"
-          type="button"
+        <RouterLink
+          v-if="!appStore.isResellerTenant"
+          :to="userAuth.isAuthenticated ? '/me/keys' : { path: '/auth/login', query: { redirect: '/me/keys' } }"
           class="connect-key-btn"
-          :disabled="ssoLoading"
-          @click="openConsoleKeys"
         >
           <span>{{ t('needtoken.apiConnect.getKey') }}</span>
           <ArrowUpRight :size="15" aria-hidden="true" />
-        </button>
-        <RouterLink v-else to="/auth/login?redirect=/api-services" class="connect-key-btn">
+        </RouterLink>
+        <a v-else :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer" class="connect-key-btn">
           <span>{{ t('needtoken.apiConnect.getKey') }}</span>
           <ArrowUpRight :size="15" aria-hidden="true" />
-        </RouterLink>
+        </a>
       </div>
     </header>
 
@@ -105,11 +103,16 @@
             <strong>{{ t('needtoken.apiConnect.quickConfigTitle') }}</strong>
             <p>{{ t('needtoken.apiConnect.quickConfigHint') }}</p>
           </div>
-          <a :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer" data-api-quick-config>
+          <a v-if="appStore.isResellerTenant" :href="CONSOLE_URL" target="_blank" rel="noopener noreferrer" data-api-quick-config>
             <Zap :size="14" aria-hidden="true" />
             <span>{{ t('needtoken.apiConnect.quickConfig') }}</span>
             <ArrowUpRight :size="13" aria-hidden="true" />
           </a>
+          <RouterLink v-else :to="userAuth.isAuthenticated ? '/me/keys' : { path: '/auth/login', query: { redirect: '/me/keys' } }" data-api-quick-config>
+            <Zap :size="14" aria-hidden="true" />
+            <span>{{ t('needtoken.apiConnect.quickConfig') }}</span>
+            <ArrowUpRight :size="13" aria-hidden="true" />
+          </RouterLink>
         </div>
 
         <!-- 接入步骤 -->
@@ -222,7 +225,6 @@ import {
 } from '../lib/apiIntegrations'
 import { useUserAuthStore } from '../../../stores/userAuth'
 import { useAppStore } from '../../../stores/app'
-import { useApiAccountLink } from '../composables/useApiAccountLink'
 import CodeBlock from './CodeBlock.vue'
 
 const props = defineProps<{
@@ -232,10 +234,6 @@ const props = defineProps<{
 const { t } = useI18n()
 const userAuth = useUserAuthStore()
 const appStore = useAppStore()
-const { ssoLoading, openApiConsoleSSO } = useApiAccountLink()
-const openConsoleKeys = () => {
-  void openApiConsoleSSO('/keys', '/api-services')
-}
 
 const scenarios: readonly IntegrationScenario[] = ['coding', 'local', 'cloud', 'agent']
 const toolIcons: Record<IntegrationId, any> = {

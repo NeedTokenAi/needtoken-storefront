@@ -92,19 +92,16 @@
       </div>
 
       <div v-if="isLinked" class="nt-account-link__shortcuts" role="group" :aria-label="t('needtoken.apiAccountLink.shortcutsLabel')">
-        <button
+        <RouterLink
           v-for="item in quickLinks"
-          :key="item.target"
-          type="button"
+          :key="item.to"
+          :to="item.to"
           class="nt-account-link__chip"
-          :disabled="busy"
-          @click="handleSSO(item.target)"
         >
-          <LoaderCircle v-if="ssoLoading && ssoTarget === item.target" :size="12" class="nt-account-link__spin" aria-hidden="true" />
-          <component :is="item.icon" v-else :size="12" aria-hidden="true" />
+          <component :is="item.icon" :size="12" aria-hidden="true" />
           <span>{{ t(item.labelKey) }}</span>
           <ArrowUpRight :size="11" aria-hidden="true" />
-        </button>
+        </RouterLink>
       </div>
 
       <p v-if="errorMessage" class="nt-account-link__error" role="alert">
@@ -131,11 +128,10 @@
             type="button"
             class="nt-account-link__cta"
             :disabled="busy"
-            @click="handleSSO('/dashboard')"
+            @click="handleOpenMemberConsole"
           >
-            <LoaderCircle v-if="ssoLoading" :size="15" class="nt-account-link__spin" aria-hidden="true" />
-            <Zap v-else :size="15" aria-hidden="true" />
-            <span>{{ ssoLoading ? t('needtoken.apiAccountLink.ssoRedirecting') : ctaLabel }}</span>
+            <Zap :size="15" aria-hidden="true" />
+            <span>{{ ctaLabel }}</span>
           </button>
           <button
             type="button"
@@ -150,17 +146,14 @@
         </template>
       </template>
 
-      <button
+      <RouterLink
         v-else
-        type="button"
+        to="/me"
         class="nt-account-link__cta is-sso"
-        :disabled="busy"
-        @click="handleSSO('/dashboard')"
       >
-        <LoaderCircle v-if="ssoLoading && ssoTarget === '/dashboard'" :size="15" class="nt-account-link__spin" aria-hidden="true" />
-        <ArrowUpRight v-else :size="15" aria-hidden="true" />
-        <span>{{ ssoLoading && ssoTarget === '/dashboard' ? t('needtoken.apiAccountLink.ssoRedirecting') : t('needtoken.apiAccountLink.enterConsoleSSO') }}</span>
-      </button>
+        <ArrowUpRight :size="15" aria-hidden="true" />
+        <span>{{ t('needtoken.apiAccountLink.enterConsoleSSO') }}</span>
+      </RouterLink>
     </div>
   </section>
 </template>
@@ -168,6 +161,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import {
   Activity,
   AlertTriangle,
@@ -189,7 +183,6 @@ import {
   computeSubscriptionUsagePercent,
   formatApiQuotaUsd,
   formatSubscriptionExpiry,
-  type ApiConsoleTargetPath,
 } from '../lib/apiAccountLinkPolicy'
 
 const props = withDefaults(
@@ -206,6 +199,7 @@ const props = withDefaults(
 )
 
 const { t, locale } = useI18n()
+const router = useRouter()
 const userAuth = useUserAuthStore()
 const appStore = useAppStore()
 const {
@@ -214,20 +208,17 @@ const {
   ensureResult,
   summaryLoading,
   starting,
-  ssoLoading,
-  ssoTarget,
   errorMessage,
   load,
   ensure,
   loadSummary,
   beginLinking,
-  openApiConsoleSSO,
 } = useApiAccountLink()
 
-const quickLinks: readonly { target: ApiConsoleTargetPath; labelKey: string; icon: typeof KeyRound }[] = [
-  { target: '/keys', labelKey: 'needtoken.apiAccountLink.shortcutKeys', icon: KeyRound },
-  { target: '/dashboard', labelKey: 'needtoken.apiAccountLink.shortcutDashboard', icon: Activity },
-  { target: '/subscriptions', labelKey: 'needtoken.apiAccountLink.shortcutSubscriptions', icon: CreditCard },
+const quickLinks: readonly { to: string; labelKey: string; icon: typeof KeyRound }[] = [
+  { to: '/me/keys', labelKey: 'needtoken.apiAccountLink.shortcutKeys', icon: KeyRound },
+  { to: '/me/usage', labelKey: 'needtoken.apiAccountLink.shortcutDashboard', icon: Activity },
+  { to: '/me/assets', labelKey: 'needtoken.apiAccountLink.shortcutSubscriptions', icon: CreditCard },
 ]
 
 const syncLinkAndSummary = async () => {
@@ -265,7 +256,7 @@ const pendingOrders = computed(() => status.value?.pending_orders ?? 0)
 const hasPendingOrders = computed(() => !isLinked.value && pendingOrders.value > 0)
 const requiresExistingManualLink = computed(() => !isLinked.value && ensureResult.value?.status === 'existing_requires_link')
 const activeSubscriptions = computed(() => summary.value?.active_subscriptions ?? [])
-const busy = computed(() => starting.value || ssoLoading.value)
+const busy = computed(() => starting.value)
 
 const visible = computed(() => {
   if (getActiveTemplate() !== 'needtoken' || appStore.isResellerTenant || !userAuth.isAuthenticated) {
@@ -323,8 +314,9 @@ const subscriptionExpiryText = (endTime?: number | null) => {
   return t('needtoken.apiAccountLink.subscriptionValidUntil', { date: formatted })
 }
 
-const handleSSO = (target: ApiConsoleTargetPath) => {
-  void openApiConsoleSSO(target, props.nextPath)
+const handleOpenMemberConsole = async () => {
+  await ensure()
+  void router.push('/me')
 }
 
 const handleManualBind = () => {
