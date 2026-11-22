@@ -612,9 +612,15 @@ type ImportUpstreamProductsResult struct {
 	Failures      []ImportUpstreamProductsFailure `json:"failures,omitempty"`
 }
 
+type UpdateUpstreamConnectionStatusInput struct {
+	Status string `json:"status"`
+}
+
 type UpstreamStore interface {
 	ListConnections() ([]UpstreamConnection, int64, error)
 	SaveConnection(input SaveUpstreamConnectionInput) (*UpstreamConnection, error)
+	UpdateConnectionStatus(id uint, status string) (*UpstreamConnection, error)
+	DeleteConnection(id uint) error
 	FetchCatalog(connectionID uint) (*UpstreamCatalogResult, error)
 	ImportOrSync(connectionID uint, input ImportUpstreamProductsInput) (*ImportUpstreamProductsResult, error)
 }
@@ -680,6 +686,8 @@ type Bridge interface {
 	MailHealth() (*MailHealthResult, error)
 	UpstreamConnections() (*UpstreamConnectionsResult, error)
 	SaveUpstreamConnection(input SaveUpstreamConnectionInput) (*UpstreamConnection, error)
+	UpdateUpstreamConnectionStatus(id uint, status string) (*UpstreamConnection, error)
+	DeleteUpstreamConnection(id uint) error
 	UpstreamCatalog(connectionID uint) (*UpstreamCatalogResult, error)
 	ImportUpstreamProducts(connectionID uint, input ImportUpstreamProductsInput) (*ImportUpstreamProductsResult, error)
 	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)

@@ -506,6 +506,30 @@ func (f *fakeUpstreamStore) SaveConnection(input opscontract.SaveUpstreamConnect
 	return &conn, nil
 }
 
+func (f *fakeUpstreamStore) UpdateConnectionStatus(id uint, status string) (*opscontract.UpstreamConnection, error) {
+	for i := range f.conns {
+		if f.conns[i].ID == id {
+			f.conns[i].Status = status
+			out := f.conns[i]
+			return &out, nil
+		}
+	}
+	return nil, opscontract.ErrNotFound
+}
+
+func (f *fakeUpstreamStore) DeleteConnection(id uint) error {
+	for i := range f.conns {
+		if f.conns[i].ID == id {
+			if f.conns[i].Status == constants.ConnectionStatusActive {
+				return &opscontract.ConflictError{Code: "upstream_connection_active"}
+			}
+			f.conns = append(f.conns[:i], f.conns[i+1:]...)
+			return nil
+		}
+	}
+	return opscontract.ErrNotFound
+}
+
 func (f *fakeUpstreamStore) FetchCatalog(connectionID uint) (*opscontract.UpstreamCatalogResult, error) {
 	return &opscontract.UpstreamCatalogResult{
 		Source:              "storefront",
@@ -551,6 +575,26 @@ func TestUpstreamBridgeSaveFetchAndImport(t *testing.T) {
 	imp, err := svc.ImportUpstreamProducts(saved.ID, opscontract.ImportUpstreamProductsInput{UpstreamProductIDs: []uint{1000001}})
 	if err != nil || imp.ImportedCount != 1 {
 		t.Fatalf("ImportUpstreamProducts failed: %v %+v", err, imp)
+	}
+
+	// Active connection cannot be deleted until disabled.
+	var conflictErr *opscontract.ConflictError
+	if err := svc.DeleteUpstreamConnection(saved.ID); !errors.As(err, &conflictErr) || conflictErr.Code != "upstream_connection_active" {
+		t.Fatalf("expected active connection delete conflict, got %v", err)
+	}
+	if _, err := svc.UpdateUpstreamConnectionStatus(saved.ID, "bogus"); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("invalid status must return ErrInvalidInput, got %v", err)
+	}
+	disabled, err := svc.UpdateUpstreamConnectionStatus(saved.ID, constants.ConnectionStatusDisabled)
+	if err != nil || disabled.Status != constants.ConnectionStatusDisabled {
+		t.Fatalf("disable connection failed: %+v err=%v", disabled, err)
+	}
+	if err := svc.DeleteUpstreamConnection(saved.ID); err != nil {
+		t.Fatalf("delete disabled connection failed: %v", err)
+	}
+	listed, err := svc.UpstreamConnections()
+	if err != nil || len(listed.Connections) != 0 {
+		t.Fatalf("expected 0 connections after delete, got %+v err=%v", listed, err)
 	}
 }
 

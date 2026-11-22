@@ -1589,6 +1589,30 @@ func (s *Service) SaveUpstreamConnection(input opscontract.SaveUpstreamConnectio
 	return s.upstream.SaveConnection(input)
 }
 
+func (s *Service) UpdateUpstreamConnectionStatus(id uint, status string) (*opscontract.UpstreamConnection, error) {
+	if s.upstream == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	st := strings.ToLower(strings.TrimSpace(status))
+	if st != constants.ConnectionStatusActive && st != constants.ConnectionStatusDisabled {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.upstream.UpdateConnectionStatus(id, st)
+}
+
+func (s *Service) DeleteUpstreamConnection(id uint) error {
+	if s.upstream == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	return s.upstream.DeleteConnection(id)
+}
+
 func (s *Service) UpstreamCatalog(connectionID uint) (*opscontract.UpstreamCatalogResult, error) {
 	if s.upstream == nil {
 		return nil, opscontract.ErrNotConfigured

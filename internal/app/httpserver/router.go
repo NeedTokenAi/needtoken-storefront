@@ -19,6 +19,7 @@ import (
 	channelwiring "github.com/dujiao-next/internal/bootstrap/channelapi"
 	channeluserwiring "github.com/dujiao-next/internal/bootstrap/channeluser"
 	fulfillmentwiring "github.com/dujiao-next/internal/bootstrap/fulfillment"
+	giftcardwiring "github.com/dujiao-next/internal/bootstrap/giftcard"
 	orderwiring "github.com/dujiao-next/internal/bootstrap/order"
 	paymentwiring "github.com/dujiao-next/internal/bootstrap/payment"
 	publicconfigwiring "github.com/dujiao-next/internal/bootstrap/publicconfig"
@@ -153,6 +154,7 @@ func SetupRouter(cfg *config.Config, c *container.Container) *gin.Engine {
 	adminCatalogProductMappingHandler := mappinghttp.NewAdminHandler(c.ProductMappingService)
 	userAuditLogHandler := auditlogtransport.NewUserHandler(c.UserLoginLogService)
 	adminCouponHandler := coupontransport.NewAdminHandler(c.CouponAdminService)
+	c.GiftCardService.SetUniversalRedeemer(giftcardwiring.NewUniversalRedeemer(c))
 	adminGiftCardHandler := giftcardtransport.NewAdminHandler(c.GiftCardService)
 	userGiftCardHandler := giftcardtransport.NewUserHandler(c.GiftCardService, captchaVerifier)
 	channelGiftCardHandler := giftcardtransport.NewChannelHandler(

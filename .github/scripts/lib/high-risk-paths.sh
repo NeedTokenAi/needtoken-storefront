@@ -29,7 +29,8 @@ is_high_risk_path() {
     internal/constants/constants.go | internal/app/container/bootstrap.go | internal/app/container/bootstrap_test.go | \
       internal/modules/diagnostics/* | internal/modules/opsbridge/* | internal/modules/apipublic/* | \
       internal/modules/identity/userauth/application/service.go | \
-      internal/app/httpserver/routes_storefront.go | internal/app/httpserver/routes_channel.go | \
+      internal/modules/giftcard/application/* | internal/modules/giftcard/contract/* | \
+      internal/app/httpserver/router.go | internal/app/httpserver/routes_storefront.go | internal/app/httpserver/routes_channel.go | \
       frontend/user/src/templates/needtoken/* | frontend/user/index.html | \
       frontend/user/src/router/index.ts | frontend/user/src/api/order.ts | \
       frontend/user/src/stores/userAuth.ts | frontend/user/src/stores/userProfile.ts | \
