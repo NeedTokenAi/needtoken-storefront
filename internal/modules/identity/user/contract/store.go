@@ -35,4 +35,5 @@ type Store interface {
 	UpdateTOTPEnabled(uint, string, time.Time, string) error
 	UpdateRecoveryCodes(uint, string) error
 	ClearTOTP(uint) error
+	SoftDelete(id uint, archivedEmail string, deletedAt time.Time) error
 }

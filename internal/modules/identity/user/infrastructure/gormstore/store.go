@@ -226,3 +226,23 @@ func (r *Store) ClearTOTP(userID uint) error {
 		"token_invalid_before":    now,
 	}).Error
 }
+
+// SoftDelete 软删除并注销用户，释放原邮箱并强制使所有旧会话失效
+func (r *Store) SoftDelete(userID uint, archivedEmail string, deletedAt time.Time) error {
+	if userID == 0 {
+		return errors.New("invalid user id")
+	}
+	return r.db.Model(&userdomain.User{}).Where("id = ? AND deleted_at IS NULL", userID).Updates(map[string]interface{}{
+		"email":                   archivedEmail,
+		"status":                  constants.UserStatusDisabled,
+		"totp_secret":             "",
+		"totp_enabled_at":         nil,
+		"totp_pending_secret":     "",
+		"totp_pending_expires_at": nil,
+		"recovery_codes":          "",
+		"token_version":           gorm.Expr("token_version + 1"),
+		"token_invalid_before":    deletedAt,
+		"deleted_at":              deletedAt,
+		"updated_at":              deletedAt,
+	}).Error
+}
