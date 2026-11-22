@@ -19,6 +19,9 @@ type ResetRecord struct {
 	Type        string      `json:"type"`
 	AnnouncedAt time.Time   `json:"announced_at"`
 	Text        string      `json:"text"`
+	TextZH      string      `json:"text_zh,omitempty"`
+	Scope       string      `json:"scope,omitempty"`
+	ScopeZH     string      `json:"scope_zh,omitempty"`
 	Source      ResetSource `json:"source"`
 }
 
@@ -42,4 +45,9 @@ type ResetFeedSource interface {
 
 type ResetFeedReader interface {
 	Latest(context.Context) (ResetFeedSnapshot, error)
+}
+
+type ChannelResetFeedReader interface {
+	ResetFeedReader
+	LatestForChannel(context.Context, string) (ResetFeedSnapshot, error)
 }

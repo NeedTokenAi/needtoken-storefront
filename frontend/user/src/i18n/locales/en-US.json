@@ -3733,7 +3733,35 @@
       },
       "types": {
         "regular": "Global reset",
-        "banked": "Reset card"
+        "banked": "Reset card",
+        "preview": "Official preview"
+      },
+      "delivery": {
+        "direct": "Direct browser feed",
+        "cached_proxy": "Edge-cached sync",
+        "cacheNote": "5m client cache · minimal origin load",
+        "refresh": "Refresh",
+        "sourcesLabel": "Sources"
+      },
+      "channels": {
+        "claude": {
+          "title": "Claude Reset Radar",
+          "subtitle": "Live public Anthropic Claude quota reset and reset-card announcements, with quick links to claude-resets.net and tsalon.tech."
+        },
+        "gemini": {
+          "title": "Gemini / Antigravity Reset Radar",
+          "subtitle": "Live public Google Antigravity Gemini quota resets alongside a zero-request Pacific midnight daily RPD countdown."
+        },
+        "grok": {
+          "title": "Grok Reset Radar",
+          "subtitle": "Live public xAI Grok / SuperGrok global quota reset announcements and interval history."
+        }
+      },
+      "geminiDaily": {
+        "badge": "Daily RPD reset (client-calculated)",
+        "countdown": "Next daily reset in {hours}h {minutes}m",
+        "dstRule": "US Daylight Time (PDT): Midnight PT = {time} UTC+8 daily reset",
+        "stdRule": "US Standard Time (PST): Midnight PT = {time} UTC+8 daily reset"
       },
       "noResetDay": "No reset recorded on this day",
       "recordsTitle": "Reset records",
@@ -3757,36 +3785,36 @@
       "placeholder": {
         "claude": {
           "title": "Claude Radar",
-          "subtitle": "Track Claude Pro / Max quota windows and official credit announcements (live feed coming soon)",
+          "subtitle": "Track Claude Pro / Max quota windows and official credit announcements",
           "rulesTitle": "Official quota refresh rules",
           "rule1Title": "5-hour rolling window",
           "rule1Body": "Chat and Claude Code session allowances refresh on a rolling 5-hour cycle from your first message rather than a single global reset time.",
           "rule2Title": "Weekly usage limits",
           "rule2Body": "Heavy usage is also governed by rolling weekly limits that recover automatically per account schedule.",
-          "rule3Title": "Live radar status",
-          "rule3Body": "No public global-reset feed is connected yet. Real-time tracking will go live once a reliable official source is available."
+          "rule3Title": "Source & sync strategy",
+          "rule3Body": "Loads directly in your browser from the public feed with a 5-minute client cache and direct links to claude-resets.net and source posts."
         },
         "gemini": {
           "title": "Gemini Radar",
-          "subtitle": "Track Google AI Pro / Ultra & Gemini CLI quota refreshes and official announcements (live feed coming soon)",
+          "subtitle": "Track Google Antigravity public reset notices and daily RPD countdown",
           "rulesTitle": "Official quota refresh rules",
           "rule1Title": "Web & app rolling recovery",
           "rule1Body": "Advanced model allowances in the Gemini web and mobile apps scale with prompt complexity and typically replenish incrementally on a 5-hour rolling cycle up to tier limits.",
           "rule2Title": "CLI & daily RPD reset",
           "rule2Body": "Daily request quotas (RPD) for Gemini CLI, Code Assist, and AI Studio reset at midnight Pacific Time (PT), accounted separately from consumer chat and paid API billing.",
-          "rule3Title": "Live radar status",
-          "rule3Body": "Displayed as a placeholder without fabricated records. Full calendar and timeline will activate once a reliable public feed is integrated."
+          "rule3Title": "Antigravity feed & sync",
+          "rule3Body": "Syncs public Antigravity (Varun Mohan) Gemini quota resets through a 10-minute edge-cached snapshot with direct X links—never fabricated."
         },
         "grok": {
           "title": "Grok Radar",
-          "subtitle": "Track SuperGrok / X Premium+ quota refreshes and official announcements (live feed coming soon)",
+          "subtitle": "Track SuperGrok / X Premium+ quota refreshes and official announcements",
           "rulesTitle": "Official quota refresh rules",
           "rule1Title": "2-hour rolling window",
           "rule1Body": "Grok chat, DeepSearch, and Think quotas replenish independently on rolling 2-hour windows.",
           "rule2Title": "Tiered allowances",
           "rule2Body": "SuperGrok and SuperGrok Heavy provide higher rate limits; check the Grok client for live remaining quota.",
-          "rule3Title": "Live radar status",
-          "rule3Body": "Displayed as a placeholder without fabricated records. Full calendar and timeline will activate once a public feed is integrated."
+          "rule3Title": "Source & sync strategy",
+          "rule3Body": "Loads directly in your browser from the public feed and shares the 5-minute client cache with Claude without extra requests."
         }
       }
     },

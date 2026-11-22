@@ -18,16 +18,28 @@ const (
 
 // ResetFeed keeps one public page in memory; no account or quota data is stored.
 type ResetFeed struct {
-	source diagnosticscontract.ResetFeedSource
-	now    func() time.Time
-	mu     sync.Mutex
-	latest *diagnosticscontract.ResetFeedSnapshot
-	retry  time.Time
-	flight chan struct{}
+	source    diagnosticscontract.ResetFeedSource
+	sourceURL string
+	freshFor  time.Duration
+	now       func() time.Time
+	mu        sync.Mutex
+	latest    *diagnosticscontract.ResetFeedSnapshot
+	retry     time.Time
+	flight    chan struct{}
 }
 
 func NewResetFeed(source diagnosticscontract.ResetFeedSource) *ResetFeed {
-	return &ResetFeed{source: source, now: time.Now}
+	return NewResetFeedWithOptions(source, resetFeedSourceURL, resetFreshFor)
+}
+
+func NewResetFeedWithOptions(source diagnosticscontract.ResetFeedSource, sourceURL string, freshFor time.Duration) *ResetFeed {
+	if sourceURL == "" {
+		sourceURL = resetFeedSourceURL
+	}
+	if freshFor <= 0 {
+		freshFor = resetFreshFor
+	}
+	return &ResetFeed{source: source, sourceURL: sourceURL, freshFor: freshFor, now: time.Now}
 }
 
 func (s *ResetFeed) Latest(ctx context.Context) (diagnosticscontract.ResetFeedSnapshot, error) {
@@ -37,7 +49,7 @@ func (s *ResetFeed) Latest(ctx context.Context) (diagnosticscontract.ResetFeedSn
 		}
 		s.mu.Lock()
 		now := s.now()
-		if s.latest != nil && now.Sub(s.latest.FetchedAt) < resetFreshFor {
+		if s.latest != nil && now.Sub(s.latest.FetchedAt) < s.freshFor {
 			result := copySnapshot(*s.latest, false)
 			s.mu.Unlock()
 			return result, nil
@@ -77,7 +89,7 @@ func (s *ResetFeed) refresh(done chan struct{}) {
 	defer s.mu.Unlock()
 	now := s.now().UTC()
 	if err == nil {
-		result := diagnosticscontract.ResetFeedSnapshot{SourceURL: resetFeedSourceURL, FetchedAt: now, HasMore: page.HasMore, Records: page.Records}
+		result := diagnosticscontract.ResetFeedSnapshot{SourceURL: s.sourceURL, FetchedAt: now, HasMore: page.HasMore, Records: page.Records}
 		result = copySnapshot(result, false)
 		s.latest = &result
 		s.retry = time.Time{}
@@ -101,4 +113,37 @@ func copySnapshot(value diagnosticscontract.ResetFeedSnapshot, stale bool) diagn
 	return value
 }
 
-var _ diagnosticscontract.ResetFeedReader = (*ResetFeed)(nil)
+// MultiChannelResetFeed routes each public radar channel to its own singleflight cache.
+type MultiChannelResetFeed struct {
+	channels map[string]diagnosticscontract.ResetFeedReader
+}
+
+func NewMultiChannelResetFeed(channels map[string]diagnosticscontract.ResetFeedReader) *MultiChannelResetFeed {
+	copied := make(map[string]diagnosticscontract.ResetFeedReader, len(channels))
+	for k, v := range channels {
+		if v != nil {
+			copied[k] = v
+		}
+	}
+	return &MultiChannelResetFeed{channels: copied}
+}
+
+func (m *MultiChannelResetFeed) Latest(ctx context.Context) (diagnosticscontract.ResetFeedSnapshot, error) {
+	return m.LatestForChannel(ctx, "codex")
+}
+
+func (m *MultiChannelResetFeed) LatestForChannel(ctx context.Context, channel string) (diagnosticscontract.ResetFeedSnapshot, error) {
+	if m == nil {
+		return diagnosticscontract.ResetFeedSnapshot{}, diagnosticscontract.ErrResetFeedUnavailable
+	}
+	reader, ok := m.channels[channel]
+	if !ok || reader == nil {
+		return diagnosticscontract.ResetFeedSnapshot{}, diagnosticscontract.ErrResetFeedUnavailable
+	}
+	return reader.Latest(ctx)
+}
+
+var (
+	_ diagnosticscontract.ResetFeedReader        = (*ResetFeed)(nil)
+	_ diagnosticscontract.ChannelResetFeedReader = (*MultiChannelResetFeed)(nil)
+)

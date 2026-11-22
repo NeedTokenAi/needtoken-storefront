@@ -101,11 +101,18 @@ func registerStorefrontRoutes(
 			Prefix: "public_account_diagnostic", WindowSeconds: 60, MaxRequests: 5, BlockSeconds: 60,
 		}, middleware.KeyByIP))
 		diagnosticstransport.RegisterPublicRoutes(accountTools, diagnosticsbootstrap.NewHandler())
+		resetHandler := diagnosticsbootstrap.NewResetHandler()
 		resetTools := public.Group("/tools")
 		resetTools.Use(diagnosticstransport.NoStore(), middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
 			Prefix: "public_codex_resets", WindowSeconds: 60, MaxRequests: 30, BlockSeconds: 60,
 		}, middleware.KeyByIP))
-		diagnosticstransport.RegisterResetRoutes(resetTools, diagnosticsbootstrap.NewResetHandler())
+		diagnosticstransport.RegisterResetRoutes(resetTools, resetHandler)
+		// 多渠道公开雷达支持 Cloudflare CDN 边缘缓存（不加 no-store），避免反复回源请求后端。
+		channelResetTools := public.Group("/tools")
+		channelResetTools.Use(middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
+			Prefix: "public_radar_resets", WindowSeconds: 60, MaxRequests: 60, BlockSeconds: 30,
+		}, middleware.KeyByIP))
+		diagnosticstransport.RegisterChannelResetRoutes(channelResetTools, resetHandler)
 		// 公开服务状态接口为纯内存缓存只读查询，使用独立且兼容 NAT/多标签页的限流额度，不与雷达/账号检测互抢配额。
 		statusTools := public.Group("/tools")
 		statusTools.Use(diagnosticstransport.NoStore(), middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
