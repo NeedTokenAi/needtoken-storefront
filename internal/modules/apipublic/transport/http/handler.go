@@ -23,14 +23,20 @@ const (
 	defaultPoolStatusTimeout = 5 * time.Second
 	defaultPoolStatusTTL     = 30 * time.Second
 
+	defaultRankingsTimeout = 6 * time.Second
+	defaultRankingsTTL     = 3 * time.Minute
+
 	defaultStaleWindow = 10 * time.Minute
 	maxUpstreamBody    = 4 << 20
 )
 
 var (
-	emptyPricingJSON    = []byte(`{"success":true,"data":[],"vendors":[],"group_ratio":{},"usable_group":{}}`)
-	emptyPoolStatusJSON = []byte(`{"groups":[]}`)
-	unavailableJSON     = []byte(`{"success":false,"error_code":"upstream_unavailable"}`)
+	emptyPricingJSON      = []byte(`{"success":true,"data":[],"vendors":[],"group_ratio":{},"usable_group":{}}`)
+	emptyPoolStatusJSON   = []byte(`{"groups":[]}`)
+	emptyRankingsJSON     = []byte(`{"success":true,"data":{"models":[],"vendors":[],"top_movers":[],"top_droppers":[],"models_history":{"points":[],"models":[],"buckets":0},"vendor_share_history":{"points":[],"vendors":[],"buckets":0}}}`)
+	invalidPeriodJSON     = []byte(`{"success":false,"error_code":"invalid_period"}`)
+	unavailableJSON       = []byte(`{"success":false,"error_code":"upstream_unavailable"}`)
+	allowedRankingPeriods = []string{"today", "week", "month", "year"}
 )
 
 // BaseURLResolver resolves the active Glue upstream base URL for the main storefront.
@@ -46,6 +52,8 @@ type Options struct {
 	PricingTTL        time.Duration
 	PoolStatusTimeout time.Duration
 	PoolStatusTTL     time.Duration
+	RankingsTimeout   time.Duration
+	RankingsTTL       time.Duration
 	StaleWindow       time.Duration
 }
 
@@ -57,7 +65,7 @@ type cacheSlot struct {
 	fetchedAt time.Time
 }
 
-// Handler serves same-origin cached public API pricing and pool status snapshots.
+// Handler serves same-origin cached public API pricing, rankings, and pool status snapshots.
 type Handler struct {
 	resolver          BaseURLResolver
 	client            *http.Client
@@ -66,9 +74,12 @@ type Handler struct {
 	pricingTTL        time.Duration
 	poolStatusTimeout time.Duration
 	poolStatusTTL     time.Duration
+	rankingsTimeout   time.Duration
+	rankingsTTL       time.Duration
 	staleWindow       time.Duration
 	pricingCache      cacheSlot
 	poolStatusCache   cacheSlot
+	rankingsCache     map[string]*cacheSlot
 }
 
 func NewHandler(resolver BaseURLResolver, opts ...Options) *Handler {
@@ -100,9 +111,21 @@ func NewHandler(resolver BaseURLResolver, opts ...Options) *Handler {
 	if poolTTL <= 0 {
 		poolTTL = defaultPoolStatusTTL
 	}
+	rankingsTimeout := opt.RankingsTimeout
+	if rankingsTimeout <= 0 {
+		rankingsTimeout = defaultRankingsTimeout
+	}
+	rankingsTTL := opt.RankingsTTL
+	if rankingsTTL <= 0 {
+		rankingsTTL = defaultRankingsTTL
+	}
 	staleWindow := opt.StaleWindow
 	if staleWindow <= 0 {
 		staleWindow = defaultStaleWindow
+	}
+	rankingsSlots := make(map[string]*cacheSlot, len(allowedRankingPeriods))
+	for _, period := range allowedRankingPeriods {
+		rankingsSlots[period] = &cacheSlot{}
 	}
 	return &Handler{
 		resolver:          resolver,
@@ -112,12 +135,16 @@ func NewHandler(resolver BaseURLResolver, opts ...Options) *Handler {
 		pricingTTL:        pricingTTL,
 		poolStatusTimeout: poolTimeout,
 		poolStatusTTL:     poolTTL,
+		rankingsTimeout:   rankingsTimeout,
+		rankingsTTL:       rankingsTTL,
 		staleWindow:       staleWindow,
+		rankingsCache:     rankingsSlots,
 	}
 }
 
 func RegisterPublicRoutes(group gin.IRoutes, handler *Handler) {
 	group.GET("/api-pricing", handler.GetAPIPricing)
+	group.GET("/api-rankings", handler.GetAPIRankings)
 	group.GET("/pool-status", handler.GetPoolStatus)
 }
 
@@ -129,6 +156,28 @@ func (h *Handler) GetAPIPricing(c *gin.Context) {
 		h.pricingTTL,
 		emptyPricingJSON,
 		&h.pricingCache,
+	)
+}
+
+func (h *Handler) GetAPIRankings(c *gin.Context) {
+	period := strings.ToLower(strings.TrimSpace(c.Query("period")))
+	if period == "" {
+		period = "week"
+	}
+	slot, ok := h.rankingsCache[period]
+	if !ok {
+		c.Header("Cache-Control", "no-store")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Data(http.StatusBadRequest, "application/json; charset=utf-8", invalidPeriodJSON)
+		return
+	}
+	h.serveCachedUpstream(
+		c,
+		"/api/public/rankings?period="+period,
+		h.rankingsTimeout,
+		h.rankingsTTL,
+		emptyRankingsJSON,
+		slot,
 	)
 }
 

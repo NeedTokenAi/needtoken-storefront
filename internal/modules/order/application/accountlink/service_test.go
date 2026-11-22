@@ -3,21 +3,28 @@ package accountlink
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 type stubBridge struct {
-	gotRef    string
-	gotNext   string
-	gotCID    string
-	gotAppr   string
-	gotSSO    ConsoleSSOInput
-	statusRes Status
-	startRes  Challenge
-	doneRes   CompleteResult
-	ssoRes    ConsoleSSOResult
-	err       error
+	gotRef        string
+	gotNext       string
+	gotCID        string
+	gotAppr       string
+	gotSSO        ConsoleSSOInput
+	gotAuto       AutoLinkInput
+	autoCalls     atomic.Int32
+	autoDelayGate chan struct{}
+	statusRes     Status
+	startRes      Challenge
+	doneRes       CompleteResult
+	ssoRes        ConsoleSSOResult
+	autoRes       AutoLinkResult
+	summaryRes    APISummaryResult
+	err           error
 }
 
 func (s *stubBridge) Status(_ context.Context, ref string) (Status, error) {
@@ -38,6 +45,18 @@ func (s *stubBridge) Complete(_ context.Context, ref, cid, appr string) (Complet
 func (s *stubBridge) ConsoleSSO(_ context.Context, input ConsoleSSOInput) (ConsoleSSOResult, error) {
 	s.gotSSO = input
 	return s.ssoRes, s.err
+}
+func (s *stubBridge) AutoLink(_ context.Context, input AutoLinkInput) (AutoLinkResult, error) {
+	s.autoCalls.Add(1)
+	s.gotAuto = input
+	if s.autoDelayGate != nil {
+		<-s.autoDelayGate
+	}
+	return s.autoRes, s.err
+}
+func (s *stubBridge) APISummary(_ context.Context, ref string) (APISummaryResult, error) {
+	s.gotRef = ref
+	return s.summaryRes, s.err
 }
 
 type stubIdentity struct {
@@ -127,5 +146,89 @@ func TestServiceNilBridgeDegradesGracefully(t *testing.T) {
 	}
 	if _, err := svc.Start(context.Background(), 12, "/plans"); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("want ErrUnavailable, got %v", err)
+	}
+	autoRes, err := svc.Ensure(context.Background(), 12)
+	if err != nil || autoRes.Linked || autoRes.Status != "disabled" {
+		t.Fatalf("nil bridge Ensure should degrade gracefully: %+v err=%v", autoRes, err)
+	}
+	sumRes, err := svc.APISummary(context.Background(), 12)
+	if err != nil || sumRes.Linked {
+		t.Fatalf("nil bridge APISummary should degrade gracefully: %+v err=%v", sumRes, err)
+	}
+}
+
+func TestServiceEnsureSingleflightSecurityAndAPISummary(t *testing.T) {
+	gate := make(chan struct{})
+	bridge := &stubBridge{
+		autoDelayGate: gate,
+		autoRes:       AutoLinkResult{Linked: true, Status: "auto_provisioned", NativeUserID: 77, AwakenedOrders: 1},
+		summaryRes: APISummaryResult{
+			Linked:       true,
+			NativeUserID: 77,
+			Quota:        2500000,
+			UsedQuota:    500000,
+			RequestCount: 15,
+			Group:        "default",
+		},
+	}
+	identity := &stubIdentity{member: MemberIdentity{UserID: 9, Email: "verified@example.com", EmailVerified: true, DisplayName: "Verified", Active: true}}
+	svc := New(bridge).WithIdentityReader(identity)
+
+	// Concurrent Ensure calls for the same user coalesce into a single upstream call.
+	var wg sync.WaitGroup
+	results := make([]AutoLinkResult, 4)
+	errs := make([]error, 4)
+	for i := 0; i < 4; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[i], errs[i] = svc.Ensure(context.Background(), 9)
+		}()
+	}
+	time.Sleep(20 * time.Millisecond)
+	close(gate)
+	wg.Wait()
+
+	if bridge.autoCalls.Load() != 1 {
+		t.Fatalf("concurrent Ensure calls must coalesce into 1 upstream request, got %d", bridge.autoCalls.Load())
+	}
+	for i := range results {
+		if errs[i] != nil || !results[i].Linked || results[i].NativeUserID != 77 {
+			t.Fatalf("worker %d unexpected Ensure result: %+v err=%v", i, results[i], errs[i])
+		}
+	}
+
+	// existing_requires_link must strip NativeUserID and never claim linked.
+	bridge.autoDelayGate = nil
+	bridge.autoRes = AutoLinkResult{Linked: true, Status: "existing_requires_link", NativeUserID: 999, AwakenedOrders: 3}
+	res, err := svc.Ensure(context.Background(), 9)
+	if err != nil || res.Linked || res.Status != "existing_requires_link" || res.NativeUserID != 0 || res.AwakenedOrders != 0 {
+		t.Fatalf("existing_requires_link must strip native identity: %+v err=%v", res, err)
+	}
+
+	// Unverified member email must not be forwarded to upstream AutoLink.
+	identity.member.EmailVerified = false
+	bridge.autoRes = AutoLinkResult{Linked: false, Status: "email_unverified"}
+	res, err = svc.Ensure(context.Background(), 9)
+	if err != nil || res.Linked || bridge.gotAuto.Email != "" || bridge.gotAuto.EmailVerified {
+		t.Fatalf("unverified member must not forward email: res=%+v gotAuto=%+v err=%v", res, bridge.gotAuto, err)
+	}
+
+	// Disabled member is forbidden.
+	identity.member.Active = false
+	if _, err := svc.Ensure(context.Background(), 9); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("disabled member Ensure must return ErrForbidden, got %v", err)
+	}
+
+	// APISummary passes merchant ref and strips data when unlinked.
+	sum, err := svc.APISummary(context.Background(), 9)
+	if err != nil || !sum.Linked || sum.NativeUserID != 77 || sum.Quota != 2500000 || bridge.gotRef != "needtoken-storefront:user:9" {
+		t.Fatalf("APISummary failed: %+v ref=%q err=%v", sum, bridge.gotRef, err)
+	}
+	bridge.summaryRes = APISummaryResult{Linked: false, NativeUserID: 77, Quota: 999}
+	sum, err = svc.APISummary(context.Background(), 9)
+	if err != nil || sum.Linked || sum.NativeUserID != 0 || sum.Quota != 0 {
+		t.Fatalf("unlinked APISummary must not expose remote fields: %+v err=%v", sum, err)
 	}
 }

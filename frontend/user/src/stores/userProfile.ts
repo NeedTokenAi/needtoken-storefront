@@ -15,6 +15,7 @@ import type {
 } from '../api'
 import { useAppStore } from './app'
 import { useUserAuthStore } from './userAuth'
+import { triggerSilentApiAccountLinkEnsure } from '../templates/needtoken/composables/useApiAccountLink'
 
 interface PersonalOrderSummary {
     id: number
@@ -273,6 +274,7 @@ export const useUserProfileStore = defineStore('user-profile', () => {
             const data = response.data.data
             profile.value = data
             userAuthStore.syncUserProfile(data)
+            triggerSilentApiAccountLinkEnsure({ force: true })
             return true
         } catch (error) {
             securityError.value = normalizeErrorMessage(error, '更换邮箱失败')

@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  computeSubscriptionRemainingQuota,
+  computeSubscriptionUsagePercent,
+  formatApiQuotaUsd,
+  formatSubscriptionExpiry,
   isSafeAuthorizeUrl,
   parseAccountLinkFragment,
   resolveReturnRoute,
@@ -67,4 +71,24 @@ test('isSafeAuthorizeUrl accepts only credential-free http(s) URLs', () => {
   assert.equal(isSafeAuthorizeUrl('javascript:alert(1)'), false)
   assert.equal(isSafeAuthorizeUrl('https://user:pass@api.needtoken.ai/account-link'), false)
   assert.equal(isSafeAuthorizeUrl(''), false)
+})
+
+test('API quota and subscription summary formatters handle raw quota units and timestamps', () => {
+  assert.equal(formatApiQuotaUsd(0), '$0.00')
+  assert.equal(formatApiQuotaUsd(500_000), '$1.00')
+  assert.equal(formatApiQuotaUsd(5_000_000), '$10.00')
+  assert.equal(formatApiQuotaUsd(125_000), '$0.25')
+  assert.equal(formatApiQuotaUsd(1_000), '$0.002')
+  assert.equal(formatApiQuotaUsd(-100), '$0.00')
+
+  assert.equal(computeSubscriptionRemainingQuota(10_000_000, 2_500_000), 7_500_000)
+  assert.equal(computeSubscriptionRemainingQuota(1_000_000, 1_500_000), 0)
+  assert.equal(computeSubscriptionUsagePercent(10_000_000, 2_500_000), 25)
+  assert.equal(computeSubscriptionUsagePercent(0, 100), 0)
+  assert.equal(computeSubscriptionUsagePercent(1_000, 2_000), 100)
+
+  assert.equal(formatSubscriptionExpiry(0, 'en-US'), null)
+  assert.equal(formatSubscriptionExpiry(null, 'en-US'), null)
+  const formatted = formatSubscriptionExpiry(1_702_592_000, 'en-US')
+  assert.ok(formatted && formatted.includes('2023'))
 })

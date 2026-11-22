@@ -82,6 +82,54 @@ func TestCustomerLinkBridgeSignsRequestsMapsErrorsAndBlocksRedirects(t *testing.
 				"auto_created":    true,
 				"awakened_orders": 1,
 			})
+		case "/api/v1/upstream/customer-links/auto-link":
+			var body CustomerAutoLinkInput
+			if json.Unmarshal(raw, &body) != nil || body.MerchantCustomerID != "needtoken-storefront:user:42" {
+				t.Errorf("unexpected auto-link body: %s", raw)
+			}
+			if body.Email == "existing@example.com" {
+				// Simulate an upstream accidentally returning native_user_id; adapter must strip it.
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"ok":             true,
+					"linked":         false,
+					"status":         "existing_requires_link",
+					"native_user_id": 999,
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"ok":              true,
+				"linked":          true,
+				"status":          "auto_provisioned",
+				"native_user_id":  108,
+				"awakened_orders": 2,
+			})
+		case "/api/v1/upstream/customer-links/api-summary":
+			if r.URL.Query().Get("storefront_user_id") != "needtoken-storefront:user:42" {
+				t.Errorf("unexpected storefront_user_id: %s", r.URL.Query().Get("storefront_user_id"))
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"ok":             true,
+				"linked":         true,
+				"native_user_id": 108,
+				"quota":          5000000,
+				"used_quota":     1250000,
+				"request_count":  42,
+				"group":          "vip",
+				"active_subscriptions": []map[string]any{
+					{
+						"id":                    7,
+						"plan_id":               3,
+						"plan_title":            "Pro Monthly",
+						"status":                "active",
+						"amount_total":          10000000,
+						"amount_used":           2000000,
+						"start_time":            1700000000,
+						"end_time":              1702592000,
+						"allow_wallet_overflow": true,
+					},
+				},
+			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -124,7 +172,30 @@ func TestCustomerLinkBridgeSignsRequestsMapsErrorsAndBlocksRedirects(t *testing.
 	if err != nil || ssoRes.Mode != "sso" || !ssoRes.Linked || ssoRes.NativeUserID != 108 || !ssoRes.AutoCreated {
 		t.Fatalf("consoleSSO=%+v err=%v", ssoRes, err)
 	}
-	if seen != 6 {
+	autoRes, err := adapter.AutoLink(ctx, CustomerAutoLinkInput{
+		StorefrontUserID:   "needtoken-storefront:user:42",
+		MerchantCustomerID: "needtoken-storefront:user:42",
+		Email:              "alice@example.com",
+		EmailVerified:      true,
+		DisplayName:        "Alice",
+	})
+	if err != nil || !autoRes.Linked || autoRes.Status != "auto_provisioned" || autoRes.NativeUserID != 108 || autoRes.AwakenedOrders != 2 {
+		t.Fatalf("autoLink=%+v err=%v", autoRes, err)
+	}
+	existingRes, err := adapter.AutoLink(ctx, CustomerAutoLinkInput{
+		StorefrontUserID:   "needtoken-storefront:user:42",
+		MerchantCustomerID: "needtoken-storefront:user:42",
+		Email:              "existing@example.com",
+		EmailVerified:      true,
+	})
+	if err != nil || existingRes.Linked || existingRes.Status != "existing_requires_link" || existingRes.NativeUserID != 0 {
+		t.Fatalf("existing_requires_link must never leak native_user_id: %+v err=%v", existingRes, err)
+	}
+	summaryRes, err := adapter.APISummary(ctx, "needtoken-storefront:user:42")
+	if err != nil || !summaryRes.Linked || summaryRes.NativeUserID != 108 || summaryRes.Quota != 5000000 || summaryRes.UsedQuota != 1250000 || summaryRes.Group != "vip" || len(summaryRes.ActiveSubscriptions) != 1 || summaryRes.ActiveSubscriptions[0].PlanTitle != "Pro Monthly" {
+		t.Fatalf("apiSummary=%+v err=%v", summaryRes, err)
+	}
+	if seen != 9 {
 		t.Fatalf("unexpected request count: %d", seen)
 	}
 
@@ -141,7 +212,7 @@ func TestCustomerLinkBridgeSignsRequestsMapsErrorsAndBlocksRedirects(t *testing.
 	if _, err := redirectAdapter.CustomerLinkStatus(ctx, "needtoken-storefront:user:42"); !errors.Is(err, ErrCustomerLinkUnavailable) {
 		t.Fatalf("redirect should fail closed: %v", err)
 	}
-	if seen != 6 {
+	if seen != 9 {
 		t.Fatalf("redirect leaked request to upstream: seen=%d", seen)
 	}
 }

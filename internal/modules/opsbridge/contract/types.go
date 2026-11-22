@@ -3,6 +3,8 @@ package contract
 import (
 	"errors"
 	"time"
+
+	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
 )
 
 var (
@@ -10,6 +12,28 @@ var (
 	ErrNotFound      = errors.New("opsbridge: record not found")
 	ErrInvalidInput  = errors.New("opsbridge: invalid input")
 	ErrConflict      = errors.New("opsbridge: conflict")
+)
+
+// ConflictError wraps ErrConflict with a stable machine-readable error_code
+// for HTTP 409 responses on catalog mutation endpoints.
+type ConflictError struct {
+	Code string
+}
+
+func (e *ConflictError) Error() string {
+	return "opsbridge: conflict: " + e.Code
+}
+
+func (e *ConflictError) Unwrap() error {
+	return ErrConflict
+}
+
+var (
+	ErrCategoryInUse            = &ConflictError{Code: "category_in_use"}
+	ErrProductHasStock          = &ConflictError{Code: "product_has_stock"}
+	ErrProductHasOrderRecord    = &ConflictError{Code: "product_has_order_record"}
+	ErrProductRequiresActiveSKU = &ConflictError{Code: "product_requires_active_sku"}
+	ErrSKUHasCardSecretStock    = &ConflictError{Code: "sku_has_card_secret_stock"}
 )
 
 type Payment struct {
@@ -104,6 +128,7 @@ type Category struct {
 	ParentID  uint              `json:"parent_id"`
 	Slug      string            `json:"slug"`
 	Name      map[string]string `json:"name"`
+	Icon      string            `json:"icon,omitempty"`
 	SortOrder int               `json:"sort_order"`
 	IsActive  bool              `json:"is_active"`
 	CreatedAt time.Time         `json:"created_at"`
@@ -116,9 +141,66 @@ type CategoriesResult struct {
 	Categories  []Category `json:"categories"`
 }
 
+type CreateCategoryInput struct {
+	ParentID  uint              `json:"parent_id"`
+	Slug      string            `json:"slug"`
+	Name      map[string]string `json:"name"`
+	Icon      string            `json:"icon,omitempty"`
+	SortOrder int               `json:"sort_order,omitempty"`
+	IsActive  *bool             `json:"is_active,omitempty"`
+}
+
 type UpdateCategoryInput struct {
-	SortOrder *int  `json:"sort_order,omitempty"`
-	IsActive  *bool `json:"is_active,omitempty"`
+	ParentID  *uint             `json:"parent_id,omitempty"`
+	Slug      *string           `json:"slug,omitempty"`
+	Name      map[string]string `json:"name,omitempty"`
+	Icon      *string           `json:"icon,omitempty"`
+	SortOrder *int              `json:"sort_order,omitempty"`
+	IsActive  *bool             `json:"is_active,omitempty"`
+}
+
+type DeleteResult struct {
+	Deleted bool `json:"deleted"`
+	ID      uint `json:"id"`
+}
+
+type BatchDeleteProductsInput struct {
+	IDs []uint `json:"ids"`
+}
+
+type BatchDeleteError struct {
+	ID    uint   `json:"id"`
+	Error string `json:"error"`
+}
+
+type BatchDeleteResult struct {
+	Total     int                `json:"total"`
+	Succeeded int                `json:"succeeded"`
+	Failed    int                `json:"failed"`
+	Errors    []BatchDeleteError `json:"errors"`
+}
+
+// CategoryStore delegates category CRUD and two-level tree guards to the native CategoryService.
+type CategoryStore interface {
+	Create(parentID uint, slug string, name map[string]any, icon string, sortOrder int, isActive bool) (*Category, error)
+	Update(id string, parentID uint, slug string, name map[string]any, icon string, sortOrder int, isActive *bool) (*Category, error)
+	Delete(id string) error
+}
+
+// ProductDeleteStore delegates safe product deletion to the native ProductAdminService.
+type ProductDeleteStore interface {
+	Delete(id string) error
+}
+
+// CardSecretStockCounter checks per-SKU card secret usage before deleting a SKU.
+type CardSecretStockCounter interface {
+	CountByProduct(productID, skuID uint) (total, available, used int64, err error)
+}
+
+// SKUDeleteUnitOfWork runs single-SKU hard delete and product wholesale/price sync
+// inside one transaction handle so SQLite MaxOpenConns=1 never self-deadlocks.
+type SKUDeleteUnitOfWork interface {
+	WithinTransaction(fn func(products productcontract.Repository, skus productcontract.SKURepository) error) error
 }
 
 type ProductSKU struct {
@@ -574,12 +656,17 @@ type Reader interface {
 type Bridge interface {
 	Reader
 	Categories() (*CategoriesResult, error)
+	CreateCategory(input CreateCategoryInput) (*Category, error)
 	UpdateCategory(id string, input UpdateCategoryInput) (*Category, error)
+	DeleteCategory(id string) error
 	Products(page, pageSize int, categoryID, search string) (*ProductsResult, error)
 	CreateProduct(input CreateProductInput) (*Product, error)
 	UpdateProduct(id string, input UpdateProductInput) (*Product, error)
+	DeleteProduct(id string) error
+	BatchDeleteProducts(input BatchDeleteProductsInput) (*BatchDeleteResult, error)
 	CreateSKU(productID uint, input CreateSKUInput) (*ProductSKU, error)
 	UpdateSKU(id uint, input UpdateSKUInput) (*ProductSKU, error)
+	DeleteSKU(id uint) error
 	Coupons(page, pageSize int, code string, isActive *bool) (*CouponsResult, error)
 	CreateCoupon(input CreateCouponInput) (*Coupon, error)
 	UpdateCouponStatus(id uint, active bool) (*Coupon, error)

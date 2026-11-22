@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { userAuthAPI } from '../api'
+import { resetApiAccountLinkCache, triggerSilentApiAccountLinkEnsure } from '../templates/needtoken/composables/useApiAccountLink'
 
 export const useUserAuthStore = defineStore('user-auth', () => {
     const router = useRouter()
@@ -43,6 +44,7 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         user.value = null
         localStorage.removeItem('user_token')
         localStorage.removeItem('user_profile')
+        resetApiAccountLinkCache()
     }
 
     const sendVerifyCode = async (payload: any) => {
@@ -65,6 +67,9 @@ export const useUserAuthStore = defineStore('user-auth', () => {
             }
             if (userData) {
                 setUser(userData)
+            }
+            if (accessToken) {
+                triggerSilentApiAccountLinkEnsure({ force: true })
             }
             return true
         } finally {
@@ -102,6 +107,9 @@ export const useUserAuthStore = defineStore('user-auth', () => {
             setToken(accessToken)
             setUser(userData)
             clearChallenge()
+            if (accessToken) {
+                triggerSilentApiAccountLinkEnsure({ force: true })
+            }
             return true
         } finally {
             loading.value = false
@@ -122,6 +130,9 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         const { token: accessToken, user: userData } = data || {}
         setToken(accessToken)
         setUser(userData)
+        if (accessToken) {
+            triggerSilentApiAccountLinkEnsure({ force: true })
+        }
         return { requiresTotp: false }
     }
 

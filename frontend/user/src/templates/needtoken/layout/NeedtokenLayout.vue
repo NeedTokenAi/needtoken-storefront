@@ -209,6 +209,7 @@ const navNodes = computed<(NavTopLink | NavGroup)[]>(() => [
   { kind: 'group', key: 'gateway', label: t('needtoken.nav.gateway'), icon: 'gateway', items: [
     link('plans', API_SERVICES_PATH, t('needtoken.nav.plans')),
     link('models', '/models', t('needtoken.nav.models')),
+    link('rankings', '/rankings', t('needtoken.nav.rankings')),
     link('docs', '/docs', t('needtoken.nav.docs')),
   ] },
   { kind: 'link', key: 'radar', path: '/tools/radar', label: t('needtoken.nav.radar'), icon: 'radar' },

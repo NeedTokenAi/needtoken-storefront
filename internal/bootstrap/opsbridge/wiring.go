@@ -3,15 +3,21 @@ package opsbridge
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dujiao-next/internal/app/container"
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/constants"
+	categoryapp "github.com/dujiao-next/internal/modules/catalog/category/application"
+	categorydomain "github.com/dujiao-next/internal/modules/catalog/category/domain"
 	mappingapp "github.com/dujiao-next/internal/modules/catalog/mapping/application"
 	mappingcontract "github.com/dujiao-next/internal/modules/catalog/mapping/contract"
 	mappingdomain "github.com/dujiao-next/internal/modules/catalog/mapping/domain"
+	productadmin "github.com/dujiao-next/internal/modules/catalog/product/application/admin"
+	productcontract "github.com/dujiao-next/internal/modules/catalog/product/contract"
+	productgormstore "github.com/dujiao-next/internal/modules/catalog/product/store/gormstore"
 	opsapp "github.com/dujiao-next/internal/modules/opsbridge/application"
 	opscontract "github.com/dujiao-next/internal/modules/opsbridge/contract"
 	opstransport "github.com/dujiao-next/internal/modules/opsbridge/transport/http"
@@ -30,6 +36,7 @@ import (
 	"github.com/dujiao-next/internal/shared/jsonslice"
 	"github.com/dujiao-next/internal/shared/money"
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 )
 
 func NewHandler(c *container.Container) *opstransport.Handler {
@@ -42,6 +49,21 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 		c.ProductSKURepo,
 		c.CouponRepo,
 	)
+	if c.CategoryService != nil {
+		svc.WithCategoryStore(&categoryStoreAdapter{svc: c.CategoryService})
+	}
+	if c.ProductAdminService != nil {
+		svc.WithProductDeleteStore(&productDeleteStoreAdapter{svc: c.ProductAdminService})
+	}
+	if c.CardSecretRepo != nil {
+		svc.WithCardSecretStock(c.CardSecretRepo)
+	}
+	if c.ProductRepo != nil && c.ProductSKURepo != nil {
+		svc.WithSKUDeleteUoW(&skuDeleteUoWAdapter{
+			products: c.ProductRepo,
+			skus:     c.ProductSKURepo,
+		})
+	}
 	if c.SettingService != nil || c.SiteConnectionService != nil {
 		svc.WithPricing(&pricingStoreAdapter{
 			settings:    c.SettingService,
@@ -77,6 +99,137 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 		})
 	}
 	return opstransport.New(svc)
+}
+
+type categoryStoreAdapter struct {
+	svc *categoryapp.Service
+}
+
+func mapCategoryModel(c categorydomain.Category) *opscontract.Category {
+	name := map[string]string{}
+	for k, v := range c.NameJSON {
+		if str, ok := v.(string); ok {
+			name[k] = str
+		}
+	}
+	return &opscontract.Category{
+		ID:        c.ID,
+		ParentID:  c.ParentID,
+		Slug:      c.Slug,
+		Name:      name,
+		Icon:      c.Icon,
+		SortOrder: c.SortOrder,
+		IsActive:  c.IsActive,
+		CreatedAt: c.CreatedAt,
+	}
+}
+
+func translateCategoryError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, categoryapp.ErrNotFound):
+		return opscontract.ErrNotFound
+	case errors.Is(err, categoryapp.ErrParentInvalid):
+		return opscontract.ErrInvalidInput
+	case errors.Is(err, categoryapp.ErrSlugExists):
+		return opscontract.ErrConflict
+	case errors.Is(err, categoryapp.ErrInUse):
+		return opscontract.ErrCategoryInUse
+	default:
+		return err
+	}
+}
+
+func (a *categoryStoreAdapter) Create(parentID uint, slug string, name map[string]any, icon string, sortOrder int, isActive bool) (*opscontract.Category, error) {
+	if a.svc == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	created, err := a.svc.Create(categoryapp.UpsertInput{
+		ParentID:  parentID,
+		Slug:      slug,
+		NameJSON:  name,
+		Icon:      icon,
+		SortOrder: sortOrder,
+	})
+	if err != nil {
+		return nil, translateCategoryError(err)
+	}
+	if !isActive {
+		updated, activeErr := a.svc.SetActive(strconv.FormatUint(uint64(created.ID), 10), false)
+		if activeErr != nil {
+			return nil, translateCategoryError(activeErr)
+		}
+		created = updated
+	}
+	return mapCategoryModel(*created), nil
+}
+
+func (a *categoryStoreAdapter) Update(id string, parentID uint, slug string, name map[string]any, icon string, sortOrder int, isActive *bool) (*opscontract.Category, error) {
+	if a.svc == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	updated, err := a.svc.Update(id, categoryapp.UpsertInput{
+		ParentID:  parentID,
+		Slug:      slug,
+		NameJSON:  name,
+		Icon:      icon,
+		SortOrder: sortOrder,
+	})
+	if err != nil {
+		return nil, translateCategoryError(err)
+	}
+	if isActive != nil && updated.IsActive != *isActive {
+		updated, err = a.svc.SetActive(id, *isActive)
+		if err != nil {
+			return nil, translateCategoryError(err)
+		}
+	}
+	return mapCategoryModel(*updated), nil
+}
+
+func (a *categoryStoreAdapter) Delete(id string) error {
+	if a.svc == nil {
+		return opscontract.ErrNotConfigured
+	}
+	return translateCategoryError(a.svc.Delete(id))
+}
+
+type productDeleteStoreAdapter struct {
+	svc *productadmin.AdminService
+}
+
+func (a *productDeleteStoreAdapter) Delete(id string) error {
+	if a.svc == nil {
+		return opscontract.ErrNotConfigured
+	}
+	err := a.svc.Delete(id)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, productcontract.ErrNotFound):
+		return opscontract.ErrNotFound
+	case errors.Is(err, productcontract.ErrProductHasStock):
+		return opscontract.ErrProductHasStock
+	case errors.Is(err, productcontract.ErrProductHasOrderRecord):
+		return opscontract.ErrProductHasOrderRecord
+	default:
+		return err
+	}
+}
+
+type skuDeleteUoWAdapter struct {
+	products *productgormstore.ProductStore
+	skus     *productgormstore.SKUStore
+}
+
+func (u *skuDeleteUoWAdapter) WithinTransaction(fn func(products productcontract.Repository, skus productcontract.SKURepository) error) error {
+	if u.products == nil || u.skus == nil {
+		return opscontract.ErrNotConfigured
+	}
+	return u.products.Transaction(func(tx *gorm.DB) error {
+		return fn(u.products.BindTx(tx), u.skus.BindTx(tx))
+	})
 }
 
 type pricingStoreAdapter struct {

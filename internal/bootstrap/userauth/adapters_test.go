@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dujiao-next/internal/config"
+	"github.com/dujiao-next/internal/constants"
 	emailverificationdomain "github.com/dujiao-next/internal/modules/identity/emailverification/domain"
 	emailverificationstore "github.com/dujiao-next/internal/modules/identity/emailverification/infrastructure/gormstore"
 	externalidentitydomain "github.com/dujiao-next/internal/modules/identity/externalidentity/domain"
@@ -42,6 +43,11 @@ func TestLoginAdapterBindsTokenToRequestReseller(t *testing.T) {
 		UserJWT: config.JWTConfig{SecretKey: "user-jwt-wiring-secret", ExpireHours: 24},
 	}
 	settings := settingsapp.NewService(settingsstore.New(db))
+	if _, err := settings.Update(constants.SettingKeyRegistrationConfig, map[string]any{
+		constants.SettingFieldEmailVerificationEnabled: false,
+	}); err != nil {
+		t.Fatalf("disable email verification failed: %v", err)
+	}
 	auth := userauthapp.NewService(cfg, userstore.New(db), externalidentitystore.New(db), emailverificationstore.New(db), settings, noopVerifySender{}, nil)
 	auth.SetAuthUnitOfWork(userauthgormstore.New(db))
 	adapter := userLoginTransportAdapter{auth: auth, settings: settings}

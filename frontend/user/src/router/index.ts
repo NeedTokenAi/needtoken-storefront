@@ -55,7 +55,7 @@ const shouldWarmupRoutes = () => {
 const warmedRouteLoaders = new WeakSet<Function>()
 const intentRouteNames = new Set([
     'home', 'products', 'category-products', 'product-detail', 'cart',
-    'model-square', 'api-services', 'plans', 'api-docs', 'faq', 'blog', 'blog-detail',
+    'model-square', 'api-rankings', 'api-services', 'plans', 'api-docs', 'faq', 'blog', 'blog-detail',
     'environment-tools', 'reset-radar', 'codex-account-check', 'user-login',
 ])
 
@@ -305,6 +305,11 @@ const router = createRouter({
             path: '/models',
             name: 'model-square',
             component: templateView('ModelSquare', () => import('../views/NotFound.vue')),
+        },
+        {
+            path: '/rankings',
+            name: 'api-rankings',
+            component: templateView('Rankings', () => import('../views/NotFound.vue')),
         },
         {
             path: '/api-services',

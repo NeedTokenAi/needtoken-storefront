@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 import { userApi } from '../../../api/client'
+import { useAppStore } from '../../../stores/app'
+import { getActiveTemplate } from '../../registry'
 import {
   isSafeAuthorizeUrl,
   sanitizeConsoleNextPath,
@@ -40,18 +42,54 @@ export interface ApiConsoleSSOResult {
   awakened_orders?: number
 }
 
+export interface ApiAccountEnsureResult {
+  linked: boolean
+  status: string
+  native_user_id?: number
+  awakened_orders?: number
+}
+
+export interface ApiSubscriptionSummary {
+  id: number
+  plan_id: number
+  plan_title?: string
+  status: string
+  amount_total: number
+  amount_used: number
+  start_time: number
+  end_time: number
+  allow_wallet_overflow?: boolean
+}
+
+export interface ApiAccountSummary {
+  linked: boolean
+  native_user_id?: number
+  quota?: number
+  used_quota?: number
+  request_count?: number
+  group?: string
+  active_subscriptions?: ApiSubscriptionSummary[]
+}
+
 const sharedStatus = ref<ApiAccountLinkStatus | null>(null)
 const sharedLoaded = ref(false)
-let inflight: Promise<ApiAccountLinkStatus | null> | null = null
+const sharedSummary = ref<ApiAccountSummary | null>(null)
+const sharedSummaryLoaded = ref(false)
+const sharedEnsureResult = ref<ApiAccountEnsureResult | null>(null)
+const sharedEnsureAttempted = ref(false)
+
+let statusInflight: Promise<ApiAccountLinkStatus | null> | null = null
+let ensureInflight: Promise<ApiAccountEnsureResult | null> | null = null
+let summaryInflight: Promise<ApiAccountSummary | null> | null = null
 
 export async function fetchApiAccountLinkStatus(force = false): Promise<ApiAccountLinkStatus | null> {
   if (!force && sharedLoaded.value) {
     return sharedStatus.value
   }
-  if (inflight) {
-    return inflight
+  if (statusInflight) {
+    return statusInflight
   }
-  inflight = userApi
+  statusInflight = userApi
     .get('/me/api-account-link', { silentBusinessError: true })
     .then(res => {
       const data = (res?.data?.data || null) as ApiAccountLinkStatus | null
@@ -64,15 +102,95 @@ export async function fetchApiAccountLinkStatus(force = false): Promise<ApiAccou
       return null
     })
     .finally(() => {
-      inflight = null
+      statusInflight = null
     })
-  return inflight
+  return statusInflight
+}
+
+export async function fetchApiAccountSummary(force = false): Promise<ApiAccountSummary | null> {
+  if (!force && sharedSummaryLoaded.value) {
+    return sharedSummary.value
+  }
+  if (summaryInflight) {
+    return summaryInflight
+  }
+  summaryInflight = userApi
+    .get('/me/api-account-summary', { silentBusinessError: true })
+    .then(res => {
+      const data = (res?.data?.data || null) as ApiAccountSummary | null
+      sharedSummary.value = data
+      sharedSummaryLoaded.value = true
+      return data
+    })
+    .catch(() => null)
+    .finally(() => {
+      summaryInflight = null
+    })
+  return summaryInflight
+}
+
+export async function ensureApiAccountLink(options?: { force?: boolean }): Promise<ApiAccountEnsureResult | null> {
+  const force = Boolean(options?.force)
+  if (!force && sharedEnsureAttempted.value) {
+    return sharedEnsureResult.value
+  }
+  if (ensureInflight) {
+    return ensureInflight
+  }
+  ensureInflight = userApi
+    .post('/me/api-account-link/ensure', {}, { silentBusinessError: true })
+    .then(res => {
+      const data = (res?.data?.data || null) as ApiAccountEnsureResult | null
+      sharedEnsureAttempted.value = true
+      sharedEnsureResult.value = data
+      if (data?.linked) {
+        sharedStatus.value = {
+          enabled: true,
+          linked: true,
+          status: data.status || 'self_verified',
+          native_user_id: data.native_user_id,
+          pending_orders: 0,
+        }
+        sharedLoaded.value = true
+        void fetchApiAccountSummary(true)
+      }
+      return data
+    })
+    .catch(() => {
+      sharedEnsureAttempted.value = true
+      return null
+    })
+    .finally(() => {
+      ensureInflight = null
+    })
+  return ensureInflight
+}
+
+/**
+ * Non-blocking, fail-silent trigger called after login, registration, 2FA,
+ * Google OAuth, and verified email binding. Never throws or delays auth navigation.
+ */
+export function triggerSilentApiAccountLinkEnsure(options?: { force?: boolean }): void {
+  try {
+    if (getActiveTemplate() !== 'needtoken') return
+    const appStore = useAppStore()
+    if (appStore.isResellerTenant) return
+    void ensureApiAccountLink(options).catch(() => null)
+  } catch {
+    // Silent degradation by design.
+  }
 }
 
 export function resetApiAccountLinkCache(): void {
   sharedStatus.value = null
   sharedLoaded.value = false
-  inflight = null
+  sharedSummary.value = null
+  sharedSummaryLoaded.value = false
+  sharedEnsureResult.value = null
+  sharedEnsureAttempted.value = false
+  statusInflight = null
+  ensureInflight = null
+  summaryInflight = null
 }
 
 export async function startApiAccountLinkRequest(nextPath?: string): Promise<ApiAccountLinkStartResult> {
@@ -138,11 +256,20 @@ export async function completeApiAccountLinkRequest(
     pending_orders: 0,
   }
   sharedLoaded.value = true
+  sharedEnsureResult.value = {
+    linked: true,
+    status: data.status || 'self_verified',
+    native_user_id: data.native_user_id,
+    awakened_orders: data.awakened_orders,
+  }
+  void fetchApiAccountSummary(true)
   return data
 }
 
 export function useApiAccountLink() {
   const loading = ref(false)
+  const ensuring = ref(false)
+  const summaryLoading = ref(false)
   const starting = ref(false)
   const ssoLoading = ref(false)
   const ssoTarget = ref<string>('')
@@ -154,6 +281,24 @@ export function useApiAccountLink() {
       return await fetchApiAccountLinkStatus(force)
     } finally {
       loading.value = false
+    }
+  }
+
+  const ensure = async (force = false) => {
+    ensuring.value = true
+    try {
+      return await ensureApiAccountLink({ force })
+    } finally {
+      ensuring.value = false
+    }
+  }
+
+  const loadSummary = async (force = false) => {
+    summaryLoading.value = true
+    try {
+      return await fetchApiAccountSummary(force)
+    } finally {
+      summaryLoading.value = false
     }
   }
 
@@ -187,12 +332,18 @@ export function useApiAccountLink() {
 
   return {
     status: sharedStatus,
+    summary: sharedSummary,
+    ensureResult: sharedEnsureResult,
     loading,
+    ensuring,
+    summaryLoading,
     starting,
     ssoLoading,
     ssoTarget,
     errorMessage,
     load,
+    ensure,
+    loadSummary,
     beginLinking,
     openApiConsoleSSO,
   }

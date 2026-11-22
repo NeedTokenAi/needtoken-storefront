@@ -13,6 +13,13 @@
         <span v-if="pricing.loadedAt.value">
           {{ t('needtoken.models.updatedAt', { time: pricing.loadedAt.value.toLocaleTimeString() }) }}
         </span>
+        <RouterLink
+          to="/rankings"
+          class="inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1 font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          <span>{{ t('needtoken.nav.rankings') }}</span>
+          <ArrowUpRight class="h-3.5 w-3.5" aria-hidden="true" />
+        </RouterLink>
       </div>
     </header>
 
@@ -342,7 +349,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowUpRight, Check, Copy, LoaderCircle } from 'lucide-vue-next'
@@ -382,9 +389,25 @@ usePageSeo({
   canonicalPath: () => '/models',
 })
 
-const keyword = ref(typeof route.query.q === 'string' ? route.query.q : '')
+const readModelSearchQuery = (query: typeof route.query): string => {
+  if (typeof query.search === 'string' && query.search.trim()) return query.search.trim()
+  if (typeof query.q === 'string' && query.q.trim()) return query.q.trim()
+  return ''
+}
+
+const keyword = ref(readModelSearchQuery(route.query))
 const vendor = ref(typeof route.query.vendor === 'string' ? route.query.vendor : '')
 const selectedGroup = ref(typeof route.query.group === 'string' ? route.query.group : '')
+
+watch(
+  () => [route.query.search, route.query.q] as const,
+  () => {
+    const nextSearch = readModelSearchQuery(route.query)
+    if (nextSearch && nextSearch !== keyword.value) {
+      keyword.value = nextSearch
+    }
+  },
+)
 const billingType = ref<'' | 'token' | 'per_call'>('')
 const supply = ref('')
 const sort = ref<OfferSort>('default')
