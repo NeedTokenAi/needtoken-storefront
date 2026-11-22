@@ -39,6 +39,9 @@ type Service struct {
 	coupons      couponcontract.Repository
 	giftCards    giftcardcontract.Repository
 	pricing      opscontract.PricingStore
+	acquiring    opscontract.AcquiringStore
+	upstream     opscontract.UpstreamStore
+	refunds      opscontract.OrderRefundStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -72,6 +75,21 @@ func (s *Service) WithPricing(pricing opscontract.PricingStore) *Service {
 
 func (s *Service) WithGiftCards(giftCards giftcardcontract.Repository) *Service {
 	s.giftCards = giftCards
+	return s
+}
+
+func (s *Service) WithAcquiring(acquiring opscontract.AcquiringStore) *Service {
+	s.acquiring = acquiring
+	return s
+}
+
+func (s *Service) WithUpstream(upstream opscontract.UpstreamStore) *Service {
+	s.upstream = upstream
+	return s
+}
+
+func (s *Service) WithOrderRefunds(refunds opscontract.OrderRefundStore) *Service {
+	s.refunds = refunds
 	return s
 }
 
@@ -128,15 +146,16 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 		}
 		for _, payment := range payments {
 			out.Payments = append(out.Payments, opscontract.Payment{
-				ID:           payment.ID,
-				ProviderType: payment.ProviderType,
-				ChannelType:  payment.ChannelType,
-				Status:       payment.Status,
-				Amount:       payment.Amount.String(),
-				Currency:     payment.Currency,
-				ProviderRef:  payment.ProviderRef,
-				PaidAt:       payment.PaidAt,
-				UpdatedAt:    payment.UpdatedAt,
+				ID:                 payment.ID,
+				ProviderType:       payment.ProviderType,
+				ChannelType:        payment.ChannelType,
+				PaymentEnvironment: payment.FrozenPaymentEnvironment(),
+				Status:             payment.Status,
+				Amount:             payment.Amount.String(),
+				Currency:           payment.Currency,
+				ProviderRef:        payment.ProviderRef,
+				PaidAt:             payment.PaidAt,
+				UpdatedAt:          payment.UpdatedAt,
 			})
 		}
 		refunds, err := s.orders.ListRefundRecordsByOrderIDs([]uint{row.ID})
@@ -215,6 +234,12 @@ func (s *Service) Overview() (*opscontract.Overview, error) {
 	}
 	if s.giftCards != nil {
 		caps = append(caps, "gift_cards.read", "gift_cards.write")
+	}
+	if s.acquiring != nil {
+		caps = append(caps, "acquiring.read", "acquiring.write", "mail_health.read")
+	}
+	if s.refunds != nil {
+		caps = append(caps, "refunds.write")
 	}
 	result := &opscontract.Overview{Source: "storefront", CollectedAt: time.Now().UTC(), Freshness: "fresh", OrdersByStatus: map[string]int64{}, Capabilities: caps}
 	_, total, err := s.orders.ListAdmin(ordercontract.ListFilter{Page: 1, PageSize: 1})
@@ -1198,4 +1223,121 @@ func (s *Service) UpdateCouponStatus(id uint, active bool) (*opscontract.Coupon,
 	}
 	out := mapCoupon(*rec)
 	return &out, nil
+}
+
+func (s *Service) AcquiringChannels() (*opscontract.AcquiringChannelsResult, error) {
+	if s.acquiring == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	channels, total, err := s.acquiring.ListChannels()
+	if err != nil {
+		return nil, err
+	}
+	return &opscontract.AcquiringChannelsResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		Freshness:   "fresh",
+		Channels:    channels,
+		Total:       total,
+	}, nil
+}
+
+func (s *Service) UpsertAcquiringChannel(input opscontract.UpsertAcquiringChannelInput) (*opscontract.AcquiringChannel, error) {
+	if s.acquiring == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if strings.TrimSpace(input.Name) == "" || strings.TrimSpace(input.ProviderType) == "" || strings.TrimSpace(input.InteractionMode) == "" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.acquiring.UpsertChannel(input)
+}
+
+func (s *Service) UpdateAcquiringChannelStatus(id uint, active bool) (*opscontract.AcquiringChannel, error) {
+	if s.acquiring == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.acquiring.UpdateChannelStatus(id, active)
+}
+
+func (s *Service) MailHealth() (*opscontract.MailHealthResult, error) {
+	if s.acquiring == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	return s.acquiring.MailHealth()
+}
+
+func (s *Service) UpstreamConnections() (*opscontract.UpstreamConnectionsResult, error) {
+	if s.upstream == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	conns, total, err := s.upstream.ListConnections()
+	if err != nil {
+		return nil, err
+	}
+	return &opscontract.UpstreamConnectionsResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		Freshness:   "fresh",
+		Connections: conns,
+		Total:       total,
+	}, nil
+}
+
+func (s *Service) SaveUpstreamConnection(input opscontract.SaveUpstreamConnectionInput) (*opscontract.UpstreamConnection, error) {
+	if s.upstream == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if strings.TrimSpace(input.Name) == "" || strings.TrimSpace(input.BaseURL) == "" || strings.TrimSpace(input.ApiKey) == "" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.upstream.SaveConnection(input)
+}
+
+func (s *Service) UpstreamCatalog(connectionID uint) (*opscontract.UpstreamCatalogResult, error) {
+	if s.upstream == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if connectionID == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.upstream.FetchCatalog(connectionID)
+}
+
+func (s *Service) ImportUpstreamProducts(connectionID uint, input opscontract.ImportUpstreamProductsInput) (*opscontract.ImportUpstreamProductsResult, error) {
+	if s.upstream == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if connectionID == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.upstream.ImportOrSync(connectionID, input)
+}
+
+func (s *Service) RefundOrder(orderNo string, input opscontract.RefundOrderInput) (*opscontract.RefundOrderResult, error) {
+	if s.refunds == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	orderNo = strings.TrimSpace(orderNo)
+	opID := strings.TrimSpace(input.OperationID)
+	if orderNo == "" || opID == "" || len(opID) > 128 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	mode := strings.ToLower(strings.TrimSpace(input.Mode))
+	if mode == "" {
+		mode = "external_original"
+	}
+	if mode != "external_original" && mode != "wallet" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	amtDec, err := decimal.NewFromString(strings.TrimSpace(input.Amount))
+	if err != nil || amtDec.Round(2).LessThanOrEqual(decimal.Zero) {
+		return nil, opscontract.ErrInvalidInput
+	}
+	input.OperationID = opID
+	input.Mode = mode
+	input.Amount = amtDec.Round(2).StringFixed(2)
+	return s.refunds.RefundOrder(orderNo, input)
 }

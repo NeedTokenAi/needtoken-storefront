@@ -12,6 +12,10 @@ import (
 // 回调兼容逻辑用它区分具备新版事实快照的支付与升级前创建的在途支付。
 const GatewayPayloadFiatCurrencySent = "_dujiao_next_fiat_currency_sent"
 
+// GatewayPayloadPaymentEnvironment 标记创建在线支付时冻结的渠道运行环境（live / sandbox）。
+// 缺失该字段的历史记录一律视为 unknown，不可凭后续渠道配置反推升级。
+const GatewayPayloadPaymentEnvironment = "_needtoken_payment_environment"
+
 // GatewayCreateInput 是统一支付网关创建输入。
 type GatewayCreateInput struct {
 	PaymentID      uint

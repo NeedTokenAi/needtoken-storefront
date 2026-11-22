@@ -107,6 +107,37 @@ func (h *Handler) handleTokenPayCallback(c *gin.Context) bool {
 	})
 }
 
+func (h *Handler) handleMoinCashCallback(c *gin.Context) bool {
+	body, ok := readCallbackBody(c)
+	if !ok {
+		return false
+	}
+	var probe struct {
+		Provider  string `json:"provider"`
+		TradeID   string `json:"trade_id"`
+		OrderNo   string `json:"order_no"`
+		Signature string `json:"signature"`
+	}
+	if err := json.Unmarshal(body, &probe); err != nil {
+		ginutil.RequestLog(c).Debugw("moincash_callback_parse_failed", "error", err)
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(probe.Provider), constants.PaymentProviderMoinCash) ||
+		strings.TrimSpace(probe.TradeID) == "" ||
+		strings.TrimSpace(probe.OrderNo) == "" ||
+		strings.TrimSpace(probe.Signature) == "" {
+		return false
+	}
+	ginutil.RequestLog(c).Infow("moincash_callback_received", "trade_id", probe.TradeID, "order_no", probe.OrderNo, "body_size", len(body))
+	return h.processBodyCallback(c, body, bodyCallback{
+		providerType: constants.PaymentProviderMoinCash, logPrefix: "moincash",
+		orderNo: probe.OrderNo, providerRef: probe.TradeID,
+		successBody: constants.MoinCashCallbackSuccess, failBody: constants.MoinCashCallbackFail,
+		contentType: "application/json", alertType: "moincash_callback_handle_failed",
+		alertData: jsonmap.JSON{"trade_id": probe.TradeID},
+	})
+}
+
 func (h *Handler) handleEpusdtCallback(c *gin.Context) bool {
 	body, ok := readCallbackBody(c)
 	if !ok {

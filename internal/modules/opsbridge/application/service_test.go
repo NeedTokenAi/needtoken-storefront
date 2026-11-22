@@ -474,3 +474,155 @@ func (f *fakeGiftCardRepo) List(filter giftcardcontract.ListFilter) ([]giftcardd
 	}
 	return out, int64(len(out)), nil
 }
+
+type fakeUpstreamStore struct {
+	conns []opscontract.UpstreamConnection
+}
+
+func (f *fakeUpstreamStore) ListConnections() ([]opscontract.UpstreamConnection, int64, error) {
+	return f.conns, int64(len(f.conns)), nil
+}
+
+func (f *fakeUpstreamStore) SaveConnection(input opscontract.SaveUpstreamConnectionInput) (*opscontract.UpstreamConnection, error) {
+	conn := opscontract.UpstreamConnection{
+		ID:       1,
+		Name:     input.Name,
+		BaseURL:  input.BaseURL,
+		ApiKey:   input.ApiKey,
+		Protocol: "dujiao-next",
+		Status:   "active",
+	}
+	f.conns = []opscontract.UpstreamConnection{conn}
+	return &conn, nil
+}
+
+func (f *fakeUpstreamStore) FetchCatalog(connectionID uint) (*opscontract.UpstreamCatalogResult, error) {
+	return &opscontract.UpstreamCatalogResult{
+		Source:              "storefront",
+		ConnectionID:        connectionID,
+		CategoriesSupported: true,
+		Products: []opscontract.UpstreamCatalogProduct{
+			{ID: 1000001, Slug: "tokens-10", IsActive: true, EntitlementContractHash: strings.Repeat("c", 64)},
+		},
+		Total: 1,
+	}, nil
+}
+
+func (f *fakeUpstreamStore) ImportOrSync(connectionID uint, input opscontract.ImportUpstreamProductsInput) (*opscontract.ImportUpstreamProductsResult, error) {
+	return &opscontract.ImportUpstreamProductsResult{
+		Source:        "storefront",
+		ConnectionID:  connectionID,
+		Requested:     len(input.UpstreamProductIDs),
+		ImportedCount: len(input.UpstreamProductIDs),
+	}, nil
+}
+
+func TestUpstreamBridgeSaveFetchAndImport(t *testing.T) {
+	svc := application.New(nil, nil, nil).WithUpstream(&fakeUpstreamStore{})
+
+	if _, err := svc.SaveUpstreamConnection(opscontract.SaveUpstreamConnectionInput{Name: ""}); err != opscontract.ErrInvalidInput {
+		t.Fatalf("expected invalid input on empty connection, got %v", err)
+	}
+	saved, err := svc.SaveUpstreamConnection(opscontract.SaveUpstreamConnectionInput{
+		Name:      "NeedToken Glue",
+		BaseURL:   "https://glue.needtoken.ai",
+		ApiKey:    "glue_key",
+		ApiSecret: "glue_secret_32_chars_minimum_test",
+	})
+	if err != nil || saved.ID != 1 {
+		t.Fatalf("SaveUpstreamConnection failed: %v %+v", err, saved)
+	}
+
+	cat, err := svc.UpstreamCatalog(saved.ID)
+	if err != nil || len(cat.Products) != 1 || cat.Products[0].EntitlementContractHash == "" {
+		t.Fatalf("UpstreamCatalog failed: %v %+v", err, cat)
+	}
+
+	imp, err := svc.ImportUpstreamProducts(saved.ID, opscontract.ImportUpstreamProductsInput{UpstreamProductIDs: []uint{1000001}})
+	if err != nil || imp.ImportedCount != 1 {
+		t.Fatalf("ImportUpstreamProducts failed: %v %+v", err, imp)
+	}
+}
+
+type fakeOrderRefundStore struct {
+	records map[string]*opscontract.RefundOrderResult
+}
+
+func (f *fakeOrderRefundStore) RefundOrder(orderNo string, input opscontract.RefundOrderInput) (*opscontract.RefundOrderResult, error) {
+	if f.records == nil {
+		f.records = map[string]*opscontract.RefundOrderResult{}
+	}
+	if existing, ok := f.records[input.OperationID]; ok {
+		if existing.OrderNo != orderNo || existing.RefundedAmount != input.Amount {
+			return nil, opscontract.ErrConflict
+		}
+		return existing, nil
+	}
+	res := &opscontract.RefundOrderResult{
+		Source:           "storefront",
+		OrderID:          1,
+		OrderNo:          orderNo,
+		Status:           constants.OrderStatusRefunded,
+		TotalAmount:      input.Amount,
+		RefundedAmount:   input.Amount,
+		Currency:         "CNY",
+		RefundRecordID:   uint(len(f.records) + 1),
+		RefundType:       input.Mode,
+		SettlementStatus: "settled",
+		OperationID:      input.OperationID,
+	}
+	f.records[input.OperationID] = res
+	return res, nil
+}
+
+func TestRefundOrderBridgeValidationAndIdempotency(t *testing.T) {
+	svc := application.New(orders{}, payments{}, procurements{}).WithOrderRefunds(&fakeOrderRefundStore{})
+
+	ov, err := svc.Overview()
+	if err != nil {
+		t.Fatalf("Overview failed: %v", err)
+	}
+	hasRefundWrite := false
+	for _, capName := range ov.Capabilities {
+		if capName == "refunds.write" {
+			hasRefundWrite = true
+		}
+	}
+	if !hasRefundWrite {
+		t.Fatalf("expected refunds.write capability, got %v", ov.Capabilities)
+	}
+
+	if _, err := svc.RefundOrder("", opscontract.RefundOrderInput{OperationID: "op_1", Amount: "10.00"}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("empty orderNo must return ErrInvalidInput, got %v", err)
+	}
+	if _, err := svc.RefundOrder("ORD-1", opscontract.RefundOrderInput{OperationID: "op_1", Mode: "unknown_mode", Amount: "10.00"}); !errors.Is(err, opscontract.ErrInvalidInput) {
+		t.Fatalf("invalid mode must return ErrInvalidInput, got %v", err)
+	}
+
+	res1, err := svc.RefundOrder("ORD-MOIN-1", opscontract.RefundOrderInput{
+		OperationID:   "ops_refund_moin_1",
+		Amount:        "85",
+		Channel:       "moin_cash",
+		ExternalTxRef: "moin_rf_001",
+	})
+	if err != nil || res1.RefundedAmount != "85.00" || res1.SettlementStatus != "settled" || res1.RefundType != "external_original" {
+		t.Fatalf("RefundOrder failed: %v %+v", err, res1)
+	}
+
+	resDup, err := svc.RefundOrder("ORD-MOIN-1", opscontract.RefundOrderInput{
+		OperationID:   "ops_refund_moin_1",
+		Amount:        "85.00",
+		Channel:       "moin_cash",
+		ExternalTxRef: "moin_rf_001",
+	})
+	if err != nil || resDup.RefundRecordID != res1.RefundRecordID {
+		t.Fatalf("idempotent replay failed: %v %+v", err, resDup)
+	}
+
+	if _, err := svc.RefundOrder("ORD-MOIN-1", opscontract.RefundOrderInput{
+		OperationID: "ops_refund_moin_1",
+		Amount:      "90.00",
+	}); !errors.Is(err, opscontract.ErrConflict) {
+		t.Fatalf("tampered replay must return ErrConflict, got %v", err)
+	}
+}

@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dujiao-next/internal/shared/jsonmap"
@@ -35,4 +37,42 @@ type PaymentChannel struct {
 // TableName 指定表名
 func (PaymentChannel) TableName() string {
 	return "payment_channels"
+}
+
+// ResolvePaymentEnvironment 根据渠道创建时配置推导权威运行环境（live / sandbox / unknown）。
+func (c *PaymentChannel) ResolvePaymentEnvironment() string {
+	if c == nil {
+		return "unknown"
+	}
+	provider := strings.ToLower(strings.TrimSpace(c.ProviderType))
+	if provider == "" || provider == "wallet" {
+		return "unknown"
+	}
+	if c.ConfigJSON != nil {
+		if explicit := strings.ToLower(strings.TrimSpace(fmt.Sprint(c.ConfigJSON["payment_environment"]))); explicit == "live" || explicit == "sandbox" {
+			return explicit
+		}
+		if rawSandbox, ok := c.ConfigJSON["sandbox"].(bool); ok && rawSandbox {
+			return "sandbox"
+		}
+		if rawIsSandbox, ok := c.ConfigJSON["is_sandbox"].(bool); ok && rawIsSandbox {
+			return "sandbox"
+		}
+		if mode := strings.ToLower(strings.TrimSpace(fmt.Sprint(c.ConfigJSON["mode"]))); mode == "sandbox" || mode == "test" {
+			return "sandbox"
+		}
+		gatewayURL := strings.ToLower(strings.TrimSpace(fmt.Sprint(c.ConfigJSON["gateway_url"])))
+		if strings.Contains(gatewayURL, "alipaydev.com") || strings.Contains(gatewayURL, "sandbox") {
+			return "sandbox"
+		}
+		apiURL := strings.ToLower(strings.TrimSpace(fmt.Sprint(c.ConfigJSON["api_url"])))
+		if strings.Contains(apiURL, "sandbox") {
+			return "sandbox"
+		}
+		secretKey := strings.TrimSpace(fmt.Sprint(c.ConfigJSON["secret_key"]))
+		if strings.HasPrefix(secretKey, "sk_test_") || strings.HasPrefix(secretKey, "rk_test_") {
+			return "sandbox"
+		}
+	}
+	return "live"
 }

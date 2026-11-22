@@ -63,6 +63,7 @@ const (
 	PaymentProviderDujiaoPay = "dujiaopay"
 	PaymentProviderOkpay     = "okpay"
 	PaymentProviderTokenpay  = "tokenpay"
+	PaymentProviderMoinCash  = "moincash"
 	PaymentProviderWallet    = "wallet"
 )
 
@@ -202,6 +203,12 @@ const (
 const (
 	BepusdtCallbackSuccess = "success"
 	BepusdtCallbackFail    = "fail"
+)
+
+// MoinCash 回调常量
+const (
+	MoinCashCallbackSuccess = `{"ok":true}`
+	MoinCashCallbackFail    = `{"ok":false}`
 )
 
 // epusdt（GMPay）回调常量

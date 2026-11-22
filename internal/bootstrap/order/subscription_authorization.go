@@ -64,6 +64,27 @@ func (a authorizationDirectory) snapshot(_ context.Context, order *orderdomain.O
 		local.BuyerRef = "needtoken-storefront:guest:" + strconv.FormatUint(uint64(order.ID), 10)
 	}
 	local.Paid = order.PaidAt != nil && order.RefundedAmount.IsZero() && (order.Status == constants.OrderStatusPaid || order.Status == constants.OrderStatusFulfilling)
+	if local.Paid && order.WalletPaidAmount.IsZero() && a.c.PaymentStore != nil {
+		payOrderID := order.ID
+		if order.ParentID != nil && *order.ParentID > 0 {
+			payOrderID = *order.ParentID
+		}
+		if payments, err := a.c.PaymentStore.ListByOrderID(payOrderID); err == nil {
+			matched := 0
+			resolvedEnv := "unknown"
+			for i := range payments {
+				p := &payments[i]
+				if p.Status != constants.PaymentStatusSuccess || p.SupersededAt != nil || p.ExceptionCode != "" || p.ProviderType == constants.PaymentProviderWallet {
+					continue
+				}
+				matched++
+				resolvedEnv = p.FrozenPaymentEnvironment()
+			}
+			if matched == 1 && (resolvedEnv == "live" || resolvedEnv == "sandbox") {
+				local.PaymentEnvironment = resolvedEnv
+			}
+		}
+	}
 	if !local.Leaf {
 		return local, nil
 	}
