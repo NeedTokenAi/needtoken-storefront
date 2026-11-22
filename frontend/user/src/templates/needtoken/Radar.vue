@@ -48,18 +48,6 @@
           <span v-else class="tool-capability">{{ t('needtoken.radarLayout.scope') }}</span>
 
           <div class="hero-source-actions">
-            <span class="source-links-label">{{ t('needtoken.radarV2.delivery.sourcesLabel') }}:</span>
-            <a
-              v-for="refLink in activeChannelMeta.referenceLinks"
-              :key="refLink.url"
-              :href="refLink.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="source-ref-link"
-            >
-              <span>{{ refLink.label }}</span>
-              <ArrowUpRight :size="12" aria-hidden="true" />
-            </a>
             <button
               type="button"
               class="radar-refresh-btn"
@@ -689,27 +677,6 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-}
-
-.source-links-label {
-  color: var(--ui-text-muted);
-}
-
-.source-ref-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px 9px;
-  border: 1px solid var(--ui-border);
-  border-radius: 999px;
-  background: var(--ui-bg-elevated);
-  color: var(--ui-text-secondary);
-  text-decoration: none;
-  transition: border-color 150ms ease, color 150ms ease;
-}
-.source-ref-link:hover {
-  border-color: var(--nt-accent-border-strong);
-  color: var(--ui-accent);
 }
 
 .radar-refresh-btn {
