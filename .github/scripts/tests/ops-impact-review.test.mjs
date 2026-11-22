@@ -3,11 +3,14 @@ import test from "node:test";
 
 import {
   COMMENT_MARKER,
+  buildPrClosedPayload,
   buildStaticImpactAssessment,
   callAiGateway,
   classifyDbMigrationRisk,
   classifyReleasePRKind,
+  normalizeReleaseTag,
   parseAiReviewJson,
+  parseArgs,
   postOpsWebhook,
   renderPrCommentMarkdown,
   resolveAiCandidateModels,
@@ -259,13 +262,52 @@ test("redacts secrets in ai_error_detail, logs error, and renders sanitized summ
   assert.equal(md.includes("AIzaSyDummySecretKey"), false);
 });
 
-test("only dispatches Ops release governance webhook for upstream sync and rollback PRs", () => {
+test("parses empty --tag safely without turning into 'true' and tracks dual-track PR lifecycle", () => {
+  const parsed = parseArgs(["--mode", "pr", "--tag", "", "--head-ref", "feat/gemini-radar", "--flag-only"]);
+  assert.equal(parsed.tag, "");
+  assert.equal(parsed["head-ref"], "feat/gemini-radar");
+  assert.equal(parsed["flag-only"], "true");
+
+  assert.equal(normalizeReleaseTag(""), "");
+  assert.equal(normalizeReleaseTag("true"), "");
+  assert.equal(normalizeReleaseTag("v1.0.2"), "v1.0.2");
+
   assert.equal(classifyReleasePRKind("sync/upstream/abcdef", "pr"), "upstream_sync");
   assert.equal(classifyReleasePRKind("rollback/bad-merge", "pr"), "rollback");
-  assert.equal(classifyReleasePRKind("feat/custom-work", "pr"), "internal");
+  assert.equal(classifyReleasePRKind("feat/custom-work", "pr"), "custom_dev");
   assert.equal(classifyReleasePRKind("feat/custom-work", "conflict"), "upstream_sync");
+
   assert.equal(shouldNotifyOpsWebhook({ mode: "pr", headRef: "sync/upstream/1234" }), true);
-  assert.equal(shouldNotifyOpsWebhook({ mode: "pr", headRef: "rollback/1234" }), true);
-  assert.equal(shouldNotifyOpsWebhook({ mode: "pr", headRef: "feat/local-feature" }), false);
+  assert.equal(shouldNotifyOpsWebhook({ mode: "pr", headRef: "feat/local-feature" }), true);
+  assert.equal(shouldNotifyOpsWebhook({ mode: "closed", headRef: "feat/local-feature" }), true);
   assert.equal(shouldNotifyOpsWebhook({ mode: "pr", headRef: "sync/upstream/1234", skipWebhook: true }), false);
+
+  const closed = buildPrClosedPayload({
+    moduleName: "storefront",
+    repo: "NeedTokenAi/needtoken-storefront",
+    prNumber: 48,
+    prMerged: true,
+    mergeSha: "ef106a6231491dce8940ec3e6c66f591b9c4222b",
+    headRef: "feat/gemini-radar",
+  });
+  assert.equal(closed.event, "pr_closed");
+  assert.equal(closed.pr_kind, "custom_dev");
+  assert.equal(closed.pr_state, "merged");
+  assert.equal(closed.merge_sha, "ef106a6231491dce8940ec3e6c66f591b9c4222b");
+
+  const customMd = renderPrCommentMarkdown({
+    module: "storefront",
+    pr_kind: "custom_dev",
+    verdict: "safe",
+    db_migration_risk: "none",
+    contract_check_status: "passed",
+    ai_status: "completed",
+    summary_zh: "二开无风险",
+    ops_impact: "无",
+    db_migration_notes: "无",
+    attention_files: [],
+    recommendation_zh: "合入即可",
+  });
+  assert.equal(customMd.includes("自研二开"), true);
+  assert.equal(customMd.includes("Create a merge commit"), false);
 });
