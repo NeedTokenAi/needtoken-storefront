@@ -355,6 +355,8 @@ func (a orderCreateAdapter) CreateOrder(input ordertransport.CreateOrderInput) (
 		AffiliateCode:       input.AffiliateCode,
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
+		UserAgent:           input.UserAgent,
+		ClientFingerprint:   input.ClientFingerprint,
 		ManualFormData:      input.ManualFormData,
 		InvoiceRequest:      input.InvoiceRequest,
 	})
@@ -372,6 +374,8 @@ func (a orderCreateAdapter) CreateGuestOrder(input ordertransport.CreateGuestOrd
 		AffiliateCode:       input.AffiliateCode,
 		AffiliateVisitorKey: input.AffiliateVisitorKey,
 		ClientIP:            input.ClientIP,
+		UserAgent:           input.UserAgent,
+		ClientFingerprint:   input.ClientFingerprint,
 		ManualFormData:      input.ManualFormData,
 		InvoiceRequest:      input.InvoiceRequest,
 	})

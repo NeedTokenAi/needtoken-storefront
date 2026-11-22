@@ -118,6 +118,11 @@ jobs:
           NEEDTOKEN_STOREFRONT_TEST_POSTGRES_DSN: postgres://glue@127.0.0.1:5432/gluetest?sslmode=disable
         run: go test ./internal/modules/catalog/product/store/gormstore -run TestSKUDisplayMetaAdditiveMigrationPostgres -count=1
 
+      - name: Verify order device meta migration and filters on PostgreSQL
+        env:
+          NEEDTOKEN_STOREFRONT_TEST_POSTGRES_DSN: postgres://glue@127.0.0.1:5432/gluetest?sslmode=disable
+        run: go test -v ./internal/bootstrap/database/migrations -run TestOrderDeviceMetaMigrationPostgres -count=1
+
       - name: Build server
         run: go build ./cmd/server
 

@@ -40,6 +40,8 @@ type Order struct {
 	ResellerDomain          string          `gorm:"type:varchar(255);index" json:"reseller_domain,omitempty"`                         // 下单分销域名快照
 	ResellerProfitAmount    money.Amount    `gorm:"type:decimal(20,2);not null;default:0" json:"reseller_profit_amount"`              // 分销差价快照
 	ClientIP                string          `gorm:"type:varchar(64)" json:"client_ip,omitempty"`                                      // 下单客户端IP
+	UserAgent               string          `gorm:"type:varchar(512);not null;default:''" json:"user_agent,omitempty"`                // 下单客户端 User-Agent
+	ClientFingerprint       string          `gorm:"type:varchar(128);index;not null;default:''" json:"client_fingerprint,omitempty"`  // 下单浏览器/设备指纹
 	RiskIP                  string          `gorm:"type:varchar(80);index;index:idx_orders_risk_pending,priority:1" json:"-"`         // 规范化风控IP（IPv6按/64）
 	ExpiresAt               *time.Time      `gorm:"index" json:"expires_at"`                                                          // 过期时间
 	PaidAt                  *time.Time      `gorm:"index" json:"paid_at"`                                                             // 支付时间

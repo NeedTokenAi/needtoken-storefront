@@ -4,18 +4,25 @@ import "time"
 
 // ListFilter 查询订单列表的过滤条件。
 type ListFilter struct {
-	Page           int
-	PageSize       int
-	UserID         uint
-	UserKeyword    string
-	Status         string
-	OrderNo        string
-	GuestEmail     string
-	ProductKeyword string
-	CreatedFrom    *time.Time
-	CreatedTo      *time.Time
-	SortBy         string
-	SortOrder      string
+	Page            int
+	PageSize        int
+	UserID          uint
+	UserKeyword     string
+	Status          string
+	OrderNo         string
+	GuestEmail      string
+	ProductKeyword  string
+	Keyword         string
+	CategoryID      uint
+	FulfillmentType string
+	BuyerType       string
+	PaymentChannel  string
+	ClientIP        string
+	ExceptionOnly   bool
+	CreatedFrom     *time.Time
+	CreatedTo       *time.Time
+	SortBy          string
+	SortOrder       string
 }
 
 // TenantScope 表示前台订单查询的分销租户范围。

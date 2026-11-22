@@ -460,6 +460,76 @@ func (r *Store) ListAdmin(filter ordercontract.ListFilter) ([]orderdomain.Order,
 	if filter.GuestEmail != "" {
 		query = query.Where("guest_email = ?", filter.GuestEmail)
 	}
+	switch strings.ToLower(strings.TrimSpace(filter.BuyerType)) {
+	case "member":
+		query = query.Where("orders.user_id > 0")
+	case "guest":
+		query = query.Where("orders.user_id = 0")
+	}
+	if clientIP := strings.TrimSpace(filter.ClientIP); clientIP != "" {
+		query = query.Where("orders.client_ip LIKE ?", "%"+clientIP+"%")
+	}
+	if filter.CategoryID > 0 {
+		query = query.Where(
+			"orders.id IN ("+
+				"SELECT DISTINCT oi.order_id FROM order_items oi "+
+				"INNER JOIN products p ON p.id = oi.product_id "+
+				"WHERE oi.deleted_at IS NULL AND (p.category_id = ? OR p.category_id IN (SELECT c.id FROM categories c WHERE c.parent_id = ? AND c.deleted_at IS NULL))"+
+				") OR orders.id IN ("+
+				"SELECT DISTINCT child.parent_id FROM orders child "+
+				"INNER JOIN order_items oi2 ON oi2.order_id = child.id "+
+				"INNER JOIN products p2 ON p2.id = oi2.product_id "+
+				"WHERE child.deleted_at IS NULL AND child.parent_id IS NOT NULL AND oi2.deleted_at IS NULL "+
+				"AND (p2.category_id = ? OR p2.category_id IN (SELECT c2.id FROM categories c2 WHERE c2.parent_id = ? AND c2.deleted_at IS NULL))"+
+				")",
+			filter.CategoryID, filter.CategoryID, filter.CategoryID, filter.CategoryID,
+		)
+	}
+	if ft := strings.ToLower(strings.TrimSpace(filter.FulfillmentType)); ft != "" {
+		query = query.Where(
+			"orders.id IN (SELECT DISTINCT oi.order_id FROM order_items oi WHERE oi.deleted_at IS NULL AND LOWER(oi.fulfillment_type) = ?) "+
+				"OR orders.id IN (SELECT DISTINCT child.parent_id FROM orders child INNER JOIN order_items oi2 ON oi2.order_id = child.id WHERE child.deleted_at IS NULL AND child.parent_id IS NOT NULL AND oi2.deleted_at IS NULL AND LOWER(oi2.fulfillment_type) = ?)",
+			ft, ft,
+		)
+	}
+	if pc := strings.ToLower(strings.TrimSpace(filter.PaymentChannel)); pc != "" {
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM payments p WHERE p.deleted_at IS NULL AND p.order_id = orders.id AND (LOWER(p.provider_type) = ? OR LOWER(p.channel_type) = ?))",
+			pc, pc,
+		)
+	}
+	if filter.ExceptionOnly {
+		query = query.Where(
+			"EXISTS (SELECT 1 FROM payments p WHERE p.deleted_at IS NULL AND p.order_id = orders.id AND p.exception_code <> '') " +
+				"OR EXISTS (SELECT 1 FROM payments p WHERE p.deleted_at IS NULL AND p.order_id = orders.id AND p.status = 'success' AND orders.online_paid_amount > 0 AND ABS((p.amount - p.fee_amount) - orders.online_paid_amount) > 0.01) " +
+				"OR EXISTS (SELECT 1 FROM procurement_orders po WHERE (po.local_order_id = orders.id OR po.local_order_id IN (SELECT c.id FROM orders c WHERE c.parent_id = orders.id AND c.deleted_at IS NULL)) AND po.status IN ('failed', 'rejected')) " +
+				"OR EXISTS (SELECT 1 FROM checkout_reservations cr WHERE (cr.order_id = orders.id OR cr.root_order_id = orders.id) AND cr.attention_code <> '')",
+		)
+	}
+	if kw := strings.TrimSpace(filter.Keyword); kw != "" {
+		like := "%" + kw + "%"
+		lowerLike := "%" + strings.ToLower(kw) + "%"
+		cond1, argCount1 := gormutil.BuildLocalizedLikeCondition(r.db, nil, []string{"oi.title_json"})
+		cond2, argCount2 := gormutil.BuildLocalizedLikeCondition(r.db, nil, []string{"oi2.title_json"})
+		clauses := []string{
+			"LOWER(orders.order_no) LIKE ?",
+			"LOWER(orders.guest_email) LIKE ?",
+			"LOWER(orders.client_ip) LIKE ?",
+			"LOWER(orders.client_fingerprint) LIKE ?",
+			"LOWER(orders.reseller_domain) LIKE ?",
+			"orders.user_id IN (SELECT u.id FROM users u WHERE u.deleted_at IS NULL AND (LOWER(u.email) LIKE ? OR LOWER(u.display_name) LIKE ?))",
+		}
+		args := []any{lowerLike, lowerLike, lowerLike, lowerLike, lowerLike, lowerLike, lowerLike}
+		if cond1 != "" && cond2 != "" {
+			clauses = append(clauses,
+				"orders.id IN (SELECT DISTINCT oi.order_id FROM order_items oi WHERE oi.deleted_at IS NULL AND ("+cond1+"))",
+				"orders.id IN (SELECT DISTINCT o3.parent_id FROM orders o3 INNER JOIN order_items oi2 ON oi2.order_id = o3.id WHERE o3.deleted_at IS NULL AND o3.parent_id IS NOT NULL AND oi2.deleted_at IS NULL AND ("+cond2+"))",
+			)
+			args = append(args, gormutil.RepeatLikeArgs(like, argCount1)...)
+			args = append(args, gormutil.RepeatLikeArgs(like, argCount2)...)
+		}
+		query = query.Where("("+strings.Join(clauses, " OR ")+")", args...)
+	}
 	if keyword := strings.TrimSpace(filter.ProductKeyword); keyword != "" {
 		like := "%" + keyword + "%"
 		cond1, argCount1 := gormutil.BuildLocalizedLikeCondition(r.db, nil, []string{"oi.title_json"})
