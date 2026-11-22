@@ -500,6 +500,46 @@ func (h *Handler) SaveUpstreamConnection(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *Handler) UpdateUpstreamConnectionStatus(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	var req opscontract.UpdateUpstreamConnectionStatusInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.UpdateUpstreamConnectionStatus(uint(id), req.Status)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) DeleteUpstreamConnection(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	if err := h.bridge.DeleteUpstreamConnection(uint(id)); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, opscontract.DeleteResult{Deleted: true, ID: uint(id)})
+}
+
 func (h *Handler) UpstreamCatalog(c *gin.Context) {
 	if h.bridge == nil {
 		fail(c, opscontract.ErrNotConfigured)

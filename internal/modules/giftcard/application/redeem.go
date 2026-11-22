@@ -1,6 +1,7 @@
 package application
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -82,9 +83,95 @@ func (s *Service) RedeemGiftCard(input RedeemInput) (*giftcarddomain.GiftCard, *
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, giftcardcontract.ErrNotFound) && s.universal != nil {
+			return s.redeemUniversalGiftCard(input.UserID, code)
+		}
 		return nil, nil, nil, err
 	}
 	return resultCard, resultAcc, resultTxn, nil
+}
+
+// redeemUniversalGiftCard 在本地事务外通过权威源（Glue）原子预锁双端通用礼品卡，
+// 再在独立本地短事务内完成钱包入账，最后确认核销或在入账失败时释放预锁。
+func (s *Service) redeemUniversalGiftCard(userID uint, code string) (*giftcarddomain.GiftCard, *walletdomain.Account, *walletdomain.Transaction, error) {
+	siteCurrency := ""
+	if s.currency != nil {
+		siteCurrency = strings.TrimSpace(strings.ToUpper(s.currency.SiteCurrency()))
+	}
+	if siteCurrency == "" {
+		siteCurrency = constants.SiteCurrencyDefault
+	}
+
+	claim, err := s.universal.Claim(code, userID, siteCurrency)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if claim == nil || claim.CreditAmount.Decimal.Round(2).LessThanOrEqual(decimal.Zero) {
+		if claim != nil && claim.ClaimID != "" {
+			_ = s.universal.Release(code, claim.ClaimID, "invalid_credit_amount")
+		}
+		return nil, nil, nil, giftcardcontract.ErrInvalid
+	}
+
+	creditCurrency := strings.TrimSpace(strings.ToUpper(claim.Currency))
+	if creditCurrency == "" {
+		creditCurrency = siteCurrency
+	}
+	remark := fmt.Sprintf("通用礼品卡兑换：%s", claim.Code)
+	if claim.FaceUSDCents > 0 {
+		remark = fmt.Sprintf("通用礼品卡兑换：%s（$%.2f USD）", claim.Code, float64(claim.FaceUSDCents)/100.0)
+	}
+
+	var (
+		resultAcc *walletdomain.Account
+		resultTxn *walletdomain.Transaction
+	)
+	txErr := s.redeemer.WithinRedeemTransaction(func(tx giftcardcontract.RedeemTransaction) error {
+		account, txn, creditErr := tx.CreditWallet(giftcardcontract.WalletCreditInput{
+			UserID:    userID,
+			Amount:    claim.CreditAmount,
+			Currency:  creditCurrency,
+			TxnType:   constants.WalletTxnTypeGiftCard,
+			Reference: "universal_gift_card:" + claim.Code,
+			Remark:    remark,
+		})
+		if creditErr != nil {
+			return creditErr
+		}
+		resultAcc = account
+		resultTxn = txn
+		return nil
+	})
+	if txErr != nil {
+		_ = s.universal.Release(claim.Code, claim.ClaimID, "storefront_wallet_credit_failed")
+		return nil, nil, nil, txErr
+	}
+
+	txnRef := "storefront:wallet"
+	if resultTxn != nil && resultTxn.ID > 0 {
+		txnRef = fmt.Sprintf("storefront:wallet_txn:%d", resultTxn.ID)
+	}
+	creditDisplay := fmt.Sprintf("%s %s", claim.CreditAmount.StringFixed(2), creditCurrency)
+	_ = s.universal.Confirm(claim.Code, claim.ClaimID, txnRef, creditDisplay)
+
+	now := time.Now()
+	var txnIDPtr *uint
+	if resultTxn != nil && resultTxn.ID > 0 {
+		id := resultTxn.ID
+		txnIDPtr = &id
+	}
+	card := &giftcarddomain.GiftCard{
+		Name:           claim.Name,
+		Code:           claim.Code,
+		Amount:         claim.CreditAmount,
+		Currency:       creditCurrency,
+		Status:         giftcarddomain.GiftCardStatusRedeemed,
+		ExpiresAt:      claim.ExpiresAt,
+		RedeemedUserID: &userID,
+		RedeemedAt:     &now,
+		WalletTxnID:    txnIDPtr,
+	}
+	return card, resultAcc, resultTxn, nil
 }
 
 func isGiftCardExpired(expiresAt *time.Time, now time.Time) bool {

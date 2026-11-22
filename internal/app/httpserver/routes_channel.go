@@ -61,6 +61,8 @@ func registerChannelRoutes(
 		channelAPI.GET("/needtoken-ops/mail/health", opsHandler.MailHealth)
 		channelAPI.GET("/needtoken-ops/upstream/connections", opsHandler.UpstreamConnections)
 		channelAPI.POST("/needtoken-ops/upstream/connections", opsHandler.SaveUpstreamConnection)
+		channelAPI.PATCH("/needtoken-ops/upstream/connections/:id/status", opsHandler.UpdateUpstreamConnectionStatus)
+		channelAPI.DELETE("/needtoken-ops/upstream/connections/:id", opsHandler.DeleteUpstreamConnection)
 		channelAPI.GET("/needtoken-ops/upstream/connections/:id/catalog", opsHandler.UpstreamCatalog)
 		channelAPI.POST("/needtoken-ops/upstream/connections/:id/import", opsHandler.ImportUpstreamProducts)
 		channelAPI.POST("/needtoken-ops/orders/:order_no/refund", opsHandler.RefundOrder)

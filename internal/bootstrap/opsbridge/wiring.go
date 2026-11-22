@@ -763,6 +763,53 @@ func (u *upstreamStoreAdapter) SaveConnection(input opscontract.SaveUpstreamConn
 	return &out, nil
 }
 
+func (u *upstreamStoreAdapter) UpdateConnectionStatus(id uint, status string) (*opscontract.UpstreamConnection, error) {
+	if u.connections == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if err := u.connections.SetStatus(id, status); err != nil {
+		if errors.Is(err, siteconnectioncontract.ErrNotFound) {
+			return nil, opscontract.ErrNotFound
+		}
+		return nil, err
+	}
+	reloaded, err := u.connections.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if reloaded == nil {
+		return nil, opscontract.ErrNotFound
+	}
+	out := mapUpstreamConn(*reloaded)
+	return &out, nil
+}
+
+func (u *upstreamStoreAdapter) DeleteConnection(id uint) error {
+	if u.connections == nil {
+		return opscontract.ErrNotConfigured
+	}
+	conn, err := u.connections.GetByID(id)
+	if err != nil {
+		if errors.Is(err, siteconnectioncontract.ErrNotFound) {
+			return opscontract.ErrNotFound
+		}
+		return err
+	}
+	if conn == nil {
+		return opscontract.ErrNotFound
+	}
+	if strings.EqualFold(strings.TrimSpace(conn.Status), constants.ConnectionStatusActive) {
+		return &opscontract.ConflictError{Code: "upstream_connection_active"}
+	}
+	if err := u.connections.Delete(id); err != nil {
+		if errors.Is(err, siteconnectioncontract.ErrNotFound) {
+			return opscontract.ErrNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func (u *upstreamStoreAdapter) FetchCatalog(connectionID uint) (*opscontract.UpstreamCatalogResult, error) {
 	if u.mappings == nil {
 		return nil, opscontract.ErrNotConfigured

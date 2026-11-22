@@ -71,3 +71,23 @@ type UserDirectory interface {
 type CurrencyProvider interface {
 	SiteCurrency() string
 }
+
+// UniversalGiftCardClaim 描述从跨系统权威源（Glue）原子预锁定的通用礼品卡凭据。
+type UniversalGiftCardClaim struct {
+	ClaimID      string
+	Code         string
+	Name         string
+	BatchNo      string
+	CreditAmount money.Amount
+	Currency     string
+	FaceUSDCents int64
+	ExpiresAt    *time.Time
+}
+
+// UniversalGiftCardRedeemer 提供双端通用礼品卡（一卡两用防超售）的跨系统二阶段核销端口。
+// 所有调用必须在本地数据库事务外执行，避免占用 SQLite 写锁或长事务。
+type UniversalGiftCardRedeemer interface {
+	Claim(code string, userID uint, siteCurrency string) (*UniversalGiftCardClaim, error)
+	Confirm(code, claimID, txnRef, creditDisplay string) error
+	Release(code, claimID, reason string) error
+}

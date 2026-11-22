@@ -39,6 +39,8 @@ high_risk_cases=(
   "internal/modules/opsbridge/application/service.go"
   "internal/modules/apipublic/transport/http/handler.go"
   "internal/modules/identity/userauth/application/service.go"
+  "internal/modules/giftcard/application/redeem.go"
+  "internal/app/httpserver/router.go"
   "internal/app/httpserver/routes_storefront.go"
   "internal/app/httpserver/routes_channel.go"
   "frontend/user/src/templates/needtoken/layout/NeedtokenLayout.vue"
