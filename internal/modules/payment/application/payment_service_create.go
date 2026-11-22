@@ -16,6 +16,7 @@ import (
 
 	"github.com/dujiao-next/internal/constants"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
+	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/money"
 
 	"github.com/shopspring/decimal"
@@ -259,8 +260,11 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 			FeePolicy:       feePolicy,
 			Currency:        lockedOrder.Currency,
 			Status:          constants.PaymentStatusInitiated,
-			CreatedAt:       now,
-			UpdatedAt:       now,
+			ProviderPayload: jsonmap.JSON{
+				paymentcontract.GatewayPayloadPaymentEnvironment: channel.ResolvePaymentEnvironment(),
+			},
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 		if shouldUseCNYPaymentCurrency(channel) {
 			payment.Currency = "CNY"

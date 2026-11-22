@@ -195,7 +195,15 @@ func (s *PaymentService) applyProviderPayment(input CreatePaymentInput, order *o
 		payment.ProviderRef = providerOrderNo
 	}
 	if result.Payload != nil {
-		payment.ProviderPayload = result.Payload
+		payment.ProviderPayload = mergeProviderPayload(payment.ProviderPayload, result.Payload)
+	}
+	if env := channel.ResolvePaymentEnvironment(); env == "live" || env == "sandbox" {
+		if payment.ProviderPayload == nil {
+			payment.ProviderPayload = jsonmap.JSON{}
+		}
+		if _, exists := payment.ProviderPayload[paymentcontract.GatewayPayloadPaymentEnvironment]; !exists {
+			payment.ProviderPayload[paymentcontract.GatewayPayloadPaymentEnvironment] = env
+		}
 	}
 	// DisplayChannelType 是 adapter 返回的“展示用渠道类型”。
 	// 例如 BEpusdt 新格式的 payment.channel_type 固定为 bepusdt，

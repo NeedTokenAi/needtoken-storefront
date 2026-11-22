@@ -168,6 +168,15 @@ var hash64 = regexp.MustCompile(`^[0-9a-f]{64}$`)
 var positiveMinor = regexp.MustCompile(`^[1-9][0-9]{0,11}$`)
 var currencyCode = regexp.MustCompile(`^[A-Z]{3}$`)
 
+func isAllowedSubscriptionPlan(plan string) bool {
+	switch plan {
+	case "plus-monthly", "pro-monthly", "pro-5x-monthly", "pro-20x-monthly":
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Service) load(ctx context.Context, subject Subject) (OrderSnapshot, Context, Terms, error) {
 	var terms Terms
 	if s.directory == nil {
@@ -191,7 +200,7 @@ func (s *Service) load(ctx context.Context, subject Subject) (OrderSnapshot, Con
 		return local, Context{}, terms, ordercontract.ErrAuthorizationConflict
 	}
 	terms = contract.Subscription
-	if contract.Kind != "recharge" || terms.Version != 1 || terms.Platform != "openai" || terms.Route != "web_card" || terms.RouteVersion != 1 || terms.Plan != "plus-monthly" || terms.Period != "month" || terms.RenewalPolicy != "single_cycle" || !positiveMinor.MatchString(terms.BudgetMinor) || !currencyCode.MatchString(terms.Currency) {
+	if contract.Kind != "recharge" || terms.Version != 1 || terms.Platform != "openai" || terms.Route != "web_card" || terms.RouteVersion != 1 || !isAllowedSubscriptionPlan(terms.Plan) || terms.Period != "month" || terms.RenewalPolicy != "single_cycle" || !positiveMinor.MatchString(terms.BudgetMinor) || !currencyCode.MatchString(terms.Currency) {
 		return local, Context{}, terms, ordercontract.ErrAuthorizationConflict
 	}
 	remote, err := s.bridge.Context(ctx, local.ConnectionID, local.UpstreamOrderID)

@@ -12,6 +12,9 @@ import (
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 	orderstore "github.com/dujiao-next/internal/modules/order/infrastructure/gormstore"
+	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
+	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
+	paymentstore "github.com/dujiao-next/internal/modules/payment/infrastructure/gormstore"
 	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -67,5 +70,29 @@ func TestAuthorizationDirectoryEnforcesRealOwnerGuestProofAndTenant(t *testing.T
 				t.Fatalf("accepted identity: %#v %v", snapshot, err)
 			}
 		})
+	}
+
+	if err = db.AutoMigrate(&paymentdomain.Payment{}); err != nil {
+		t.Fatal(err)
+	}
+	payments := paymentstore.New(db, "test-order-secret")
+	paidAt := now
+	if err = payments.Create(&paymentdomain.Payment{
+		OrderID:         1,
+		ChannelID:       10,
+		ProviderType:    "official",
+		ChannelType:     "alipay",
+		InteractionMode: "qr",
+		Currency:        "USD",
+		Status:          "success",
+		PaidAt:          &paidAt,
+		ProviderPayload: jsonmap.JSON{paymentcontract.GatewayPayloadPaymentEnvironment: "live"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	liveDirectory := authorizationDirectory{&container.Container{OrderStore: store, PaymentStore: payments}}
+	liveSnapshot, err := liveDirectory.Resolve(context.Background(), subscriptionauth.Subject{OrderNo: "member", UserID: 1})
+	if err != nil || liveSnapshot.PaymentEnvironment != "live" {
+		t.Fatalf("expected frozen live payment_environment, got %#v err=%v", liveSnapshot, err)
 	}
 }

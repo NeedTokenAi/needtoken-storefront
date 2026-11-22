@@ -13,15 +13,16 @@ var (
 )
 
 type Payment struct {
-	ID           uint       `json:"id"`
-	ProviderType string     `json:"provider_type,omitempty"`
-	ChannelType  string     `json:"channel_type,omitempty"`
-	Status       string     `json:"status"`
-	Amount       string     `json:"amount"`
-	Currency     string     `json:"currency"`
-	ProviderRef  string     `json:"provider_ref,omitempty"`
-	PaidAt       *time.Time `json:"paid_at,omitempty"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID                 uint       `json:"id"`
+	ProviderType       string     `json:"provider_type,omitempty"`
+	ChannelType        string     `json:"channel_type,omitempty"`
+	PaymentEnvironment string     `json:"payment_environment,omitempty"`
+	Status             string     `json:"status"`
+	Amount             string     `json:"amount"`
+	Currency           string     `json:"currency"`
+	ProviderRef        string     `json:"provider_ref,omitempty"`
+	PaidAt             *time.Time `json:"paid_at,omitempty"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 type Refund struct {
 	ID               uint      `json:"id"`
@@ -358,6 +359,213 @@ type GenerateGiftCardsResult struct {
 	Cards       []GiftCard    `json:"cards"`
 }
 
+type AcquiringChannel struct {
+	ID                 uint              `json:"id"`
+	OpsChannelRef      string            `json:"ops_channel_ref,omitempty"`
+	Name               string            `json:"name"`
+	Icon               string            `json:"icon,omitempty"`
+	ProviderType       string            `json:"provider_type"`
+	ChannelType        string            `json:"channel_type"`
+	InteractionMode    string            `json:"interaction_mode"`
+	PaymentEnvironment string            `json:"payment_environment"`
+	FeeRate            string            `json:"fee_rate"`
+	FixedFee           string            `json:"fixed_fee"`
+	MinAmount          string            `json:"min_amount"`
+	MaxAmount          string            `json:"max_amount"`
+	PaymentRoles       []string          `json:"payment_roles,omitempty"`
+	PaymentTypes       []string          `json:"payment_types,omitempty"`
+	ConfigSummary      map[string]string `json:"config_summary,omitempty"`
+	IsActive           bool              `json:"is_active"`
+	SortOrder          int               `json:"sort_order"`
+	UpdatedAt          time.Time         `json:"updated_at"`
+}
+
+type AcquiringChannelsResult struct {
+	Source      string             `json:"source"`
+	CollectedAt time.Time          `json:"collected_at"`
+	Freshness   string             `json:"freshness"`
+	Channels    []AcquiringChannel `json:"channels"`
+	Total       int64              `json:"total"`
+}
+
+type UpsertAcquiringChannelInput struct {
+	ID                 uint           `json:"id,omitempty"`
+	OpsChannelRef      string         `json:"ops_channel_ref"`
+	Name               string         `json:"name"`
+	Icon               string         `json:"icon,omitempty"`
+	ProviderType       string         `json:"provider_type"`
+	ChannelType        string         `json:"channel_type"`
+	InteractionMode    string         `json:"interaction_mode"`
+	PaymentEnvironment string         `json:"payment_environment"`
+	FeeRate            string         `json:"fee_rate,omitempty"`
+	FixedFee           string         `json:"fixed_fee,omitempty"`
+	MinAmount          string         `json:"min_amount,omitempty"`
+	MaxAmount          string         `json:"max_amount,omitempty"`
+	HideAmountOutRange bool           `json:"hide_amount_out_range,omitempty"`
+	PaymentRoles       []string       `json:"payment_roles,omitempty"`
+	PaymentTypes       []string       `json:"payment_types,omitempty"`
+	ConfigJSON         map[string]any `json:"config_json"`
+	IsActive           *bool          `json:"is_active,omitempty"`
+	SortOrder          int            `json:"sort_order,omitempty"`
+}
+
+type UpdateAcquiringChannelStatusInput struct {
+	IsActive bool `json:"is_active"`
+}
+
+type MailHealthResult struct {
+	Source      string    `json:"source"`
+	CollectedAt time.Time `json:"collected_at"`
+	Freshness   string    `json:"freshness"`
+	Enabled     bool      `json:"enabled"`
+	Configured  bool      `json:"configured"`
+	Host        string    `json:"host,omitempty"`
+	Port        int       `json:"port,omitempty"`
+	From        string    `json:"from,omitempty"`
+	Status      string    `json:"status"`
+}
+
+type AcquiringStore interface {
+	ListChannels() ([]AcquiringChannel, int64, error)
+	UpsertChannel(input UpsertAcquiringChannelInput) (*AcquiringChannel, error)
+	UpdateChannelStatus(id uint, active bool) (*AcquiringChannel, error)
+	MailHealth() (*MailHealthResult, error)
+}
+
+type UpstreamConnection struct {
+	ID                 uint       `json:"id"`
+	Name               string     `json:"name"`
+	BaseURL            string     `json:"base_url"`
+	ApiKey             string     `json:"api_key"`
+	Protocol           string     `json:"protocol"`
+	CallbackURL        string     `json:"callback_url,omitempty"`
+	Status             string     `json:"status"`
+	LastPingAt         *time.Time `json:"last_ping_at,omitempty"`
+	LastPingOK         bool       `json:"last_ping_ok"`
+	ExchangeRate       string     `json:"exchange_rate"`
+	PriceMarkupPercent string     `json:"price_markup_percent"`
+	PriceRoundingMode  string     `json:"price_rounding_mode"`
+	AutoSyncPrice      bool       `json:"auto_sync_price"`
+	PingSiteName       string     `json:"ping_site_name,omitempty"`
+	PingError          string     `json:"ping_error,omitempty"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+type UpstreamConnectionsResult struct {
+	Source      string               `json:"source"`
+	CollectedAt time.Time            `json:"collected_at"`
+	Freshness   string               `json:"freshness"`
+	Connections []UpstreamConnection `json:"connections"`
+	Total       int64                `json:"total"`
+}
+
+type SaveUpstreamConnectionInput struct {
+	ID                 uint     `json:"id,omitempty"`
+	Name               string   `json:"name"`
+	BaseURL            string   `json:"base_url"`
+	ApiKey             string   `json:"api_key"`
+	ApiSecret          string   `json:"api_secret,omitempty"`
+	Protocol           string   `json:"protocol,omitempty"`
+	CallbackURL        string   `json:"callback_url,omitempty"`
+	ExchangeRate       *float64 `json:"exchange_rate,omitempty"`
+	PriceMarkupPercent *float64 `json:"price_markup_percent,omitempty"`
+	PriceRoundingMode  *string  `json:"price_rounding_mode,omitempty"`
+	AutoSyncPrice      *bool    `json:"auto_sync_price,omitempty"`
+	Ping               *bool    `json:"ping,omitempty"`
+}
+
+type UpstreamCatalogCategory struct {
+	ID        uint           `json:"id"`
+	ParentID  uint           `json:"parent_id"`
+	Slug      string         `json:"slug"`
+	Name      map[string]any `json:"name"`
+	SortOrder int            `json:"sort_order"`
+}
+
+type UpstreamCatalogProduct struct {
+	ID                      uint           `json:"id"`
+	CategoryID              uint           `json:"category_id"`
+	Slug                    string         `json:"slug"`
+	Title                   map[string]any `json:"title"`
+	PriceAmount             string         `json:"price_amount"`
+	Currency                string         `json:"currency"`
+	IsActive                bool           `json:"is_active"`
+	SKUCount                int            `json:"sku_count"`
+	RequiresReservation     bool           `json:"requires_reservation"`
+	EntitlementContractHash string         `json:"entitlement_contract_hash,omitempty"`
+	Mapped                  bool           `json:"mapped"`
+	MappingID               uint           `json:"mapping_id,omitempty"`
+	LocalProductID          uint           `json:"local_product_id,omitempty"`
+}
+
+type UpstreamCatalogResult struct {
+	Source              string                    `json:"source"`
+	CollectedAt         time.Time                 `json:"collected_at"`
+	Freshness           string                    `json:"freshness"`
+	ConnectionID        uint                      `json:"connection_id"`
+	CategoriesSupported bool                      `json:"categories_supported"`
+	Categories          []UpstreamCatalogCategory `json:"categories"`
+	Products            []UpstreamCatalogProduct  `json:"products"`
+	Total               int                       `json:"total"`
+}
+
+type ImportUpstreamProductsInput struct {
+	UpstreamProductIDs []uint `json:"upstream_product_ids,omitempty"`
+	LocalCategoryID    uint   `json:"local_category_id,omitempty"`
+	AutoCreateCategory *bool  `json:"auto_create_category,omitempty"`
+}
+
+type ImportUpstreamProductsFailure struct {
+	UpstreamProductID uint   `json:"upstream_product_id"`
+	Error             string `json:"error"`
+}
+
+type ImportUpstreamProductsResult struct {
+	Source        string                          `json:"source"`
+	CollectedAt   time.Time                       `json:"collected_at"`
+	ConnectionID  uint                            `json:"connection_id"`
+	Requested     int                             `json:"requested"`
+	ImportedCount int                             `json:"imported_count"`
+	SyncedCount   int                             `json:"synced_count"`
+	Failures      []ImportUpstreamProductsFailure `json:"failures,omitempty"`
+}
+
+type UpstreamStore interface {
+	ListConnections() ([]UpstreamConnection, int64, error)
+	SaveConnection(input SaveUpstreamConnectionInput) (*UpstreamConnection, error)
+	FetchCatalog(connectionID uint) (*UpstreamCatalogResult, error)
+	ImportOrSync(connectionID uint, input ImportUpstreamProductsInput) (*ImportUpstreamProductsResult, error)
+}
+
+type RefundOrderInput struct {
+	OperationID        string `json:"operation_id"`
+	Mode               string `json:"mode,omitempty"`
+	Amount             string `json:"amount"`
+	Channel            string `json:"channel,omitempty"`
+	ExternalTxRef      string `json:"external_tx_ref,omitempty"`
+	Remark             string `json:"remark,omitempty"`
+	PaymentFeeRefunded bool   `json:"payment_fee_refunded,omitempty"`
+}
+
+type RefundOrderResult struct {
+	Source           string    `json:"source"`
+	CollectedAt      time.Time `json:"collected_at"`
+	OrderID          uint      `json:"order_id"`
+	OrderNo          string    `json:"order_no"`
+	Status           string    `json:"status"`
+	TotalAmount      string    `json:"total_amount"`
+	RefundedAmount   string    `json:"refunded_amount"`
+	Currency         string    `json:"currency"`
+	RefundRecordID   uint      `json:"refund_record_id"`
+	RefundType       string    `json:"refund_type"`
+	SettlementStatus string    `json:"settlement_status"`
+	OperationID      string    `json:"operation_id"`
+}
+
+type OrderRefundStore interface {
+	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)
+}
+
 type Reader interface {
 	Orders(page, pageSize int) (*OrdersResult, error)
 	Overview() (*Overview, error)
@@ -379,4 +587,13 @@ type Bridge interface {
 	GenerateGiftCards(input GenerateGiftCardsInput) (*GenerateGiftCardsResult, error)
 	Pricing() (*PricingSettings, error)
 	UpdatePricing(input UpdatePricingInput) (*PricingSettings, error)
+	AcquiringChannels() (*AcquiringChannelsResult, error)
+	UpsertAcquiringChannel(input UpsertAcquiringChannelInput) (*AcquiringChannel, error)
+	UpdateAcquiringChannelStatus(id uint, active bool) (*AcquiringChannel, error)
+	MailHealth() (*MailHealthResult, error)
+	UpstreamConnections() (*UpstreamConnectionsResult, error)
+	SaveUpstreamConnection(input SaveUpstreamConnectionInput) (*UpstreamConnection, error)
+	UpstreamCatalog(connectionID uint) (*UpstreamCatalogResult, error)
+	ImportUpstreamProducts(connectionID uint, input ImportUpstreamProductsInput) (*ImportUpstreamProductsResult, error)
+	RefundOrder(orderNo string, input RefundOrderInput) (*RefundOrderResult, error)
 }

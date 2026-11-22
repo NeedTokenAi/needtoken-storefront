@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dujiao-next/internal/shared/jsonmap"
@@ -43,4 +45,20 @@ type Payment struct {
 // TableName 指定表名
 func (Payment) TableName() string {
 	return "payments"
+}
+
+// FrozenPaymentEnvironment 返回创建该在线支付单时持久冻结的运行环境（live / sandbox），缺失则为 unknown。
+func (p *Payment) FrozenPaymentEnvironment() string {
+	if p == nil || p.ProviderPayload == nil {
+		return "unknown"
+	}
+	raw, ok := p.ProviderPayload["_needtoken_payment_environment"]
+	if !ok {
+		return "unknown"
+	}
+	env := strings.ToLower(strings.TrimSpace(fmt.Sprint(raw)))
+	if env == "live" || env == "sandbox" {
+		return env
+	}
+	return "unknown"
 }
