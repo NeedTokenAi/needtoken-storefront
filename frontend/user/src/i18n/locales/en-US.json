@@ -3766,6 +3766,17 @@
           "rule3Title": "Live radar status",
           "rule3Body": "No public global-reset feed is connected yet. Real-time tracking will go live once a reliable official source is available."
         },
+        "gemini": {
+          "title": "Gemini Radar",
+          "subtitle": "Track Google AI Pro / Ultra & Gemini CLI quota refreshes and official announcements (live feed coming soon)",
+          "rulesTitle": "Official quota refresh rules",
+          "rule1Title": "Web & app rolling recovery",
+          "rule1Body": "Advanced model allowances in the Gemini web and mobile apps scale with prompt complexity and typically replenish incrementally on a 5-hour rolling cycle up to tier limits.",
+          "rule2Title": "CLI & daily RPD reset",
+          "rule2Body": "Daily request quotas (RPD) for Gemini CLI, Code Assist, and AI Studio reset at midnight Pacific Time (PT), accounted separately from consumer chat and paid API billing.",
+          "rule3Title": "Live radar status",
+          "rule3Body": "Displayed as a placeholder without fabricated records. Full calendar and timeline will activate once a reliable public feed is integrated."
+        },
         "grok": {
           "title": "Grok Radar",
           "subtitle": "Track SuperGrok / X Premium+ quota refreshes and official announcements (live feed coming soon)",

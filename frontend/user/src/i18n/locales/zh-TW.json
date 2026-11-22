@@ -3766,6 +3766,17 @@
           "rule3Title": "即時雷達狀態",
           "rule3Body": "目前暫未接入第三方公開全員重置來源，待官方出現全員額度補償或事件來源穩定後將第一時間上線即時記錄。"
         },
+        "gemini": {
+          "title": "Gemini 雷達",
+          "subtitle": "追蹤 Google AI Pro / Ultra 與 Gemini CLI 額度重新整理及官方補償動態（即時追蹤接入中）",
+          "rulesTitle": "官方額度重新整理規則參考",
+          "rule1Title": "網頁與 App 滾動恢復",
+          "rule1Body": "Gemini 網頁端與 App 的進階模型額度依提示詞長度與功能複雜度動態計算，通常依 5 小時滾動增量與週期上限自動恢復。",
+          "rule2Title": "CLI 與每日配額重新整理",
+          "rule2Body": "Gemini CLI、Code Assist 與 AI Studio 每日請求限額（RPD）於太平洋時間（PT）午夜自動重置，與訂閱網頁端及獨立計費 API 分開計算。",
+          "rule3Title": "即時雷達狀態",
+          "rule3Body": "目前為佔位展示，絕不虛構歷史記錄；待官方或公開全員重置公告來源穩定接入後，自動展示完整日曆與時間軸。"
+        },
         "grok": {
           "title": "Grok 雷達",
           "subtitle": "追蹤 SuperGrok / X Premium+ 額度重新整理與官方補償動態（即時追蹤接入中）",

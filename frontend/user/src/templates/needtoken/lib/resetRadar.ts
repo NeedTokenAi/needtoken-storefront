@@ -4,6 +4,20 @@ export const RESET_FEED_SOURCE = 'https://codex-resets.com/'
 export const RESET_FEED_POLL_MS = 60_000
 export const RESET_FEED_MAX_AGE_MS = 12 * 60 * 60 * 1000
 
+export type RadarChannelId = 'codex' | 'claude' | 'gemini' | 'grok'
+
+export interface RadarChannelMeta {
+  id: RadarChannelId
+  brand: 'gpt' | 'claude' | 'gemini' | 'grok'
+}
+
+export const RADAR_CHANNELS: ReadonlyArray<RadarChannelMeta> = [
+  { id: 'codex', brand: 'gpt' },
+  { id: 'claude', brand: 'claude' },
+  { id: 'gemini', brand: 'gemini' },
+  { id: 'grok', brand: 'grok' },
+]
+
 export interface ResetRecord {
   id: string
   type: 'regular' | 'banked'
