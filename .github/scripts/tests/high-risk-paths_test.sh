@@ -65,7 +65,7 @@ high_risk_cases=(
   "frontend/user/src/utils/themeState.ts"
 )
 
-for path in "${high_risk_cases[@]}"; do
+for path in "${high_risk_cases[@]}" "internal/modules/identity/user/contract/store.go"; do
   is_high_risk_path "$path" || fail "expected high-risk: $path"
 done
 

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/dujiao-next/internal/i18n"
 	opscontract "github.com/dujiao-next/internal/modules/opsbridge/contract"
@@ -40,7 +42,135 @@ func (h *Handler) Overview(c *gin.Context) {
 func (h *Handler) Orders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.Query("page"))
 	size, _ := strconv.Atoi(c.Query("page_size"))
-	result, err := h.reader.Orders(page, size)
+	if h.bridge == nil {
+		result, err := h.reader.Orders(page, size)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+		response.Success(c, result)
+		return
+	}
+	filter := opscontract.OrdersFilter{
+		Page:            page,
+		PageSize:        size,
+		Status:          strings.TrimSpace(c.Query("status")),
+		OrderNo:         strings.TrimSpace(c.Query("order_no")),
+		Keyword:         strings.TrimSpace(c.Query("keyword")),
+		FulfillmentType: strings.TrimSpace(c.Query("fulfillment_type")),
+		BuyerType:       strings.TrimSpace(c.Query("buyer_type")),
+		PaymentChannel:  strings.TrimSpace(c.Query("payment_channel")),
+		ClientIP:        strings.TrimSpace(c.Query("client_ip")),
+	}
+	if rawCat := strings.TrimSpace(c.Query("category_id")); rawCat != "" {
+		if id, err := strconv.ParseUint(rawCat, 10, 64); err == nil {
+			filter.CategoryID = uint(id)
+		}
+	}
+	if rawExc := strings.ToLower(strings.TrimSpace(c.Query("exception_only"))); rawExc == "true" || rawExc == "1" {
+		filter.ExceptionOnly = true
+	}
+	if from := parseQueryTime(c.Query("created_from"), false); from != nil {
+		filter.CreatedFrom = from
+	}
+	if to := parseQueryTime(c.Query("created_to"), true); to != nil {
+		filter.CreatedTo = to
+	}
+	result, err := h.bridge.OrdersFiltered(filter)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func parseQueryTime(raw string, endOfDay bool) *time.Time {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	if t, err := time.Parse(time.RFC3339, trimmed); err == nil {
+		return &t
+	}
+	if t, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
+		return &t
+	}
+	if t, err := time.Parse("2006-01-02", trimmed); err == nil {
+		if endOfDay {
+			t = t.Add(24*time.Hour - time.Nanosecond)
+		}
+		return &t
+	}
+	return nil
+}
+
+func (h *Handler) ManualConfirmPayment(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.ManualConfirmPaymentInput
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			fail(c, opscontract.ErrInvalidInput)
+			return
+		}
+	}
+	result, err := h.bridge.ManualConfirmPayment(c.Param("order_no"), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) ManualFulfillOrder(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.ManualFulfillOrderInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.ManualFulfillOrder(c.Param("order_no"), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) UpdateOrderStatus(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.UpdateOrderStatusInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.UpdateOrderStatus(c.Param("order_no"), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) RetryProcurement(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.RetryProcurement(uint(id))
 	if err != nil {
 		fail(c, err)
 		return
@@ -619,6 +749,136 @@ func (h *Handler) RevokeUserSLO(c *gin.Context) {
 		return
 	}
 	response.Success(c, result)
+}
+
+func (h *Handler) Users(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	result, err := h.bridge.Users(page, pageSize, c.Query("keyword"), c.Query("status"))
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) CreateUser(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	var req opscontract.CreateUserInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.CreateUser(req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) UpdateUser(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	var req opscontract.UpdateUserInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.UpdateUser(uint(id), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) DeleteUser(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	if err := h.bridge.DeleteUser(uint(id)); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, opscontract.DeleteResult{Deleted: true, ID: uint(id)})
+}
+
+func (h *Handler) AdjustUserWallet(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	var req opscontract.AdjustUserWalletInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.bridge.AdjustUserWallet(uint(id), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) ClearUserTOTP(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	if err := h.bridge.ClearUserTOTP(uint(id)); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, gin.H{"cleared": true, "user_id": uint(id)})
+}
+
+func (h *Handler) UnbindUserOAuth(c *gin.Context) {
+	if h.bridge == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	if err := h.bridge.UnbindUserOAuth(uint(id), c.Param("provider")); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, gin.H{"unbound": true, "user_id": uint(id), "provider": strings.ToLower(strings.TrimSpace(c.Param("provider")))})
 }
 
 func fail(c *gin.Context, err error) {

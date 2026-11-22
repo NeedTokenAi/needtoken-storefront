@@ -48,6 +48,9 @@ type Service struct {
 	upstream        opscontract.UpstreamStore
 	refunds         opscontract.OrderRefundStore
 	sessionRevoker  opscontract.UserSessionRevoker
+	orderEnricher   opscontract.OrderEnricher
+	orderActions    opscontract.OrderActionStore
+	users           opscontract.UserStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -89,6 +92,11 @@ func (s *Service) WithAcquiring(acquiring opscontract.AcquiringStore) *Service {
 	return s
 }
 
+func (s *Service) WithUsers(users opscontract.UserStore) *Service {
+	s.users = users
+	return s
+}
+
 func (s *Service) WithUpstream(upstream opscontract.UpstreamStore) *Service {
 	s.upstream = upstream
 	return s
@@ -96,6 +104,16 @@ func (s *Service) WithUpstream(upstream opscontract.UpstreamStore) *Service {
 
 func (s *Service) WithOrderRefunds(refunds opscontract.OrderRefundStore) *Service {
 	s.refunds = refunds
+	return s
+}
+
+func (s *Service) WithOrderEnricher(enricher opscontract.OrderEnricher) *Service {
+	s.orderEnricher = enricher
+	return s
+}
+
+func (s *Service) WithOrderActions(actions opscontract.OrderActionStore) *Service {
+	s.orderActions = actions
 	return s
 }
 
@@ -125,7 +143,13 @@ func (s *Service) WithUserSessionRevoker(revoker opscontract.UserSessionRevoker)
 }
 
 func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) {
+	return s.OrdersFiltered(opscontract.OrdersFilter{Page: page, PageSize: pageSize})
+}
+
+func (s *Service) OrdersFiltered(filter opscontract.OrdersFilter) (*opscontract.OrdersResult, error) {
 	collected := time.Now().UTC()
+	page := filter.Page
+	pageSize := filter.PageSize
 	if page < 1 {
 		page = 1
 	}
@@ -135,23 +159,112 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 	if pageSize > 100 {
 		pageSize = 100
 	}
-	rows, total, err := s.orders.ListAdmin(ordercontract.ListFilter{Page: page, PageSize: pageSize, SortBy: "id", SortOrder: "desc"})
+	rows, total, err := s.orders.ListAdmin(ordercontract.ListFilter{
+		Page:            page,
+		PageSize:        pageSize,
+		Status:          strings.TrimSpace(filter.Status),
+		OrderNo:         strings.TrimSpace(filter.OrderNo),
+		Keyword:         strings.TrimSpace(filter.Keyword),
+		CategoryID:      filter.CategoryID,
+		FulfillmentType: strings.TrimSpace(filter.FulfillmentType),
+		BuyerType:       strings.TrimSpace(filter.BuyerType),
+		PaymentChannel:  strings.TrimSpace(filter.PaymentChannel),
+		ClientIP:        strings.TrimSpace(filter.ClientIP),
+		ExceptionOnly:   filter.ExceptionOnly,
+		CreatedFrom:     filter.CreatedFrom,
+		CreatedTo:       filter.CreatedTo,
+		SortBy:          "id",
+		SortOrder:       "desc",
+	})
 	if err != nil {
 		return nil, err
 	}
-	result := &opscontract.OrdersResult{Source: "storefront", CollectedAt: collected, Freshness: "fresh", Orders: make([]opscontract.Order, 0, len(rows)), Total: total, Page: page, PageSize: pageSize}
+
+	buyerByID := map[uint]opscontract.OrderBuyerInfo{}
+	productCategoryByID := map[uint]uint{}
+	userIDSet := map[uint]struct{}{}
+	productIDSet := map[uint]struct{}{}
+	var collectIDs func(orderdomain.Order)
+	collectIDs = func(row orderdomain.Order) {
+		if row.UserID > 0 {
+			userIDSet[row.UserID] = struct{}{}
+		}
+		for _, item := range row.Items {
+			if item.ProductID > 0 {
+				productIDSet[item.ProductID] = struct{}{}
+			}
+		}
+		for _, child := range row.Children {
+			collectIDs(child)
+		}
+	}
+	for _, row := range rows {
+		collectIDs(row)
+	}
+	if s.orderEnricher != nil && len(userIDSet) > 0 {
+		ids := make([]uint, 0, len(userIDSet))
+		for id := range userIDSet {
+			ids = append(ids, id)
+		}
+		if looked, err := s.orderEnricher.LookupBuyers(ids); err == nil && looked != nil {
+			buyerByID = looked
+		}
+	}
+	if s.products != nil && len(productIDSet) > 0 {
+		ids := make([]uint, 0, len(productIDSet))
+		for id := range productIDSet {
+			ids = append(ids, id)
+		}
+		if loaded, err := s.products.ListByIDs(ids); err == nil {
+			for _, p := range loaded {
+				productCategoryByID[p.ID] = p.CategoryID
+			}
+		}
+	}
+
+	result := &opscontract.OrdersResult{
+		Source:      "storefront",
+		CollectedAt: collected,
+		Freshness:   "fresh",
+		Orders:      make([]opscontract.Order, 0, len(rows)),
+		Total:       total,
+		Page:        page,
+		PageSize:    pageSize,
+	}
 	var mapOrder func(orderdomain.Order) (opscontract.Order, error)
 	mapOrder = func(row orderdomain.Order) (opscontract.Order, error) {
+		buyerType := "guest"
+		buyerEmail := ""
+		buyerName := ""
+		if row.UserID > 0 {
+			buyerType = "member"
+			if info, ok := buyerByID[row.UserID]; ok {
+				buyerEmail = strings.TrimSpace(info.Email)
+				buyerName = strings.TrimSpace(info.DisplayName)
+			}
+		} else {
+			buyerEmail = strings.TrimSpace(row.GuestEmail)
+		}
 		out := opscontract.Order{
 			ID:                row.ID,
 			OrderNo:           row.OrderNo,
 			ParentID:          row.ParentID,
+			UserID:            row.UserID,
+			BuyerType:         buyerType,
+			BuyerEmail:        buyerEmail,
+			BuyerName:         buyerName,
+			SourceDomain:      strings.TrimSpace(row.ResellerDomain),
+			ClientIP:          strings.TrimSpace(row.ClientIP),
+			UserAgent:         strings.TrimSpace(row.UserAgent),
+			ClientFingerprint: strings.TrimSpace(row.ClientFingerprint),
 			Status:            row.Status,
 			Currency:          row.Currency,
 			OriginalAmount:    row.OriginalAmount.String(),
 			DiscountAmount:    row.DiscountAmount.String(),
 			CouponID:          row.CouponID,
 			TotalAmount:       row.TotalAmount.String(),
+			WalletPaidAmount:  row.WalletPaidAmount.String(),
+			OnlinePaidAmount:  row.OnlinePaidAmount.String(),
 			RefundedAmount:    row.RefundedAmount.String(),
 			PaymentStatus:     "unpaid",
 			FulfillmentStatus: row.Status,
@@ -159,6 +272,7 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 			PaidAt:            row.PaidAt,
 			CreatedAt:         row.CreatedAt,
 			UpdatedAt:         row.UpdatedAt,
+			Items:             []opscontract.OrderItemSummary{},
 			Payments:          []opscontract.Payment{},
 			Refunds:           []opscontract.Refund{},
 		}
@@ -171,11 +285,55 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 		if row.Fulfillment != nil {
 			out.FulfillmentStatus = row.Fulfillment.Status
 		}
+		for _, item := range row.Items {
+			skuCode := ""
+			if item.SKUSnapshotJSON != nil {
+				if raw, ok := item.SKUSnapshotJSON["sku_code"]; ok && raw != nil {
+					skuCode = strings.TrimSpace(fmt.Sprint(raw))
+				}
+			}
+			out.Items = append(out.Items, opscontract.OrderItemSummary{
+				ID:              item.ID,
+				OrderID:         item.OrderID,
+				ProductID:       item.ProductID,
+				CategoryID:      productCategoryByID[item.ProductID],
+				SKUID:           item.SKUID,
+				SKUCode:         skuCode,
+				Title:           stringMap(item.TitleJSON),
+				FulfillmentType: item.FulfillmentType,
+				Quantity:        item.Quantity,
+				UnitPrice:       item.UnitPrice.String(),
+				TotalPrice:      item.TotalPrice.String(),
+				Tags:            append([]string(nil), item.Tags...),
+			})
+		}
+
+		exceptionSet := map[string]struct{}{}
+		addException := func(reason string) {
+			reason = strings.TrimSpace(reason)
+			if reason == "" {
+				return
+			}
+			if _, exists := exceptionSet[reason]; !exists {
+				exceptionSet[reason] = struct{}{}
+				out.ExceptionReasons = append(out.ExceptionReasons, reason)
+			}
+		}
+
 		payments, err := s.payments.ListByOrderID(row.ID)
 		if err != nil {
 			return opscontract.Order{}, err
 		}
 		for _, payment := range payments {
+			if code := strings.TrimSpace(payment.ExceptionCode); code != "" {
+				addException("payment_exception:" + code)
+			}
+			if payment.Status == constants.PaymentStatusSuccess && row.OnlinePaidAmount.Decimal.GreaterThan(decimal.Zero) {
+				netPaid := payment.Amount.Decimal.Sub(payment.FeeAmount.Decimal)
+				if netPaid.Sub(row.OnlinePaidAmount.Decimal).Abs().GreaterThan(decimal.NewFromFloat(0.01)) {
+					addException("amount_mismatch")
+				}
+			}
 			out.Payments = append(out.Payments, opscontract.Payment{
 				ID:                 payment.ID,
 				ProviderType:       payment.ProviderType,
@@ -183,8 +341,13 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 				PaymentEnvironment: payment.FrozenPaymentEnvironment(),
 				Status:             payment.Status,
 				Amount:             payment.Amount.String(),
+				FeeAmount:          payment.FeeAmount.String(),
 				Currency:           payment.Currency,
+				ExceptionCode:      strings.TrimSpace(payment.ExceptionCode),
+				GatewayOrderNo:     strings.TrimSpace(payment.GatewayOrderNo),
 				ProviderRef:        payment.ProviderRef,
+				CallbackAt:         payment.CallbackAt,
+				CallbackSummary:    sanitizePaymentCallbackPayload(payment.ProviderPayload),
 				PaidAt:             payment.PaidAt,
 				UpdatedAt:          payment.UpdatedAt,
 			})
@@ -208,7 +371,18 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 			return opscontract.Order{}, err
 		}
 		if procurement != nil {
-			out.Procurement = &opscontract.Procurement{ID: procurement.ID, Status: procurement.Status, UpstreamOrderNo: procurement.UpstreamOrderNo, UpdatedAt: procurement.UpdatedAt, LocalOrderID: procurement.LocalOrderID}
+			out.Procurement = &opscontract.Procurement{
+				ID:              procurement.ID,
+				Status:          procurement.Status,
+				UpstreamOrderNo: procurement.UpstreamOrderNo,
+				ErrorMessage:    strings.TrimSpace(procurement.ErrorMessage),
+				RetryCount:      procurement.RetryCount,
+				UpdatedAt:       procurement.UpdatedAt,
+				LocalOrderID:    procurement.LocalOrderID,
+			}
+			if procurement.Status == constants.ProcurementStatusFailed || procurement.Status == constants.ProcurementStatusRejected {
+				addException("procurement_failed")
+			}
 		}
 		out.Children = []opscontract.Order{}
 		out.Procurements = []opscontract.Procurement{}
@@ -225,6 +399,9 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 			if r.OrderID != row.ID {
 				continue
 			}
+			if code := strings.TrimSpace(r.AttentionCode); code != "" {
+				addException("reservation_attention:" + code)
+			}
 			out.Reservations = append(out.Reservations, opscontract.Reservation{OrderItemID: r.OrderItemID, LocalOrderID: r.OrderID, HoldID: r.HoldID, OrderRef: r.OrderRef, Version: r.HoldVersion, Status: r.State, BookStatus: r.BookStatus, ReadyForPayment: r.ReadyForPayment, ExpiresAt: r.ExpiresAt, AttentionCode: r.AttentionCode, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt})
 		}
 		if out.Procurement != nil {
@@ -236,9 +413,16 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 				return opscontract.Order{}, err
 			}
 			out.Children = append(out.Children, mapped)
+			if len(out.Items) == 0 || row.ParentID == nil {
+				out.Items = append(out.Items, mapped.Items...)
+			}
 			out.Procurements = append(out.Procurements, mapped.Procurements...)
 			out.Reservations = append(out.Reservations, mapped.Reservations...)
+			for _, reason := range mapped.ExceptionReasons {
+				addException(reason)
+			}
 		}
+		out.HasException = len(out.ExceptionReasons) > 0
 		return out, nil
 	}
 	for _, row := range rows {
@@ -250,6 +434,113 @@ func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) 
 	}
 
 	return result, nil
+}
+
+func sanitizePaymentCallbackPayload(raw jsonmap.JSON) map[string]any {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(raw))
+	for k, v := range raw {
+		lower := strings.ToLower(strings.TrimSpace(k))
+		if lower == "" || isSensitiveCallbackKey(lower) {
+			continue
+		}
+		if nested, ok := v.(map[string]any); ok {
+			cleaned := sanitizeCallbackMap(nested, 0)
+			if len(cleaned) > 0 {
+				out[k] = cleaned
+			}
+			continue
+		}
+		if nested, ok := v.(jsonmap.JSON); ok {
+			cleaned := sanitizeCallbackMap(map[string]any(nested), 0)
+			if len(cleaned) > 0 {
+				out[k] = cleaned
+			}
+			continue
+		}
+		out[k] = v
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func sanitizeCallbackMap(m map[string]any, depth int) map[string]any {
+	if depth > 2 || len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		lower := strings.ToLower(strings.TrimSpace(k))
+		if lower == "" || isSensitiveCallbackKey(lower) {
+			continue
+		}
+		if nested, ok := v.(map[string]any); ok {
+			if cleaned := sanitizeCallbackMap(nested, depth+1); len(cleaned) > 0 {
+				out[k] = cleaned
+			}
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+func isSensitiveCallbackKey(lowerKey string) bool {
+	for _, needle := range []string{"secret", "token", "password", "private", "signature", "sign", "authorization", "cookie", "api_key", "apikey", "credential", "cert"} {
+		if strings.Contains(lowerKey, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) ManualConfirmPayment(orderNo string, input opscontract.ManualConfirmPaymentInput) (*opscontract.ManualConfirmPaymentResult, error) {
+	if s.orderActions == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	orderNo = strings.TrimSpace(orderNo)
+	if orderNo == "" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.orderActions.ManualConfirmPayment(orderNo, input)
+}
+
+func (s *Service) ManualFulfillOrder(orderNo string, input opscontract.ManualFulfillOrderInput) (*opscontract.ManualFulfillOrderResult, error) {
+	if s.orderActions == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	orderNo = strings.TrimSpace(orderNo)
+	if orderNo == "" || strings.TrimSpace(input.Payload) == "" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.orderActions.ManualFulfillOrder(orderNo, input)
+}
+
+func (s *Service) UpdateOrderStatus(orderNo string, input opscontract.UpdateOrderStatusInput) (*opscontract.UpdateOrderStatusResult, error) {
+	if s.orderActions == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	orderNo = strings.TrimSpace(orderNo)
+	status := strings.TrimSpace(input.Status)
+	if orderNo == "" || status == "" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	input.Status = status
+	return s.orderActions.UpdateOrderStatus(orderNo, input)
+}
+
+func (s *Service) RetryProcurement(id uint) (*opscontract.RetryProcurementResult, error) {
+	if s.orderActions == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.orderActions.RetryProcurement(id)
 }
 
 func (s *Service) Overview() (*opscontract.Overview, error) {
@@ -277,6 +568,9 @@ func (s *Service) Overview() (*opscontract.Overview, error) {
 	}
 	if s.refunds != nil {
 		caps = append(caps, "refunds.write")
+	}
+	if s.orderActions != nil {
+		caps = append(caps, "orders.filter", "orders.manual_confirm", "orders.manual_fulfill", "orders.status_write", "procurement.retry")
 	}
 	result := &opscontract.Overview{Source: "storefront", CollectedAt: time.Now().UTC(), Freshness: "fresh", OrdersByStatus: map[string]int64{}, Capabilities: caps}
 	_, total, err := s.orders.ListAdmin(ordercontract.ListFilter{Page: 1, PageSize: 1})
@@ -1689,4 +1983,119 @@ func (s *Service) RevokeUserSLO(input opscontract.SLORevokeUserInput) (*opscontr
 		Revoked: revoked,
 		UserID:  userID,
 	}, nil
+}
+
+func (s *Service) Users(page, pageSize int, keyword, status string) (*opscontract.UsersResult, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if status != "" && status != constants.UserStatusActive && status != constants.UserStatusDisabled {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.users.ListUsers(page, pageSize, strings.TrimSpace(keyword), status)
+}
+
+func (s *Service) CreateUser(input opscontract.CreateUserInput) (*opscontract.StorefrontUser, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	input.Email = strings.TrimSpace(input.Email)
+	if input.Email == "" || len(input.Password) < 8 || len(input.Password) > 128 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if st := strings.ToLower(strings.TrimSpace(input.Status)); st != "" {
+		if st != constants.UserStatusActive && st != constants.UserStatusDisabled {
+			return nil, opscontract.ErrInvalidInput
+		}
+		input.Status = st
+	} else {
+		input.Status = constants.UserStatusActive
+	}
+	return s.users.CreateUser(input)
+}
+
+func (s *Service) UpdateUser(id uint, input opscontract.UpdateUserInput) (*opscontract.StorefrontUser, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if input.Password != nil && *input.Password != "" {
+		if len(*input.Password) < 8 || len(*input.Password) > 128 {
+			return nil, opscontract.ErrInvalidInput
+		}
+	}
+	if input.Status != nil {
+		st := strings.ToLower(strings.TrimSpace(*input.Status))
+		if st != constants.UserStatusActive && st != constants.UserStatusDisabled {
+			return nil, opscontract.ErrInvalidInput
+		}
+		input.Status = &st
+	}
+	return s.users.UpdateUser(id, input)
+}
+
+func (s *Service) DeleteUser(id uint) error {
+	if s.users == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	return s.users.DeleteUser(id)
+}
+
+func (s *Service) AdjustUserWallet(id uint, input opscontract.AdjustUserWalletInput) (*opscontract.WalletAdjustmentResult, error) {
+	if s.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	op := strings.ToLower(strings.TrimSpace(input.Operation))
+	if op != "credit" && op != "debit" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	amtDec, err := decimal.NewFromString(strings.TrimSpace(input.Amount))
+	if err != nil || amtDec.Round(2).LessThanOrEqual(decimal.Zero) {
+		return nil, opscontract.ErrInvalidInput
+	}
+	input.Operation = op
+	input.Amount = amtDec.Round(2).StringFixed(2)
+	return s.users.AdjustUserWallet(id, input)
+}
+
+func (s *Service) ClearUserTOTP(id uint) error {
+	if s.users == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	return s.users.ClearUserTOTP(id)
+}
+
+func (s *Service) UnbindUserOAuth(id uint, provider string) error {
+	if s.users == nil {
+		return opscontract.ErrNotConfigured
+	}
+	if id == 0 {
+		return opscontract.ErrInvalidInput
+	}
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider != "telegram" && provider != "google" {
+		return opscontract.ErrInvalidInput
+	}
+	return s.users.UnbindUserOAuth(id, provider)
 }
