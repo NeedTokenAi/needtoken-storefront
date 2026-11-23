@@ -4133,7 +4133,25 @@
         "orders": "我的订单",
         "assets": "资产与礼品卡",
         "affiliate": "推广与分销",
+        "affiliateReferral": "推广拉新",
+        "resellerSystem": "分销系统",
+        "profileCardHint": "点击进入账号资料与安全设置",
         "security": "账号与安全"
+      },
+      "reseller": {
+        "title": "分销系统",
+        "activeSubtitle": "在 NeedToken 会员中心统一管理独立站选品加价、分销订单、财务提现与域名配置",
+        "inactiveSubtitle": "开通分销系统即可拥有独立品牌域名、自定义加价策略与自动化履约结算",
+        "statusActive": "分销已开通",
+        "statusPending": "审核中",
+        "statusRejected": "未通过",
+        "statusDisabled": "已停用",
+        "tabDashboard": "分销总览",
+        "tabProducts": "选品与加价",
+        "tabOrders": "分销订单",
+        "tabFinance": "财务与提现",
+        "tabSite": "独立站与域名",
+        "subTabProfile": "资质与申请"
       },
       "overview": {
         "apiTotalQuota": "Need 网关可用总额",

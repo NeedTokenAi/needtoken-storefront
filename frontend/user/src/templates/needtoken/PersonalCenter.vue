@@ -1,101 +1,143 @@
 <template>
   <div class="relative min-h-screen bg-background pb-16 pt-20 text-foreground sm:pt-24">
     <div class="mx-auto w-full max-w-[1240px] px-4 sm:px-6">
-      <!-- 顶部一体化会员控制台头 -->
-      <header class="mb-6 overflow-hidden rounded-3xl border bg-card shadow-sm">
-        <div class="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex min-w-0 items-center gap-4">
-            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-xl font-black text-primary sm:h-16 sm:w-16 sm:text-2xl">
-              {{ displayInitial }}
-            </div>
-            <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
-                  {{ t('needtoken.memberConsole.eyebrow') }}
-                </p>
-                <span
-                  v-if="showGatewayFeatures && displayNativeUserId"
-                  class="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-primary"
-                >
-                  API #{{ displayNativeUserId }}
-                </span>
-                <span
-                  v-if="showGatewayFeatures && apiSummary?.group"
-                  class="rounded-full border bg-muted/60 px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground"
-                >
-                  {{ apiSummary.group }}
-                </span>
-              </div>
-              <h1 class="mt-1 truncate text-xl font-black text-foreground sm:text-2xl">
-                {{ userProfileStore.displayName }}
-              </h1>
-              <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span class="truncate">{{ userProfileStore.profile?.email || t('personalCenter.subtitle') }}</span>
-                <Badge :variant="emailVerifiedVariant" size="sm">{{ emailVerifiedLabel }}</Badge>
-                <span
-                  v-if="userProfileStore.currentLevel"
-                  class="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary"
-                >
-                  <img
-                    v-if="isImagePath(userProfileStore.currentLevel?.icon)"
-                    :src="getImageUrl(userProfileStore.currentLevel!.icon)"
-                    class="h-3 w-3 object-contain"
-                    alt=""
-                  />
-                  <Crown v-else class="h-3 w-3" />
-                  {{ levelName(userProfileStore.currentLevel) }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="showGatewayFeatures" class="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div class="flex items-center gap-2 rounded-xl border bg-muted/40 px-3 py-2 text-xs">
-              <span class="shrink-0 font-semibold text-muted-foreground">API</span>
-              <code class="max-w-[220px] truncate font-mono font-semibold text-foreground sm:max-w-[260px]">
-                {{ API_BASE_URL }}
-              </code>
-              <button
-                type="button"
-                class="inline-flex shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                @click="copyEndpoint"
-              >
-                <Check v-if="copiedEndpoint" class="h-3 w-3 text-primary" />
-                <Copy v-else class="h-3 w-3" />
-                <span>{{ copiedEndpoint ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <!-- 左侧精简导航（桌面粘性竖栏 + 移动横向切换条） -->
         <aside class="lg:col-span-3">
           <div class="rounded-2xl border bg-card p-3.5 shadow-sm lg:sticky lg:top-24">
+            <!-- 收敛后的紧凑个人资料卡（悬停样式反馈，点击直达账号与安全 /me/security） -->
+            <button
+              type="button"
+              data-testid="sidebar-profile-card"
+              class="group mb-3.5 flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-150"
+              :class="activeSection === 'security'
+                ? 'border-primary/45 bg-primary/10 shadow-xs'
+                : 'border-border/70 bg-muted/25 hover:border-primary/40 hover:bg-primary/5 hover:shadow-xs'"
+              :title="t('needtoken.memberConsole.nav.profileCardHint')"
+              @click="navigateToSection('security')"
+            >
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-black transition-colors"
+                :class="activeSection === 'security'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground'"
+              >
+                {{ displayInitial }}
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="truncate text-sm font-bold text-foreground transition-colors group-hover:text-primary">
+                    {{ userProfileStore.displayName }}
+                  </span>
+                  <span
+                    v-if="showGatewayFeatures && displayNativeUserId"
+                    class="shrink-0 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-primary"
+                  >
+                    #{{ displayNativeUserId }}
+                  </span>
+                </div>
+                <p class="mt-0.5 truncate text-[11.5px] text-muted-foreground">
+                  {{ userProfileStore.profile?.email || t('personalCenter.subtitle') }}
+                </p>
+                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                  <Badge :variant="emailVerifiedVariant" size="sm" class="h-4 px-1.5 text-[10px]">
+                    {{ emailVerifiedLabel }}
+                  </Badge>
+                  <span
+                    v-if="userProfileStore.currentLevel"
+                    class="inline-flex items-center gap-0.5 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary"
+                  >
+                    <img
+                      v-if="isImagePath(userProfileStore.currentLevel?.icon)"
+                      :src="getImageUrl(userProfileStore.currentLevel!.icon)"
+                      class="h-2.5 w-2.5 object-contain"
+                      alt=""
+                    />
+                    <Crown v-else class="h-2.5 w-2.5" />
+                    {{ levelName(userProfileStore.currentLevel) }}
+                  </span>
+                </div>
+              </div>
+              <ChevronRight
+                class="h-4 w-4 shrink-0 transition-transform duration-150"
+                :class="activeSection === 'security'
+                  ? 'translate-x-0.5 text-primary'
+                  : 'text-muted-foreground/70 group-hover:translate-x-0.5 group-hover:text-primary'"
+              />
+            </button>
+
             <!-- 桌面端分组导航 -->
             <nav class="hidden flex-col gap-4 lg:flex" :aria-label="t('personalCenter.title')">
               <div v-for="group in navGroups" :key="group.key" class="space-y-1">
                 <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {{ t(group.labelKey) }}
                 </p>
-                <button
-                  v-for="item in group.items"
-                  :key="item.key"
-                  type="button"
-                  class="group relative flex w-full items-center gap-2.5 rounded-xl py-2.5 pl-4 pr-3 text-left text-sm font-semibold transition-colors"
-                  :class="activeSection === item.key
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
-                  @click="navigateToSection(item.key)"
-                >
-                  <span
-                    class="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full transition-all"
-                    :class="activeSection === item.key ? 'bg-primary' : 'bg-transparent'"
-                  />
-                  <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                  <span class="truncate">{{ t(item.labelKey) }}</span>
-                </button>
+                <template v-for="item in group.items" :key="item.key">
+                  <!-- 可展开/收缩的二级菜单组（推广与分销） -->
+                  <div v-if="item.children?.length" class="space-y-1">
+                    <button
+                      type="button"
+                      data-testid="nav-group-growth-toggle"
+                      class="group relative flex w-full items-center justify-between gap-2 rounded-xl py-2.5 pl-4 pr-3 text-left text-sm font-semibold transition-colors"
+                      :class="isGrowthSectionActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                      :aria-expanded="growthExpanded"
+                      @click="growthExpanded = !growthExpanded"
+                    >
+                      <span
+                        class="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full transition-all"
+                        :class="isGrowthSectionActive ? 'bg-primary' : 'bg-transparent'"
+                      />
+                      <span class="flex min-w-0 items-center gap-2.5">
+                        <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                        <span class="truncate">{{ t(item.labelKey) }}</span>
+                      </span>
+                      <ChevronDown
+                        class="h-4 w-4 shrink-0 transition-transform duration-150"
+                        :class="growthExpanded ? 'rotate-180' : ''"
+                      />
+                    </button>
+                    <div v-if="growthExpanded" class="space-y-1 pl-4">
+                      <button
+                        v-for="child in item.children"
+                        :key="child.key"
+                        type="button"
+                        :data-testid="`nav-item-${child.key}`"
+                        class="group relative flex w-full items-center gap-2.5 rounded-xl py-2 pl-4 pr-3 text-left text-[13px] font-semibold transition-colors"
+                        :class="activeSection === child.key
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                        @click="navigateToSection(child.key)"
+                      >
+                        <span
+                          class="h-1.5 w-1.5 shrink-0 rounded-full transition-colors"
+                          :class="activeSection === child.key ? 'bg-primary' : 'bg-muted-foreground/40 group-hover:bg-foreground/60'"
+                        />
+                        <component :is="child.icon" class="h-3.5 w-3.5 shrink-0" />
+                        <span class="truncate">{{ t(child.labelKey) }}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 普通一级菜单项 -->
+                  <button
+                    v-else
+                    type="button"
+                    class="group relative flex w-full items-center gap-2.5 rounded-xl py-2.5 pl-4 pr-3 text-left text-sm font-semibold transition-colors"
+                    :class="activeSection === item.key
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                    @click="navigateToSection(item.key)"
+                  >
+                    <span
+                      class="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full transition-all"
+                      :class="activeSection === item.key ? 'bg-primary' : 'bg-transparent'"
+                    />
+                    <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                    <span class="truncate">{{ t(item.labelKey) }}</span>
+                  </button>
+                </template>
               </div>
 
               <div class="border-t pt-3">
@@ -261,32 +303,48 @@
               </button>
             </div>
 
-            <!-- 快捷操作条 -->
-            <div class="flex flex-wrap items-center gap-2.5 rounded-2xl border bg-card p-4 shadow-sm">
-              <Button v-if="showGatewayFeatures" size="sm" @click="navigateToSection('keys')">
-                <KeyRound class="mr-1.5 h-4 w-4" />
-                {{ t('needtoken.memberConsole.quick.manageKeys') }}
-              </Button>
-              <Button v-if="showGatewayFeatures" as-child variant="outline" size="sm">
-                <RouterLink to="/plans">
-                  <Sparkles class="mr-1.5 h-4 w-4 text-primary" />
-                  {{ t('needtoken.memberConsole.quick.buyPlans') }}
-                </RouterLink>
-              </Button>
-              <Button v-if="showGatewayFeatures" variant="outline" size="sm" @click="navigateToSection('usage')">
-                <Activity class="mr-1.5 h-4 w-4" />
-                {{ t('needtoken.memberConsole.quick.viewUsage') }}
-              </Button>
-              <Button variant="outline" size="sm" @click="openAssetsSubTab('giftCard')">
-                <Gift class="mr-1.5 h-4 w-4" />
-                {{ t('needtoken.memberConsole.quick.redeemGiftCard') }}
-              </Button>
-              <Button v-if="canAccessResellerConsole" as-child variant="outline" size="sm">
-                <RouterLink to="/reseller">
-                  <Banknote class="mr-1.5 h-4 w-4" />
-                  {{ t('resellerConsole.title') }}
-                </RouterLink>
-              </Button>
+            <!-- 快捷操作与 API 接口条 -->
+            <div class="flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+              <div class="flex flex-wrap items-center gap-2">
+                <Button v-if="showGatewayFeatures" size="sm" @click="navigateToSection('keys')">
+                  <KeyRound class="mr-1.5 h-4 w-4" />
+                  {{ t('needtoken.memberConsole.quick.manageKeys') }}
+                </Button>
+                <Button v-if="showGatewayFeatures" as-child variant="outline" size="sm">
+                  <RouterLink to="/plans">
+                    <Sparkles class="mr-1.5 h-4 w-4 text-primary" />
+                    {{ t('needtoken.memberConsole.quick.buyPlans') }}
+                  </RouterLink>
+                </Button>
+                <Button v-if="showGatewayFeatures" variant="outline" size="sm" @click="navigateToSection('usage')">
+                  <Activity class="mr-1.5 h-4 w-4" />
+                  {{ t('needtoken.memberConsole.quick.viewUsage') }}
+                </Button>
+                <Button variant="outline" size="sm" @click="openAssetsSubTab('giftCard')">
+                  <Gift class="mr-1.5 h-4 w-4" />
+                  {{ t('needtoken.memberConsole.quick.redeemGiftCard') }}
+                </Button>
+                <Button v-if="canAccessResellerConsole" variant="outline" size="sm" @click="navigateToSection('reseller')">
+                  <Store class="mr-1.5 h-4 w-4" />
+                  {{ t('needtoken.memberConsole.nav.resellerSystem') }}
+                </Button>
+              </div>
+
+              <div v-if="showGatewayFeatures" class="flex items-center gap-2 rounded-xl border bg-muted/40 px-3 py-1.5 text-xs">
+                <span class="shrink-0 font-semibold text-muted-foreground">API</span>
+                <code class="max-w-[200px] truncate font-mono font-semibold text-foreground sm:max-w-[240px]">
+                  {{ API_BASE_URL }}
+                </code>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  @click="copyEndpoint"
+                >
+                  <Check v-if="copiedEndpoint" class="h-3 w-3 text-primary" />
+                  <Copy v-else class="h-3 w-3" />
+                  <span>{{ copiedEndpoint ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
+                </button>
+              </div>
             </div>
 
             <!-- 生效中的 Need 网关套餐 -->
@@ -509,27 +567,13 @@
             <WalletPanel v-else />
           </template>
 
-          <!-- 6. 推广与分销 -->
-          <template v-else-if="activeSection === 'affiliate'">
-            <div v-if="canAccessResellerConsole" class="flex flex-col justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/5 p-6 shadow-sm sm:flex-row sm:items-center">
-              <div>
-                <div class="flex items-center gap-2">
-                  <Banknote class="h-5 w-5 text-primary" />
-                  <h2 class="text-base font-bold text-foreground">{{ t('resellerConsole.title') }}</h2>
-                </div>
-                <p class="mt-1 text-xs text-muted-foreground">{{ t('resellerConsole.dashboard.description') }}</p>
-              </div>
-              <Button as-child size="sm" class="shrink-0">
-                <RouterLink to="/reseller">
-                  {{ t('resellerConsole.nav.dashboard') }}
-                  <ArrowUpRight class="ml-1 h-3.5 w-3.5" />
-                </RouterLink>
-              </Button>
-            </div>
-            <AffiliatePanel />
-          </template>
+          <!-- 6. 推广拉新 -->
+          <AffiliatePanel v-else-if="activeSection === 'affiliate'" />
 
-          <!-- 7. 账号与安全（合并资料 + 安全设置） -->
+          <!-- 7. 分销系统（全面纳管重构，统一 NeedToken 视觉与路由） -->
+          <ResellerWorkspacePanel v-else-if="activeSection === 'reseller' && canAccessResellerConsole" />
+
+          <!-- 8. 账号与安全（点击左侧顶部资料卡进入） -->
           <template v-else-if="activeSection === 'security'">
             <ProfilePanel />
             <SecurityPanel />
@@ -547,8 +591,9 @@ import { useRouter } from 'vue-router'
 import {
   Activity,
   ArrowUpRight,
-  Banknote,
   Check,
+  ChevronDown,
+  ChevronRight,
   Copy,
   Cpu,
   Crown,
@@ -557,9 +602,10 @@ import {
   LayoutDashboard,
   LogOut,
   Megaphone,
-  ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Store,
+  UserPlus,
   Wallet,
 } from 'lucide-vue-next'
 import { affiliateAPI, type AffiliateDashboardData } from '../../api'
@@ -580,6 +626,7 @@ import AffiliatePanel from '../../views/personal/AffiliatePanel.vue'
 import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
 import GatewayKeysPanel from './components/member/GatewayKeysPanel.vue'
 import GatewayUsagePanel from './components/member/GatewayUsagePanel.vue'
+import ResellerWorkspacePanel from './components/member/ResellerWorkspacePanel.vue'
 import { API_BASE_URL } from './config'
 import { useApiAccountLink } from './composables/useApiAccountLink'
 import {
@@ -647,16 +694,28 @@ watch(
   },
 )
 
-interface NavItem {
+interface NavLeafItem {
   key: NeedtokenMemberSection
   labelKey: string
   icon: Component
+}
+interface NavItem {
+  key: string
+  labelKey: string
+  icon: Component
+  children?: NavLeafItem[]
 }
 interface NavGroup {
   key: string
   labelKey: string
   items: NavItem[]
 }
+
+const isGrowthSectionActive = computed(() => activeSection.value === 'affiliate' || activeSection.value === 'reseller')
+const growthExpanded = ref(isGrowthSectionActive.value)
+watch(isGrowthSectionActive, (active) => {
+  if (active) growthExpanded.value = true
+})
 
 const navGroups = computed<NavGroup[]>(() => {
   const groups: NavGroup[] = []
@@ -679,26 +738,42 @@ const navGroups = computed<NavGroup[]>(() => {
       ],
     })
   }
+  const growthNavItem: NavItem = canAccessResellerConsole.value
+    ? {
+        key: 'growth',
+        labelKey: 'needtoken.memberConsole.nav.affiliate',
+        icon: Megaphone,
+        children: [
+          { key: 'affiliate', labelKey: 'needtoken.memberConsole.nav.affiliateReferral', icon: UserPlus },
+          { key: 'reseller', labelKey: 'needtoken.memberConsole.nav.resellerSystem', icon: Store },
+        ],
+      }
+    : {
+        key: 'affiliate',
+        labelKey: 'needtoken.memberConsole.nav.affiliateReferral',
+        icon: UserPlus,
+      }
   groups.push({
     key: 'assets',
     labelKey: 'needtoken.memberConsole.nav.groupAssets',
     items: [
       { key: 'orders', labelKey: 'needtoken.memberConsole.nav.orders', icon: ShoppingBag },
       { key: 'assets', labelKey: 'needtoken.memberConsole.nav.assets', icon: Wallet },
-      { key: 'affiliate', labelKey: 'needtoken.memberConsole.nav.affiliate', icon: Megaphone },
-    ],
-  })
-  groups.push({
-    key: 'account',
-    labelKey: 'needtoken.memberConsole.nav.groupAccount',
-    items: [
-      { key: 'security', labelKey: 'needtoken.memberConsole.nav.security', icon: ShieldCheck },
+      growthNavItem,
     ],
   })
   return groups
 })
 
-const flatNavItems = computed(() => navGroups.value.flatMap(group => group.items))
+const flatNavItems = computed<NavLeafItem[]>(() =>
+  navGroups.value.flatMap(group =>
+    group.items.flatMap(item =>
+      item.children?.length
+        ? item.children
+        : [{ key: item.key as NeedtokenMemberSection, labelKey: item.labelKey, icon: item.icon }],
+    ),
+  ),
+)
 
 const sectionRoutes: Record<NeedtokenMemberSection, string> = {
   overview: '/me',
@@ -707,11 +782,15 @@ const sectionRoutes: Record<NeedtokenMemberSection, string> = {
   orders: '/me/orders',
   assets: '/me/assets',
   affiliate: '/me/affiliate',
+  reseller: '/me/reseller',
   security: '/me/security',
 }
 
-const navigateToSection = (section: NeedtokenMemberSection) => {
-  void router.push(sectionRoutes[section])
+const navigateToSection = (section: string) => {
+  const key = section as NeedtokenMemberSection
+  if (sectionRoutes[key]) {
+    void router.push(sectionRoutes[key])
+  }
 }
 
 const openAssetsSubTab = (tab: 'giftCard' | 'wallet') => {

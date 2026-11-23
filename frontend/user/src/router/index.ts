@@ -4,6 +4,7 @@ import { useAppStore } from '../stores/app'
 import { useTelegramMiniAppStore } from '../stores/telegramMiniApp'
 import { captureAffiliateFromRoute } from '../utils/affiliate'
 import { getActiveTemplate, templateView } from '../templates/registry'
+import { mapLegacyResellerPath } from '../templates/needtoken/lib/gatewayConsoleHelpers'
 import { GOOGLE_REDIRECT_FRONTEND_CALLBACK_PATH } from '../utils/googleRedirect'
 import { waitForListScrollSignal } from '../utils/listScrollSignal'
 
@@ -269,7 +270,22 @@ const router = createRouter({
         {
             path: '/me/reseller',
             name: 'personal-center-reseller',
-            redirect: '/reseller',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'reseller' },
+            meta: { requiresUserAuth: true, resellerConsole: true }
+        },
+        {
+            path: '/me/reseller/orders/:order_no',
+            name: 'personal-center-reseller-order-detail',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'reseller' },
+            meta: { requiresUserAuth: true, resellerConsole: true }
+        },
+        {
+            path: '/me/reseller/:tab',
+            name: 'personal-center-reseller-tab',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'reseller' },
             meta: { requiresUserAuth: true, resellerConsole: true }
         },
         {
@@ -455,6 +471,15 @@ router.beforeEach(async (to, _from, next) => {
             next({ path: '/plans', query: { ...to.query }, hash: to.hash, replace: true })
             return
         }
+    }
+
+    if (getActiveTemplate() === 'needtoken' && (to.path === '/reseller' || to.path.startsWith('/reseller/'))) {
+        next({ path: mapLegacyResellerPath(to.path), query: { ...to.query }, hash: to.hash, replace: true })
+        return
+    }
+    if (getActiveTemplate() !== 'needtoken' && to.path === '/me/reseller') {
+        next({ path: '/reseller', query: { ...to.query }, hash: to.hash, replace: true })
+        return
     }
 
     if (to.meta.requiresUserAuth) {
