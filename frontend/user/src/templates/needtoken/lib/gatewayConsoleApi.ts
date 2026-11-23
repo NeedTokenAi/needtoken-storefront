@@ -145,7 +145,135 @@ export async function listGatewayLogs(params: {
   return (res?.data?.data || { items: [], total: 0, page: 1, page_size: 20, quota_per_unit: API_QUOTA_PER_USD }) as GatewayLogsResponse
 }
 
+export interface GatewayModelPricingItem {
+  model_name: string
+  quota_type: number // 0 = per token, 1 = per call fixed
+  model_ratio: number
+  model_price: number
+  completion_ratio: number
+  enable_groups: string[]
+  supported_endpoint_types?: string[]
+  vendor_id?: number
+  description?: string
+  tags?: string
+}
+
+export interface GatewayVendorItem {
+  id: number
+  name: string
+  icon?: string
+}
+
+export interface GatewayModelsResponse {
+  models: GatewayModelPricingItem[]
+  vendors: GatewayVendorItem[]
+  usable_groups: Record<string, string>
+  group_ratio: Record<string, number>
+  default_group: string
+  supported_endpoint?: Record<string, { path?: string; method?: string }>
+  auto_groups?: string[]
+  quota_per_unit: number
+}
+
+export interface GatewayTaskItem {
+  task_id: string
+  platform?: string
+  action?: string
+  status?: string
+  progress?: string
+  fail_reason?: string
+  quota?: number
+  submit_time?: number
+  start_time?: number
+  finish_time?: number
+  created_at?: number
+  updated_at?: number
+}
+
+export interface GatewayTasksResponse {
+  items: GatewayTaskItem[]
+  total: number
+  page: number
+  page_size: number
+  quota_per_unit: number
+}
+
+export interface GatewayDrawingItem {
+  id: number
+  mj_id: string
+  action: string
+  status: string
+  progress: string
+  prompt: string
+  prompt_en: string
+  fail_reason: string
+  image_url: string
+  quota: number
+  submit_time: number
+  finish_time: number
+}
+
+export interface GatewayDrawingsResponse {
+  items: GatewayDrawingItem[]
+  total: number
+  page: number
+  page_size: number
+  quota_per_unit: number
+}
+
+export interface GatewaySubscriptionItem {
+  id: number
+  plan_id: number
+  plan_title?: string
+  allowed_groups?: string
+  status: string
+  amount_total: number
+  amount_used: number
+  start_time: number
+  end_time: number
+  allow_wallet_overflow?: boolean
+}
+
+export interface GatewaySubscriptionsResponse {
+  active_subscriptions: GatewaySubscriptionItem[]
+  all_subscriptions: GatewaySubscriptionItem[]
+  user_group: string
+  user_quota: number
+  quota_per_unit: number
+}
+
 export async function getGatewayUsage(days = 7): Promise<GatewayUsageResponse> {
   const res = await userApi.get('/me/gateway/usage', { params: { days }, silentBusinessError: true })
   return (res?.data?.data || { days, start_ts: 0, end_ts: 0, total_quota: 0, total_requests: 0, total_tokens: 0, quota_per_unit: API_QUOTA_PER_USD, daily: [], models: [] }) as GatewayUsageResponse
+}
+
+export async function getGatewayModels(): Promise<GatewayModelsResponse> {
+  const res = await userApi.get('/me/gateway/models', { silentBusinessError: true })
+  return (res?.data?.data || { models: [], vendors: [], usable_groups: {}, group_ratio: {}, default_group: 'default', quota_per_unit: API_QUOTA_PER_USD }) as GatewayModelsResponse
+}
+
+export async function listGatewayTasks(params: {
+  p?: number
+  page_size?: number
+  platform?: string
+  task_id?: string
+  status?: string
+  action?: string
+} = {}): Promise<GatewayTasksResponse> {
+  const res = await userApi.get('/me/gateway/tasks', { params, silentBusinessError: true })
+  return (res?.data?.data || { items: [], total: 0, page: 1, page_size: 20, quota_per_unit: API_QUOTA_PER_USD }) as GatewayTasksResponse
+}
+
+export async function listGatewayDrawings(params: {
+  p?: number
+  page_size?: number
+  mj_id?: string
+} = {}): Promise<GatewayDrawingsResponse> {
+  const res = await userApi.get('/me/gateway/drawings', { params, silentBusinessError: true })
+  return (res?.data?.data || { items: [], total: 0, page: 1, page_size: 20, quota_per_unit: API_QUOTA_PER_USD }) as GatewayDrawingsResponse
+}
+
+export async function getGatewaySubscriptions(): Promise<GatewaySubscriptionsResponse> {
+  const res = await userApi.get('/me/gateway/subscriptions', { silentBusinessError: true })
+  return (res?.data?.data || { active_subscriptions: [], all_subscriptions: [], user_group: 'default', user_quota: 0, quota_per_unit: API_QUOTA_PER_USD }) as GatewaySubscriptionsResponse
 }

@@ -1,6 +1,6 @@
 import { API_QUOTA_PER_USD, computeSubscriptionRemainingQuota } from './apiAccountLinkPolicy.ts'
 
-export type NeedtokenMemberSection = 'overview' | 'keys' | 'usage' | 'orders' | 'assets' | 'affiliate' | 'reseller' | 'security'
+export type NeedtokenMemberSection = 'overview' | 'keys' | 'models' | 'playground' | 'usage' | 'plans' | 'orders' | 'assets' | 'affiliate' | 'reseller' | 'security'
 
 export type ResellerWorkspaceMainTab = 'dashboard' | 'products' | 'orders' | 'finance' | 'site'
 export type ResellerFinanceSubTab = 'finance' | 'ledger' | 'withdraws'
@@ -18,8 +18,15 @@ export function normalizeNeedtokenMemberSection(raw?: string | null): NeedtokenM
     case 'keys':
     case 'api':
       return 'keys'
+    case 'models':
+      return 'models'
+    case 'playground':
+      return 'playground'
     case 'usage':
       return 'usage'
+    case 'plans':
+    case 'subscriptions':
+      return 'plans'
     case 'orders':
       return 'orders'
     case 'assets':

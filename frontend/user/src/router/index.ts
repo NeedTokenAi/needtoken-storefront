@@ -205,10 +205,31 @@ const router = createRouter({
             meta: { requiresUserAuth: true }
         },
         {
+            path: '/me/models',
+            name: 'personal-center-models',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'models' },
+            meta: { requiresUserAuth: true }
+        },
+        {
+            path: '/me/playground',
+            name: 'personal-center-playground',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'playground' },
+            meta: { requiresUserAuth: true }
+        },
+        {
             path: '/me/usage',
             name: 'personal-center-usage',
             component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
             props: { section: 'usage' },
+            meta: { requiresUserAuth: true }
+        },
+        {
+            path: '/me/plans',
+            name: 'personal-center-plans',
+            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            props: { section: 'plans' },
             meta: { requiresUserAuth: true }
         },
         {

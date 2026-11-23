@@ -31,6 +31,10 @@ func RegisterMemberReadRoutes(routes gin.IRoutes, h *Handler) {
 	routes.GET("/me/gateway/tokens", h.gatewayListTokens)
 	routes.GET("/me/gateway/logs", h.gatewayListLogs)
 	routes.GET("/me/gateway/usage", h.gatewayUsage)
+	routes.GET("/me/gateway/models", h.gatewayModels)
+	routes.GET("/me/gateway/tasks", h.gatewayListTasks)
+	routes.GET("/me/gateway/drawings", h.gatewayListDrawings)
+	routes.GET("/me/gateway/subscriptions", h.gatewaySubscriptions)
 }
 
 func RegisterMemberWriteRoutes(routes gin.IRoutes, h *Handler) {
@@ -329,6 +333,54 @@ func (h *Handler) gatewayUsage(c *gin.Context) {
 		}
 	}
 	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/usage", q, nil)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewayModels(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/models", nil, nil)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewayListTasks(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	q := url.Values{}
+	for _, key := range []string{"p", "page_size", "platform", "task_id", "status", "action", "start_timestamp", "end_timestamp"} {
+		if val := strings.TrimSpace(c.Query(key)); val != "" {
+			q.Set(key, val)
+		}
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/tasks", q, nil)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewayListDrawings(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	q := url.Values{}
+	for _, key := range []string{"p", "page_size", "mj_id", "start_timestamp", "end_timestamp"} {
+		if val := strings.TrimSpace(c.Query(key)); val != "" {
+			q.Set(key, val)
+		}
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/drawings", q, nil)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewaySubscriptions(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/subscriptions", nil, nil)
 	h.respondGatewayData(c, data, err)
 }
 
