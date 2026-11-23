@@ -4133,7 +4133,25 @@
         "orders": "我的訂單",
         "assets": "資產與禮品卡",
         "affiliate": "推廣與分銷",
+        "affiliateReferral": "推廣拉新",
+        "resellerSystem": "分銷系統",
+        "profileCardHint": "點擊進入帳號資料與安全設定",
         "security": "帳號與安全"
+      },
+      "reseller": {
+        "title": "分銷系統",
+        "activeSubtitle": "於 NeedToken 會員中心統一管理獨立站選品加價、分銷訂單、財務提領與網域設定",
+        "inactiveSubtitle": "開通分銷系統即可擁有獨立品牌網域、自訂加價策略與自動化履約結算",
+        "statusActive": "分銷已開通",
+        "statusPending": "審核中",
+        "statusRejected": "未通過",
+        "statusDisabled": "已停用",
+        "tabDashboard": "分銷總覽",
+        "tabProducts": "選品與加價",
+        "tabOrders": "分銷訂單",
+        "tabFinance": "財務與提領",
+        "tabSite": "獨立站與網域",
+        "subTabProfile": "資質與申請"
       },
       "overview": {
         "apiTotalQuota": "Need 網關可用總額",

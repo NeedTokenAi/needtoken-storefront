@@ -1,6 +1,17 @@
 import { API_QUOTA_PER_USD, computeSubscriptionRemainingQuota } from './apiAccountLinkPolicy.ts'
 
-export type NeedtokenMemberSection = 'overview' | 'keys' | 'usage' | 'orders' | 'assets' | 'affiliate' | 'security'
+export type NeedtokenMemberSection = 'overview' | 'keys' | 'usage' | 'orders' | 'assets' | 'affiliate' | 'reseller' | 'security'
+
+export type ResellerWorkspaceMainTab = 'dashboard' | 'products' | 'orders' | 'finance' | 'site'
+export type ResellerFinanceSubTab = 'finance' | 'ledger' | 'withdraws'
+export type ResellerSiteSubTab = 'domains' | 'site' | 'apply'
+
+export interface ResolvedResellerView {
+  mainTab: ResellerWorkspaceMainTab
+  financeSubTab: ResellerFinanceSubTab
+  siteSubTab: ResellerSiteSubTab
+  isOrderDetail: boolean
+}
 
 export function normalizeNeedtokenMemberSection(raw?: string | null): NeedtokenMemberSection {
   switch (String(raw || '').trim()) {
@@ -16,13 +27,55 @@ export function normalizeNeedtokenMemberSection(raw?: string | null): NeedtokenM
     case 'giftCard':
       return 'assets'
     case 'affiliate':
-    case 'reseller':
       return 'affiliate'
+    case 'reseller':
+      return 'reseller'
     case 'security':
     case 'profile':
       return 'security'
     default:
       return 'overview'
+  }
+}
+
+export function mapLegacyResellerPath(rawPath: string): string {
+  const clean = String(rawPath || '').trim()
+  if (clean === '/reseller' || clean === '/reseller/') {
+    return '/me/reseller'
+  }
+  if (clean.startsWith('/reseller/')) {
+    return `/me${clean}`
+  }
+  return '/me/reseller'
+}
+
+export function resolveResellerViewFromPath(rawPath: string): ResolvedResellerView {
+  const normalized = String(rawPath || '').replace(/\/+$/, '')
+  if (normalized.startsWith('/me/reseller/orders/')) {
+    return { mainTab: 'orders', financeSubTab: 'finance', siteSubTab: 'domains', isOrderDetail: true }
+  }
+  const suffix = normalized.startsWith('/me/reseller/')
+    ? normalized.slice('/me/reseller/'.length)
+    : ''
+  switch (suffix) {
+    case 'products':
+      return { mainTab: 'products', financeSubTab: 'finance', siteSubTab: 'domains', isOrderDetail: false }
+    case 'orders':
+      return { mainTab: 'orders', financeSubTab: 'finance', siteSubTab: 'domains', isOrderDetail: false }
+    case 'finance':
+      return { mainTab: 'finance', financeSubTab: 'finance', siteSubTab: 'domains', isOrderDetail: false }
+    case 'ledger':
+      return { mainTab: 'finance', financeSubTab: 'ledger', siteSubTab: 'domains', isOrderDetail: false }
+    case 'withdraws':
+      return { mainTab: 'finance', financeSubTab: 'withdraws', siteSubTab: 'domains', isOrderDetail: false }
+    case 'domains':
+      return { mainTab: 'site', financeSubTab: 'finance', siteSubTab: 'domains', isOrderDetail: false }
+    case 'site':
+      return { mainTab: 'site', financeSubTab: 'finance', siteSubTab: 'site', isOrderDetail: false }
+    case 'apply':
+      return { mainTab: 'site', financeSubTab: 'finance', siteSubTab: 'apply', isOrderDetail: false }
+    default:
+      return { mainTab: 'dashboard', financeSubTab: 'finance', siteSubTab: 'domains', isOrderDetail: false }
   }
 }
 

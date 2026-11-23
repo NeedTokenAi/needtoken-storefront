@@ -4132,8 +4132,26 @@
         "usage": "Usage & Logs",
         "orders": "My Orders",
         "assets": "Assets & Gift Cards",
-        "affiliate": "Affiliate & Reseller",
+        "affiliate": "Growth & Reseller",
+        "affiliateReferral": "Affiliate Referral",
+        "resellerSystem": "Reseller System",
+        "profileCardHint": "Open profile and security settings",
         "security": "Account & Security"
+      },
+      "reseller": {
+        "title": "Reseller System",
+        "activeSubtitle": "Manage storefront catalog markups, reseller orders, settlements, withdrawals, and custom domains inside NeedToken.",
+        "inactiveSubtitle": "Activate your reseller workspace for custom brand domains, flexible pricing markups, and automated fulfillment.",
+        "statusActive": "Active",
+        "statusPending": "Pending Review",
+        "statusRejected": "Rejected",
+        "statusDisabled": "Disabled",
+        "tabDashboard": "Overview",
+        "tabProducts": "Catalog & Markup",
+        "tabOrders": "Reseller Orders",
+        "tabFinance": "Finance & Withdrawals",
+        "tabSite": "Storefront & Domains",
+        "subTabProfile": "Application & Profile"
       },
       "overview": {
         "apiTotalQuota": "Need Gateway Total Quota",
