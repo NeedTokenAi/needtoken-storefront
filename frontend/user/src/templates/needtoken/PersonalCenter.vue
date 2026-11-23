@@ -310,6 +310,10 @@
                   <KeyRound class="mr-1.5 h-4 w-4" />
                   {{ t('needtoken.memberConsole.quick.manageKeys') }}
                 </Button>
+                <Button v-if="showGatewayFeatures" variant="outline" size="sm" @click="navigateToSection('playground')">
+                  <FlaskConical class="mr-1.5 h-4 w-4 text-primary" />
+                  {{ t('needtoken.memberConsole.nav.playground') }}
+                </Button>
                 <Button v-if="showGatewayFeatures" as-child variant="outline" size="sm">
                   <RouterLink to="/plans">
                     <Sparkles class="mr-1.5 h-4 w-4 text-primary" />
@@ -347,6 +351,47 @@
               </div>
             </div>
 
+            <!-- 近 7 天网关调用趋势 -->
+            <div v-if="showGatewayFeatures" class="rounded-2xl border bg-card p-6 shadow-sm">
+              <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 class="text-base font-bold text-foreground">{{ t('needtoken.memberConsole.overview.trendTitle') }}</h2>
+                  <p class="mt-0.5 text-xs text-muted-foreground">
+                    {{
+                      t('needtoken.memberConsole.overview.trendSubtitle', {
+                        spend: formatApiQuotaUsd(overviewUsage?.total_quota ?? 0),
+                        requests: formatInteger(overviewUsage?.total_requests ?? 0),
+                      })
+                    }}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('usage')">
+                  {{ t('needtoken.memberConsole.overview.viewUsageDetails') }}
+                </Button>
+              </div>
+
+              <div v-if="gatewayLoading && !overviewUsage" class="h-24 animate-pulse rounded-xl bg-muted" />
+              <div v-else-if="!overviewUsage?.daily?.length" class="rounded-xl border border-dashed px-4 py-5 text-xs text-muted-foreground">
+                {{ t('needtoken.memberConsole.overview.trendEmpty') }}
+              </div>
+              <div v-else class="flex h-24 items-end gap-2">
+                <div
+                  v-for="d in overviewUsage.daily"
+                  :key="d.date"
+                  class="group flex flex-1 flex-col items-center gap-1"
+                  :title="`${d.date} · ${formatApiQuotaUsd(d.quota)} · ${formatInteger(d.requests)} ${t('needtoken.memberConsole.usage.reqUnit')}`"
+                >
+                  <div class="flex h-16 w-full items-end justify-center rounded-md bg-muted/30 px-1 pt-1">
+                    <div
+                      class="w-full max-w-[28px] rounded-t-md bg-primary/80 transition-all group-hover:bg-primary"
+                      :style="{ height: `${overviewBarPercent(d.quota)}%` }"
+                    />
+                  </div>
+                  <span class="font-mono text-[10px] text-muted-foreground">{{ d.date.slice(5) }}</span>
+                </div>
+              </div>
+            </div>
+
             <!-- 生效中的 Need 网关套餐 -->
             <div v-if="showGatewayFeatures" class="rounded-2xl border bg-card p-6 shadow-sm">
               <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -354,12 +399,17 @@
                   <h2 class="text-base font-bold text-foreground">{{ t('needtoken.memberConsole.plans.title') }}</h2>
                   <p class="mt-0.5 text-xs text-muted-foreground">{{ t('needtoken.memberConsole.plans.subtitle') }}</p>
                 </div>
-                <Button as-child variant="outline" size="sm">
-                  <RouterLink to="/plans">
-                    {{ t('needtoken.memberConsole.plans.browseMore') }}
-                    <ArrowUpRight class="ml-1 h-3.5 w-3.5" />
-                  </RouterLink>
-                </Button>
+                <div class="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('plans')">
+                    {{ t('needtoken.memberConsole.plans.viewAllPlans') }}
+                  </Button>
+                  <Button as-child variant="outline" size="sm">
+                    <RouterLink to="/plans">
+                      {{ t('needtoken.memberConsole.plans.browseMore') }}
+                      <ArrowUpRight class="ml-1 h-3.5 w-3.5" />
+                    </RouterLink>
+                  </Button>
+                </div>
               </div>
 
               <div v-if="gatewayLoading && !apiSummary" class="space-y-3">
@@ -477,10 +527,19 @@
           <!-- 2. API 密钥管理 -->
           <GatewayKeysPanel v-else-if="activeSection === 'keys' && showGatewayFeatures" @changed="refreshGatewayData" />
 
-          <!-- 3. 用量与调用日志 -->
+          <!-- 3. 模型与计费（模型目录 + 分组实时价格 + 调用分析） -->
+          <GatewayModelsPanel v-else-if="activeSection === 'models' && showGatewayFeatures" />
+
+          <!-- 4. 在线调试（Playground） -->
+          <GatewayPlaygroundPanel v-else-if="activeSection === 'playground' && showGatewayFeatures" />
+
+          <!-- 5. 用量与调用日志（趋势图 + 调用日志 / 异步任务 / 绘图任务） -->
           <GatewayUsagePanel v-else-if="activeSection === 'usage' && showGatewayFeatures" />
 
-          <!-- 4. 我的订单 -->
+          <!-- 6. 我的套餐（生效中 + 历史订阅全量明细） -->
+          <GatewayPlansPanel v-else-if="activeSection === 'plans' && showGatewayFeatures" />
+
+          <!-- 7. 我的订单 -->
           <OrdersPanel v-else-if="activeSection === 'orders'" />
 
           <!-- 5. 资产与礼品卡（集合展示 API 额度 + 店面钱包 + 推广佣金 + 礼品卡兑换 + 钱包流水） -->
@@ -591,12 +650,15 @@ import { useRouter } from 'vue-router'
 import {
   Activity,
   ArrowUpRight,
+  Box,
   Check,
   ChevronDown,
   ChevronRight,
   Copy,
   Cpu,
+  CreditCard,
   Crown,
+  FlaskConical,
   Gift,
   KeyRound,
   LayoutDashboard,
@@ -625,6 +687,9 @@ import GiftCardPanel from '../../views/personal/GiftCardPanel.vue'
 import AffiliatePanel from '../../views/personal/AffiliatePanel.vue'
 import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
 import GatewayKeysPanel from './components/member/GatewayKeysPanel.vue'
+import GatewayModelsPanel from './components/member/GatewayModelsPanel.vue'
+import GatewayPlansPanel from './components/member/GatewayPlansPanel.vue'
+import GatewayPlaygroundPanel from './components/member/GatewayPlaygroundPanel.vue'
 import GatewayUsagePanel from './components/member/GatewayUsagePanel.vue'
 import ResellerWorkspacePanel from './components/member/ResellerWorkspacePanel.vue'
 import { API_BASE_URL } from './config'
@@ -641,7 +706,7 @@ import {
   sumSubscriptionRemainingQuota,
   type NeedtokenMemberSection,
 } from './lib/gatewayConsoleHelpers'
-import { listGatewayTokens } from './lib/gatewayConsoleApi'
+import { getGatewayUsage, listGatewayTokens, type GatewayUsageResponse } from './lib/gatewayConsoleApi'
 
 const props = withDefaults(defineProps<{ section?: PersonalSection }>(), {
   section: 'overview',
@@ -677,9 +742,11 @@ const {
 
 const showGatewayFeatures = computed(() => !appStore.isResellerTenant)
 
+const GATEWAY_ONLY_SECTIONS = new Set<NeedtokenMemberSection>(['keys', 'models', 'playground', 'usage', 'plans'])
+
 const activeSection = computed<NeedtokenMemberSection>(() => {
   const normalized = normalizeNeedtokenMemberSection(props.section)
-  if (!showGatewayFeatures.value && (normalized === 'keys' || normalized === 'usage')) {
+  if (!showGatewayFeatures.value && GATEWAY_ONLY_SECTIONS.has(normalized)) {
     return 'overview'
   }
   return normalized
@@ -726,7 +793,10 @@ const navGroups = computed<NavGroup[]>(() => {
       items: [
         { key: 'overview', labelKey: 'needtoken.memberConsole.nav.overview', icon: LayoutDashboard },
         { key: 'keys', labelKey: 'needtoken.memberConsole.nav.keys', icon: KeyRound },
+        { key: 'models', labelKey: 'needtoken.memberConsole.nav.models', icon: Box },
+        { key: 'playground', labelKey: 'needtoken.memberConsole.nav.playground', icon: FlaskConical },
         { key: 'usage', labelKey: 'needtoken.memberConsole.nav.usage', icon: Activity },
+        { key: 'plans', labelKey: 'needtoken.memberConsole.nav.plans', icon: CreditCard },
       ],
     })
   } else {
@@ -778,7 +848,10 @@ const flatNavItems = computed<NavLeafItem[]>(() =>
 const sectionRoutes: Record<NeedtokenMemberSection, string> = {
   overview: '/me',
   keys: '/me/keys',
+  models: '/me/models',
+  playground: '/me/playground',
   usage: '/me/usage',
+  plans: '/me/plans',
   orders: '/me/orders',
   assets: '/me/assets',
   affiliate: '/me/affiliate',
@@ -800,8 +873,16 @@ const openAssetsSubTab = (tab: 'giftCard' | 'wallet') => {
 
 const gatewayLoading = ref(false)
 const activeKeyCount = ref<number | null>(null)
+const overviewUsage = ref<GatewayUsageResponse | null>(null)
 const affiliateLoading = ref(false)
 const affiliateDashboard = ref<AffiliateDashboardData | null>(null)
+
+const overviewBarPercent = (quota: number) => {
+  const daily = overviewUsage.value?.daily || []
+  const maxQuota = Math.max(0, ...daily.map(item => item.quota))
+  if (maxQuota <= 0 || quota <= 0) return 6
+  return Math.max(10, Math.round((quota / maxQuota) * 100))
+}
 
 const displayNativeUserId = computed(() => apiStatus.value?.native_user_id || apiSummary.value?.native_user_id || 0)
 const activeSubscriptions = computed(() => apiSummary.value?.active_subscriptions ?? [])
@@ -855,12 +936,18 @@ const refreshGatewayData = async () => {
       await ensureApiLink()
     }
     await loadApiSummary(true)
-    try {
-      const tokenRes = await listGatewayTokens()
+    const [tokenRes, usageRes] = await Promise.all([
+      listGatewayTokens().catch(() => null),
+      getGatewayUsage(7).catch(() => null),
+    ])
+    if (tokenRes) {
       const items = Array.isArray(tokenRes.items) ? tokenRes.items : []
       activeKeyCount.value = items.filter(tok => tok.status === 1).length
-    } catch {
+    } else {
       activeKeyCount.value = null
+    }
+    if (usageRes) {
+      overviewUsage.value = usageRes
     }
   } finally {
     gatewayLoading.value = false

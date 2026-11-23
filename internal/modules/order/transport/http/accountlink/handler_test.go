@@ -354,7 +354,31 @@ func TestGatewayConsoleMemberRoutes(t *testing.T) {
 		t.Fatalf("usage failed: code=%d body=%s", w6.Code, w6.Body.String())
 	}
 
-	if len(bridge.consoleCalls) != 6 || bridge.consoleCalls[4] != "GET /logs?model_name=claude-sonnet-4-6&p=1&page_size=20" {
+	w7 := httptest.NewRecorder()
+	r.ServeHTTP(w7, httptest.NewRequest(http.MethodGet, "/me/gateway/models", nil))
+	if w7.Code != http.StatusOK {
+		t.Fatalf("models failed: code=%d body=%s", w7.Code, w7.Body.String())
+	}
+
+	w8 := httptest.NewRecorder()
+	r.ServeHTTP(w8, httptest.NewRequest(http.MethodGet, "/me/gateway/tasks?p=1&page_size=20&status=SUCCESS&ignored=1", nil))
+	if w8.Code != http.StatusOK {
+		t.Fatalf("tasks failed: code=%d body=%s", w8.Code, w8.Body.String())
+	}
+
+	w9 := httptest.NewRecorder()
+	r.ServeHTTP(w9, httptest.NewRequest(http.MethodGet, "/me/gateway/drawings?p=1&page_size=20&mj_id=mj1", nil))
+	if w9.Code != http.StatusOK {
+		t.Fatalf("drawings failed: code=%d body=%s", w9.Code, w9.Body.String())
+	}
+
+	w10 := httptest.NewRecorder()
+	r.ServeHTTP(w10, httptest.NewRequest(http.MethodGet, "/me/gateway/subscriptions", nil))
+	if w10.Code != http.StatusOK {
+		t.Fatalf("subscriptions failed: code=%d body=%s", w10.Code, w10.Body.String())
+	}
+
+	if len(bridge.consoleCalls) != 10 || bridge.consoleCalls[4] != "GET /logs?model_name=claude-sonnet-4-6&p=1&page_size=20" || bridge.consoleCalls[7] != "GET /tasks?p=1&page_size=20&status=SUCCESS" {
 		t.Fatalf("unexpected console proxy calls: %v", bridge.consoleCalls)
 	}
 }
