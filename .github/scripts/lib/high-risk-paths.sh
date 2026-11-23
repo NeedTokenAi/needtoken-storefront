@@ -31,6 +31,7 @@ is_high_risk_path() {
       internal/modules/identity/userauth/application/service.go | \
       internal/modules/identity/user/contract/* | \
       internal/modules/giftcard/application/* | internal/modules/giftcard/contract/* | \
+      internal/modules/giftcard/transport/http/* | \
       internal/app/httpserver/router.go | internal/app/httpserver/routes_storefront.go | internal/app/httpserver/routes_channel.go | \
       frontend/user/src/templates/needtoken/* | frontend/user/index.html | \
       frontend/user/src/router/index.ts | frontend/user/src/api/order.ts | frontend/user/src/api/auth.ts | \

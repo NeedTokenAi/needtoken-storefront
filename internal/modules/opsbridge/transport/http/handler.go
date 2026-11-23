@@ -488,21 +488,13 @@ func (h *Handler) GiftCards(c *gin.Context) {
 }
 
 func (h *Handler) GenerateGiftCards(c *gin.Context) {
-	if h.bridge == nil {
-		fail(c, opscontract.ErrNotConfigured)
-		return
-	}
-	var req opscontract.GenerateGiftCardsInput
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fail(c, opscontract.ErrInvalidInput)
-		return
-	}
-	result, err := h.bridge.GenerateGiftCards(req)
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	response.Success(c, result)
+	response.ChannelError(
+		c,
+		http.StatusGone,
+		response.CodeBadRequest,
+		"single_side_gift_card_generation_disabled",
+		"Single-side storefront gift card generation is disabled; please issue universal gift cards in NeedToken Ops.",
+	)
 }
 
 func (h *Handler) Pricing(c *gin.Context) {

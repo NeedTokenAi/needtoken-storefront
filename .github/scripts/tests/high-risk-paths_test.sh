@@ -40,6 +40,7 @@ high_risk_cases=(
   "internal/modules/apipublic/transport/http/handler.go"
   "internal/modules/identity/userauth/application/service.go"
   "internal/modules/giftcard/application/redeem.go"
+  "internal/modules/giftcard/transport/http/admin_handler.go"
   "internal/app/httpserver/router.go"
   "internal/app/httpserver/routes_storefront.go"
   "internal/app/httpserver/routes_channel.go"
