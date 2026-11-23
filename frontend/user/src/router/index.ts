@@ -293,21 +293,21 @@ const router = createRouter({
             name: 'personal-center-reseller',
             component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
             props: { section: 'reseller' },
-            meta: { requiresUserAuth: true, resellerConsole: true }
+            meta: { requiresUserAuth: true, requiresResellerAccess: true }
         },
         {
             path: '/me/reseller/orders/:order_no',
             name: 'personal-center-reseller-order-detail',
             component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
             props: { section: 'reseller' },
-            meta: { requiresUserAuth: true, resellerConsole: true }
+            meta: { requiresUserAuth: true, requiresResellerAccess: true }
         },
         {
             path: '/me/reseller/:tab',
             name: 'personal-center-reseller-tab',
             component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
             props: { section: 'reseller' },
-            meta: { requiresUserAuth: true, resellerConsole: true }
+            meta: { requiresUserAuth: true, requiresResellerAccess: true }
         },
         {
             path: '/reseller',
@@ -507,7 +507,7 @@ router.beforeEach(async (to, _from, next) => {
         if (!userAuthStore.isAuthenticated) {
             const redirect = encodeURIComponent(to.fullPath)
             next(`/auth/login?redirect=${redirect}`)
-        } else if (to.meta.resellerConsole && !appStore.canAccessResellerConsole) {
+        } else if ((to.meta.resellerConsole || to.meta.requiresResellerAccess) && !appStore.canAccessResellerConsole) {
             next('/me/orders')
         } else {
             next()
