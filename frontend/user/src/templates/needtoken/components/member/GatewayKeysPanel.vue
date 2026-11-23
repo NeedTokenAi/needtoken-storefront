@@ -249,9 +249,22 @@
             />
           </label>
 
-          <label class="block space-y-1.5 text-xs">
+          <div class="block space-y-1.5 text-xs">
             <span class="font-semibold text-foreground">{{ t('needtoken.memberConsole.keys.groupLabel') }}</span>
+            <div
+              v-if="groupOptions.length <= 1"
+              class="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2.5 text-sm"
+            >
+              <span class="font-mono font-semibold text-foreground">
+                {{ groupOptions[0]?.name || defaultGroup }}
+                <span v-if="groupOptions[0]?.desc && groupOptions[0]?.desc !== groupOptions[0]?.name" class="font-sans text-xs font-normal text-muted-foreground">
+                  — {{ groupOptions[0].desc }}
+                </span>
+              </span>
+              <span class="text-[11px] text-muted-foreground">{{ t('needtoken.memberConsole.keys.singleGroupHint') }}</span>
+            </div>
             <select
+              v-else
               v-model="form.group"
               class="h-10 w-full rounded-lg border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
             >
@@ -259,7 +272,7 @@
                 {{ g.name }}{{ g.desc && g.desc !== g.name ? ` — ${g.desc}` : '' }}
               </option>
             </select>
-          </label>
+          </div>
 
           <div class="space-y-2 rounded-xl border bg-muted/30 p-3.5 text-xs">
             <label class="flex cursor-pointer items-center gap-2 font-semibold text-foreground">
@@ -459,7 +472,10 @@ const loadTokens = async () => {
 const openCreateModal = () => {
   editingToken.value = null
   form.name = ''
-  form.group = defaultAutoGroup.value && usableGroups.value.auto ? 'auto' : (defaultGroup.value || 'default')
+  const preferred = defaultAutoGroup.value && usableGroups.value.auto ? 'auto' : (defaultGroup.value || 'default')
+  form.group = groupOptions.value.some(g => g.name === preferred)
+    ? preferred
+    : (groupOptions.value[0]?.name || preferred)
   form.unlimitedQuota = true
   form.quotaUsd = '10'
   form.expirePreset = 'never'
