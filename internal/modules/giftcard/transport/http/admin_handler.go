@@ -14,10 +14,8 @@ import (
 	giftcarddomain "github.com/dujiao-next/internal/modules/giftcard/domain"
 	"github.com/dujiao-next/internal/platform/http/ginutil"
 	"github.com/dujiao-next/internal/platform/http/response"
-	"github.com/dujiao-next/internal/shared/money"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 )
 
 // AdminService 是后台礼品卡管理端口。
@@ -79,46 +77,12 @@ type adminGiftCardItem struct {
 }
 
 // Generate 管理端生成礼品卡。
+// NeedToken 统一收口至 Ops 双端通用礼品卡，禁用单端店面礼品卡生成。
 func (h *AdminHandler) Generate(c *gin.Context) {
-	adminID, ok := ginutil.GetAdminID(c)
-	if !ok {
+	if _, ok := ginutil.GetAdminID(c); !ok {
 		return
 	}
-	var req generateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		ginutil.RespondBindError(c, err)
-		return
-	}
-	amount, err := decimal.NewFromString(strings.TrimSpace(req.Amount))
-	if err != nil {
-		ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
-		return
-	}
-	expiresAt, err := ginutil.ParseTimeNullable(strings.TrimSpace(req.ExpiresAt))
-	if err != nil {
-		ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
-		return
-	}
-	batch, created, err := h.cards.Generate(giftcardapp.GenerateInput{
-		Name:      req.Name,
-		Quantity:  req.Quantity,
-		Amount:    money.FromDecimal(amount),
-		ExpiresAt: expiresAt,
-		CreatedBy: &adminID,
-	})
-	if err != nil {
-		switch {
-		case errors.Is(err, giftcardcontract.ErrInvalid):
-			ginutil.RespondError(c, response.CodeBadRequest, "error.gift_card_invalid", nil)
-		default:
-			ginutil.RespondError(c, response.CodeInternal, "error.gift_card_create_failed", err)
-		}
-		return
-	}
-	response.Success(c, gin.H{
-		"batch":   batch,
-		"created": created,
-	})
+	response.ErrorWithHTTPStatus(c, http.StatusGone, response.CodeBadRequest, "Single-side storefront gift card generation is disabled; please issue universal gift cards in NeedToken Ops.")
 }
 
 // List 获取礼品卡列表。

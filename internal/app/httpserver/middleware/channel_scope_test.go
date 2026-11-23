@@ -183,7 +183,8 @@ func TestOpsBridgeGiftCardsHMACAuthAndGeneration(t *testing.T) {
 		t.Fatalf("expected 403 for non-ops channel credential, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// 3. Dedicated needtoken_ops credential generates batch & returns plaintext cards + batch_no.
+	// 3. Dedicated needtoken_ops credential passes scope guard and receives 410 Gone
+	// because single-side storefront gift card generation is disabled in favor of Ops universal gift cards.
 	req = httptest.NewRequest(http.MethodPost, path, bytes.NewReader(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(channelHeaderKey, opsCred.ChannelKey)
@@ -191,21 +192,11 @@ func TestOpsBridgeGiftCardsHMACAuthAndGeneration(t *testing.T) {
 	req.Header.Set(channelHeaderSignature, upstream.Sign(opsCred.ChannelSecret, http.MethodPost, path, nowTs, bodyBytes))
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 for ops gift card generate, got %d: %s", w.Code, w.Body.String())
-	}
-	var genEnvelope struct {
-		StatusCode int                                 `json:"status_code"`
-		Data       opscontract.GenerateGiftCardsResult `json:"data"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &genEnvelope); err != nil {
-		t.Fatalf("decode generate response: %v", err)
-	}
-	if genEnvelope.StatusCode != 0 || !strings.HasPrefix(genEnvelope.Data.BatchNo, "GCB") || len(genEnvelope.Data.Cards) != 2 {
-		t.Fatalf("unexpected generate payload: %+v", genEnvelope)
+	if w.Code != http.StatusGone || !strings.Contains(w.Body.String(), "single_side_gift_card_generation_disabled") {
+		t.Fatalf("expected 410 single_side_gift_card_generation_disabled, got %d: %s", w.Code, w.Body.String())
 	}
 
-	// 4. GET /needtoken-ops/gift-cards returns generated cards.
+	// 4. GET /needtoken-ops/gift-cards remains readable for historical single-side records.
 	listPath := "/api/v1/channel/needtoken-ops/gift-cards"
 	req = httptest.NewRequest(http.MethodGet, listPath+"?page=1&page_size=10", nil)
 	req.Header.Set(channelHeaderKey, opsCred.ChannelKey)
@@ -223,7 +214,7 @@ func TestOpsBridgeGiftCardsHMACAuthAndGeneration(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &listEnvelope); err != nil {
 		t.Fatalf("decode list response: %v", err)
 	}
-	if listEnvelope.Data.Total != 2 || len(listEnvelope.Data.Cards) != 2 {
+	if listEnvelope.StatusCode != 0 {
 		t.Fatalf("unexpected list payload: %+v", listEnvelope)
 	}
 }
