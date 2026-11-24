@@ -97,5 +97,12 @@ export function forwardRequest(request) {
   const forwarded = new Request(url, request);
   forwarded.headers.delete("host");
   stripEdgeGateHeaders(forwarded.headers);
+  // Cloudflare 边缘注入的 CF-Connecting-IP 不可被客户端伪造；同步覆写 X-Forwarded-For / X-Real-IP，
+  // 防止外部客户端伪造代理头绕过后端按 IP 限流与登录审计。
+  const cfIP = (request.headers.get("cf-connecting-ip") || "").trim();
+  if (cfIP && !/[\r\n\s,]/.test(cfIP)) {
+    forwarded.headers.set("x-forwarded-for", cfIP);
+    forwarded.headers.set("x-real-ip", cfIP);
+  }
   return forwarded;
 }

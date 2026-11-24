@@ -51,6 +51,8 @@ func RegisterUserLoginAuthRoutes(auth gin.IRoutes, handler *UserLoginHandler, ra
 		panic("user login auth routes: required dependency is nil")
 	}
 	auth.POST("/login", rateLimit, handler.UserLogin)
+	auth.POST("/login/verify-email", rateLimit, handler.VerifyLoginEmail)
+	auth.POST("/login/resend-email", rateLimit, handler.ResendLoginEmail)
 }
 
 // RegisterUser2FAAuthRoutes 注册公开的 2FA 挑战验证端点（需附带限流中间件）。

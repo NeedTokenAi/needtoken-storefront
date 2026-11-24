@@ -107,6 +107,21 @@ test("requests are forwarded to the container port", async () => {
   assert.equal(forwarded.headers.get("content-type"), "application/json");
 });
 
+test("forwardRequest overwrites spoofed forwarding headers with cf-connecting-ip", () => {
+  const req = new Request("https://needtoken.ai/api/v1/auth/login", {
+    method: "POST",
+    headers: {
+      "cf-connecting-ip": "198.51.100.42",
+      "x-forwarded-for": "1.1.1.1, 2.2.2.2",
+      "x-real-ip": "9.9.9.9",
+    },
+  });
+  const forwarded = forwardRequest(req);
+  assert.equal(forwarded.headers.get("cf-connecting-ip"), "198.51.100.42");
+  assert.equal(forwarded.headers.get("x-forwarded-for"), "198.51.100.42");
+  assert.equal(forwarded.headers.get("x-real-ip"), "198.51.100.42");
+});
+
 test("readiness waits through a cold start, then answers 503", async () => {
   let probes = 0;
   await waitForReady(

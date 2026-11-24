@@ -22,6 +22,9 @@ type Handlers struct {
 
 // New assembles user authentication transports at the application boundary.
 func New(c *container.Container) Handlers {
+	if c.UserAuthService != nil && c.UserLoginLogService != nil {
+		c.UserAuthService.SetLoginHistoryReader(userLoginHistoryAdapter{logs: c.UserLoginLogService})
+	}
 	verify := userVerifyTransportAdapter{auth: c.UserAuthService, settings: c.SettingService}
 	login := userLoginTransportAdapter{auth: c.UserAuthService, settings: c.SettingService}
 	recorder := userLoginRecorderAdapter{logs: c.UserLoginLogService}

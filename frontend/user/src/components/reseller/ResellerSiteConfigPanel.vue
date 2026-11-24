@@ -388,8 +388,9 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import ResellerImageField from './ResellerImageField.vue'
 import ResellerLocaleTabs from './ResellerLocaleTabs.vue'
+import { lazyImportWithRetry } from '../../utils/chunkRecovery'
 // TipTap 体积较大，异步加载，进入公告编辑时才拉取对应 chunk
-const ResellerRichText = defineAsyncComponent(() => import('./ResellerRichText.vue'))
+const ResellerRichText = defineAsyncComponent(lazyImportWithRetry(() => import('./ResellerRichText.vue')))
 import { useAppStore } from '../../stores/app'
 import { type PageAlert } from '../../utils/alerts'
 import { processHtmlForDisplay } from '../../utils/content'

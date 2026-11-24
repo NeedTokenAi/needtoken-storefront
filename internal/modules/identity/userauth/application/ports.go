@@ -58,3 +58,16 @@ type GoogleRedirectHandoff struct {
 	Identity  googleauthapp.VerifiedIdentity
 	CreatedAt time.Time
 }
+
+// LoginHistoryEntry 是环境变更检测所需的最小历史登录记录视图。
+type LoginHistoryEntry struct {
+	Status    string
+	ClientIP  string
+	UserAgent string
+	CreatedAt time.Time
+}
+
+// LoginHistoryReader 读取用户近期登录历史，用于存量老用户平滑过渡受信任设备校验。
+type LoginHistoryReader interface {
+	ListRecentUserLogins(userID uint, limit int) ([]LoginHistoryEntry, error)
+}

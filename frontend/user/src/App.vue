@@ -64,6 +64,7 @@ import { ConfigProvider } from 'reka-ui'
 import { useAppStore } from './stores/app'
 import { getActiveTemplate, rememberTemplate } from './templates/registry'
 import { shouldBrandNeedtokenStartup, storefrontStartupPhase } from './utils/storefrontStartup'
+import { isChunkLoadError, lazyImportWithRetry, recoverFromChunkError } from './utils/chunkRecovery'
 import NeedtokenStartup from './templates/needtoken/components/NeedtokenStartup.vue'
 import NeedtokenSkeleton from './templates/needtoken/components/NeedtokenSkeleton.vue'
 import Navbar from './components/Navbar.vue'
@@ -76,9 +77,9 @@ import BackToTop from './components/BackToTop.vue'
 import MobileBottomNav from './components/MobileBottomNav.vue'
 
 // vault 外壳按需加载，classic 用户不会拉取其 chunk/样式
-const VaultLayout = defineAsyncComponent(() => import('./templates/vault/layout/VaultLayout.vue'))
+const VaultLayout = defineAsyncComponent(lazyImportWithRetry(() => import('./templates/vault/layout/VaultLayout.vue')))
 const NeedtokenLayout = defineAsyncComponent({
-  loader: () => import('./templates/needtoken/layout/NeedtokenLayout.vue'),
+  loader: lazyImportWithRetry(() => import('./templates/needtoken/layout/NeedtokenLayout.vue')),
   loadingComponent: {
     setup() {
       const store = useAppStore()
@@ -129,9 +130,12 @@ watch(() => appStore.config, config => {
 void router.isReady().then(() => { initialRouteReady.value = true }).catch(() => { initialRouteFailed.value = true })
 const removeBeforeGuard = router.beforeEach(() => { navigationPending.value = true; routeLoadFailed.value = false })
 const removeAfterGuard = router.afterEach(() => { navigationPending.value = false })
-const removeErrorHandler = router.onError((_error, destination) => {
+const removeErrorHandler = router.onError((error, destination) => {
   navigationPending.value = false
   failedDestination.value = destination.fullPath
+  if (isChunkLoadError(error) && recoverFromChunkError(destination.fullPath)) {
+    return
+  }
   if (!initialRouteReady.value) initialRouteFailed.value = true
   else routeLoadFailed.value = true
 })

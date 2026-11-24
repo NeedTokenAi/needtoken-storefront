@@ -305,24 +305,35 @@ func configureTrustedProxies(engine *gin.Engine, trustedProxies []string) error 
 	if engine == nil {
 		return fmt.Errorf("gin engine is nil")
 	}
-	for _, rawProxy := range trustedProxies {
-		proxy := strings.TrimSpace(rawProxy)
-		if proxy == "" {
-			return fmt.Errorf("trusted proxy cannot be empty")
-		}
-		if net.ParseIP(proxy) != nil {
-			continue
-		}
-		_, network, err := net.ParseCIDR(proxy)
-		if err != nil {
-			return fmt.Errorf("invalid trusted proxy %q: %w", proxy, err)
-		}
-		ones, bits := network.Mask.Size()
-		if ones == 0 && (bits == 32 || bits == 128) {
-			return fmt.Errorf("trusted proxy %q would trust every address", proxy)
+	normalized := make([]string, 0, len(trustedProxies))
+	for _, rawEntry := range trustedProxies {
+		for _, rawProxy := range strings.Split(rawEntry, ",") {
+			proxy := strings.TrimSpace(rawProxy)
+			if proxy == "" {
+				if strings.TrimSpace(rawEntry) == "" {
+					return fmt.Errorf("trusted proxy cannot be empty")
+				}
+				continue
+			}
+			if net.ParseIP(proxy) != nil {
+				normalized = append(normalized, proxy)
+				continue
+			}
+			_, network, err := net.ParseCIDR(proxy)
+			if err != nil {
+				return fmt.Errorf("invalid trusted proxy %q: %w", proxy, err)
+			}
+			ones, bits := network.Mask.Size()
+			if ones == 0 && (bits == 32 || bits == 128) {
+				return fmt.Errorf("trusted proxy %q would trust every address", proxy)
+			}
+			normalized = append(normalized, proxy)
 		}
 	}
-	return engine.SetTrustedProxies(trustedProxies)
+	// 仅在请求来源于受信任代理网段时，优先读取 Cloudflare 边缘注入的 CF-Connecting-IP，
+	// 其次回退 X-Forwarded-For / X-Real-IP；非受信任公网直连发来的这些头一律被 Gin 忽略。
+	engine.RemoteIPHeaders = []string{"CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP"}
+	return engine.SetTrustedProxies(normalized)
 }
 
 type adminPermissionCatalogItem struct {

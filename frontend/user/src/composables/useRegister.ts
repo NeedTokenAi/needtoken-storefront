@@ -2,6 +2,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserAuthStore } from '../stores/userAuth'
 import { useI18n } from 'vue-i18n'
+import { resolveFallbackSiteName } from '../utils/storefrontStartup'
 import { debounceAsync } from '../utils/debounce'
 import { useAppStore } from '../stores/app'
 import type { CaptchaPayload } from '../api'
@@ -20,10 +21,12 @@ export function useRegister(options: { requireEmailProof?: boolean; onRegistered
   const appStore = useAppStore()
   const { t } = useI18n()
 
-  const brandSiteName = computed(() => {
-    const siteName = String(appStore.config?.brand?.site_name || '').trim()
-    return siteName !== '' ? siteName : 'Dujiao-Next'
-  })
+  const brandSiteName = computed(() => resolveFallbackSiteName(appStore.config?.brand?.site_name, {
+    brandOverrideName: appStore.storefrontBrandOverride?.siteName,
+    fallbackLabel: t('common.siteName'),
+    hostname: typeof window === 'undefined' ? '' : window.location.hostname,
+    isReseller: appStore.isResellerTenant,
+  }))
 
   const email = ref('')
   const emailLocalPart = ref('')
@@ -143,7 +146,7 @@ export function useRegister(options: { requireEmailProof?: boolean; onRegistered
       }
     }
     if (captchaProvider.value === 'turnstile') {
-      return {
+      return turnstileRef.value?.getPayload() ?? {
         turnstile_token: turnstileToken.value,
       }
     }
@@ -181,7 +184,8 @@ export function useRegister(options: { requireEmailProof?: boolean; onRegistered
       }
     }
     if (sendCodeCaptchaEnabled.value && captchaProvider.value === 'turnstile') {
-      if (!turnstileToken.value) {
+      const resolved = getCaptchaPayload()
+      if (!resolved?.turnstile_token && !(resolved?.captcha_id && resolved?.captcha_code)) {
         error.value = t('auth.common.captchaRequired')
         return
       }
@@ -220,6 +224,17 @@ export function useRegister(options: { requireEmailProof?: boolean; onRegistered
       error.value = t('auth.register.errors.agreementRequired')
       return
     }
+    const needsDirectRegisterCaptcha = !emailVerificationEnabled.value && !options.requireEmailProof && sendCodeCaptchaEnabled.value
+    if (needsDirectRegisterCaptcha) {
+      const resolved = getCaptchaPayload()
+      const hasCaptcha = captchaProvider.value === 'image'
+        ? Boolean(resolved?.captcha_id && resolved?.captcha_code)
+        : Boolean(resolved?.turnstile_token || (resolved?.captcha_id && resolved?.captcha_code))
+      if (!hasCaptcha) {
+        error.value = t('auth.common.captchaRequired')
+        return
+      }
+    }
     try {
       await userAuthStore.register({
         email: currentEmail,
@@ -227,11 +242,19 @@ export function useRegister(options: { requireEmailProof?: boolean; onRegistered
         code: emailVerificationEnabled.value || options.requireEmailProof ? code.value : '',
         agreement_accepted: agreed.value,
         invite_code: inviteOnlyEnabled.value ? inviteCode.value.trim() : undefined,
+        captcha_payload: needsDirectRegisterCaptcha ? getCaptchaPayload() : undefined,
       })
       if (options.onRegistered) await options.onRegistered()
       else router.push('/me/orders')
     } catch (err: any) {
       error.value = err.message || t('auth.register.errors.registerFailed')
+      if (needsDirectRegisterCaptcha) {
+        if (captchaProvider.value === 'image') imageCaptchaRef.value?.refresh()
+        if (captchaProvider.value === 'turnstile') {
+          turnstileRef.value?.reset()
+          turnstileToken.value = ''
+        }
+      }
     }
   }
 

@@ -3,8 +3,9 @@ package jwttoken
 import "github.com/golang-jwt/jwt/v5"
 
 const (
-	TypeAccess             = "access"
-	TypeTwoFactorChallenge = "2fa_challenge"
+	TypeAccess              = "access"
+	TypeTwoFactorChallenge  = "2fa_challenge"
+	TypeLoginEmailChallenge = "login_email_challenge"
 )
 
 // IsAccessType accepts an empty type for tokens issued before typ was added.

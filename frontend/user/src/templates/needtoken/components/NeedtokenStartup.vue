@@ -1,6 +1,6 @@
 <template>
   <section class="nt-startup" :class="{ 'nt-startup--branded': branded }" :aria-busy="!failed">
-    <header class="nt-startup-header" aria-hidden="true"><div class="nt-startup-identity"><img v-if="branded" src="/needtoken-icon.svg" alt="" width="30" height="30" /><span v-if="branded" translate="no">NeedToken.AI</span><i v-else /></div><div class="nt-startup-nav"><i /><i /><i /></div></header>
+    <header class="nt-startup-header" aria-hidden="true"><div class="nt-startup-identity"><BrandMark v-if="branded" width="30" height="30" /><span v-if="branded" translate="no">NeedToken.AI</span><i v-else /></div><div class="nt-startup-nav"><i /><i /><i /></div></header>
     <div v-if="branded && !failed" class="nt-startup-catalogue" role="status" aria-live="polite">
       <div class="nt-startup-catalogue-heading" aria-hidden="true"><i /><i /></div>
       <div class="nt-startup-catalogue-toolbar" aria-hidden="true"><i /><i /></div>
@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import BrandMark from './BrandMark.vue'
 import NeedtokenSkeleton from './NeedtokenSkeleton.vue'
 withDefaults(defineProps<{ branded?: boolean; failed?: boolean; slow?: boolean }>(), { branded: false, failed: false, slow: false })
 defineEmits<{ retry: [] }>()

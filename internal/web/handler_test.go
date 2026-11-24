@@ -397,3 +397,38 @@ func TestCacheControlHeaders(t *testing.T) {
 		})
 	}
 }
+
+func TestMissingStaticAssetsReturn404WithoutHTMLFallback(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	if err := RegisterAdmin(r, "/admin", newAdminFS("<html>admin-spa</html>")); err != nil {
+		t.Fatalf("RegisterAdmin: %v", err)
+	}
+	if err := RegisterUser(r, newUserFS()); err != nil {
+		t.Fatalf("RegisterUser: %v", err)
+	}
+
+	for _, p := range []string{
+		"/assets/ApiCostCalculator-OLDHASH.js",
+		"/assets/missing.css",
+		"/nonexistent.mjs",
+		"/admin/assets/Dashboard-OLDHASH.js",
+		"/admin/assets/missing.css",
+	} {
+		t.Run(p, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, p, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusNotFound {
+				t.Fatalf("status = %d, want 404 (body=%q)", w.Code, w.Body.String())
+			}
+			if got := w.Header().Get("Cache-Control"); got != missingAssetCacheControl {
+				t.Fatalf("Cache-Control = %q, want %q", got, missingAssetCacheControl)
+			}
+			if strings.Contains(w.Body.String(), "spa") {
+				t.Fatalf("missing asset fell back to SPA HTML: %s", w.Body.String())
+			}
+		})
+	}
+}

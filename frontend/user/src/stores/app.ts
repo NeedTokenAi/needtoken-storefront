@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { configAPI } from '../api'
 import { applyCustomScripts } from '../utils/customScripts'
 import { getImageUrl } from '../utils/image'
 import { getLocalizedText } from '../utils/resellerSiteConfig'
+import { resolveStorefrontHeadBrand } from '../utils/storefrontStartup'
 import { detectLocale, setI18nLocale } from '../i18n'
 import { useHead } from '@unhead/vue'
 
@@ -11,6 +12,32 @@ export interface StorefrontBrandOverride {
     siteName: string
     siteIcon: string
     touchIcon?: string
+}
+
+function readBootTemplateHint(): string | null {
+    if (typeof window === 'undefined') return null
+    try {
+        const param = new URLSearchParams(window.location.search).get('template')
+        if (param === 'classic' || param === 'vault' || param === 'needtoken') return param
+        const override = param === 'reset' ? null : localStorage.getItem('dj-storefront-template')
+        return override || localStorage.getItem('dj-storefront-template-last')
+    } catch {
+        return null
+    }
+}
+
+function readVerifiedMainHint(): boolean {
+    if (typeof window === 'undefined') return false
+    try {
+        return localStorage.getItem('dj-storefront-boot-main') === '1'
+    } catch {
+        return false
+    }
+}
+
+function clearBootHeadLinks(): void {
+    if (typeof document === 'undefined') return
+    document.querySelectorAll('link[data-nt-boot-head]').forEach(el => el.remove())
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -26,11 +53,17 @@ export const useAppStore = defineStore('app', () => {
     }
     // 服务器与客户端的时间偏移量（毫秒），serverTime = clientTime + offset
     const serverTimeOffset = ref(0)
-    const siteIconHref = computed(() => {
-        if (storefrontBrandOverride.value) return storefrontBrandOverride.value.siteIcon
-        const siteIcon = String(config.value?.brand?.site_icon || '').trim()
-        return siteIcon ? getImageUrl(siteIcon) : '/dj.svg'
-    })
+    const bootTemplateHint = readBootTemplateHint()
+    const bootVerifiedMainHint = readVerifiedMainHint()
+    const bootHostname = typeof window === 'undefined' ? '' : window.location.hostname
+    const headBrand = computed(() => resolveStorefrontHeadBrand({
+        brandOverride: storefrontBrandOverride.value,
+        config: config.value,
+        templateHint: bootTemplateHint,
+        verifiedMainHint: bootVerifiedMainHint,
+        hostname: bootHostname,
+        resolveImageUrl: getImageUrl,
+    }))
     const isResellerTenant = computed(() => {
         return String(config.value?.tenant?.mode || '').trim().toLowerCase() === 'reseller'
     })
@@ -49,7 +82,7 @@ export const useAppStore = defineStore('app', () => {
     useHead({
         htmlAttrs: { lang: computed(() => locale.value) },
         title: () => {
-            if (storefrontBrandOverride.value) return storefrontBrandOverride.value.siteName
+            if (headBrand.value.brandTitle) return headBrand.value.brandTitle
             const seo = config.value?.seo
             const lang = locale.value
             const localized = getLocalizedText(seo?.title, lang)
@@ -57,14 +90,36 @@ export const useAppStore = defineStore('app', () => {
             const siteName = String(config.value?.brand?.site_name || '').trim()
             return siteName || undefined
         },
-        link: () => [
-            { key: 'favicon', rel: 'icon', href: siteIconHref.value },
-            ...(storefrontBrandOverride.value?.touchIcon ? [{
-                key: 'apple-touch-icon',
-                rel: 'apple-touch-icon',
-                href: storefrontBrandOverride.value.touchIcon,
-            }] : []),
-        ],
+        link: () => {
+            const links: Array<Record<string, string>> = []
+            if (headBrand.value.siteIcon) {
+                const iconLink: Record<string, string> = {
+                    key: 'favicon',
+                    rel: 'icon',
+                    href: headBrand.value.siteIcon,
+                }
+                if (/\.svg(?:[?#]|$)/i.test(headBrand.value.siteIcon)) {
+                    iconLink.type = 'image/svg+xml'
+                }
+                links.push(iconLink)
+            }
+            if (headBrand.value.fallbackIcon) {
+                links.push({
+                    key: 'favicon-ico',
+                    rel: 'icon',
+                    sizes: 'any',
+                    href: headBrand.value.fallbackIcon,
+                })
+            }
+            if (headBrand.value.touchIcon) {
+                links.push({
+                    key: 'apple-touch-icon',
+                    rel: 'apple-touch-icon',
+                    href: headBrand.value.touchIcon,
+                })
+            }
+            return links
+        },
         meta: () => {
             const seo = config.value?.seo
             if (!seo) return []
@@ -81,6 +136,16 @@ export const useAppStore = defineStore('app', () => {
             return tags
         }
     })
+
+    // 待 useHead 接管 <head> 图标后，移除 index.html 首屏注入的临时 boot link，避免重复标签或残留。
+    watch(
+        [() => config.value, () => storefrontBrandOverride.value],
+        ([cfg, override]) => {
+            if (!cfg && !override) return
+            void nextTick(() => clearBootHeadLinks())
+        },
+        { immediate: true },
+    )
 
     // 更新SEO信息 (向后兼容的方法)
     const applySEO = () => {

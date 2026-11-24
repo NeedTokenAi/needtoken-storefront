@@ -5,6 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
+  <title></title>
   <script data-cfasync="false">
     (() => {
       try {
@@ -15,9 +16,35 @@
         const isDark = pref === 'dark' || (pref === 'light dark' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList.toggle('dark', isDark);
       } catch { /* Follow system color-scheme when storage is unavailable. */ }
+
+      const mainHost = location.hostname === 'needtoken.ai' || location.hostname === 'www.needtoken.ai';
+      let brandNeedtoken = mainHost;
+      try {
+        const param = new URLSearchParams(location.search).get('template');
+        const override = ['classic', 'vault', 'needtoken'].includes(param) ? param : param === 'reset' ? null : localStorage.getItem('dj-storefront-template');
+        const template = override || localStorage.getItem('dj-storefront-template-last');
+        if (!mainHost && template === 'needtoken' && localStorage.getItem('dj-storefront-boot-main') === '1') {
+          brandNeedtoken = true;
+        }
+        const lang = localStorage.getItem('locale') || navigator.language || 'zh-CN';
+        document.documentElement.dataset.bootLocale = /^(zh-TW|zh-HK|zh-Hant)/i.test(lang) ? 'zh-TW' : /^en/i.test(lang) ? 'en-US' : 'zh-CN';
+      } catch { /* Unknown tenants retain neutral startup placeholders. */ }
+
+      if (brandNeedtoken) {
+        document.documentElement.dataset.bootBrand = 'needtoken';
+        document.title = 'NeedToken.AI';
+        const appendHeadLink = attrs => {
+          const link = document.createElement('link');
+          link.dataset.ntBootHead = '1';
+          Object.entries(attrs).forEach(([key, value]) => link.setAttribute(key, value));
+          document.head.appendChild(link);
+        };
+        appendHeadLink({ rel: 'icon', type: 'image/svg+xml', href: '/needtoken-icon.svg' });
+        appendHeadLink({ rel: 'icon', sizes: 'any', href: '/needtoken.ico' });
+        appendHeadLink({ rel: 'apple-touch-icon', href: '/needtoken-touch.png' });
+      }
     })();
   </script>
-  <title></title>
   <style>
     html,body{margin:0}#nt-preboot{--boot-bg:#f5f5f7;--boot-fg:#1d1d1f;--boot-muted:#7d8a99;min-height:100svh;background:var(--boot-bg);color:var(--boot-fg);font-family:ui-sans-serif,system-ui,-apple-system,sans-serif}
     #nt-preboot .nt-preboot-header{max-width:1152px;height:64px;margin:auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:24px}.nt-preboot-identity,.nt-preboot-nav{display:flex;align-items:center;gap:12px}.nt-preboot-identity{font-size:17px;font-weight:700;letter-spacing:-.035em}.nt-preboot-nav{gap:20px}
@@ -45,7 +72,7 @@
 <body>
   <div id="app">
     <div id="nt-preboot" role="status" aria-live="polite" aria-busy="true">
-      <div class="nt-preboot-header" aria-hidden="true"><div class="nt-preboot-identity"><i></i><span class="nt-preboot-brand"><svg width="30" height="30" viewBox="0 0 64 64" fill="none"><rect x="1" y="1" width="62" height="62" rx="18" fill="#10241f" stroke="#2dd4a7" stroke-opacity=".3" stroke-width="2"/><path d="M19 45V19l26 26V19" stroke="#5eeac0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="nt-preboot-brand" translate="no">NeedToken.AI</span></div><div class="nt-preboot-nav"><i></i><i></i><i></i></div></div>
+      <div class="nt-preboot-header" aria-hidden="true"><div class="nt-preboot-identity"><i></i><span class="nt-preboot-brand"><svg width="30" height="30" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="1" y="1" width="62" height="62" rx="18" fill="#10241f" stroke="#2dd4a7" stroke-opacity=".3" stroke-width="2"/><path d="M19 45V19l26 26V19" stroke="#5eeac0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="45" cy="19" r="4.5" fill="#cefff0"/></svg></span><span class="nt-preboot-brand" translate="no">NeedToken.AI</span></div><div class="nt-preboot-nav"><i></i><i></i><i></i></div></div>
       <div class="nt-preboot-scene">
         <svg class="nt-preboot-logo nt-preboot-brand" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="1" y="1" width="62" height="62" rx="18" fill="#10241f" stroke="#2dd4a7" stroke-opacity=".3" stroke-width="2"/><path d="M19 45V19l26 26V19" stroke="#5eeac0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/><circle cx="45" cy="19" r="4.5" fill="#cefff0"/></svg>
         <span class="nt-preboot-neutral" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -61,16 +88,6 @@
   <script data-cfasync="false">
     (() => {
       const root = document.getElementById('nt-preboot');
-      const mainHost = location.hostname === 'needtoken.ai' || location.hostname === 'www.needtoken.ai';
-      if (mainHost) document.documentElement.dataset.bootBrand = 'needtoken';
-      try {
-        const param = new URLSearchParams(location.search).get('template');
-        const override = ['classic', 'vault', 'needtoken'].includes(param) ? param : param === 'reset' ? null : localStorage.getItem('dj-storefront-template');
-        const template = override || localStorage.getItem('dj-storefront-template-last');
-        if (!mainHost && template === 'needtoken' && localStorage.getItem('dj-storefront-boot-main') === '1') document.documentElement.dataset.bootBrand = 'needtoken';
-        const lang = localStorage.getItem('locale') || navigator.language || 'zh-CN';
-        document.documentElement.dataset.bootLocale = /^(zh-TW|zh-HK|zh-Hant)/i.test(lang) ? 'zh-TW' : /^en/i.test(lang) ? 'en-US' : 'zh-CN';
-      } catch { /* Unknown tenants retain neutral startup placeholders. */ }
       const timer = window.setTimeout(() => { if (root?.isConnected) root.dataset.slow = '1'; }, 8000);
       const retry = () => location.reload();
       root?.querySelector('.nt-preboot-retry')?.addEventListener('click', retry);

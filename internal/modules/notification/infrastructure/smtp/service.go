@@ -304,6 +304,9 @@ func buildVerifyCodeContent(code, purpose, locale string, brands ...mailbrand.Br
 		case constants.VerifyPurposeEmailAuth:
 			subject = "繼續登入或註冊"
 			purposeText = "確認郵箱所有權後繼續登入或註冊"
+		case constants.VerifyPurposeLoginEnv:
+			subject = "新環境登入安全驗證碼"
+			purposeText = "驗證新登入環境並完成登入"
 		case constants.VerifyPurposeRegister:
 			subject = "註冊驗證碼"
 			purposeText = "註冊"
@@ -326,6 +329,9 @@ func buildVerifyCodeContent(code, purpose, locale string, brands ...mailbrand.Br
 		case constants.VerifyPurposeEmailAuth:
 			subject = "Continue sign-in or registration"
 			purposeText = "verifying inbox ownership to continue sign-in or registration"
+		case constants.VerifyPurposeLoginEnv:
+			subject = "Sign-in Security Verification Code"
+			purposeText = "confirming your new sign-in environment"
 		case constants.VerifyPurposeRegister:
 			subject = "Registration Code"
 			purposeText = "registration"
@@ -348,6 +354,9 @@ func buildVerifyCodeContent(code, purpose, locale string, brands ...mailbrand.Br
 		case constants.VerifyPurposeEmailAuth:
 			subject = "继续登录或注册"
 			purposeText = "确认邮箱所有权后继续登录或注册"
+		case constants.VerifyPurposeLoginEnv:
+			subject = "新环境登录安全验证码"
+			purposeText = "验证新登录环境并完成登录"
 		case constants.VerifyPurposeRegister:
 			subject = "注册验证码"
 			purposeText = "注册"

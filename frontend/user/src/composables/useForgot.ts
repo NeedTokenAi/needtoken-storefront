@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import { useUserAuthStore } from '../stores/userAuth'
 import { useI18n } from 'vue-i18n'
 import { debounceAsync } from '../utils/debounce'
+import { resolveFallbackSiteName } from '../utils/storefrontStartup'
 import { useAppStore } from '../stores/app'
 import type { CaptchaPayload } from '../api'
 import ImageCaptcha from '../components/captcha/ImageCaptcha.vue'
@@ -18,10 +19,12 @@ export function useForgot() {
   const appStore = useAppStore()
   const { t } = useI18n()
 
-  const brandSiteName = computed(() => {
-    const siteName = String(appStore.config?.brand?.site_name || '').trim()
-    return siteName !== '' ? siteName : 'Dujiao-Next'
-  })
+  const brandSiteName = computed(() => resolveFallbackSiteName(appStore.config?.brand?.site_name, {
+    brandOverrideName: appStore.storefrontBrandOverride?.siteName,
+    fallbackLabel: t('common.siteName'),
+    hostname: typeof window === 'undefined' ? '' : window.location.hostname,
+    isReseller: appStore.isResellerTenant,
+  }))
 
   const emailVerificationEnabled = computed(() => appStore.config?.email_verification_enabled !== false)
 
@@ -62,7 +65,7 @@ export function useForgot() {
       }
     }
     if (captchaProvider.value === 'turnstile') {
-      return {
+      return turnstileRef.value?.getPayload() ?? {
         turnstile_token: turnstileToken.value,
       }
     }
@@ -90,7 +93,8 @@ export function useForgot() {
       }
     }
     if (sendCodeCaptchaEnabled.value && captchaProvider.value === 'turnstile') {
-      if (!turnstileToken.value) {
+      const resolved = getCaptchaPayload()
+      if (!resolved?.turnstile_token && !(resolved?.captcha_id && resolved?.captcha_code)) {
         error.value = t('auth.common.captchaRequired')
         return
       }

@@ -45,7 +45,7 @@
     "failed": "Unable to retrieve credentials right now. Refresh the page or contact support."
   },
   "common": {
-    "siteName": "Dujiao-Next",
+    "siteName": "Digital Store",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
@@ -75,7 +75,8 @@
   },
   "errorBoundary": {
     "retry": "Retry",
-    "defaultMessage": "Something went wrong. Please try again."
+    "defaultMessage": "Something went wrong. Please try again.",
+    "chunkLoadFailed": "The site was updated or a page module failed to load. Click retry to refresh."
   },
   "formValidation": {
     "required": "This field is required",
@@ -160,7 +161,7 @@
   },
   "home": {
     "hero": {
-      "title": "Dujiao-Next",
+      "title": "Digital Store",
       "subtitle": "Professional Products and Services Provider",
       "cta": "Browse Products",
       "badge": "Next Gen Digital Store"
@@ -308,8 +309,8 @@
   },
   "about": {
     "title": "About Us",
-    "subtitle": "Learn about Dujiao-Next",
-    "introduction": "Dujiao-Next is a professional online studio dedicated to providing high-quality products and services to our customers. Innovation, professionalism, and efficiency are our core values, and we constantly pursue excellence to create value for our customers.",
+    "subtitle": "Learn about us",
+    "introduction": "We are a professional online digital storefront dedicated to providing high-quality products and services to our customers. Innovation, professionalism, and efficiency are our core values, and we constantly pursue excellence to create value for our customers.",
     "ourServices": "Our Services",
     "service1": "Premium Product Recommendations & Sales",
     "service2": "Professional Pre-sales Consulting",
@@ -1066,6 +1067,11 @@
       "captchaRefresh": "Refresh",
       "captchaRefreshing": "Refreshing...",
       "captchaCodePlaceholder": "Enter the image captcha",
+      "turnstileLoading": "Loading security verification...",
+      "turnstileSlowHint": "Taking too long to load?",
+      "turnstileUseImage": "Use image captcha",
+      "turnstileFallbackNotice": "Slow network detected. Switched to image captcha.",
+      "turnstileRetry": "Retry Turnstile",
       "showPassword": "Show password",
       "hidePassword": "Hide password"
     },
@@ -1118,6 +1124,22 @@
         "codeRequired": "Please enter the code",
         "recoveryRequired": "Please enter a recovery code",
         "verifyFailed": "Verification failed, please check your input"
+      },
+      "emailVerify": {
+        "title": "Verify your sign-in environment",
+        "subtitle": "A new device or environment was detected. We sent a security code to {email}.",
+        "codeLabel": "Email security code",
+        "codePlaceholder": "Enter the code from your email",
+        "codeRequired": "Please enter the verification code",
+        "submit": "Verify and sign in",
+        "verifying": "Verifying...",
+        "resend": "Resend verification code",
+        "resendCountdown": "Resend available in {seconds}s",
+        "resent": "A new verification code has been sent to your email.",
+        "verifyFailed": "Invalid or expired verification code. Please try again.",
+        "expired": "Verification timed out. Please sign in again.",
+        "cancel": "Back to sign in",
+        "deviceTrustHint": "Once verified, this device will be trusted for 30 days so you can sign in directly with your password."
       },
       "inviteOnlyHint": "Registration is invite-only. New users (including third-party sign-in) need an invite code."
     },
@@ -3220,7 +3242,17 @@
       "newPassword": "Set a sign-in password",
       "setupTwoFactor": "Set up two-step verification after signing up",
       "setupTwoFactorHint": "After account creation, scan with an authenticator and confirm a code to enable it.",
-      "securityHint": "Your existing password and two-step verification still protect your account."
+      "securityHint": "Your existing password and two-step verification still protect your account.",
+      "tabLogin": "Sign in",
+      "tabRegister": "Create account",
+      "loginSubtitle": "Sign in directly with email and password. Email verification is only required when your environment changes.",
+      "registerSubtitle": "Verify your email, set a password, and you'll be signed in right away.",
+      "registerCodeSubtitle": "Enter the email verification code and set your password to finish creating your account.",
+      "codeSentHint": "Verification code sent. Enter it below and set your password.",
+      "emailExistsSwitch": "This email is already registered — sign in instead →",
+      "sendRegisterCode": "Send verification code",
+      "submitRegister": "Create account & sign in",
+      "deviceSecurityHint": "Trusted devices sign in directly for 30 days. Changing your password revokes old devices."
     },
     "homeLibrary": {
       "eyebrow": "Product library",

@@ -3,11 +3,14 @@ package userauthhttp
 import (
 	"context"
 	"errors"
+	"net/http"
+	"strings"
 	"time"
 
 	userdomain "github.com/dujiao-next/internal/modules/identity/user/domain"
 
 	"github.com/dujiao-next/internal/constants"
+	"github.com/dujiao-next/internal/i18n"
 	captcha "github.com/dujiao-next/internal/modules/captcha/contract"
 	captchahttp "github.com/dujiao-next/internal/modules/captcha/transport/http"
 	userpresenter "github.com/dujiao-next/internal/modules/identity/userauth/transport/presenter"
@@ -17,11 +20,83 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var (
-	ErrAgreementRequired  = errors.New("agreement required")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrEmailNotVerified   = errors.New("email not verified")
+const (
+	trustedDeviceCookieName   = "nt_trusted_device"
+	trustedDeviceCookieMaxAge = 30 * 24 * 3600
 )
+
+var (
+	ErrAgreementRequired          = errors.New("agreement required")
+	ErrInvalidCredentials         = errors.New("invalid credentials")
+	ErrEmailNotVerified           = errors.New("email not verified")
+	ErrLoginEmailChallengeInvalid = errors.New("login email challenge invalid")
+	ErrAccountLocked              = errors.New("account login temporarily locked")
+)
+
+// AccountLockedError 携带账号临时锁定的剩余秒数。
+type AccountLockedError struct {
+	RetryAfterSeconds int
+}
+
+func (e AccountLockedError) Error() string { return ErrAccountLocked.Error() }
+func (e AccountLockedError) Is(target error) bool {
+	return target == ErrAccountLocked
+}
+
+// LoginContextParams 登录环境校验输入。
+type LoginContextParams struct {
+	Email              string
+	Password           string
+	RememberMe         bool
+	ClientIP           string
+	UserAgent          string
+	Locale             string
+	TrustedDeviceToken string
+}
+
+// UserLoginEnvAuth 是可选的环境感知登录、受信任设备签发与邮箱二次验证端口。
+type UserLoginEnvAuth interface {
+	LoginStep1WithEnv(ctx context.Context, params LoginContextParams) (*AuthLoginResult, error)
+	VerifyLoginEmail(ctx context.Context, challengeToken, code, userAgent string) (*AuthLoginResult, error)
+	ResendLoginEmail(ctx context.Context, challengeToken, locale string) error
+	IssueTrustedDeviceToken(user *userdomain.User, userAgent string) string
+}
+
+// TrustedDeviceIssuer 供注册/2FA 完成后签发受信任设备 Cookie。
+type TrustedDeviceIssuer interface {
+	IssueTrustedDeviceToken(user *userdomain.User, userAgent string) string
+}
+
+func isSecureCookieRequest(c *gin.Context) bool {
+	if c == nil || c.Request == nil {
+		return false
+	}
+	if c.Request.TLS != nil {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")), "https") {
+		return true
+	}
+	if strings.Contains(strings.ToLower(c.GetHeader("CF-Visitor")), `"https"`) {
+		return true
+	}
+	return false
+}
+
+func setTrustedDeviceCookie(c *gin.Context, token string) {
+	if c == nil || strings.TrimSpace(token) == "" {
+		return
+	}
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     trustedDeviceCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   trustedDeviceCookieMaxAge,
+		HttpOnly: true,
+		Secure:   isSecureCookieRequest(c),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
 
 // UserLoginSettings 是注册端点所需的设置端口。
 type UserLoginSettings interface {
@@ -55,11 +130,12 @@ func NewUserLoginHandler(settings UserLoginSettings, auth UserLoginAuth, captcha
 
 // UserRegisterRequest 注册请求。
 type UserRegisterRequest struct {
-	Email             string `json:"email" binding:"required"`
-	Password          string `json:"password" binding:"required"`
-	Code              string `json:"code"`
-	InviteCode        string `json:"invite_code"`
-	AgreementAccepted bool   `json:"agreement_accepted"`
+	Email             string                            `json:"email" binding:"required"`
+	Password          string                            `json:"password" binding:"required"`
+	Code              string                            `json:"code"`
+	InviteCode        string                            `json:"invite_code"`
+	AgreementAccepted bool                              `json:"agreement_accepted"`
+	CaptchaPayload    captchahttp.CaptchaPayloadRequest `json:"captcha_payload"`
 }
 
 // UserLoginRequest 登录请求。
@@ -100,6 +176,14 @@ func (h *UserLoginHandler) UserRegister(c *gin.Context) {
 		return
 	}
 
+	// 若站点未开启邮箱验证，注册提交必须直接过人机核验，防止脚本无限批量注册。
+	if !emailVerificationEnabled && h.captcha != nil {
+		if captchaErr := h.captcha.Verify(constants.CaptchaSceneRegisterSendCode, req.CaptchaPayload, c.ClientIP()); captchaErr != nil {
+			respondCaptchaError(c, captchaErr)
+			return
+		}
+	}
+
 	user, token, expiresAt, err := h.auth.Register(c.Request.Context(), req.Email, req.Password, req.Code, req.InviteCode, req.AgreementAccepted, emailVerificationEnabled)
 	if err != nil {
 		if respondInviteCodeError(c, err) {
@@ -126,6 +210,13 @@ func (h *UserLoginHandler) UserRegister(c *gin.Context) {
 			ginutil.RespondError(c, response.CodeInternal, "error.register_failed", err)
 		}
 		return
+	}
+
+	if issuer, ok := h.auth.(TrustedDeviceIssuer); ok && user != nil {
+		setTrustedDeviceCookie(c, issuer.IssueTrustedDeviceToken(user, c.GetHeader("User-Agent")))
+	}
+	if user != nil {
+		h.recordLogin(c, user.Email, user.ID, constants.LoginLogStatusSuccess, "", constants.LoginLogSourceWeb)
 	}
 
 	response.Success(c, gin.H{
@@ -167,9 +258,35 @@ func (h *UserLoginHandler) UserLogin(c *gin.Context) {
 		}
 	}
 
-	res, err := h.auth.LoginStep1(c.Request.Context(), req.Email, req.Password, req.RememberMe)
+	var (
+		res *AuthLoginResult
+		err error
+	)
+	if envAuth, ok := h.auth.(UserLoginEnvAuth); ok {
+		trustedCookie, _ := c.Cookie(trustedDeviceCookieName)
+		res, err = envAuth.LoginStep1WithEnv(c.Request.Context(), LoginContextParams{
+			Email:              req.Email,
+			Password:           req.Password,
+			RememberMe:         req.RememberMe,
+			ClientIP:           c.ClientIP(),
+			UserAgent:          c.GetHeader("User-Agent"),
+			Locale:             i18n.ResolveLocale(c),
+			TrustedDeviceToken: trustedCookie,
+		})
+	} else {
+		res, err = h.auth.LoginStep1(c.Request.Context(), req.Email, req.Password, req.RememberMe)
+	}
 	if err != nil {
+		var lockedErr AccountLockedError
 		switch {
+		case errors.As(err, &lockedErr):
+			h.recordLogin(c, req.Email, 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonAccountLocked, constants.LoginLogSourceWeb)
+			retryAfter := lockedErr.RetryAfterSeconds
+			if retryAfter < 1 {
+				retryAfter = 60
+			}
+			msg := i18n.Sprintf(i18n.ResolveLocale(c), "error.login_account_locked", retryAfter)
+			response.ErrorWithHTTPStatus(c, http.StatusTooManyRequests, response.CodeTooManyRequests, msg)
 		case errors.Is(err, ErrInvalidEmail):
 			h.recordLogin(c, req.Email, 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonInvalidEmail, constants.LoginLogSourceWeb)
 			ginutil.RespondError(c, response.CodeBadRequest, "error.email_invalid", nil)
@@ -182,6 +299,9 @@ func (h *UserLoginHandler) UserLogin(c *gin.Context) {
 		case errors.Is(err, ErrUserDisabled):
 			h.recordLogin(c, req.Email, 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonUserDisabled, constants.LoginLogSourceWeb)
 			ginutil.RespondError(c, response.CodeUnauthorized, "error.user_disabled", nil)
+		case errors.Is(err, ErrVerifyCodeTooFrequent):
+			h.recordLogin(c, req.Email, 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonTooManyAttempts, constants.LoginLogSourceWeb)
+			ginutil.RespondError(c, response.CodeTooManyRequests, "error.verify_code_too_frequent", nil)
 		default:
 			h.recordLogin(c, req.Email, 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonInternalError, constants.LoginLogSourceWeb)
 			ginutil.RespondError(c, response.CodeInternal, "error.login_failed", err)
@@ -192,20 +312,126 @@ func (h *UserLoginHandler) UserLogin(c *gin.Context) {
 	if res.RequiresTOTP {
 		h.recordLogin(c, res.User.Email, res.User.ID, constants.LoginLogStatusSuccess, constants.LoginLogPasswordOK2FAPending, constants.LoginLogSourceWeb)
 		response.Success(c, gin.H{
-			"requires_totp":        true,
-			"challenge_token":      res.ChallengeToken,
-			"challenge_expires_at": res.ChallengeExpiresAt.Format("2006-01-02T15:04:05Z07:00"),
+			"requires_totp":         true,
+			"requires_email_verify": false,
+			"challenge_token":       res.ChallengeToken,
+			"challenge_expires_at":  res.ChallengeExpiresAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
 		return
 	}
 
+	if res.RequiresEmailVerify {
+		c.Header("Cache-Control", "no-store")
+		h.recordLogin(c, res.User.Email, res.User.ID, constants.LoginLogStatusSuccess, constants.LoginLogPasswordOKEmailPending, constants.LoginLogSourceWeb)
+		response.Success(c, gin.H{
+			"requires_totp":         false,
+			"requires_email_verify": true,
+			"challenge_token":       res.ChallengeToken,
+			"challenge_expires_at":  res.ChallengeExpiresAt.Format("2006-01-02T15:04:05Z07:00"),
+			"masked_email":          res.MaskedEmail,
+		})
+		return
+	}
+
+	setTrustedDeviceCookie(c, res.TrustedDeviceToken)
 	h.recordLogin(c, res.User.Email, res.User.ID, constants.LoginLogStatusSuccess, "", constants.LoginLogSourceWeb)
 	response.Success(c, gin.H{
-		"requires_totp": false,
-		"user":          userpresenter.NewUserAuthBriefResp(res.User),
-		"token":         res.Token,
-		"expires_at":    res.ExpiresAt.Format("2006-01-02T15:04:05Z07:00"),
+		"requires_totp":         false,
+		"requires_email_verify": false,
+		"user":                  userpresenter.NewUserAuthBriefResp(res.User),
+		"token":                 res.Token,
+		"expires_at":            res.ExpiresAt.Format("2006-01-02T15:04:05Z07:00"),
 	})
+}
+
+// VerifyLoginEmailRequest 新环境登录邮箱验证码核验请求。
+type VerifyLoginEmailRequest struct {
+	ChallengeToken string `json:"challenge_token" binding:"required"`
+	Code           string `json:"code" binding:"required"`
+}
+
+// VerifyLoginEmail 完成新环境登录邮箱验证码验证并签发受信任设备 Cookie。
+func (h *UserLoginHandler) VerifyLoginEmail(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var req VerifyLoginEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ginutil.RespondBindError(c, err)
+		return
+	}
+	envAuth, ok := h.auth.(UserLoginEnvAuth)
+	if !ok {
+		ginutil.RespondError(c, response.CodeInternal, "error.email_auth_unavailable", nil)
+		return
+	}
+	res, err := envAuth.VerifyLoginEmail(c.Request.Context(), req.ChallengeToken, req.Code, c.GetHeader("User-Agent"))
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrLoginEmailChallengeInvalid):
+			h.recordLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonChallengeInvalid, constants.LoginLogSourceWeb)
+			ginutil.RespondError(c, response.CodeUnauthorized, "error.login_email_challenge_invalid", nil)
+		case errors.Is(err, ErrVerifyCodeInvalid):
+			h.recordLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonInvalidCredentials, constants.LoginLogSourceWeb)
+			ginutil.RespondError(c, response.CodeBadRequest, "error.verify_code_invalid", nil)
+		case errors.Is(err, ErrVerifyCodeExpired):
+			h.recordLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonChallengeInvalid, constants.LoginLogSourceWeb)
+			ginutil.RespondError(c, response.CodeBadRequest, "error.verify_code_expired", nil)
+		case errors.Is(err, ErrVerifyCodeAttemptsExceeded):
+			h.recordLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonTooManyAttempts, constants.LoginLogSourceWeb)
+			ginutil.RespondError(c, response.CodeTooManyRequests, "error.verify_code_attempts_exceeded", nil)
+		case errors.Is(err, ErrUserDisabled):
+			h.recordLogin(c, "", 0, constants.LoginLogStatusFailed, constants.LoginLogFailReasonUserDisabled, constants.LoginLogSourceWeb)
+			ginutil.RespondError(c, response.CodeUnauthorized, "error.user_disabled", nil)
+		default:
+			ginutil.RespondError(c, response.CodeInternal, "error.login_failed", err)
+		}
+		return
+	}
+	setTrustedDeviceCookie(c, res.TrustedDeviceToken)
+	h.recordLogin(c, res.User.Email, res.User.ID, constants.LoginLogStatusSuccess, "", constants.LoginLogSourceWeb)
+	response.Success(c, gin.H{
+		"requires_totp":         false,
+		"requires_email_verify": false,
+		"user":                  userpresenter.NewUserAuthBriefResp(res.User),
+		"token":                 res.Token,
+		"expires_at":            res.ExpiresAt.Format("2006-01-02T15:04:05Z07:00"),
+	})
+}
+
+// ResendLoginEmailRequest 重发新环境登录邮箱验证码请求。
+type ResendLoginEmailRequest struct {
+	ChallengeToken string `json:"challenge_token" binding:"required"`
+}
+
+// ResendLoginEmail 重发新环境登录安全验证码。
+func (h *UserLoginHandler) ResendLoginEmail(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var req ResendLoginEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ginutil.RespondBindError(c, err)
+		return
+	}
+	envAuth, ok := h.auth.(UserLoginEnvAuth)
+	if !ok {
+		ginutil.RespondError(c, response.CodeInternal, "error.email_auth_unavailable", nil)
+		return
+	}
+	if err := envAuth.ResendLoginEmail(c.Request.Context(), req.ChallengeToken, i18n.ResolveLocale(c)); err != nil {
+		switch {
+		case errors.Is(err, ErrLoginEmailChallengeInvalid):
+			ginutil.RespondError(c, response.CodeUnauthorized, "error.login_email_challenge_invalid", nil)
+		case errors.Is(err, ErrUserDisabled):
+			ginutil.RespondError(c, response.CodeUnauthorized, "error.user_disabled", nil)
+		case errors.Is(err, ErrVerifyCodeTooFrequent):
+			ginutil.RespondError(c, response.CodeTooManyRequests, "error.verify_code_too_frequent", nil)
+		case errors.Is(err, ErrEmailServiceDisabled),
+			errors.Is(err, ErrEmailServiceNotConfigured):
+			ginutil.RespondError(c, response.CodeInternal, "error.email_service_not_configured", err)
+		default:
+			ginutil.RespondError(c, response.CodeInternal, "error.send_verify_code_failed", err)
+		}
+		return
+	}
+	response.Success(c, gin.H{"sent": true})
 }
 
 var (

@@ -577,7 +577,7 @@ export function useCheckout(options: { source?: 'buynow' } = {}) {
       }
     }
     if (captchaProvider.value === 'turnstile') {
-      return {
+      return guestTurnstileRef.value?.getPayload() ?? {
         turnstile_token: guestTurnstileToken.value,
       }
     }
@@ -608,7 +608,7 @@ export function useCheckout(options: { source?: 'buynow' } = {}) {
       return Boolean(guestCaptchaPayload.value.captcha_id && guestCaptchaPayload.value.captcha_code)
     }
     if (captchaProvider.value === 'turnstile') {
-      return Boolean(guestTurnstileToken.value)
+      return Boolean(guestTurnstileRef.value?.hasPayload() ?? guestTurnstileToken.value)
     }
     return false
   })

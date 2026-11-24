@@ -199,6 +199,7 @@ import { useAppStore } from '../../stores/app'
 import { useUserAuthStore } from '../../stores/userAuth'
 import { useTheme } from '../../utils/theme'
 import { getImageUrl } from '../../utils/image'
+import { resolveFallbackSiteName } from '../../utils/storefrontStartup'
 
 defineProps<{
   title: string
@@ -226,10 +227,12 @@ const currentLocaleLabel = computed(() => {
   return '简'
 })
 
-const brandSiteName = computed(() => {
-  const text = String(appStore.config?.brand?.site_name || '').trim()
-  return text !== '' ? text : 'Dujiao-Next'
-})
+const brandSiteName = computed(() => resolveFallbackSiteName(appStore.config?.brand?.site_name, {
+  brandOverrideName: appStore.storefrontBrandOverride?.siteName,
+  fallbackLabel: t('common.siteName'),
+  hostname: typeof window === 'undefined' ? '' : window.location.hostname,
+  isReseller: appStore.isResellerTenant,
+}))
 
 const brandLogo = computed(() => {
   const raw = String(appStore.config?.brand?.site_logo || '').trim()

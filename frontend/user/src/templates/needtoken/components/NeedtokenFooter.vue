@@ -135,7 +135,7 @@ const columns = computed(() => [
 .nt-footer-top { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.7fr); gap: 40px; padding: 40px 40px 32px; }
 .nt-footer-top.has-contact { grid-template-columns: minmax(190px, 0.9fr) minmax(0, 1.55fr) minmax(240px, 1.05fr); }
 .nt-footer-brand { display: inline-flex; align-items: center; gap: 11px; max-width: 100%; color: var(--ui-text-primary); font-size: 20px; font-weight: 700; letter-spacing: -.04em; }
-.nt-footer-brand > img { flex-shrink: 0; border-radius: 9px; object-fit: contain; }
+.nt-footer-brand > :is(img, svg) { flex-shrink: 0; border-radius: 9px; object-fit: contain; }
 .nt-footer-brand > span { min-width: 0; overflow-wrap: anywhere; }
 .nt-footer-description { max-width: 28ch; margin-top: 14px; font-size: 13px; line-height: 1.85; }
 .nt-footer-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; padding-top: 4px; }

@@ -178,7 +178,7 @@ const getCaptchaPayload = (): CaptchaPayload | undefined => {
     }
   }
   if (captchaProvider.value === 'turnstile') {
-    return {
+    return turnstileRef.value?.getPayload() ?? {
       turnstile_token: turnstileToken.value || '',
     }
   }
@@ -211,7 +211,7 @@ const ensureCaptchaPassed = () => {
     return Boolean(captchaPayload.value.captcha_id && captchaPayload.value.captcha_code)
   }
   if (captchaProvider.value === 'turnstile') {
-    return Boolean(turnstileToken.value)
+    return Boolean(turnstileRef.value?.hasPayload() ?? turnstileToken.value)
   }
   return false
 }

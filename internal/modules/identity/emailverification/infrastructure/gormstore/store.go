@@ -56,3 +56,11 @@ func (store *Store) ReserveAttempt(id uint, maxAttempts int) (bool, error) {
 	result := query.UpdateColumn("attempt_count", gorm.Expr("attempt_count + 1"))
 	return result.RowsAffected == 1, result.Error
 }
+
+func (store *Store) CountSentSince(email string, since time.Time) (int64, error) {
+	var count int64
+	err := store.db.Model(&emailverificationdomain.Code{}).
+		Where("email = ? AND deleted_at IS NULL AND sent_at >= ?", email, since).
+		Count(&count).Error
+	return count, err
+}

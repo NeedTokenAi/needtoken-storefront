@@ -58,7 +58,8 @@ func verificationExpiryMinutes(cfg *config.EmailConfig, purpose string) int {
 	if cfg != nil && cfg.VerifyCode.ExpireMinutes > 0 {
 		minutes = cfg.VerifyCode.ExpireMinutes
 	}
-	if strings.EqualFold(strings.TrimSpace(purpose), constants.VerifyPurposeEmailAuth) {
+	trimmedPurpose := strings.TrimSpace(purpose)
+	if strings.EqualFold(trimmedPurpose, constants.VerifyPurposeEmailAuth) || strings.EqualFold(trimmedPurpose, constants.VerifyPurposeLoginEnv) {
 		return min(minutes, constants.EmailAuthMaxExpireMinutes)
 	}
 	return minutes
