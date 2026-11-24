@@ -33,14 +33,17 @@ var (
 
 // AuthLoginResult 是 transport 层登录结果视图。
 type AuthLoginResult struct {
-	RequiresTOTP       bool
-	User               *userdomain.User
-	Token              string
-	ExpiresAt          time.Time
-	ChallengeToken     string
-	ChallengeExpiresAt time.Time
-	InviteRequired     bool
-	InviteTicket       string
+	RequiresTOTP        bool
+	RequiresEmailVerify bool
+	MaskedEmail         string
+	TrustedDeviceToken  string
+	User                *userdomain.User
+	Token               string
+	ExpiresAt           time.Time
+	ChallengeToken      string
+	ChallengeExpiresAt  time.Time
+	InviteRequired      bool
+	InviteTicket        string
 }
 
 // LoginRecorder 记录用户登录审计日志。

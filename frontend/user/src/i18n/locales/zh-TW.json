@@ -45,7 +45,7 @@
     "failed": "暫時無法取得安全領號憑據，請重新整理頁面後重試或聯絡客服。"
   },
   "common": {
-    "siteName": "Dujiao-Next",
+    "siteName": "數位商店",
     "loading": "載入中...",
     "error": "錯誤",
     "success": "成功",
@@ -75,7 +75,8 @@
   },
   "errorBoundary": {
     "retry": "重試",
-    "defaultMessage": "頁面載入出錯，請重試"
+    "defaultMessage": "頁面載入出錯，請重試",
+    "chunkLoadFailed": "頁面資源已更新或載入失敗，請點擊重試重新整理頁面。"
   },
   "formValidation": {
     "required": "此欄位為必填項",
@@ -160,7 +161,7 @@
   },
   "home": {
     "hero": {
-      "title": "Dujiao-Next · D&N",
+      "title": "數位商店",
       "subtitle": "專業的產品與服務提供商",
       "cta": "瀏覽商品",
       "badge": "新一代數位商店"
@@ -308,8 +309,8 @@
   },
   "about": {
     "title": "關於我們",
-    "subtitle": "了解Dujiao-Next",
-    "introduction": "Dujiao-Next（D&N）是一家專業的線上工作室，致力於為客戶提供優質的產品和服務。我們以創新、專業、高效為核心價值觀，不斷追求卓越，為客戶創造價值。",
+    "subtitle": "了解我們",
+    "introduction": "我們是一家專業的線上數位服務與商品商店，致力於為客戶提供優質的產品和服務。我們以創新、專業、高效為核心價值觀，不斷追求卓越，為客戶創造價值。",
     "ourServices": "我們的服務",
     "service1": "優質商品推薦與銷售",
     "service2": "專業的售前諮詢服務",
@@ -1066,6 +1067,11 @@
       "captchaRefresh": "換一張",
       "captchaRefreshing": "刷新中...",
       "captchaCodePlaceholder": "請輸入圖片驗證碼",
+      "turnstileLoading": "正在載入安全驗證...",
+      "turnstileSlowHint": "安全驗證載入較慢？",
+      "turnstileUseImage": "切換圖形驗證碼",
+      "turnstileFallbackNotice": "網路較慢，已自動切換為圖形驗證碼",
+      "turnstileRetry": "重試人機驗證",
       "showPassword": "顯示密碼",
       "hidePassword": "隱藏密碼"
     },
@@ -1118,6 +1124,22 @@
         "codeRequired": "請輸入動態碼",
         "recoveryRequired": "請輸入恢復碼",
         "verifyFailed": "驗證失敗，請確認輸入是否正確"
+      },
+      "emailVerify": {
+        "title": "驗證你的登入環境",
+        "subtitle": "偵測到新裝置或新登入環境，已向 {email} 寄送安全驗證碼。",
+        "codeLabel": "信箱安全驗證碼",
+        "codePlaceholder": "輸入郵件中的驗證碼",
+        "codeRequired": "請輸入信箱驗證碼",
+        "submit": "驗證並登入",
+        "verifying": "驗證中...",
+        "resend": "重新寄送驗證碼",
+        "resendCountdown": "{seconds}s 後可重新寄送",
+        "resent": "驗證碼已重新寄送，請查收信箱。",
+        "verifyFailed": "驗證碼錯誤或已過期，請重試",
+        "expired": "安全驗證已逾時，請重新輸入帳號密碼登入",
+        "cancel": "返回登入",
+        "deviceTrustHint": "驗證通過後將記住目前裝置 30 天，後續可直接輸入密碼登入。"
       },
       "inviteOnlyHint": "本站僅限邀請註冊，新用戶（含第三方登入）需填寫邀請碼。"
     },
@@ -3220,7 +3242,17 @@
       "newPassword": "設定登入密碼",
       "setupTwoFactor": "註冊後設定兩步驗證",
       "setupTwoFactorHint": "建立帳號後，用驗證器掃碼並輸入驗證碼啟用。",
-      "securityHint": "既有密碼與兩步驗證繼續保護你的帳號。"
+      "securityHint": "既有密碼與兩步驗證繼續保護你的帳號。",
+      "tabLogin": "登入",
+      "tabRegister": "建立帳號",
+      "loginSubtitle": "輸入信箱與密碼即可登入；僅在新裝置或環境變化時需要信箱驗證。",
+      "registerSubtitle": "驗證信箱後設定登入密碼，即可立即建立帳號並登入。",
+      "registerCodeSubtitle": "輸入收到的信箱驗證碼並設定密碼，完成後將自動登入。",
+      "codeSentHint": "驗證碼已寄送至你的信箱，請查收並設定登入密碼。",
+      "emailExistsSwitch": "此信箱已註冊，直接去登入 →",
+      "sendRegisterCode": "寄送信箱驗證碼",
+      "submitRegister": "建立帳號並登入",
+      "deviceSecurityHint": "受信任裝置 30 天內可直接輸入密碼登入，修改密碼將自動失效舊裝置。"
     },
     "homeLibrary": {
       "eyebrow": "產品庫",

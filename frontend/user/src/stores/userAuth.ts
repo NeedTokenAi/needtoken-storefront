@@ -24,6 +24,10 @@ export const useUserAuthStore = defineStore('user-auth', () => {
     // 2FA 挑战中间状态（不持久化到 localStorage）
     const challengeToken = ref<string>('')
     const challengeExpiresAt = ref<string>('')
+    // 新环境登录邮箱验证挑战中间状态（不持久化）
+    const emailVerifyChallengeToken = ref<string>('')
+    const emailVerifyExpiresAt = ref<string>('')
+    const emailVerifyMaskedEmail = ref<string>('')
     // 邀请制下第三方新用户的待补邀请码票据（不持久化，后端 10 分钟有效）
     const inviteTicket = ref<string>('')
 
@@ -82,6 +86,12 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         challengeExpiresAt.value = ''
     }
 
+    const clearEmailVerifyChallenge = () => {
+        emailVerifyChallengeToken.value = ''
+        emailVerifyExpiresAt.value = ''
+        emailVerifyMaskedEmail.value = ''
+    }
+
     const login = async (payload: any) => {
         loading.value = true
         try {
@@ -90,6 +100,40 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         } finally {
             loading.value = false
         }
+    }
+
+    const verifyLoginEmail = async (code: string) => {
+        if (!emailVerifyChallengeToken.value) {
+            throw new Error('challenge_token_missing')
+        }
+        loading.value = true
+        try {
+            const response = await userAuthAPI.verifyLoginEmail({
+                challenge_token: emailVerifyChallengeToken.value,
+                code,
+            })
+            const data = response.data.data || {}
+            const { token: accessToken, user: userData } = data
+            setToken(accessToken)
+            setUser(userData)
+            clearEmailVerifyChallenge()
+            if (accessToken) {
+                triggerSilentApiAccountLinkEnsure({ force: true })
+            }
+            return true
+        } finally {
+            loading.value = false
+        }
+    }
+
+    const resendLoginEmail = async () => {
+        if (!emailVerifyChallengeToken.value) {
+            throw new Error('challenge_token_missing')
+        }
+        await userAuthAPI.resendLoginEmail({
+            challenge_token: emailVerifyChallengeToken.value,
+        })
+        return true
     }
 
     const verify2FA = async (payload: { code?: string; recovery_code?: string }) => {
@@ -116,17 +160,26 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         }
     }
 
-    const handleLoginResponse = (data: any): { requiresTotp: boolean; inviteRequired?: boolean } => {
+    const handleLoginResponse = (data: any): { requiresTotp: boolean; requiresEmailVerify?: boolean; inviteRequired?: boolean } => {
         if (data?.invite_required) {
             inviteTicket.value = data.invite_ticket || ''
             return { requiresTotp: false, inviteRequired: true }
         }
         if (data?.requires_totp) {
+            clearEmailVerifyChallenge()
             challengeToken.value = data.challenge_token || ''
             challengeExpiresAt.value = data.challenge_expires_at || ''
             return { requiresTotp: true }
         }
+        if (data?.requires_email_verify) {
+            clearChallenge()
+            emailVerifyChallengeToken.value = data.challenge_token || ''
+            emailVerifyExpiresAt.value = data.challenge_expires_at || ''
+            emailVerifyMaskedEmail.value = data.masked_email || ''
+            return { requiresTotp: false, requiresEmailVerify: true }
+        }
         clearChallenge()
+        clearEmailVerifyChallenge()
         const { token: accessToken, user: userData } = data || {}
         setToken(accessToken)
         setUser(userData)
@@ -294,13 +347,19 @@ export const useUserAuthStore = defineStore('user-auth', () => {
         loading,
         challengeToken,
         challengeExpiresAt,
+        emailVerifyChallengeToken,
+        emailVerifyExpiresAt,
+        emailVerifyMaskedEmail,
         inviteTicket,
         isAuthenticated,
         sendVerifyCode,
         register,
         login,
+        verifyLoginEmail,
+        resendLoginEmail,
         verify2FA,
         clearChallenge,
+        clearEmailVerifyChallenge,
         telegramLogin,
         telegramOidcLogin,
         telegramMiniAppLogin,

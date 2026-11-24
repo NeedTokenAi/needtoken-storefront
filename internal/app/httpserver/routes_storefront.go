@@ -93,7 +93,14 @@ func registerStorefrontRoutes(
 		producthttp.RegisterPublicRoutes(public, publicCatalogHandler)
 		categoryhttp.RegisterPublicRoutes(public, publicCategoryHandler)
 		contenttransport.RegisterPublicRoutes(public, publicContentHandler)
-		captchatransport.RegisterPublicRoutes(public, captchatransport.NewPublicHandler(c.CaptchaService))
+		captchaImageRateLimit := middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
+			Prefix:        loginRule.Prefix + ":captcha_image",
+			WindowSeconds: 60,
+			MaxRequests:   60,
+			BlockSeconds:  60,
+			MessageKey:    "error.rate_limited",
+		}, middleware.KeyByIP)
+		captchatransport.RegisterPublicRoutes(public, captchatransport.NewPublicHandler(c.CaptchaService), captchaImageRateLimit)
 		affiliatetransport.RegisterPublicRoutes(public, affiliateHandler)
 		memberleveltransport.RegisterPublicRoutes(public, publicMemberLevelHandler)
 		accountTools := public.Group("/tools")
@@ -158,8 +165,16 @@ func registerStorefrontRoutes(
 	}
 	authRateLimit := middleware.RateLimitMiddleware(redisClient, authRule, middleware.KeyByIP)
 
-	// 用户认证接口
+	// 用户认证接口：外层叠加纯 IP 总频控（防单 IP 换邮箱密码喷洒/批量枚举）
+	authIPRule := middleware.RateLimitRule{
+		Prefix:        loginRule.Prefix + ":auth_ip",
+		WindowSeconds: 300,
+		MaxRequests:   40,
+		BlockSeconds:  300,
+		MessageKey:    "error.rate_limited",
+	}
 	auth := storefront.Group("/auth")
+	auth.Use(middleware.RateLimitMiddleware(redisClient, authIPRule, middleware.KeyByIP))
 	{
 		userauthtransport.RegisterUserVerifyAuthRoutes(auth, userVerifyHandler, authRateLimit)
 		userauthtransport.RegisterUserRegisterAuthRoutes(auth, userLoginHandler, authRateLimit)

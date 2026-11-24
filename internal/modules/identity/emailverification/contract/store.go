@@ -15,4 +15,6 @@ type Store interface {
 	ReserveAttempt(id uint, maxAttempts int) (bool, error)
 	// Delete 软删除验证码（如邮件未发出），使其不再占用发送间隔、也不遮挡之前已送达的验证码。
 	Delete(id uint) error
+	// CountSentSince 统计指定邮箱在 since 之后已发送的未删除验证码条数（防邮件轰炸）。
+	CountSentSince(email string, since time.Time) (int64, error)
 }

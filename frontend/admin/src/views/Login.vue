@@ -77,7 +77,7 @@ const getCaptchaPayload = (): CaptchaPayload | undefined => {
     }
   }
   if (captchaProvider.value === 'turnstile') {
-    return { turnstile_token: turnstileToken.value }
+    return turnstileRef.value?.getPayload() ?? { turnstile_token: turnstileToken.value }
   }
   return undefined
 }
@@ -91,7 +91,8 @@ const submitPassword = async () => {
     }
   }
   if (loginCaptchaEnabled.value && captchaProvider.value === 'turnstile') {
-    if (!turnstileToken.value) {
+    const resolved = getCaptchaPayload()
+    if (!resolved?.turnstile_token && !(resolved?.captcha_id && resolved?.captcha_code)) {
       error.value = t('admin.login.captchaRequired')
       return
     }

@@ -72,4 +72,11 @@ func TestStoreReturnsLatestActiveCodeAndPersistsAttempts(t *testing.T) {
 	if refreshed.AttemptCount != 1 || refreshed.VerifiedAt == nil || !refreshed.VerifiedAt.Equal(verifiedAt) {
 		t.Fatalf("verification state was not persisted: %#v", refreshed)
 	}
+	count, err := store.CountSentSince("buyer@example.com", now.Add(-2*time.Minute))
+	if err != nil {
+		t.Fatalf("count sent since failed: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("count sent since = %d, want 2 (deleted record must be excluded)", count)
+	}
 }

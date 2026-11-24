@@ -29,20 +29,35 @@ is_high_risk_path() {
     internal/constants/constants.go | internal/app/container/bootstrap.go | internal/app/container/bootstrap_test.go | \
       internal/modules/diagnostics/* | internal/modules/opsbridge/* | internal/modules/apipublic/* | \
       internal/modules/identity/userauth/application/service.go | \
+      internal/modules/identity/userauth/transport/http/user_login_handler.go | \
+      internal/modules/identity/userauth/transport/http/user_2fa_handler.go | \
+      internal/modules/identity/userauth/transport/http/routes.go | \
+      internal/modules/captcha/application/service.go | \
+      internal/web/handler.go | \
       internal/modules/identity/user/contract/* | \
       internal/modules/giftcard/application/* | internal/modules/giftcard/contract/* | \
       internal/modules/giftcard/transport/http/* | \
       internal/app/httpserver/router.go | internal/app/httpserver/routes_storefront.go | internal/app/httpserver/routes_channel.go | \
       frontend/user/src/templates/needtoken/* | frontend/user/index.html | \
+      frontend/user/public/dj.svg | frontend/user/src/main.ts | \
+      frontend/user/src/stores/app.ts | frontend/user/src/utils/storefrontStartup.ts | \
       frontend/user/src/router/index.ts | frontend/user/src/api/order.ts | frontend/user/src/api/auth.ts | \
       frontend/user/src/stores/userAuth.ts | frontend/user/src/stores/userProfile.ts | \
       frontend/user/src/composables/usePersonalCenter.ts | \
+      frontend/user/src/composables/useForgot.ts | frontend/user/src/composables/useNotFound.ts | \
+      frontend/user/src/components/Navbar.vue | frontend/user/src/components/Footer.vue | \
+      frontend/user/src/components/reseller-console/ResellerConsoleTopbar.vue | \
+      frontend/user/src/templates/vault/layout/VaultLayout.vue | \
       frontend/user/src/components/AssetVaultClaimPanel.vue | \
       frontend/user/src/components/SubscriptionAuthorizationPanel.vue | \
       frontend/user/src/utils/subscriptionAuthorization.ts | \
       frontend/user/src/views/OrderDetail.vue | frontend/user/src/views/GuestOrderDetail.vue | \
       frontend/user/src/views/PersonalCenter.vue | frontend/user/src/views/personal/GiftCardPanel.vue | \
-      frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts)
+      frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts | \
+      frontend/user/src/utils/chunkRecovery.ts | frontend/admin/src/utils/chunkRecovery.ts | \
+      frontend/user/src/components/captcha/TurnstileCaptcha.vue | \
+      frontend/admin/src/components/captcha/TurnstileCaptcha.vue | \
+      frontend/user/src/composables/useLogin.ts | frontend/user/src/composables/useRegister.ts)
       return 0
       ;;
     *)

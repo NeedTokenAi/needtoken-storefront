@@ -277,14 +277,17 @@ func toUserAuthTransportLoginResult(ctx context.Context, auth *userauthapp.Servi
 		return nil, err
 	}
 	return &userauthtransport.AuthLoginResult{
-		RequiresTOTP:       result.RequiresTOTP,
-		User:               result.User,
-		Token:              token,
-		ExpiresAt:          result.ExpiresAt,
-		ChallengeToken:     result.ChallengeToken,
-		ChallengeExpiresAt: result.ChallengeExpiresAt,
-		InviteRequired:     result.InviteRequired,
-		InviteTicket:       result.InviteTicket,
+		RequiresTOTP:        result.RequiresTOTP,
+		RequiresEmailVerify: result.RequiresEmailVerify,
+		MaskedEmail:         result.MaskedEmail,
+		TrustedDeviceToken:  result.TrustedDeviceToken,
+		User:                result.User,
+		Token:               token,
+		ExpiresAt:           result.ExpiresAt,
+		ChallengeToken:      result.ChallengeToken,
+		ChallengeExpiresAt:  result.ChallengeExpiresAt,
+		InviteRequired:      result.InviteRequired,
+		InviteTicket:        result.InviteTicket,
 	}, nil
 }
 
@@ -438,6 +441,63 @@ func (a userLoginTransportAdapter) LoginStep1(ctx context.Context, email, passwo
 	return toUserAuthTransportLoginResult(ctx, a.auth, res)
 }
 
+func (a userLoginTransportAdapter) LoginStep1WithEnv(ctx context.Context, params userauthtransport.LoginContextParams) (*userauthtransport.AuthLoginResult, error) {
+	res, err := a.auth.LoginWithContext(ctx, userauthapp.LoginContextInput{
+		Email:              params.Email,
+		Password:           params.Password,
+		RememberMe:         params.RememberMe,
+		ClientIP:           params.ClientIP,
+		UserAgent:          params.UserAgent,
+		Locale:             params.Locale,
+		TrustedDeviceToken: params.TrustedDeviceToken,
+	})
+	if err != nil {
+		return nil, mapUserAuthTransportError(err)
+	}
+	return toUserAuthTransportLoginResult(ctx, a.auth, res)
+}
+
+func (a userLoginTransportAdapter) VerifyLoginEmail(ctx context.Context, challengeToken, code, userAgent string) (*userauthtransport.AuthLoginResult, error) {
+	res, err := a.auth.VerifyLoginEmailChallenge(ctx, challengeToken, code, userAgent)
+	if err != nil {
+		return nil, mapUserAuthTransportError(err)
+	}
+	return toUserAuthTransportLoginResult(ctx, a.auth, res)
+}
+
+func (a userLoginTransportAdapter) ResendLoginEmail(ctx context.Context, challengeToken, locale string) error {
+	return mapUserAuthTransportError(a.auth.ResendLoginEmailChallenge(ctx, challengeToken, locale))
+}
+
+func (a userLoginTransportAdapter) IssueTrustedDeviceToken(user *userdomain.User, userAgent string) string {
+	return a.auth.IssueTrustedDeviceToken(user, userAgent)
+}
+
+// userLoginHistoryAdapter 将审计日志服务适配为环境变更检测所需的最小查询端口。
+type userLoginHistoryAdapter struct {
+	logs *auditlogapp.UserLoginService
+}
+
+func (a userLoginHistoryAdapter) ListRecentUserLogins(userID uint, limit int) ([]userauthapp.LoginHistoryEntry, error) {
+	if a.logs == nil || userID == 0 {
+		return nil, nil
+	}
+	rows, _, err := a.logs.ListByUser(userID, 1, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]userauthapp.LoginHistoryEntry, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, userauthapp.LoginHistoryEntry{
+			Status:    row.Status,
+			ClientIP:  row.ClientIP,
+			UserAgent: row.UserAgent,
+			CreatedAt: row.CreatedAt,
+		})
+	}
+	return out, nil
+}
+
 // userLoginRecorderAdapter 将登录日志服务适配为 transport 记录端口。
 type userLoginRecorderAdapter struct {
 	logs *auditlogapp.UserLoginService
@@ -569,6 +629,10 @@ func (a user2FAAuthTransportAdapter) GetUserEmail(userID uint) (string, error) {
 	return user.Email, nil
 }
 
+func (a user2FAAuthTransportAdapter) IssueTrustedDeviceToken(user *userdomain.User, userAgent string) string {
+	return a.auth.IssueTrustedDeviceToken(user, userAgent)
+}
+
 // user2FAChallengeStoreAdapter 将 Redis 挑战状态适配为 transport 端口。
 type user2FAChallengeStoreAdapter struct{}
 
@@ -604,6 +668,10 @@ func (user2FAChallengeStoreAdapter) Revoke(ctx context.Context, jti string) {
 func mapUserAuthTransportError(err error) error {
 	if err == nil {
 		return nil
+	}
+	var lockedErr userauthapp.AccountLockedError
+	if errors.As(err, &lockedErr) {
+		return userauthtransport.AccountLockedError{RetryAfterSeconds: lockedErr.RetryAfterSeconds}
 	}
 	if errors.Is(err, passwordpolicy.ErrWeak) {
 		type keyed interface {
@@ -673,6 +741,8 @@ func mapUserAuthTransportError(err error) error {
 		{userauthapp.ErrInviteCodeRequired, userauthtransport.ErrInviteCodeRequired},
 		{userauthapp.ErrInviteCodeInvalid, userauthtransport.ErrInviteCodeInvalid},
 		{userauthapp.ErrInviteTicketInvalid, userauthtransport.ErrInviteTicketInvalid},
+		{userauthapp.ErrLoginEmailChallengeInvalid, userauthtransport.ErrLoginEmailChallengeInvalid},
+		{userauthapp.ErrAccountLocked, userauthtransport.ErrAccountLocked},
 		{userauthapp.ErrAgreementRequired, userauthtransport.ErrAgreementRequired},
 		{userauthapp.ErrInvalidCredentials, userauthtransport.ErrInvalidCredentials},
 		{userauthapp.ErrEmailNotVerified, userauthtransport.ErrEmailNotVerified},

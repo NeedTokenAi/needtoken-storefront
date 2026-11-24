@@ -11,12 +11,42 @@
       <Card class="p-7 shadow-[var(--shadow-lg)] sm:p-9">
         <div class="mb-7 text-center">
           <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">{{ brandSiteName }}</p>
-          <h1 class="mt-3 text-3xl font-extrabold">{{ step === 'totp' ? t('auth.login.totp.title') : t('auth.login.title') }}</h1>
-          <p class="mt-2 text-sm text-muted-foreground">{{ step === 'totp' ? t('auth.login.totp.subtitle') : t('auth.login.subtitle') }}</p>
+          <h1 class="mt-3 text-3xl font-extrabold">{{ step === 'totp' ? t('auth.login.totp.title') : step === 'email_verify' ? t('auth.login.emailVerify.title') : t('auth.login.title') }}</h1>
+          <p class="mt-2 text-sm text-muted-foreground">{{ step === 'totp' ? t('auth.login.totp.subtitle') : step === 'email_verify' ? t('auth.login.emailVerify.subtitle', { email: emailVerifyMaskedEmail }) : t('auth.login.subtitle') }}</p>
         </div>
 
+        <!-- 新环境邮箱验证 -->
+        <form v-if="step === 'email_verify'" class="grid gap-[18px]" @submit.prevent="handleVerifyLoginEmail">
+          <div class="rounded-xl border bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
+            {{ t('auth.login.totp.countdown', { seconds: challengeRemainingSeconds }) }}
+          </div>
+          <FormField :label="t('auth.login.emailVerify.codeLabel')">
+            <template #default="{ id }">
+              <Input :id="id" v-model="emailVerifyCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" class="h-11 text-center tracking-[0.4em]" :placeholder="t('auth.login.emailVerify.codePlaceholder')" />
+            </template>
+          </FormField>
+          <p class="text-center text-xs text-muted-foreground">{{ t('auth.login.emailVerify.deviceTrustHint') }}</p>
+          <Alert v-if="info" class="border-success/40 text-center text-success">
+            <AlertDescription>{{ info }}</AlertDescription>
+          </Alert>
+          <Alert v-if="error" variant="destructive" class="text-center">
+            <AlertDescription>{{ error }}</AlertDescription>
+          </Alert>
+          <Button type="submit" :disabled="userAuthStore.loading" class="h-11 w-full rounded-full font-bold">
+            {{ userAuthStore.loading ? t('auth.login.emailVerify.verifying') : t('auth.login.emailVerify.submit') }}
+          </Button>
+          <div class="flex flex-col items-center gap-2">
+            <Button type="button" variant="link" class="h-auto p-0 text-xs font-normal text-muted-foreground hover:text-foreground hover:no-underline" :disabled="emailVerifyResending || emailVerifyResendCountdown > 0" @click="handleResendLoginEmail">
+              {{ emailVerifyResendCountdown > 0 ? t('auth.login.emailVerify.resendCountdown', { seconds: emailVerifyResendCountdown }) : t('auth.login.emailVerify.resend') }}
+            </Button>
+            <Button type="button" variant="link" class="h-auto p-0 text-xs font-normal text-muted-foreground hover:text-foreground hover:no-underline" @click="cancelEmailVerify">
+              {{ t('auth.login.emailVerify.cancel') }}
+            </Button>
+          </div>
+        </form>
+
         <!-- 2FA -->
-        <form v-if="step === 'totp'" class="grid gap-[18px]" @submit.prevent="handleVerify2FA">
+        <form v-else-if="step === 'totp'" class="grid gap-[18px]" @submit.prevent="handleVerify2FA">
           <div class="rounded-xl border bg-muted px-4 py-2 text-center text-xs text-muted-foreground">
             {{ t('auth.login.totp.countdown', { seconds: challengeRemainingSeconds }) }}
           </div>
@@ -213,6 +243,8 @@ const {
   userAuthStore, brandSiteName,
   email, password, showPassword, rememberMe,
   step, totpMode, totpCode, recoveryCode, challengeRemainingSeconds, handleVerify2FA, cancel2FA,
+  emailVerifyCode, emailVerifyMaskedEmail, emailVerifyResendCountdown, emailVerifyResending,
+  handleVerifyLoginEmail, handleResendLoginEmail, cancelEmailVerify,
   error, info, formValidation,
   loginCaptchaEnabled, captchaProvider, captchaPayload, turnstileToken, turnstileSiteKey,
   imageCaptchaRef, turnstileRef, handleCaptchaConfigStale,

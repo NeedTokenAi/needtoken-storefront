@@ -45,7 +45,7 @@
     "failed": "暂时无法获取安全领号凭据，请刷新页面后重试或联系客服。"
   },
   "common": {
-    "siteName": "Dujiao-Next",
+    "siteName": "数字商店",
     "loading": "加载中...",
     "error": "错误",
     "success": "成功",
@@ -75,7 +75,8 @@
   },
   "errorBoundary": {
     "retry": "重试",
-    "defaultMessage": "页面加载出错，请重试"
+    "defaultMessage": "页面加载出错，请重试",
+    "chunkLoadFailed": "页面资源已更新或加载失败，请点击重试刷新页面。"
   },
   "formValidation": {
     "required": "此字段为必填项",
@@ -160,7 +161,7 @@
   },
   "home": {
     "hero": {
-      "title": "Dujiao-Next · D&N",
+      "title": "数字商店",
       "subtitle": "专业的产品与服务提供商",
       "cta": "浏览商品",
       "badge": "新一代数字商店"
@@ -260,8 +261,8 @@
   },
   "about": {
     "title": "关于我们",
-    "subtitle": "了解Dujiao-Next",
-    "introduction": "Dujiao-Next（D&N）是一家专业的在线工作室，致力于为客户提供优质的产品和服务。我们以创新、专业、高效为核心价值观，不断追求卓越，为客户创造价值。",
+    "subtitle": "了解我们",
+    "introduction": "我们是一家专业的在线数字服务与商品商店，致力于为客户提供优质的产品和服务。我们以创新、专业、高效为核心价值观，不断追求卓越，为客户创造价值。",
     "ourServices": "我们的服务",
     "service1": "优质商品推荐与销售",
     "service2": "专业的售前咨询服务",
@@ -1018,6 +1019,11 @@
       "captchaRefresh": "换一张",
       "captchaRefreshing": "刷新中...",
       "captchaCodePlaceholder": "请输入图片验证码",
+      "turnstileLoading": "正在加载安全验证...",
+      "turnstileSlowHint": "安全验证加载较慢？",
+      "turnstileUseImage": "切换图形验证码",
+      "turnstileFallbackNotice": "网络较慢，已自动切换为图形验证码",
+      "turnstileRetry": "重试人机验证",
       "showPassword": "显示密码",
       "hidePassword": "隐藏密码"
     },
@@ -1070,6 +1076,22 @@
         "codeRequired": "请输入动态码",
         "recoveryRequired": "请输入恢复码",
         "verifyFailed": "验证失败，请确认输入是否正确"
+      },
+      "emailVerify": {
+        "title": "验证你的登录环境",
+        "subtitle": "检测到新设备或新登录环境，已向 {email} 发送安全验证码。",
+        "codeLabel": "邮箱安全验证码",
+        "codePlaceholder": "输入邮件中的验证码",
+        "codeRequired": "请输入邮箱验证码",
+        "submit": "验证并登录",
+        "verifying": "验证中...",
+        "resend": "重新发送验证码",
+        "resendCountdown": "{seconds}s 后可重新发送",
+        "resent": "验证码已重新发送，请查收邮箱。",
+        "verifyFailed": "验证码错误或已过期，请重试",
+        "expired": "安全验证已超时，请重新输入账号密码登录",
+        "cancel": "返回登录",
+        "deviceTrustHint": "验证通过后将记住当前设备 30 天，后续可直接输入密码登录。"
       },
       "inviteOnlyHint": "本站仅限邀请注册，新用户（含第三方登录）需填写邀请码。"
     },
@@ -3220,7 +3242,17 @@
       "newPassword": "设置登录密码",
       "setupTwoFactor": "注册后设置两步验证",
       "setupTwoFactorHint": "创建账号后，用验证器扫码并输入验证码启用。",
-      "securityHint": "已有密码与两步验证继续保护你的账号。"
+      "securityHint": "已有密码与两步验证继续保护你的账号。",
+      "tabLogin": "登录",
+      "tabRegister": "创建账号",
+      "loginSubtitle": "输入邮箱与密码即可登录；仅在新设备或环境变化时需要邮箱验证。",
+      "registerSubtitle": "验证邮箱后设置登录密码，即可立即创建账号并登录。",
+      "registerCodeSubtitle": "输入收到的邮箱验证码并设置密码，完成后将自动登录。",
+      "codeSentHint": "验证码已发送至你的邮箱，请查收并设置登录密码。",
+      "emailExistsSwitch": "该邮箱已注册，直接去登录 →",
+      "sendRegisterCode": "发送邮箱验证码",
+      "submitRegister": "创建账号并登录",
+      "deviceSecurityHint": "受信任设备 30 天内可直接输密码登录，修改密码将自动失效旧设备。"
     },
     "homeLibrary": {
       "eyebrow": "产品库",

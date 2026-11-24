@@ -24,6 +24,7 @@ import {
 import ImageCaptcha from '../components/captcha/ImageCaptcha.vue'
 import TurnstileCaptcha from '../components/captcha/TurnstileCaptcha.vue'
 import { useFormValidation } from './useFormValidation'
+import { resolveFallbackSiteName } from '../utils/storefrontStartup'
 
 /**
  * 用户登录页共享逻辑（classic + vault 双模板共用）。
@@ -37,10 +38,12 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
   const telegramMiniAppStore = useTelegramMiniAppStore()
   const { t } = useI18n()
 
-  const brandSiteName = computed(() => {
-    const siteName = String(appStore.config?.brand?.site_name || '').trim()
-    return siteName !== '' ? siteName : 'Dujiao-Next'
-  })
+  const brandSiteName = computed(() => resolveFallbackSiteName(appStore.config?.brand?.site_name, {
+    brandOverrideName: appStore.storefrontBrandOverride?.siteName,
+    fallbackLabel: t('common.siteName'),
+    hostname: typeof window === 'undefined' ? '' : window.location.hostname,
+    isReseller: appStore.isResellerTenant,
+  }))
 
   const email = ref('')
   const password = ref('')
@@ -51,14 +54,19 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     route.query.google2fa,
     userAuthStore.challengeToken,
   )
-  const step = ref<'password' | 'totp'>(
+  const step = ref<'password' | 'email_verify' | 'totp'>(
     resumeGoogleRedirect2FAOnMount ? 'totp' : 'password',
   )
   const totpMode = ref<'code' | 'recovery'>('code')
   const totpCode = ref('')
   const recoveryCode = ref('')
+  const emailVerifyCode = ref('')
+  const emailVerifyResendCountdown = ref(0)
+  const emailVerifyResending = ref(false)
   const challengeRemainingSeconds = ref(0)
   let challengeTimer: ReturnType<typeof setInterval> | null = null
+  let emailResendTimer: ReturnType<typeof setInterval> | null = null
+  const emailVerifyMaskedEmail = computed(() => userAuthStore.emailVerifyMaskedEmail || email.value)
 
   const formValidation = useFormValidation(['email', 'password'])
   formValidation.addRule('email', formValidation.requiredRule())
@@ -131,7 +139,7 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
       }
     }
     if (captchaProvider.value === 'turnstile') {
-      return {
+      return turnstileRef.value?.getPayload() ?? {
         turnstile_token: turnstileToken.value,
       }
     }
@@ -167,7 +175,8 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     }
 
     if (loginCaptchaEnabled.value && captchaProvider.value === 'turnstile') {
-      if (!turnstileToken.value) {
+      const resolved = getCaptchaPayload()
+      if (!resolved?.turnstile_token && !(resolved?.captcha_id && resolved?.captcha_code)) {
         error.value = t('auth.common.captchaRequired')
         return
       }
@@ -182,6 +191,10 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
       })
       if (result && result.requiresTotp) {
         enter2FAStep()
+        return
+      }
+      if (result && result.requiresEmailVerify) {
+        enterEmailVerifyStep()
         return
       }
       await redirectAfterLogin()
@@ -203,6 +216,102 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     if (challengeTimer) {
       clearInterval(challengeTimer)
       challengeTimer = null
+    }
+  }
+
+  const stopEmailResendCountdown = () => {
+    if (emailResendTimer) {
+      clearInterval(emailResendTimer)
+      emailResendTimer = null
+    }
+  }
+
+  const startEmailResendCountdown = (seconds = 60) => {
+    stopEmailResendCountdown()
+    emailVerifyResendCountdown.value = seconds
+    emailResendTimer = setInterval(() => {
+      if (emailVerifyResendCountdown.value <= 1) {
+        emailVerifyResendCountdown.value = 0
+        stopEmailResendCountdown()
+        return
+      }
+      emailVerifyResendCountdown.value -= 1
+    }, 1000)
+  }
+
+  const startEmailChallengeCountdown = () => {
+    stopChallengeCountdown()
+    const tick = () => {
+      const expiresAt = userAuthStore.emailVerifyExpiresAt
+      if (!expiresAt) {
+        challengeRemainingSeconds.value = 0
+        stopChallengeCountdown()
+        return
+      }
+      const diff = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
+      challengeRemainingSeconds.value = diff
+      if (diff <= 0) {
+        stopChallengeCountdown()
+        cancelEmailVerify()
+        error.value = t('auth.login.emailVerify.expired')
+      }
+    }
+    tick()
+    challengeTimer = setInterval(tick, 1000)
+  }
+
+  const enterEmailVerifyStep = () => {
+    error.value = ''
+    info.value = ''
+    step.value = 'email_verify'
+    emailVerifyCode.value = ''
+    startEmailChallengeCountdown()
+    startEmailResendCountdown(60)
+  }
+
+  const cancelEmailVerify = () => {
+    stopChallengeCountdown()
+    stopEmailResendCountdown()
+    userAuthStore.clearEmailVerifyChallenge()
+    step.value = 'password'
+    emailVerifyCode.value = ''
+    emailVerifyResendCountdown.value = 0
+    challengeRemainingSeconds.value = 0
+  }
+
+  const performVerifyLoginEmail = async () => {
+    error.value = ''
+    const code = emailVerifyCode.value.trim()
+    if (!code) {
+      error.value = t('auth.login.emailVerify.codeRequired')
+      return
+    }
+    try {
+      await userAuthStore.verifyLoginEmail(code)
+      stopChallengeCountdown()
+      stopEmailResendCountdown()
+      await redirectAfterLogin()
+    } catch (err: any) {
+      error.value = err?.message || t('auth.login.emailVerify.verifyFailed')
+      emailVerifyCode.value = ''
+    }
+  }
+
+  const handleVerifyLoginEmail = debounceAsync(performVerifyLoginEmail, 200)
+
+  const handleResendLoginEmail = async () => {
+    if (emailVerifyResending.value || emailVerifyResendCountdown.value > 0) return
+    error.value = ''
+    info.value = ''
+    emailVerifyResending.value = true
+    try {
+      await userAuthStore.resendLoginEmail()
+      info.value = t('auth.login.emailVerify.resent')
+      startEmailResendCountdown(60)
+    } catch (err: any) {
+      error.value = err?.message || t('auth.register.errors.sendCodeFailed')
+    } finally {
+      emailVerifyResending.value = false
     }
   }
 
@@ -473,6 +582,7 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     delete win[telegramCallbackName]
     clearTelegramWidget()
     stopChallengeCountdown()
+    stopEmailResendCountdown()
   })
 
   return {
@@ -485,14 +595,21 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     password,
     showPassword,
     rememberMe,
-    // 2FA
+    // 2FA & new environment email verification
     step,
     totpMode,
     totpCode,
     recoveryCode,
+    emailVerifyCode,
+    emailVerifyMaskedEmail,
+    emailVerifyResendCountdown,
+    emailVerifyResending,
     challengeRemainingSeconds,
     handleVerify2FA,
     cancel2FA,
+    handleVerifyLoginEmail,
+    handleResendLoginEmail,
+    cancelEmailVerify,
     // messages
     error,
     info,

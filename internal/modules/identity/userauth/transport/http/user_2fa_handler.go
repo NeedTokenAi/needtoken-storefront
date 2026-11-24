@@ -327,6 +327,9 @@ func (h *User2FAHandler) VerifyUser2FA(c *gin.Context) {
 		ginutil.RespondError(c, response.CodeInternal, "error.login_failed", err)
 		return
 	}
+	if issuer, ok := h.auth.(TrustedDeviceIssuer); ok && loginRes != nil && loginRes.User != nil {
+		setTrustedDeviceCookie(c, issuer.IssueTrustedDeviceToken(loginRes.User, c.GetHeader("User-Agent")))
+	}
 	h.recordLogin(c, loginRes.User.Email, loginRes.User.ID, constants.LoginLogStatusSuccess, "", resolvedChallengeLoginSource(claims))
 	response.Success(c, gin.H{
 		"requires_totp": false,

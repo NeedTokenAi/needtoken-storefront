@@ -5,10 +5,14 @@ import { GOOGLE_REDIRECT_API_PATHS } from '../utils/googleRedirect'
 export const userAuthAPI = {
     verifyEmailEntry: (data: { email: string; code: string }) => userApi.post('/auth/email/verify', data),
     sendVerifyCode: (data: any) => userApi.post('/auth/send-verify-code', data),
-    register: (data: any) => userApi.post('/auth/register', data),
-    login: (data: any) => userApi.post('/auth/login', data),
+    register: (data: any) => userApi.post('/auth/register', data, { credentials: 'include' }),
+    login: (data: any) => userApi.post('/auth/login', data, { credentials: 'include' }),
+    verifyLoginEmail: (data: { challenge_token: string; code: string }) =>
+        userApi.post('/auth/login/verify-email', data, { credentials: 'include' }),
+    resendLoginEmail: (data: { challenge_token: string }) =>
+        userApi.post('/auth/login/resend-email', data, { credentials: 'include' }),
     verify2FA: (data: { challenge_token: string; code?: string; recovery_code?: string }) =>
-        userApi.post('/auth/login/verify-2fa', data),
+        userApi.post('/auth/login/verify-2fa', data, { credentials: 'include' }),
     telegramLogin: (data: TelegramAuthPayload) => userApi.post('/auth/telegram/login', data),
     telegramMiniAppLogin: (data: TelegramMiniAppAuthPayload) =>
         userApi.post('/auth/telegram/miniapp/login', data),

@@ -62,8 +62,21 @@ high_risk_cases=(
   "frontend/user/src/views/PersonalCenter.vue"
   "frontend/user/src/views/personal/GiftCardPanel.vue"
   "frontend/user/index.html"
+  "frontend/user/public/dj.svg"
+  "frontend/user/src/main.ts"
+  "frontend/user/src/stores/app.ts"
+  "frontend/user/src/utils/storefrontStartup.ts"
+  "frontend/user/src/components/Footer.vue"
+  "frontend/user/src/templates/vault/layout/VaultLayout.vue"
   "frontend/user/src/utils/theme.ts"
   "frontend/user/src/utils/themeState.ts"
+  "internal/web/handler.go"
+  "internal/modules/captcha/application/service.go"
+  "internal/modules/identity/userauth/transport/http/user_login_handler.go"
+  "frontend/user/src/components/captcha/TurnstileCaptcha.vue"
+  "frontend/admin/src/components/captcha/TurnstileCaptcha.vue"
+  "frontend/user/src/utils/chunkRecovery.ts"
+  "frontend/admin/src/utils/chunkRecovery.ts"
 )
 
 for path in "${high_risk_cases[@]}" "internal/modules/identity/user/contract/store.go"; do
