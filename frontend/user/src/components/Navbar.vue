@@ -211,6 +211,7 @@ import { useCartStore } from '../stores/cart'
 import { useUserAuthStore } from '../stores/userAuth'
 import { useTheme } from '../utils/theme'
 import { getImageUrl } from '../utils/image'
+import { resolveFallbackSiteName } from '../utils/storefrontStartup'
 import { useNavConfig } from '../composables/useNavConfig'
 import {
   Sun, Moon, ShoppingCart, ClipboardList, LogIn, User, LogOut, Languages,
@@ -250,10 +251,12 @@ const currentLocale = computed(() => {
 
 const cartCount = computed(() => cartStore.totalItems)
 
-const brandSiteName = computed(() => {
-  const text = String(appStore.config?.brand?.site_name || '').trim()
-  return text !== '' ? text : 'Dujiao-Next'
-})
+const brandSiteName = computed(() => resolveFallbackSiteName(appStore.config?.brand?.site_name, {
+  brandOverrideName: appStore.storefrontBrandOverride?.siteName,
+  fallbackLabel: t('common.siteName'),
+  hostname: typeof window === 'undefined' ? '' : window.location.hostname,
+  isReseller: appStore.isResellerTenant,
+}))
 
 const brandLogo = computed(() => {
   const raw = String(appStore.config?.brand?.site_logo || '').trim()

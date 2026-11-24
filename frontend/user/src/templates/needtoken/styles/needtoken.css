@@ -462,10 +462,10 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: -0.035em;
 }
-.nt-scope :is(.nt-brand, .nt-footer-brand) > img { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }
-.nt-scope :is(.nt-brand, .nt-footer-brand):is(:hover, :focus-visible) > img { transform: translateY(-1px) rotate(-3deg); }
+.nt-scope :is(.nt-brand, .nt-footer-brand) > :is(img, svg) { transition: transform var(--nt-motion-enter) var(--nt-motion-ease); }
+.nt-scope :is(.nt-brand, .nt-footer-brand):is(:hover, :focus-visible) > :is(img, svg) { transform: translateY(-1px) rotate(-3deg); }
 @media (prefers-reduced-motion: reduce) {
-  .nt-scope :is(.nt-brand, .nt-footer-brand):is(:hover, :focus-visible) > img { transform: none; }
+  .nt-scope :is(.nt-brand, .nt-footer-brand):is(:hover, :focus-visible) > :is(img, svg) { transform: none; }
   .nt-scope :is(a, button).nt-button-purchase:active,
   body.nt-tokens :is(a, button).nt-button-purchase:active { transform: none; }
 }

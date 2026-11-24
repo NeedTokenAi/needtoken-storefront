@@ -1,7 +1,7 @@
 <template>
-  <img :src="NEEDTOKEN_BRAND_ICON" alt="" aria-hidden="true" draggable="false" />
+  <svg viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
+    <rect x="1" y="1" width="62" height="62" rx="18" fill="#10241f" stroke="#2dd4a7" stroke-opacity=".3" stroke-width="2" />
+    <path d="M19 45V19l26 26V19" stroke="#5eeac0" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="45" cy="19" r="4.5" fill="#cefff0" />
+  </svg>
 </template>
-
-<script setup lang="ts">
-import { NEEDTOKEN_BRAND_ICON } from '../config'
-</script>
