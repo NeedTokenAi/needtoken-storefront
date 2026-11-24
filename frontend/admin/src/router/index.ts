@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAdminAuthStore } from '@/stores/auth'
-import { ADMIN_BASE } from '@/utils/adminBase'
+import { ADMIN_BASE, adminUrl } from '@/utils/adminBase'
+import { isChunkLoadError, recoverFromChunkError } from '@/utils/chunkRecovery'
 
 const routes = [
   {
@@ -461,6 +462,13 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+router.onError((error, to) => {
+  if (isChunkLoadError(error)) {
+    const target = to?.fullPath ? adminUrl(to.fullPath) : undefined
+    recoverFromChunkError(target)
+  }
 })
 
 export default router

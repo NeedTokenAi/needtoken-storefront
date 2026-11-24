@@ -87,10 +87,10 @@ export const getActiveTemplate = (): StorefrontTemplate => {
     return rememberedTemplate ?? DEFAULT_TEMPLATE
 }
 
-// vault 模板页面（按需动态加载）。key 形如 './vault/Home.vue'
-const vaultViews = import.meta.glob('./vault/**/*.vue')
+// vault 模板页面（仅包含路由级页面视图，避免将 components/layout 子组件强行拆成额外动态入口）。key 形如 './vault/Home.vue'
+const vaultViews = import.meta.glob(['./vault/*.vue', './vault/auth/*.vue'])
 // needtoken 模板页面（needtoken.io 官网）。缺页时回退 classic，结算 / 支付 / 查单沿用独角原页
-const needtokenViews = import.meta.glob('./needtoken/**/*.vue')
+const needtokenViews = import.meta.glob(['./needtoken/*.vue', './needtoken/auth/*.vue'])
 
 type ViewLoader = () => Promise<unknown>
 

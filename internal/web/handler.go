@@ -93,7 +93,36 @@ const (
 
 	// assets/ 下的产物由 Vite 保证带内容 hash，内容变化必然改名，可以安全长期强缓存。
 	hashedAssetCacheControl = "public, max-age=31536000, immutable"
+
+	// 缺失的静态构建产物返回 404 时禁止缓存，避免边缘 CDN 缓存错误响应。
+	missingAssetCacheControl = "no-store"
 )
+
+// isStaticAssetPath 报告路径是否明显指向静态构建产物或资源文件。
+// 这类路径在发版后可能因旧页面缓存旧 chunk hash 而缺失，必须返回 404，
+// 绝不能兜底返回 200 HTML（否则浏览器报动态模块 MIME 错误且 CDN 可能按 .js 缓存 HTML）。
+func isStaticAssetPath(fp string) bool {
+	cleaned := strings.TrimPrefix(path.Clean("/"+fp), "/")
+	if cleaned == "" || cleaned == "." {
+		return false
+	}
+	if cleaned == "assets" || strings.HasPrefix(cleaned, "assets/") {
+		return true
+	}
+	switch strings.ToLower(path.Ext(cleaned)) {
+	case ".js", ".mjs", ".cjs", ".css", ".map", ".wasm",
+		".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".avif",
+		".woff", ".woff2", ".ttf", ".eot", ".otf":
+		return true
+	default:
+		return false
+	}
+}
+
+func serveAssetNotFound(c *gin.Context) {
+	c.Header("Cache-Control", missingAssetCacheControl)
+	c.String(http.StatusNotFound, "404 page not found")
+}
 
 // serveIndex 返回 SPA 入口，并禁止浏览器与中间 CDN 长期缓存。
 func serveIndex(c *gin.Context, body []byte) {
@@ -151,6 +180,10 @@ func RegisterAdmin(r *gin.Engine, prefix string, fsys fs.FS) error {
 			serveAsset(c, fileServer, fp)
 			return
 		}
+		if isStaticAssetPath(fp) {
+			serveAssetNotFound(c)
+			return
+		}
 		serveIndex(c, cached)
 	})
 	return nil
@@ -191,6 +224,10 @@ func RegisterUser(r *gin.Engine, fsys fs.FS) error {
 		}
 		if hasFile(fsys, fp) {
 			serveAsset(c, fileServer, fp)
+			return
+		}
+		if isStaticAssetPath(fp) {
+			serveAssetNotFound(c)
 			return
 		}
 		serveIndex(c, indexCached)

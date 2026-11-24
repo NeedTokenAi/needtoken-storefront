@@ -97,7 +97,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ArrowRight,
@@ -118,9 +118,9 @@ import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
 import ApiSmartRoutingShowcase from './components/ApiSmartRoutingShowcase.vue'
 import ApiPricingShowcase from './components/ApiPricingShowcase.vue'
 import ApiIntegrationGuide from './components/ApiIntegrationGuide.vue'
+import ApiCostCalculator from './components/ApiCostCalculator.vue'
 import ServiceProductCard from './components/ServiceProductCard.vue'
 
-const ApiCostCalculator = defineAsyncComponent(() => import('./components/ApiCostCalculator.vue'))
 const { t } = useI18n()
 const userAuth = useUserAuthStore()
 const planCatalog = useApiPlanCatalog({ pageSize: 6, syncRoute: false })

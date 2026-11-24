@@ -19,20 +19,35 @@ import { useI18n } from 'vue-i18n'
 import { AlertCircle, RotateCw } from 'lucide-vue-next'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { isChunkLoadError, recoverFromChunkError } from '@/utils/chunkRecovery'
 
 const { t } = useI18n()
 
 const error = ref<Error | null>(null)
-
+const isChunkError = ref(false)
 const displayMessage = ref('')
 
 onErrorCaptured((err: Error) => {
+  if (isChunkLoadError(err)) {
+    if (recoverFromChunkError()) {
+      return false
+    }
+    error.value = err
+    isChunkError.value = true
+    displayMessage.value = t('errorBoundary.chunkLoadFailed')
+    return false
+  }
   error.value = err
+  isChunkError.value = false
   displayMessage.value = err.message || t('errorBoundary.defaultMessage')
   return false
 })
 
 const retry = () => {
+  if (isChunkError.value) {
+    window.location.reload()
+    return
+  }
   error.value = null
   displayMessage.value = ''
 }
