@@ -4197,7 +4197,13 @@
         "affiliateReferral": "推廣拉新",
         "resellerSystem": "分銷系統",
         "profileCardHint": "點擊進入帳號資料與安全設定",
-        "security": "帳號與安全"
+        "security": "帳號與安全",
+        "consoleBadge": "控制台",
+        "backToStore": "返回店面",
+        "collapseSidebar": "收合側欄",
+        "expandSidebar": "展開側欄",
+        "openMenu": "開啟導覽選單",
+        "closeMenu": "關閉導覽選單"
       },
       "reseller": {
         "title": "分銷系統",
@@ -4234,6 +4240,8 @@
         "trendEmpty": "近 7 天尚無網關呼叫紀錄"
       },
       "quick": {
+        "title": "快捷工作台",
+        "apiEndpoint": "API 接入位址",
         "manageKeys": "管理 API 金鑰",
         "buyPlans": "選購 Need 網關方案",
         "viewUsage": "查看用量日誌",

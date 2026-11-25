@@ -4197,7 +4197,13 @@
         "affiliateReferral": "推广拉新",
         "resellerSystem": "分销系统",
         "profileCardHint": "点击进入账号资料与安全设置",
-        "security": "账号与安全"
+        "security": "账号与安全",
+        "consoleBadge": "控制台",
+        "backToStore": "返回店面",
+        "collapseSidebar": "收起侧栏",
+        "expandSidebar": "展开侧栏",
+        "openMenu": "打开导航菜单",
+        "closeMenu": "关闭导航菜单"
       },
       "reseller": {
         "title": "分销系统",
@@ -4234,6 +4240,8 @@
         "trendEmpty": "近 7 天暂无网关调用记录"
       },
       "quick": {
+        "title": "快捷工作台",
+        "apiEndpoint": "API 接入地址",
         "manageKeys": "管理 API 密钥",
         "buyPlans": "选购 Need 网关套餐",
         "viewUsage": "查看用量日志",

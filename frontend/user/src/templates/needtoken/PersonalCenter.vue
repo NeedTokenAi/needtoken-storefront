@@ -1,192 +1,435 @@
 <template>
-  <div class="relative min-h-screen bg-background pb-16 pt-20 text-foreground sm:pt-24">
-    <div class="mx-auto w-full max-w-[1240px] px-4 sm:px-6">
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <!-- 左侧精简导航（桌面粘性竖栏 + 移动横向切换条） -->
-        <aside class="lg:col-span-3">
-          <div class="rounded-2xl border bg-card p-3.5 shadow-sm lg:sticky lg:top-24">
-            <!-- 收敛后的紧凑个人资料卡（悬停样式反馈，点击直达账号与安全 /me/security） -->
-            <button
-              type="button"
-              data-testid="sidebar-profile-card"
-              class="group mb-3.5 flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-150"
-              :class="activeSection === 'security'
-                ? 'border-primary/45 bg-primary/10 shadow-xs'
-                : 'border-border/70 bg-muted/25 hover:border-primary/40 hover:bg-primary/5 hover:shadow-xs'"
-              :title="t('needtoken.memberConsole.nav.profileCardHint')"
-              @click="navigateToSection('security')"
-            >
-              <div
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base font-black transition-colors"
-                :class="activeSection === 'security'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground'"
-              >
-                {{ displayInitial }}
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-1.5">
-                  <span class="truncate text-sm font-bold text-foreground transition-colors group-hover:text-primary">
-                    {{ userProfileStore.displayName }}
-                  </span>
-                  <span
-                    v-if="showGatewayFeatures && displayNativeUserId"
-                    class="shrink-0 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-primary"
-                  >
-                    #{{ displayNativeUserId }}
-                  </span>
-                </div>
-                <p class="mt-0.5 truncate text-[11.5px] text-muted-foreground">
-                  {{ userProfileStore.profile?.email || t('personalCenter.subtitle') }}
-                </p>
-                <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                  <Badge :variant="emailVerifiedVariant" size="sm" class="h-4 px-1.5 text-[10px]">
-                    {{ emailVerifiedLabel }}
-                  </Badge>
-                  <span
-                    v-if="userProfileStore.currentLevel"
-                    class="inline-flex items-center gap-0.5 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary"
-                  >
-                    <img
-                      v-if="isImagePath(userProfileStore.currentLevel?.icon)"
-                      :src="getImageUrl(userProfileStore.currentLevel!.icon)"
-                      class="h-2.5 w-2.5 object-contain"
-                      alt=""
-                    />
-                    <Crown v-else class="h-2.5 w-2.5" />
-                    {{ levelName(userProfileStore.currentLevel) }}
-                  </span>
-                </div>
-              </div>
-              <ChevronRight
-                class="h-4 w-4 shrink-0 transition-transform duration-150"
-                :class="activeSection === 'security'
-                  ? 'translate-x-0.5 text-primary'
-                  : 'text-muted-foreground/70 group-hover:translate-x-0.5 group-hover:text-primary'"
-              />
-            </button>
+  <div class="flex min-h-dvh flex-col bg-background text-foreground lg:h-dvh lg:flex-row lg:overflow-hidden">
+    <!-- 桌面端左侧固定可折叠侧边栏 -->
+    <aside
+      class="hidden shrink-0 flex-col border-r border-border bg-card/85 backdrop-blur transition-[width] duration-200 ease-out lg:flex"
+      :class="sidebarCollapsed ? 'w-[68px]' : 'w-[232px]'"
+    >
+      <!-- 顶部品牌与折叠按钮 -->
+      <div
+        class="flex h-14 shrink-0 items-center border-b border-border"
+        :class="sidebarCollapsed ? 'justify-center px-2' : 'justify-between gap-2 px-3.5'"
+      >
+        <RouterLink
+          v-if="!sidebarCollapsed"
+          to="/me"
+          class="nt-brand flex min-w-0 items-center gap-2 text-[15px] font-bold tracking-tight text-foreground"
+        >
+          <BrandMark v-if="!appStore.isResellerTenant" class="h-6 w-6 shrink-0" />
+          <img v-else-if="resellerLogo" :src="resellerLogo" alt="" class="h-6 w-6 shrink-0 rounded-md object-contain" />
+          <span class="truncate">{{ brandName }}</span>
+          <span class="shrink-0 rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary">
+            {{ t('needtoken.memberConsole.nav.consoleBadge') }}
+          </span>
+        </RouterLink>
 
-            <!-- 桌面端分组导航 -->
-            <nav class="hidden flex-col gap-4 lg:flex" :aria-label="t('personalCenter.title')">
-              <div v-for="group in navGroups" :key="group.key" class="space-y-1">
-                <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <button
+          type="button"
+          class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          :aria-label="sidebarCollapsed ? t('needtoken.memberConsole.nav.expandSidebar') : t('needtoken.memberConsole.nav.collapseSidebar')"
+          :title="sidebarCollapsed ? t('needtoken.memberConsole.nav.expandSidebar') : t('needtoken.memberConsole.nav.collapseSidebar')"
+          @click="toggleSidebarCollapse"
+        >
+          <PanelLeftOpen v-if="sidebarCollapsed" class="h-4 w-4" />
+          <PanelLeftClose v-else class="h-4 w-4" />
+        </button>
+      </div>
+
+      <!-- 中部导航菜单 -->
+      <nav
+        class="flex-1 space-y-4 overflow-y-auto px-2.5 py-3.5"
+        :aria-label="t('personalCenter.title')"
+      >
+        <div v-for="group in navGroups" :key="group.key" class="space-y-0.5">
+          <p
+            v-if="!sidebarCollapsed"
+            class="px-2.5 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/80"
+          >
+            {{ t(group.labelKey) }}
+          </p>
+          <template v-for="item in group.items" :key="item.key">
+            <!-- 可展开/收缩的二级菜单组（推广与分销） -->
+            <div v-if="item.children?.length" class="space-y-0.5">
+              <button
+                type="button"
+                data-testid="nav-group-growth-toggle"
+                class="group relative flex w-full items-center rounded-xl py-2 text-left text-[13.5px] font-semibold transition-colors"
+                :class="[
+                  sidebarCollapsed ? 'justify-center px-0' : 'justify-between gap-2 pl-3.5 pr-2.5',
+                  isGrowthSectionActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                ]"
+                :aria-expanded="!sidebarCollapsed && growthExpanded"
+                :title="sidebarCollapsed ? t(item.labelKey) : undefined"
+                :aria-label="sidebarCollapsed ? t(item.labelKey) : undefined"
+                @click="handleGrowthGroupClick"
+              >
+                <span
+                  class="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full transition-all"
+                  :class="isGrowthSectionActive ? 'bg-primary' : 'bg-transparent'"
+                />
+                <span class="flex min-w-0 items-center gap-2.5">
+                  <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                  <span v-if="!sidebarCollapsed" class="truncate">{{ t(item.labelKey) }}</span>
+                </span>
+                <ChevronDown
+                  v-if="!sidebarCollapsed"
+                  class="h-3.5 w-3.5 shrink-0 transition-transform duration-150"
+                  :class="growthExpanded ? 'rotate-180' : ''"
+                />
+              </button>
+              <div v-if="!sidebarCollapsed && growthExpanded" class="space-y-0.5 pl-3.5">
+                <button
+                  v-for="child in item.children"
+                  :key="child.key"
+                  type="button"
+                  :data-testid="`nav-item-${child.key}`"
+                  class="group relative flex w-full items-center gap-2 rounded-xl py-1.5 pl-3.5 pr-2.5 text-left text-[13px] font-medium transition-colors"
+                  :class="activeSection === child.key
+                    ? 'bg-primary/10 font-semibold text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                  @click="navigateToSection(child.key)"
+                >
+                  <span
+                    class="h-1.5 w-1.5 shrink-0 rounded-full transition-colors"
+                    :class="activeSection === child.key ? 'bg-primary' : 'bg-muted-foreground/40 group-hover:bg-foreground/60'"
+                  />
+                  <component :is="child.icon" class="h-3.5 w-3.5 shrink-0" />
+                  <span class="truncate">{{ t(child.labelKey) }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 普通一级菜单项 -->
+            <button
+              v-else
+              type="button"
+              class="group relative flex w-full items-center rounded-xl py-2 text-left text-[13.5px] font-medium transition-colors"
+              :class="[
+                sidebarCollapsed ? 'justify-center px-0' : 'gap-2.5 pl-3.5 pr-2.5',
+                activeSection === item.key
+                  ? 'bg-primary/10 font-semibold text-primary'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              ]"
+              :title="sidebarCollapsed ? t(item.labelKey) : undefined"
+              :aria-label="sidebarCollapsed ? t(item.labelKey) : undefined"
+              @click="navigateToSection(item.key)"
+            >
+              <span
+                class="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full transition-all"
+                :class="activeSection === item.key ? 'bg-primary' : 'bg-transparent'"
+              />
+              <component :is="item.icon" class="h-4 w-4 shrink-0" />
+              <span v-if="!sidebarCollapsed" class="truncate">{{ t(item.labelKey) }}</span>
+            </button>
+          </template>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- 移动端抽屉导航 -->
+    <Teleport to="body">
+      <Transition name="nt-drawer-fade">
+        <div
+          v-if="mobileDrawerOpen"
+          class="fixed inset-0 z-50 flex lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="t('personalCenter.title')"
+        >
+          <div
+            class="fixed inset-0 bg-black/45 backdrop-blur-[2px]"
+            aria-hidden="true"
+            @click="mobileDrawerOpen = false"
+          />
+          <aside class="relative z-10 flex h-full w-[268px] max-w-[82vw] flex-col border-r border-border bg-card shadow-xl">
+            <div class="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+              <RouterLink to="/me" class="nt-brand flex min-w-0 items-center gap-2 text-[15px] font-bold text-foreground" @click="mobileDrawerOpen = false">
+                <BrandMark v-if="!appStore.isResellerTenant" class="h-6 w-6 shrink-0" />
+                <img v-else-if="resellerLogo" :src="resellerLogo" alt="" class="h-6 w-6 shrink-0 rounded-md object-contain" />
+                <span class="truncate">{{ brandName }}</span>
+                <span class="shrink-0 rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary">
+                  {{ t('needtoken.memberConsole.nav.consoleBadge') }}
+                </span>
+              </RouterLink>
+              <button
+                type="button"
+                class="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                :aria-label="t('needtoken.memberConsole.nav.closeMenu')"
+                @click="mobileDrawerOpen = false"
+              >
+                <X class="h-4 w-4" />
+              </button>
+            </div>
+
+            <nav class="flex-1 space-y-4 overflow-y-auto px-3 py-4" :aria-label="t('personalCenter.title')">
+              <div v-for="group in navGroups" :key="`m-${group.key}`" class="space-y-1">
+                <p class="px-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground/80">
                   {{ t(group.labelKey) }}
                 </p>
-                <template v-for="item in group.items" :key="item.key">
-                  <!-- 可展开/收缩的二级菜单组（推广与分销） -->
+                <template v-for="item in group.items" :key="`m-${item.key}`">
                   <div v-if="item.children?.length" class="space-y-1">
                     <button
                       type="button"
-                      data-testid="nav-group-growth-toggle"
-                      class="group relative flex w-full items-center justify-between gap-2 rounded-xl py-2.5 pl-4 pr-3 text-left text-sm font-semibold transition-colors"
-                      :class="isGrowthSectionActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
-                      :aria-expanded="growthExpanded"
+                      class="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition-colors"
+                      :class="isGrowthSectionActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
                       @click="growthExpanded = !growthExpanded"
                     >
-                      <span
-                        class="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full transition-all"
-                        :class="isGrowthSectionActive ? 'bg-primary' : 'bg-transparent'"
-                      />
-                      <span class="flex min-w-0 items-center gap-2.5">
+                      <span class="flex items-center gap-2.5">
                         <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                        <span class="truncate">{{ t(item.labelKey) }}</span>
+                        <span>{{ t(item.labelKey) }}</span>
                       </span>
-                      <ChevronDown
-                        class="h-4 w-4 shrink-0 transition-transform duration-150"
-                        :class="growthExpanded ? 'rotate-180' : ''"
-                      />
+                      <ChevronDown class="h-4 w-4 transition-transform" :class="growthExpanded ? 'rotate-180' : ''" />
                     </button>
-                    <div v-if="growthExpanded" class="space-y-1 pl-4">
+                    <div v-if="growthExpanded" class="space-y-0.5 pl-4">
                       <button
                         v-for="child in item.children"
-                        :key="child.key"
+                        :key="`m-${child.key}`"
                         type="button"
-                        :data-testid="`nav-item-${child.key}`"
-                        class="group relative flex w-full items-center gap-2.5 rounded-xl py-2 pl-4 pr-3 text-left text-[13px] font-semibold transition-colors"
-                        :class="activeSection === child.key
-                          ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                        class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition-colors"
+                        :class="activeSection === child.key ? 'bg-primary/10 font-semibold text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
                         @click="navigateToSection(child.key)"
                       >
-                        <span
-                          class="h-1.5 w-1.5 shrink-0 rounded-full transition-colors"
-                          :class="activeSection === child.key ? 'bg-primary' : 'bg-muted-foreground/40 group-hover:bg-foreground/60'"
-                        />
                         <component :is="child.icon" class="h-3.5 w-3.5 shrink-0" />
-                        <span class="truncate">{{ t(child.labelKey) }}</span>
+                        <span>{{ t(child.labelKey) }}</span>
                       </button>
                     </div>
                   </div>
-
-                  <!-- 普通一级菜单项 -->
                   <button
                     v-else
                     type="button"
-                    class="group relative flex w-full items-center gap-2.5 rounded-xl py-2.5 pl-4 pr-3 text-left text-sm font-semibold transition-colors"
-                    :class="activeSection === item.key
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
+                    class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors"
+                    :class="activeSection === item.key ? 'bg-primary/10 font-semibold text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
                     @click="navigateToSection(item.key)"
                   >
-                    <span
-                      class="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full transition-all"
-                      :class="activeSection === item.key ? 'bg-primary' : 'bg-transparent'"
-                    />
                     <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                    <span class="truncate">{{ t(item.labelKey) }}</span>
+                    <span>{{ t(item.labelKey) }}</span>
                   </button>
                 </template>
               </div>
+            </nav>
 
-              <div class="border-t pt-3">
+            <!-- 移动端主题与语言快捷设置 -->
+            <div class="space-y-2.5 border-t border-border p-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs text-muted-foreground">{{ t('needtoken.theme.label') }}</span>
+                <ThemeToggle variant="menu" />
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="lang in languages"
+                  :key="`ml-${lang.code}`"
+                  type="button"
+                  class="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                  :class="appStore.locale === lang.code ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground'"
+                  @click="changeLanguage(lang.code)"
+                >
+                  {{ lang.name }}
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- 右侧工作区（顶部固定工作台顶栏 + 独立滚动主画布） -->
+    <div class="flex min-w-0 flex-1 flex-col lg:h-dvh lg:overflow-hidden">
+      <header class="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-card/90 px-4 backdrop-blur lg:px-6">
+        <!-- 左侧：移动端菜单按钮 + 当前模块标题 -->
+        <div class="flex min-w-0 items-center gap-2.5">
+          <button
+            type="button"
+            class="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-background text-foreground transition-colors hover:border-primary/40 lg:hidden"
+            :aria-label="t('needtoken.memberConsole.nav.openMenu')"
+            @click="mobileDrawerOpen = true"
+          >
+            <Menu class="h-4 w-4" />
+          </button>
+          <h1 class="truncate text-[15px] font-bold tracking-tight text-foreground sm:text-base">
+            {{ currentSectionTitle }}
+          </h1>
+        </div>
+
+        <!-- 右侧：API Endpoint 复制 + 唯一返回店面入口 + 语言 + 主题 + 个人信息头像组件 -->
+        <div class="flex shrink-0 items-center gap-2">
+          <div
+            v-if="showGatewayFeatures"
+            class="hidden items-center gap-2 rounded-xl border border-border bg-muted/40 px-2.5 py-1 text-xs xl:inline-flex"
+          >
+            <span class="font-semibold text-muted-foreground">API</span>
+            <code class="max-w-[190px] truncate font-mono font-semibold text-foreground">
+              {{ API_BASE_URL }}
+            </code>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              @click="copyEndpoint"
+            >
+              <Check v-if="copiedEndpoint" class="h-3 w-3 text-primary" />
+              <Copy v-else class="h-3 w-3" />
+              <span>{{ copiedEndpoint ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
+            </button>
+          </div>
+
+          <!-- 唯一的返回店面入口 -->
+          <RouterLink
+            to="/"
+            class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-background px-2.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary sm:px-3"
+          >
+            <Store class="h-3.5 w-3.5 text-primary" />
+            <span class="hidden sm:inline">{{ t('needtoken.memberConsole.nav.backToStore') }}</span>
+            <ArrowUpRight class="h-3.5 w-3.5 opacity-60 sm:hidden" />
+          </RouterLink>
+
+          <!-- 语言切换 -->
+          <div ref="langEl" class="relative hidden sm:block" @focusout="onLanguageFocusOut">
+            <button
+              type="button"
+              class="grid h-9 w-9 place-items-center rounded-xl border border-border bg-background text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              :aria-label="t('navbar.selectLanguage')"
+              :aria-expanded="langOpen"
+              aria-controls="nt-console-language-options"
+              @click="langOpen = !langOpen; profileMenuOpen = false"
+            >
+              <Languages class="h-4 w-4" />
+            </button>
+            <div
+              v-if="langOpen"
+              id="nt-console-language-options"
+              class="absolute right-0 top-[calc(100%+8px)] z-50 flex min-w-[144px] flex-col rounded-xl border border-border bg-card p-1.5 shadow-lg"
+            >
+              <button
+                v-for="lang in languages"
+                :key="lang.code"
+                type="button"
+                class="rounded-lg px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent"
+                :class="appStore.locale === lang.code ? 'bg-primary/10 font-semibold text-primary' : 'text-muted-foreground'"
+                @click="changeLanguage(lang.code)"
+              >
+                {{ lang.name }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 明暗主题切换 -->
+          <ThemeToggle class="hidden sm:inline-flex" />
+
+          <!-- 顶栏最右侧：个人信息头像组件（点击展开紧凑资料卡与账号安全/退出） -->
+          <div ref="profileMenuEl" class="relative" @focusout="onProfileFocusOut">
+            <button
+              type="button"
+              data-testid="topbar-profile-trigger"
+              class="inline-flex h-9 max-w-[200px] items-center gap-2 rounded-full border border-border bg-background pl-1 pr-2.5 text-xs font-semibold text-foreground transition-colors hover:border-primary/45 hover:text-primary"
+              :aria-expanded="profileMenuOpen"
+              aria-controls="nt-console-profile-menu"
+              @click="profileMenuOpen = !profileMenuOpen; langOpen = false"
+            >
+              <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-black text-primary-foreground">
+                {{ displayInitial }}
+              </span>
+              <span class="hidden max-w-[100px] truncate sm:inline">
+                {{ userProfileStore.displayName }}
+              </span>
+              <span
+                v-if="showGatewayFeatures && displayNativeUserId"
+                class="hidden rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-primary md:inline-flex"
+              >
+                #{{ displayNativeUserId }}
+              </span>
+              <ChevronDown
+                class="h-3.5 w-3.5 shrink-0 opacity-65 transition-transform duration-150"
+                :class="profileMenuOpen ? 'rotate-180' : ''"
+              />
+            </button>
+
+            <div
+              v-if="profileMenuOpen"
+              id="nt-console-profile-menu"
+              class="absolute right-0 top-[calc(100%+8px)] z-50 w-[280px] rounded-2xl border border-border bg-card p-2 shadow-xl"
+            >
+              <button
+                type="button"
+                data-testid="sidebar-profile-card"
+                class="group flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-all duration-150"
+                :class="activeSection === 'security'
+                  ? 'border-primary/45 bg-primary/10'
+                  : 'border-border/70 bg-muted/25 hover:border-primary/40 hover:bg-primary/5'"
+                :title="t('needtoken.memberConsole.nav.profileCardHint')"
+                @click="navigateToSection('security')"
+              >
+                <div
+                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black transition-colors"
+                  :class="activeSection === 'security'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground'"
+                >
+                  {{ displayInitial }}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <span class="truncate text-xs font-bold text-foreground group-hover:text-primary">
+                      {{ userProfileStore.displayName }}
+                    </span>
+                    <span
+                      v-if="showGatewayFeatures && displayNativeUserId"
+                      class="shrink-0 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-primary"
+                    >
+                      #{{ displayNativeUserId }}
+                    </span>
+                  </div>
+                  <p class="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {{ userProfileStore.profile?.email || t('personalCenter.subtitle') }}
+                  </p>
+                  <div class="mt-1 flex flex-wrap items-center gap-1">
+                    <Badge :variant="emailVerifiedVariant" size="sm" class="h-4 px-1.5 text-[10px]">
+                      {{ emailVerifiedLabel }}
+                    </Badge>
+                    <span
+                      v-if="userProfileStore.currentLevel"
+                      class="inline-flex items-center gap-0.5 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary"
+                    >
+                      <img
+                        v-if="isImagePath(userProfileStore.currentLevel?.icon)"
+                        :src="getImageUrl(userProfileStore.currentLevel!.icon)"
+                        class="h-2.5 w-2.5 object-contain"
+                        alt=""
+                      />
+                      <Crown v-else class="h-2.5 w-2.5" />
+                      {{ levelName(userProfileStore.currentLevel) }}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+              </button>
+
+              <div class="mt-1.5 space-y-0.5 border-t border-border pt-1.5">
                 <button
                   type="button"
-                  class="flex w-full items-center gap-2.5 rounded-xl px-4 py-2.5 text-left text-sm font-semibold text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400"
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-foreground transition-colors hover:bg-accent hover:text-primary"
+                  @click="navigateToSection('security')"
+                >
+                  <ShieldCheck class="h-4 w-4 shrink-0 text-primary" />
+                  <span>{{ t('needtoken.memberConsole.nav.security') }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400"
                   @click="handleLogout"
                 >
                   <LogOut class="h-4 w-4 shrink-0" />
                   <span>{{ t('needtoken.accountMenu.signOut') }}</span>
                 </button>
               </div>
-            </nav>
-
-            <!-- 移动端横向切换栏 -->
-            <div class="lg:hidden">
-              <div class="flex gap-1.5 overflow-x-auto pb-1">
-                <button
-                  v-for="item in flatNavItems"
-                  :key="item.key"
-                  type="button"
-                  class="shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors"
-                  :class="activeSection === item.key
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'"
-                  @click="navigateToSection(item.key)"
-                >
-                  <span class="flex items-center gap-1.5">
-                    <component :is="item.icon" class="h-3.5 w-3.5" />
-                    <span>{{ t(item.labelKey) }}</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class="shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-500/10 dark:text-red-400"
-                  @click="handleLogout"
-                >
-                  <span class="flex items-center gap-1.5">
-                    <LogOut class="h-3.5 w-3.5" />
-                    <span>{{ t('needtoken.accountMenu.signOut') }}</span>
-                  </span>
-                </button>
-              </div>
             </div>
           </div>
-        </aside>
+        </div>
+      </header>
 
-        <!-- 右侧核心内容区 -->
-        <section class="min-w-0 space-y-6 lg:col-span-9">
+      <!-- 主内容画布（独立滚动） -->
+      <main ref="mainScrollEl" class="flex-1 overflow-y-auto">
+        <div class="mx-auto w-full max-w-[1440px] space-y-5 px-4 py-5 lg:px-6">
           <Alert
             v-if="globalAlert"
             :variant="pageAlertVariant(globalAlert.level)"
@@ -195,16 +438,16 @@
             <AlertDescription>{{ globalAlert.message }}</AlertDescription>
           </Alert>
 
-          <!-- 1. 控制台总览 -->
+          <!-- 1. 控制台总览（Bento 仪表盘布局） -->
           <template v-if="activeSection === 'overview'">
             <!-- 仅在存在未完成的旧账号手动绑定或待激活订单时提示 -->
             <ApiAccountLinkBanner v-if="showGatewayFeatures" next-path="/me" only-when-action-needed />
 
-            <!-- 四格一体化资产与网关聚合卡 -->
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <!-- 第一行：四格核心 KPI 指标卡 -->
+            <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
               <button
                 type="button"
-                class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                class="rounded-2xl border bg-card p-4 text-left shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
                 @click="navigateToSection('assets')"
               >
                 <div class="flex items-center justify-between text-xs font-medium text-muted-foreground">
@@ -214,7 +457,7 @@
                 <p class="mt-2 font-mono text-2xl font-black text-primary">
                   {{ userProfileStore.loadingWallet ? '—' : storeWalletDisplay }}
                 </p>
-                <p class="mt-1.5 text-[11.5px] text-muted-foreground">
+                <p class="mt-1 text-[11.5px] text-muted-foreground">
                   {{
                     showGatewayFeatures && apiSummary
                       ? t('needtoken.memberConsole.overview.unifiedBalanceApiHint', {
@@ -228,7 +471,7 @@
               <button
                 v-if="showGatewayFeatures"
                 type="button"
-                class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                class="rounded-2xl border bg-card p-4 text-left shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
                 @click="navigateToSection('plans')"
               >
                 <div class="flex items-center justify-between text-xs font-medium text-muted-foreground">
@@ -238,7 +481,7 @@
                 <p class="mt-2 font-mono text-2xl font-black text-foreground">
                   {{ gatewayLoading && !apiSummary ? '—' : formatApiQuotaUsd(subscriptionRemainingQuota) }}
                 </p>
-                <p class="mt-1.5 text-[11.5px] text-muted-foreground">
+                <p class="mt-1 text-[11.5px] text-muted-foreground">
                   {{
                     t('needtoken.memberConsole.overview.apiPlanQuotaHint', {
                       count: activeSubscriptions.length,
@@ -249,7 +492,7 @@
 
               <button
                 type="button"
-                class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                class="rounded-2xl border bg-card p-4 text-left shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
                 @click="navigateToSection('affiliate')"
               >
                 <div class="flex items-center justify-between text-xs font-medium text-muted-foreground">
@@ -259,7 +502,7 @@
                 <p class="mt-2 font-mono text-2xl font-black text-foreground">
                   {{ affiliateLoading ? '—' : affiliateAvailableDisplay }}
                 </p>
-                <p class="mt-1.5 text-[11.5px] text-muted-foreground">
+                <p class="mt-1 text-[11.5px] text-muted-foreground">
                   {{ affiliateHintText }}
                 </p>
               </button>
@@ -267,7 +510,7 @@
               <button
                 v-if="showGatewayFeatures"
                 type="button"
-                class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                class="rounded-2xl border bg-card p-4 text-left shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
                 @click="navigateToSection('keys')"
               >
                 <div class="flex items-center justify-between text-xs font-medium text-muted-foreground">
@@ -280,7 +523,7 @@
                     {{ t('needtoken.memberConsole.overview.activeKeysUnit') }}
                   </span>
                 </p>
-                <p class="mt-1.5 text-[11.5px] text-muted-foreground">
+                <p class="mt-1 text-[11.5px] text-muted-foreground">
                   {{
                     t('needtoken.memberConsole.overview.totalRequestsHint', {
                       count: formatInteger(apiSummary?.request_count ?? 0),
@@ -292,7 +535,7 @@
               <button
                 v-else
                 type="button"
-                class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                class="rounded-2xl border bg-card p-4 text-left shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
                 @click="navigateToSection('orders')"
               >
                 <div class="flex items-center justify-between text-xs font-medium text-muted-foreground">
@@ -302,226 +545,286 @@
                 <p class="mt-2 font-mono text-2xl font-black text-foreground">
                   {{ userProfileStore.loadingOrders ? '—' : userProfileStore.ordersTotal }}
                 </p>
-                <p class="mt-1.5 text-[11.5px] text-muted-foreground">
+                <p class="mt-1 text-[11.5px] text-muted-foreground">
                   {{ t('personalCenter.overview.viewAllOrders') }}
                 </p>
               </button>
             </div>
 
-            <!-- 快捷操作与 API 接口条 -->
-            <div class="flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-              <div class="flex flex-wrap items-center gap-2">
-                <Button v-if="showGatewayFeatures" size="sm" @click="navigateToSection('keys')">
-                  <KeyRound class="mr-1.5 h-4 w-4" />
-                  {{ t('needtoken.memberConsole.quick.manageKeys') }}
-                </Button>
-                <Button v-if="showGatewayFeatures" variant="outline" size="sm" @click="navigateToSection('playground')">
-                  <FlaskConical class="mr-1.5 h-4 w-4 text-primary" />
-                  {{ t('needtoken.memberConsole.nav.playground') }}
-                </Button>
-                <Button v-if="showGatewayFeatures" as-child variant="outline" size="sm">
-                  <RouterLink to="/plans">
-                    <Sparkles class="mr-1.5 h-4 w-4 text-primary" />
-                    {{ t('needtoken.memberConsole.quick.buyPlans') }}
-                  </RouterLink>
-                </Button>
-                <Button v-if="showGatewayFeatures" variant="outline" size="sm" @click="navigateToSection('usage')">
-                  <Activity class="mr-1.5 h-4 w-4" />
-                  {{ t('needtoken.memberConsole.quick.viewUsage') }}
-                </Button>
-                <Button variant="outline" size="sm" @click="openAssetsSubTab('giftCard')">
-                  <Gift class="mr-1.5 h-4 w-4" />
-                  {{ t('needtoken.memberConsole.quick.redeemGiftCard') }}
-                </Button>
-                <Button v-if="canAccessResellerConsole" variant="outline" size="sm" @click="navigateToSection('reseller')">
-                  <Store class="mr-1.5 h-4 w-4" />
-                  {{ t('needtoken.memberConsole.nav.resellerSystem') }}
-                </Button>
-              </div>
+            <!-- 第二行：双栏 Bento 主控网格 -->
+            <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-12">
+              <!-- 左 8 列：趋势与生效套餐（非网关模式下展示最近订单） -->
+              <div class="space-y-4 xl:col-span-8">
+                <template v-if="showGatewayFeatures">
+                  <!-- 近 7 天网关调用趋势 -->
+                  <div class="rounded-2xl border bg-card p-5 shadow-xs">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h2 class="text-sm font-bold text-foreground sm:text-base">{{ t('needtoken.memberConsole.overview.trendTitle') }}</h2>
+                        <p class="mt-0.5 text-xs text-muted-foreground">
+                          {{
+                            t('needtoken.memberConsole.overview.trendSubtitle', {
+                              spend: formatApiQuotaUsd(overviewUsage?.total_quota ?? 0),
+                              requests: formatInteger(overviewUsage?.total_requests ?? 0),
+                            })
+                          }}
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('usage')">
+                        {{ t('needtoken.memberConsole.overview.viewUsageDetails') }}
+                      </Button>
+                    </div>
 
-              <div v-if="showGatewayFeatures" class="flex items-center gap-2 rounded-xl border bg-muted/40 px-3 py-1.5 text-xs">
-                <span class="shrink-0 font-semibold text-muted-foreground">API</span>
-                <code class="max-w-[200px] truncate font-mono font-semibold text-foreground sm:max-w-[240px]">
-                  {{ API_BASE_URL }}
-                </code>
-                <button
-                  type="button"
-                  class="inline-flex shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                  @click="copyEndpoint"
-                >
-                  <Check v-if="copiedEndpoint" class="h-3 w-3 text-primary" />
-                  <Copy v-else class="h-3 w-3" />
-                  <span>{{ copiedEndpoint ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- 近 7 天网关调用趋势 -->
-            <div v-if="showGatewayFeatures" class="rounded-2xl border bg-card p-6 shadow-sm">
-              <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 class="text-base font-bold text-foreground">{{ t('needtoken.memberConsole.overview.trendTitle') }}</h2>
-                  <p class="mt-0.5 text-xs text-muted-foreground">
-                    {{
-                      t('needtoken.memberConsole.overview.trendSubtitle', {
-                        spend: formatApiQuotaUsd(overviewUsage?.total_quota ?? 0),
-                        requests: formatInteger(overviewUsage?.total_requests ?? 0),
-                      })
-                    }}
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('usage')">
-                  {{ t('needtoken.memberConsole.overview.viewUsageDetails') }}
-                </Button>
-              </div>
-
-              <div v-if="gatewayLoading && !overviewUsage" class="h-24 animate-pulse rounded-xl bg-muted" />
-              <div v-else-if="!overviewUsage?.daily?.length" class="rounded-xl border border-dashed px-4 py-5 text-xs text-muted-foreground">
-                {{ t('needtoken.memberConsole.overview.trendEmpty') }}
-              </div>
-              <div v-else class="flex h-24 items-end gap-2">
-                <div
-                  v-for="d in overviewUsage.daily"
-                  :key="d.date"
-                  class="group flex flex-1 flex-col items-center gap-1"
-                  :title="`${d.date} · ${formatApiQuotaUsd(d.quota)} · ${formatInteger(d.requests)} ${t('needtoken.memberConsole.usage.reqUnit')}`"
-                >
-                  <div class="flex h-16 w-full items-end justify-center rounded-md bg-muted/30 px-1 pt-1">
-                    <div
-                      class="w-full max-w-[28px] rounded-t-md bg-primary/80 transition-all group-hover:bg-primary"
-                      :style="{ height: `${overviewBarPercent(d.quota)}%` }"
-                    />
-                  </div>
-                  <span class="font-mono text-[10px] text-muted-foreground">{{ d.date.slice(5) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 生效中的 Need 网关套餐 -->
-            <div v-if="showGatewayFeatures" class="rounded-2xl border bg-card p-6 shadow-sm">
-              <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 class="text-base font-bold text-foreground">{{ t('needtoken.memberConsole.plans.title') }}</h2>
-                  <p class="mt-0.5 text-xs text-muted-foreground">{{ t('needtoken.memberConsole.plans.subtitle') }}</p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('plans')">
-                    {{ t('needtoken.memberConsole.plans.viewAllPlans') }}
-                  </Button>
-                  <Button as-child variant="outline" size="sm">
-                    <RouterLink to="/plans">
-                      {{ t('needtoken.memberConsole.plans.browseMore') }}
-                      <ArrowUpRight class="ml-1 h-3.5 w-3.5" />
-                    </RouterLink>
-                  </Button>
-                </div>
-              </div>
-
-              <div v-if="gatewayLoading && !apiSummary" class="space-y-3">
-                <div v-for="idx in 2" :key="idx" class="h-20 animate-pulse rounded-xl bg-muted" />
-              </div>
-
-              <div v-else-if="activeSubscriptions.length === 0" class="flex flex-col items-start justify-between gap-3 rounded-xl border border-dashed p-5 sm:flex-row sm:items-center">
-                <div>
-                  <p class="text-sm font-semibold text-foreground">{{ t('needtoken.memberConsole.plans.emptyTitle') }}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">{{ t('needtoken.memberConsole.plans.emptyHint') }}</p>
-                </div>
-                <Button as-child size="sm" class="shrink-0">
-                  <RouterLink to="/plans">{{ t('needtoken.memberConsole.quick.buyPlans') }}</RouterLink>
-                </Button>
-              </div>
-
-              <div v-else class="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-                <div
-                  v-for="sub in activeSubscriptions"
-                  :key="sub.id"
-                  class="rounded-xl border bg-muted/20 p-4"
-                >
-                  <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-bold text-foreground">
-                        {{ sub.plan_title || t('needtoken.apiAccountLink.subscriptionFallbackName', { id: sub.plan_id }) }}
-                      </p>
-                      <div v-if="splitGroups(sub.allowed_groups).length" class="mt-1.5 flex flex-wrap gap-1">
-                        <span
-                          v-for="grp in splitGroups(sub.allowed_groups)"
-                          :key="grp"
-                          class="rounded-md border bg-background px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-muted-foreground"
-                        >
-                          {{ grp }}
-                        </span>
+                    <div v-if="gatewayLoading && !overviewUsage" class="h-24 animate-pulse rounded-xl bg-muted" />
+                    <div v-else-if="!overviewUsage?.daily?.length" class="rounded-xl border border-dashed px-4 py-5 text-xs text-muted-foreground">
+                      {{ t('needtoken.memberConsole.overview.trendEmpty') }}
+                    </div>
+                    <div v-else class="flex h-24 items-end gap-2">
+                      <div
+                        v-for="d in overviewUsage.daily"
+                        :key="d.date"
+                        class="group flex flex-1 flex-col items-center gap-1"
+                        :title="`${d.date} · ${formatApiQuotaUsd(d.quota)} · ${formatInteger(d.requests)} ${t('needtoken.memberConsole.usage.reqUnit')}`"
+                      >
+                        <div class="flex h-16 w-full items-end justify-center rounded-md bg-muted/30 px-1 pt-1">
+                          <div
+                            class="w-full max-w-[28px] rounded-t-md bg-primary/80 transition-all group-hover:bg-primary"
+                            :style="{ height: `${overviewBarPercent(d.quota)}%` }"
+                          />
+                        </div>
+                        <span class="font-mono text-[10px] text-muted-foreground">{{ d.date.slice(5) }}</span>
                       </div>
                     </div>
-                    <span class="shrink-0 text-[11px] text-muted-foreground">
-                      {{ subscriptionExpiryText(sub.end_time) }}
-                    </span>
                   </div>
 
-                  <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <!-- 生效中的 Need 网关套餐 -->
+                  <div class="rounded-2xl border bg-card p-5 shadow-xs">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h2 class="text-sm font-bold text-foreground sm:text-base">{{ t('needtoken.memberConsole.plans.title') }}</h2>
+                        <p class="mt-0.5 text-xs text-muted-foreground">{{ t('needtoken.memberConsole.plans.subtitle') }}</p>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('plans')">
+                          {{ t('needtoken.memberConsole.plans.viewAllPlans') }}
+                        </Button>
+                        <Button as-child variant="outline" size="sm">
+                          <RouterLink to="/plans">
+                            {{ t('needtoken.memberConsole.plans.browseMore') }}
+                            <ArrowUpRight class="ml-1 h-3.5 w-3.5" />
+                          </RouterLink>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div v-if="gatewayLoading && !apiSummary" class="space-y-3">
+                      <div v-for="idx in 2" :key="idx" class="h-20 animate-pulse rounded-xl bg-muted" />
+                    </div>
+
+                    <div v-else-if="activeSubscriptions.length === 0" class="flex flex-col items-start justify-between gap-3 rounded-xl border border-dashed p-4 sm:flex-row sm:items-center">
+                      <div>
+                        <p class="text-sm font-semibold text-foreground">{{ t('needtoken.memberConsole.plans.emptyTitle') }}</p>
+                        <p class="mt-0.5 text-xs text-muted-foreground">{{ t('needtoken.memberConsole.plans.emptyHint') }}</p>
+                      </div>
+                      <Button as-child size="sm" class="shrink-0">
+                        <RouterLink to="/plans">{{ t('needtoken.memberConsole.quick.buyPlans') }}</RouterLink>
+                      </Button>
+                    </div>
+
+                    <div v-else class="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+                      <div
+                        v-for="sub in activeSubscriptions"
+                        :key="sub.id"
+                        class="rounded-xl border bg-muted/20 p-4"
+                      >
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="min-w-0">
+                            <p class="truncate text-sm font-bold text-foreground">
+                              {{ sub.plan_title || t('needtoken.apiAccountLink.subscriptionFallbackName', { id: sub.plan_id }) }}
+                            </p>
+                            <div v-if="splitGroups(sub.allowed_groups).length" class="mt-1.5 flex flex-wrap gap-1">
+                              <span
+                                v-for="grp in splitGroups(sub.allowed_groups)"
+                                :key="grp"
+                                class="rounded-md border bg-background px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-muted-foreground"
+                              >
+                                {{ grp }}
+                              </span>
+                            </div>
+                          </div>
+                          <span class="shrink-0 text-[11px] text-muted-foreground">
+                            {{ subscriptionExpiryText(sub.end_time) }}
+                          </span>
+                        </div>
+
+                        <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            class="h-full rounded-full bg-primary transition-all"
+                            :style="{ width: `${computeSubscriptionUsagePercent(sub.amount_total, sub.amount_used)}%` }"
+                          />
+                        </div>
+
+                        <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span class="font-mono font-semibold text-foreground">
+                            {{
+                              t('needtoken.apiAccountLink.subscriptionRemaining', {
+                                remaining: formatApiQuotaUsd(computeSubscriptionRemainingQuota(sub.amount_total, sub.amount_used)),
+                                total: formatApiQuotaUsd(sub.amount_total),
+                              })
+                            }}
+                          </span>
+                          <span v-if="sub.allow_wallet_overflow" class="rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
+                            {{ t('needtoken.apiAccountLink.walletOverflowEnabled') }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- 非网关模式（分销独立站）左栏直接展示最近订单 -->
+                <div v-else class="rounded-2xl border bg-card p-5 shadow-xs">
+                  <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-bold text-foreground sm:text-base">{{ t('personalCenter.overview.recentOrdersTitle') }}</h2>
+                    <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('orders')">
+                      {{ t('personalCenter.overview.viewAllOrders') }}
+                    </Button>
+                  </div>
+
+                  <div v-if="userProfileStore.loadingOrders" class="space-y-3">
+                    <div v-for="idx in 3" :key="idx" class="h-14 animate-pulse rounded-xl border bg-muted" />
+                  </div>
+
+                  <div v-else-if="userProfileStore.recentOrders.length === 0" class="rounded-xl border border-dashed px-4 py-5 text-sm text-muted-foreground">
+                    {{ t('personalCenter.overview.emptyOrders') }}
+                  </div>
+
+                  <div v-else class="space-y-2.5">
                     <div
-                      class="h-full rounded-full bg-primary transition-all"
-                      :style="{ width: `${computeSubscriptionUsagePercent(sub.amount_total, sub.amount_used)}%` }"
-                    />
-                  </div>
-
-                  <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span class="font-mono font-semibold text-foreground">
-                      {{
-                        t('needtoken.apiAccountLink.subscriptionRemaining', {
-                          remaining: formatApiQuotaUsd(computeSubscriptionRemainingQuota(sub.amount_total, sub.amount_used)),
-                          total: formatApiQuotaUsd(sub.amount_total),
-                        })
-                      }}
-                    </span>
-                    <span v-if="sub.allow_wallet_overflow" class="rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
-                      {{ t('needtoken.apiAccountLink.walletOverflowEnabled') }}
-                    </span>
+                      v-for="order in userProfileStore.recentOrders"
+                      :key="order.order_no"
+                      class="rounded-xl border bg-card px-4 py-3 transition-all hover:border-primary/30 hover:shadow-xs"
+                    >
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div class="font-mono text-xs text-muted-foreground">{{ t('orders.orderNo') }}：{{ order.order_no }}</div>
+                          <div class="mt-1 text-sm font-semibold text-foreground">
+                            {{ formatMoney(order.total_amount, order.currency) }}
+                          </div>
+                          <div class="mt-0.5 text-xs text-muted-foreground">{{ formatDate(order.created_at) }}</div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <Badge :variant="statusVariant(order.status)" size="sm">
+                            {{ statusLabel(order.status) }}
+                          </Badge>
+                          <Button as-child variant="outline" size="sm">
+                            <RouterLink :to="`/orders/${order.order_no}`">{{ t('orders.viewDetails') }}</RouterLink>
+                          </Button>
+                          <Button v-if="order.status === 'pending_payment'" as-child size="sm">
+                            <RouterLink :to="`/pay?order_no=${order.order_no}`">{{ t('orders.payNow') }}</RouterLink>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- 最近订单 -->
-            <div class="rounded-2xl border bg-card p-6 shadow-sm">
-              <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <h2 class="text-base font-bold text-foreground">{{ t('personalCenter.overview.recentOrdersTitle') }}</h2>
-                <Button variant="ghost" size="sm" class="rounded-full" @click="navigateToSection('orders')">
-                  {{ t('personalCenter.overview.viewAllOrders') }}
-                </Button>
-              </div>
+              <!-- 右 4 列：快捷工作台 + 最近订单摘要 -->
+              <div class="space-y-4 xl:col-span-4">
+                <!-- 快捷工作台 -->
+                <div class="rounded-2xl border bg-card p-4 shadow-xs">
+                  <h2 class="mb-3 text-sm font-bold text-foreground">{{ t('needtoken.memberConsole.quick.title') }}</h2>
+                  <div class="grid grid-cols-2 gap-2">
+                    <Button v-if="showGatewayFeatures" size="sm" class="h-9 justify-start px-3 text-xs" @click="navigateToSection('keys')">
+                      <KeyRound class="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                      <span class="truncate">{{ t('needtoken.memberConsole.quick.manageKeys') }}</span>
+                    </Button>
+                    <Button v-if="showGatewayFeatures" variant="outline" size="sm" class="h-9 justify-start px-3 text-xs" @click="navigateToSection('playground')">
+                      <FlaskConical class="mr-1.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span class="truncate">{{ t('needtoken.memberConsole.nav.playground') }}</span>
+                    </Button>
+                    <Button v-if="showGatewayFeatures" as-child variant="outline" size="sm" class="h-9 justify-start px-3 text-xs">
+                      <RouterLink to="/plans">
+                        <Sparkles class="mr-1.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                        <span class="truncate">{{ t('needtoken.memberConsole.quick.buyPlans') }}</span>
+                      </RouterLink>
+                    </Button>
+                    <Button v-if="showGatewayFeatures" variant="outline" size="sm" class="h-9 justify-start px-3 text-xs" @click="navigateToSection('usage')">
+                      <Activity class="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                      <span class="truncate">{{ t('needtoken.memberConsole.quick.viewUsage') }}</span>
+                    </Button>
+                    <Button variant="outline" size="sm" class="h-9 justify-start px-3 text-xs" @click="openAssetsSubTab('giftCard')">
+                      <Gift class="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                      <span class="truncate">{{ t('needtoken.memberConsole.quick.redeemGiftCard') }}</span>
+                    </Button>
+                    <Button v-if="canAccessResellerConsole" variant="outline" size="sm" class="h-9 justify-start px-3 text-xs" @click="navigateToSection('reseller')">
+                      <Store class="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                      <span class="truncate">{{ t('needtoken.memberConsole.nav.resellerSystem') }}</span>
+                    </Button>
+                  </div>
 
-              <div v-if="userProfileStore.loadingOrders" class="space-y-3">
-                <div v-for="idx in 3" :key="idx" class="h-16 animate-pulse rounded-xl border bg-muted" />
-              </div>
-
-              <div v-else-if="userProfileStore.recentOrders.length === 0" class="rounded-xl border border-dashed px-4 py-5 text-sm text-muted-foreground">
-                {{ t('personalCenter.overview.emptyOrders') }}
-              </div>
-
-              <div v-else class="space-y-3">
-                <div
-                  v-for="order in userProfileStore.recentOrders"
-                  :key="order.order_no"
-                  class="rounded-xl border bg-card px-4 py-3 transition-all hover:border-primary/30 hover:shadow-sm"
-                >
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div class="font-mono text-xs text-muted-foreground">{{ t('orders.orderNo') }}：{{ order.order_no }}</div>
-                      <div class="mt-1 text-sm font-semibold text-foreground">
-                        {{ formatMoney(order.total_amount, order.currency) }}
-                      </div>
-                      <div class="mt-1 text-xs text-muted-foreground">{{ formatDate(order.created_at) }}</div>
+                  <!-- 小于 xl 屏幕时在此处展示 API 接入地址复制栏 -->
+                  <div v-if="showGatewayFeatures" class="mt-3 flex items-center justify-between gap-2 rounded-xl border bg-muted/40 px-3 py-2 text-xs xl:hidden">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <span class="shrink-0 font-semibold text-muted-foreground">{{ t('needtoken.memberConsole.quick.apiEndpoint') }}</span>
+                      <code class="truncate font-mono font-semibold text-foreground">{{ API_BASE_URL }}</code>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <Badge :variant="statusVariant(order.status)" size="sm">
-                        {{ statusLabel(order.status) }}
-                      </Badge>
-                      <Button as-child variant="outline" size="sm">
-                        <RouterLink :to="`/orders/${order.order_no}`">{{ t('orders.viewDetails') }}</RouterLink>
-                      </Button>
-                      <Button v-if="order.status === 'pending_payment'" as-child size="sm">
-                        <RouterLink :to="`/pay?order_no=${order.order_no}`">{{ t('orders.payNow') }}</RouterLink>
-                      </Button>
+                    <button
+                      type="button"
+                      class="inline-flex shrink-0 items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                      @click="copyEndpoint"
+                    >
+                      <Check v-if="copiedEndpoint" class="h-3 w-3 text-primary" />
+                      <Copy v-else class="h-3 w-3" />
+                      <span>{{ copiedEndpoint ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 网关模式下的最近订单紧凑卡片 -->
+                <div v-if="showGatewayFeatures" class="rounded-2xl border bg-card p-4 shadow-xs">
+                  <div class="mb-3 flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-bold text-foreground">{{ t('personalCenter.overview.recentOrdersTitle') }}</h2>
+                    <Button variant="ghost" size="sm" class="h-7 rounded-full px-2.5 text-xs" @click="navigateToSection('orders')">
+                      {{ t('personalCenter.overview.viewAllOrders') }}
+                    </Button>
+                  </div>
+
+                  <div v-if="userProfileStore.loadingOrders" class="space-y-2.5">
+                    <div v-for="idx in 2" :key="idx" class="h-14 animate-pulse rounded-xl border bg-muted" />
+                  </div>
+
+                  <div v-else-if="userProfileStore.recentOrders.length === 0" class="rounded-xl border border-dashed px-3.5 py-4 text-xs text-muted-foreground">
+                    {{ t('personalCenter.overview.emptyOrders') }}
+                  </div>
+
+                  <div v-else class="space-y-2.5">
+                    <div
+                      v-for="order in userProfileStore.recentOrders"
+                      :key="order.order_no"
+                      class="rounded-xl border bg-muted/15 p-3 transition-all hover:border-primary/30"
+                    >
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                          <div class="truncate font-mono text-[11px] text-muted-foreground">{{ order.order_no }}</div>
+                          <div class="mt-0.5 text-sm font-bold text-foreground">
+                            {{ formatMoney(order.total_amount, order.currency) }}
+                          </div>
+                          <div class="mt-0.5 text-[11px] text-muted-foreground">{{ formatDate(order.created_at) }}</div>
+                        </div>
+                        <Badge :variant="statusVariant(order.status)" size="sm" class="shrink-0">
+                          {{ statusLabel(order.status) }}
+                        </Badge>
+                      </div>
+                      <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
+                        <Button as-child variant="outline" size="sm" class="h-7 px-2.5 text-xs">
+                          <RouterLink :to="`/orders/${order.order_no}`">{{ t('orders.viewDetails') }}</RouterLink>
+                        </Button>
+                        <Button v-if="order.status === 'pending_payment'" as-child size="sm" class="h-7 px-2.5 text-xs">
+                          <RouterLink :to="`/pay?order_no=${order.order_no}`">{{ t('orders.payNow') }}</RouterLink>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -547,9 +850,9 @@
           <!-- 7. 我的订单 -->
           <OrdersPanel v-else-if="activeSection === 'orders'" />
 
-          <!-- 5. 资产与礼品卡（集合展示 API 额度 + 店面钱包 + 推广佣金 + 礼品卡兑换 + 钱包流水） -->
+          <!-- 8. 资产与礼品卡（集合展示 API 额度 + 店面钱包 + 推广佣金 + 礼品卡兑换 + 钱包流水） -->
           <template v-else-if="activeSection === 'assets'">
-            <div class="rounded-2xl border bg-card p-6 shadow-sm">
+            <div class="rounded-2xl border bg-card p-6 shadow-xs">
               <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 class="text-lg font-bold text-foreground">{{ t('needtoken.memberConsole.assets.title') }}</h2>
@@ -632,19 +935,19 @@
             <WalletPanel v-else />
           </template>
 
-          <!-- 6. 推广拉新 -->
+          <!-- 9. 推广拉新 -->
           <AffiliatePanel v-else-if="activeSection === 'affiliate'" />
 
-          <!-- 7. 分销系统（全面纳管重构，统一 NeedToken 视觉与路由） -->
+          <!-- 10. 分销系统（全面纳管重构，统一 NeedToken 视觉与路由） -->
           <ResellerWorkspacePanel v-else-if="activeSection === 'reseller' && canAccessResellerConsole" />
 
-          <!-- 8. 账号与安全（点击左侧顶部资料卡进入） -->
+          <!-- 11. 账号与安全（点击顶部头像菜单或侧栏菜单进入） -->
           <template v-else-if="activeSection === 'security'">
             <ProfilePanel />
             <SecurityPanel />
           </template>
-        </section>
-      </div>
+        </div>
+      </main>
     </div>
   </div>
 </template>
@@ -667,14 +970,20 @@ import {
   FlaskConical,
   Gift,
   KeyRound,
+  Languages,
   LayoutDashboard,
   LogOut,
   Megaphone,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ShieldCheck,
   ShoppingBag,
   Sparkles,
   Store,
   UserPlus,
   Wallet,
+  X,
 } from 'lucide-vue-next'
 import { affiliateAPI, type AffiliateDashboardData } from '../../api'
 import { useAppStore } from '../../stores/app'
@@ -692,13 +1001,15 @@ import WalletPanel from '../../views/personal/WalletPanel.vue'
 import GiftCardPanel from '../../views/personal/GiftCardPanel.vue'
 import AffiliatePanel from '../../views/personal/AffiliatePanel.vue'
 import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
+import BrandMark from './components/BrandMark.vue'
+import ThemeToggle from './components/ThemeToggle.vue'
 import GatewayKeysPanel from './components/member/GatewayKeysPanel.vue'
 import GatewayModelsPanel from './components/member/GatewayModelsPanel.vue'
 import GatewayPlansPanel from './components/member/GatewayPlansPanel.vue'
 import GatewayPlaygroundPanel from './components/member/GatewayPlaygroundPanel.vue'
 import GatewayUsagePanel from './components/member/GatewayUsagePanel.vue'
 import ResellerWorkspacePanel from './components/member/ResellerWorkspacePanel.vue'
-import { API_BASE_URL } from './config'
+import { API_BASE_URL, NEEDTOKEN_BRAND_NAME } from './config'
 import { useApiAccountLink } from './composables/useApiAccountLink'
 import {
   computeSubscriptionRemainingQuota,
@@ -747,6 +1058,14 @@ const {
 
 const showGatewayFeatures = computed(() => !appStore.isResellerTenant)
 
+const brandName = computed(() => (appStore.isResellerTenant
+  ? String(appStore.config?.brand?.site_name || '').trim() || NEEDTOKEN_BRAND_NAME
+  : NEEDTOKEN_BRAND_NAME))
+const resellerLogo = computed(() => {
+  const logo = String(appStore.config?.brand?.site_logo || '').trim()
+  return logo ? getImageUrl(logo) : ''
+})
+
 const GATEWAY_ONLY_SECTIONS = new Set<NeedtokenMemberSection>(['keys', 'models', 'playground', 'usage', 'plans'])
 
 const activeSection = computed<NeedtokenMemberSection>(() => {
@@ -756,6 +1075,55 @@ const activeSection = computed<NeedtokenMemberSection>(() => {
   }
   return normalized
 })
+
+const SIDEBAR_COLLAPSE_KEY = 'nt-member-sidebar-collapsed'
+const readSidebarCollapsed = () => {
+  if (typeof window === 'undefined') return false
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+const sidebarCollapsed = ref(readSidebarCollapsed())
+const toggleSidebarCollapse = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarCollapsed.value ? '1' : '0')
+  } catch {
+    /* ignore storage unavailable */
+  }
+}
+
+const mobileDrawerOpen = ref(false)
+const mainScrollEl = ref<HTMLElement | null>(null)
+const profileMenuOpen = ref(false)
+const profileMenuEl = ref<HTMLElement | null>(null)
+const langOpen = ref(false)
+const langEl = ref<HTMLElement | null>(null)
+
+const languages = [
+  { code: 'zh-CN', name: '简体中文' },
+  { code: 'zh-TW', name: '繁體中文' },
+  { code: 'en-US', name: 'English' },
+]
+
+const changeLanguage = (code: string) => {
+  appStore.setLocale(code)
+  langOpen.value = false
+}
+
+const onLanguageFocusOut = (event: FocusEvent) => {
+  if (!(event.relatedTarget instanceof Node) || !langEl.value?.contains(event.relatedTarget)) {
+    langOpen.value = false
+  }
+}
+
+const onProfileFocusOut = (event: FocusEvent) => {
+  if (!(event.relatedTarget instanceof Node) || !profileMenuEl.value?.contains(event.relatedTarget)) {
+    profileMenuOpen.value = false
+  }
+}
 
 const assetsSubTab = ref<'giftCard' | 'wallet'>(props.section === 'wallet' ? 'wallet' : 'giftCard')
 watch(
@@ -788,6 +1156,20 @@ const growthExpanded = ref(isGrowthSectionActive.value)
 watch(isGrowthSectionActive, (active) => {
   if (active) growthExpanded.value = true
 })
+
+const handleGrowthGroupClick = () => {
+  if (sidebarCollapsed.value) {
+    sidebarCollapsed.value = false
+    growthExpanded.value = true
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSE_KEY, '0')
+    } catch {
+      /* ignore */
+    }
+    return
+  }
+  growthExpanded.value = !growthExpanded.value
+}
 
 const navGroups = computed<NavGroup[]>(() => {
   const groups: NavGroup[] = []
@@ -837,6 +1219,13 @@ const navGroups = computed<NavGroup[]>(() => {
       growthNavItem,
     ],
   })
+  groups.push({
+    key: 'account',
+    labelKey: 'needtoken.memberConsole.nav.groupAccount',
+    items: [
+      { key: 'security', labelKey: 'needtoken.memberConsole.nav.security', icon: ShieldCheck },
+    ],
+  })
   return groups
 })
 
@@ -849,6 +1238,11 @@ const flatNavItems = computed<NavLeafItem[]>(() =>
     ),
   ),
 )
+
+const currentSectionTitle = computed(() => {
+  const hit = flatNavItems.value.find(item => item.key === activeSection.value)
+  return hit ? t(hit.labelKey) : t('needtoken.memberConsole.nav.overview')
+})
 
 const sectionRoutes: Record<NeedtokenMemberSection, string> = {
   overview: '/me',
@@ -865,6 +1259,8 @@ const sectionRoutes: Record<NeedtokenMemberSection, string> = {
 }
 
 const navigateToSection = (section: string) => {
+  mobileDrawerOpen.value = false
+  profileMenuOpen.value = false
   const key = section as NeedtokenMemberSection
   if (sectionRoutes[key]) {
     void router.push(sectionRoutes[key])
@@ -902,6 +1298,10 @@ const handleAssetsChanged = async () => {
 }
 
 watch(activeSection, (next) => {
+  mobileDrawerOpen.value = false
+  profileMenuOpen.value = false
+  langOpen.value = false
+  mainScrollEl.value?.scrollTo({ top: 0 })
   if (next === 'assets' || next === 'overview') {
     void handleAssetsChanged()
   }
@@ -999,14 +1399,48 @@ const copyEndpoint = async () => {
 }
 
 const handleLogout = async () => {
+  profileMenuOpen.value = false
+  mobileDrawerOpen.value = false
   await userAuth.logout('/')
 }
 
+const onDocClick = (event: MouseEvent) => {
+  const target = event.target as Node
+  if (profileMenuOpen.value && profileMenuEl.value && !profileMenuEl.value.contains(target)) {
+    profileMenuOpen.value = false
+  }
+  if (langOpen.value && langEl.value && !langEl.value.contains(target)) {
+    langOpen.value = false
+  }
+}
+
+const onDocKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape') return
+  profileMenuOpen.value = false
+  langOpen.value = false
+  mobileDrawerOpen.value = false
+}
+
 onMounted(() => {
+  document.addEventListener('click', onDocClick)
+  document.addEventListener('keydown', onDocKeydown)
   void Promise.all([refreshGatewayData(), loadAffiliateOverview()])
 })
 
 onUnmounted(() => {
   if (copyTimer) clearTimeout(copyTimer)
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', onDocKeydown)
 })
 </script>
+
+<style scoped>
+.nt-drawer-fade-enter-active,
+.nt-drawer-fade-leave-active {
+  transition: opacity 180ms ease;
+}
+.nt-drawer-fade-enter-from,
+.nt-drawer-fade-leave-to {
+  opacity: 0;
+}
+</style>

@@ -263,7 +263,7 @@ body.nt-tokens {
 }
 
 .nt-scope {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--ui-bg-page);
@@ -399,7 +399,7 @@ body.nt-tokens {
   min-height: 0;
 }
 .nt-scope .nt-page-content > .theme-auth-page {
-  min-height: clamp(540px, calc(100svh - 160px), 780px);
+  min-height: calc(100dvh - 52px);
 }
 
 /* Match native cart/order views to the storefront content width.
