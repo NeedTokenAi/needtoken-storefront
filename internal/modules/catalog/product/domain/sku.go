@@ -42,6 +42,7 @@ type ProductSKU struct {
 	AutoStockLocked          int64             `gorm:"-" json:"auto_stock_locked"`                                                                 // 自动发货库存占用量（仅结构，不写入数据库）
 	AutoStockSold            int64             `gorm:"-" json:"auto_stock_sold"`                                                                   // 自动发货库存已售量（仅结构，不写入数据库）
 	UpstreamStock            int               `gorm:"-" json:"upstream_stock"`                                                                    // 上游库存（-1=无限, 0=售罄, >0=有货；仅结构，不写入数据库）
+	AffiliateRatePercent     *money.Amount     `gorm:"type:decimal(6,2)" json:"affiliate_rate_percent,omitempty"`                                  // 推广返利比例（%）：NULL 继承商品/全站，0 表示不参与
 	IsActive                 bool              `gorm:"default:true;index" json:"is_active"`                                                        // 是否启用
 	SortOrder                int               `gorm:"default:0;index" json:"sort_order"`                                                          // 排序权重
 	CreatedAt                time.Time         `gorm:"index" json:"created_at"`                                                                    // 创建时间

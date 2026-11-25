@@ -750,16 +750,24 @@ func TestUpdateSiteSettingValidatesContactLinks(t *testing.T) {
 }
 
 func TestNormalizeStorefrontTemplate(t *testing.T) {
-	cases := map[interface{}]string{
-		"classic":     constants.StorefrontTemplateClassic,
-		"vault":       constants.StorefrontTemplateVault,
-		" needtoken ": constants.StorefrontTemplateNeedtoken,
-		"unknown":     constants.StorefrontTemplateDefault,
-		123:           constants.StorefrontTemplateDefault,
+	cases := []struct {
+		raw  interface{}
+		want string
+	}{
+		{raw: nil, want: constants.StorefrontTemplateClassic},
+		{raw: "", want: constants.StorefrontTemplateClassic},
+		{raw: "classic", want: constants.StorefrontTemplateClassic},
+		{raw: "vault", want: constants.StorefrontTemplateVault},
+		{raw: "  vault  ", want: constants.StorefrontTemplateVault},
+		{raw: " needtoken ", want: constants.StorefrontTemplateNeedtoken},
+		{raw: "atelier", want: constants.StorefrontTemplateAtelier},
+		{raw: "  atelier  ", want: constants.StorefrontTemplateAtelier},
+		{raw: "unknown", want: constants.StorefrontTemplateDefault},
+		{raw: 123, want: constants.StorefrontTemplateDefault},
 	}
-	for raw, want := range cases {
-		if got := normalizeStorefrontTemplate(raw); got != want {
-			t.Fatalf("normalizeStorefrontTemplate(%v) = %q, want %q", raw, got, want)
+	for _, tc := range cases {
+		if got := normalizeStorefrontTemplate(tc.raw); got != tc.want {
+			t.Fatalf("normalizeStorefrontTemplate(%v) = %q, want %q", tc.raw, got, tc.want)
 		}
 	}
 }

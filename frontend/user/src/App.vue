@@ -5,7 +5,7 @@
     <NeedtokenStartup v-if="startupPhase !== 'ready'" :branded="startupBranded" :failed="startupPhase === 'error'" :slow="startupSlow" @retry="retryPage" />
     <template v-else>
       <!-- vault 模板：自带顶栏/页脚的外壳包裹页面（控制台仍走下方分支） -->
-      <VaultLayout v-if="isVault && !isResellerConsole">
+      <VaultLayout v-if="activeTemplate === 'vault' && !isResellerConsole">
         <ErrorBoundary>
           <RouterView v-slot="{ Component }">
             <Transition name="page-fade" mode="out-in">
@@ -30,6 +30,17 @@
           </RouterView>
         </ErrorBoundary>
       </NeedtokenLayout>
+
+      <!-- atelier 模板：Prism 精密科技外壳（悬浮导航 + 点阵画布 + 靛蓝令牌） -->
+      <AtelierLayout v-else-if="activeTemplate === 'atelier' && !isResellerConsole">
+        <ErrorBoundary>
+          <RouterView v-slot="{ Component }">
+            <Transition name="page-fade" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </RouterView>
+        </ErrorBoundary>
+      </AtelierLayout>
 
       <!-- classic 模板 / 分销控制台（保持原有结构不变） -->
       <template v-else>
@@ -76,8 +87,9 @@ import ErrorBoundary from './components/ErrorBoundary.vue'
 import BackToTop from './components/BackToTop.vue'
 import MobileBottomNav from './components/MobileBottomNav.vue'
 
-// vault 外壳按需加载，classic 用户不会拉取其 chunk/样式
+// 独立模板外壳按需加载，classic 用户不会拉取其 chunk/样式
 const VaultLayout = defineAsyncComponent(lazyImportWithRetry(() => import('./templates/vault/layout/VaultLayout.vue')))
+const AtelierLayout = defineAsyncComponent(lazyImportWithRetry(() => import('./templates/atelier/layout/AtelierLayout.vue')))
 const NeedtokenLayout = defineAsyncComponent({
   loader: lazyImportWithRetry(() => import('./templates/needtoken/layout/NeedtokenLayout.vue')),
   loadingComponent: {
@@ -103,8 +115,8 @@ const router = useRouter()
 const { t } = useI18n()
 const isResellerConsole = computed(() => route.meta.resellerConsole === true)
 // getActiveTemplate 读取 appStore.config（响应式），config 加载后会重新计算
-const isVault = computed(() => getActiveTemplate() === 'vault')
-const isNeedtoken = computed(() => getActiveTemplate() === 'needtoken')
+const activeTemplate = computed(() => getActiveTemplate())
+const isNeedtoken = computed(() => activeTemplate.value === 'needtoken')
 
 const initialRouteReady = ref(false)
 const initialRouteFailed = ref(false)
