@@ -438,7 +438,10 @@
             <AlertDescription>{{ globalAlert.message }}</AlertDescription>
           </Alert>
 
-          <!-- 1. 控制台总览（Bento 仪表盘布局） -->
+          <!-- 菜单切换仅更新右侧主内容区，固定侧栏与顶栏保持不动 -->
+          <Transition name="nt-console-panel" mode="out-in" @before-enter="resetMainScroll">
+            <div :key="activeSection" class="space-y-5">
+              <!-- 1. 控制台总览（Bento 仪表盘布局） -->
           <template v-if="activeSection === 'overview'">
             <!-- 仅在存在未完成的旧账号手动绑定或待激活订单时提示 -->
             <ApiAccountLinkBanner v-if="showGatewayFeatures" next-path="/me" only-when-action-needed />
@@ -946,6 +949,8 @@
             <ProfilePanel />
             <SecurityPanel />
           </template>
+            </div>
+          </Transition>
         </div>
       </main>
     </div>
@@ -1297,11 +1302,14 @@ const handleAssetsChanged = async () => {
   await Promise.all(tasks)
 }
 
+const resetMainScroll = () => {
+  mainScrollEl.value?.scrollTo({ top: 0 })
+}
+
 watch(activeSection, (next) => {
   mobileDrawerOpen.value = false
   profileMenuOpen.value = false
   langOpen.value = false
-  mainScrollEl.value?.scrollTo({ top: 0 })
   if (next === 'assets' || next === 'overview') {
     void handleAssetsChanged()
   }
@@ -1442,5 +1450,22 @@ onUnmounted(() => {
 .nt-drawer-fade-enter-from,
 .nt-drawer-fade-leave-to {
   opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .nt-console-panel-enter-active {
+    transition: opacity 160ms ease-out, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .nt-console-panel-leave-active {
+    transition: opacity 90ms ease-in, transform 90ms ease-in;
+    pointer-events: none;
+  }
+  .nt-console-panel-enter-from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  .nt-console-panel-leave-to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
 }
 </style>

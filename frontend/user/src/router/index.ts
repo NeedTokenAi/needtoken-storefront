@@ -20,6 +20,7 @@ const blogViewLoader: RouteComponentLoader = () => import('../views/Blog.vue')
 const noticeViewLoader: RouteComponentLoader = () => import('../views/Notice.vue')
 const loginViewLoader: RouteComponentLoader = () => import('../views/auth/Login.vue')
 const resellerLayoutLoader: RouteComponentLoader = () => import('../views/reseller/ResellerConsoleLayout.vue')
+const personalCenterViewLoader: RouteComponentLoader = templateView('PersonalCenter', () => import('../views/PersonalCenter.vue'))
 
 const routeWarmupLoaders: RouteComponentLoader[] = [
     templateView('Products', productsViewLoader),
@@ -197,119 +198,119 @@ const router = createRouter({
         {
             path: '/me',
             name: 'personal-center',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'overview' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/keys',
             name: 'personal-center-keys',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'keys' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/models',
             name: 'personal-center-models',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'models' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/playground',
             name: 'personal-center-playground',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'playground' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/usage',
             name: 'personal-center-usage',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'usage' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/plans',
             name: 'personal-center-plans',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'plans' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/assets',
             name: 'personal-center-assets',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'assets' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/profile',
             name: 'personal-center-profile',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'profile' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/security',
             name: 'personal-center-security',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'security' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/orders',
             name: 'personal-center-orders',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'orders' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/wallet',
             name: 'personal-center-wallet',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'wallet' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/gift-cards',
             name: 'personal-center-gift-cards',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'giftCard' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/api',
             name: 'personal-center-api',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'api' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/affiliate',
             name: 'personal-center-affiliate',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'affiliate' },
             meta: { requiresUserAuth: true }
         },
         {
             path: '/me/reseller',
             name: 'personal-center-reseller',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'reseller' },
             meta: { requiresUserAuth: true, requiresResellerAccess: true }
         },
         {
             path: '/me/reseller/orders/:order_no',
             name: 'personal-center-reseller-order-detail',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'reseller' },
             meta: { requiresUserAuth: true, requiresResellerAccess: true }
         },
         {
             path: '/me/reseller/:tab',
             name: 'personal-center-reseller-tab',
-            component: templateView('PersonalCenter', () => import('../views/PersonalCenter.vue')),
+            component: personalCenterViewLoader,
             props: { section: 'reseller' },
             meta: { requiresUserAuth: true, requiresResellerAccess: true }
         },

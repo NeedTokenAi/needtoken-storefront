@@ -256,7 +256,7 @@ import SupportWidget from '../components/SupportWidget.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import { useNeedtokenEffects } from '../composables/useNeedtokenEffects'
 import { useApiAccountLink } from '../composables/useApiAccountLink'
-import { computeCombinedApiQuota } from '../lib/gatewayConsoleHelpers'
+import { computeCombinedApiQuota, isNeedtokenMemberConsolePath } from '../lib/gatewayConsoleHelpers'
 import { formatApiQuotaUsd } from '../lib/apiAccountLinkPolicy'
 import { useSlidingIndicator } from '../composables/useSlidingIndicator'
 import { prefetchStorefrontRoute } from '../../../router'
@@ -270,7 +270,7 @@ const router = useRouter()
 const appStore = useAppStore()
 const authStore = useUserAuthStore()
 const isAuthFocusedRoute = computed(() => ['/auth/login', '/auth/register', '/auth/forgot'].includes(route.path))
-const isMemberConsoleRoute = computed(() => route.path === '/me' || route.path.startsWith('/me/'))
+const isMemberConsoleRoute = computed(() => isNeedtokenMemberConsolePath(route.path))
 const { summary: apiSummary, loadSummary } = useApiAccountLink()
 const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/me'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))
