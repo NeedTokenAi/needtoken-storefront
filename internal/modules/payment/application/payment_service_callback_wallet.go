@@ -10,6 +10,7 @@ import (
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 )
 
 func (s *PaymentService) handleWalletRechargeCallback(payment *paymentdomain.Payment, status string, input PaymentCallbackInput) (*paymentdomain.Payment, error) {
@@ -60,15 +61,6 @@ func (s *PaymentService) handleWalletRechargeCallback(payment *paymentdomain.Pay
 			recharge.Status = constants.WalletRechargeStatusSuccess
 			recharge.PaidAt = updated.PaidAt
 			recharge.UpdatedAt = updated.UpdatedAt
-			if s.walletSvc != nil && s.walletSvc.HasUnifiedBalance() {
-				s.walletSvc.SyncCreditToUnified(
-					recharge.UserID,
-					recharge.Amount,
-					recharge.Currency,
-					fmt.Sprintf("recharge:%d:success", recharge.ID),
-					strings.TrimSpace(recharge.Remark),
-				)
-			}
 		}
 		if s.memberLevelSvc != nil && recharge != nil && recharge.UserID > 0 {
 			if err := s.memberLevelSvc.OnRechargeCompleted(recharge.UserID, recharge.Amount.Decimal); err != nil {
@@ -93,6 +85,7 @@ func validateWalletCallbackPaymentFacts(payment *paymentdomain.Payment, recharge
 func (s *PaymentService) applyWalletRechargePaymentUpdate(payment *paymentdomain.Payment, status string, input PaymentCallbackInput, now time.Time) (*paymentdomain.Payment, bool, error) {
 	paymentVal := payment
 	newlySucceeded := false
+	var rechargeUnifiedOp *walletdomain.UnifiedOp
 
 	// 在事务前读取站点币种，防止历史异币充值单入账到同一个钱包。
 	currency := constants.SiteCurrencyDefault
@@ -205,6 +198,21 @@ func (s *PaymentService) applyWalletRechargePaymentUpdate(payment *paymentdomain
 			if _, err := s.walletSvc.ApplyRechargePayment(walletTx, recharge); err != nil {
 				return err
 			}
+			if s.walletSvc.HasUnifiedBalance() {
+				op, enqErr := s.walletSvc.EnqueueUnifiedCreditInTx(
+					walletTx,
+					recharge.UserID,
+					nil,
+					recharge.Amount,
+					recharge.Currency,
+					fmt.Sprintf("recharge:%d:success", recharge.ID),
+					strings.TrimSpace(recharge.Remark),
+				)
+				if enqErr != nil {
+					return enqErr
+				}
+				rechargeUnifiedOp = op
+			}
 			newlySucceeded = true
 			recharge.Status = constants.WalletRechargeStatusSuccess
 			paidAt := now
@@ -227,6 +235,9 @@ func (s *PaymentService) applyWalletRechargePaymentUpdate(payment *paymentdomain
 	})
 	if err != nil {
 		return nil, false, err
+	}
+	if rechargeUnifiedOp != nil && s.walletSvc != nil {
+		s.walletSvc.FlushUnifiedCreditOp(rechargeUnifiedOp)
 	}
 	return paymentVal, newlySucceeded, nil
 }

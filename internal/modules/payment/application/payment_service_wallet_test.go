@@ -68,6 +68,7 @@ func setupPaymentServiceWalletTest(t *testing.T) (*PaymentService, *gorm.DB) {
 		&walletdomain.Account{},
 		&walletdomain.Transaction{},
 		&walletdomain.RechargeOrder{},
+		&walletdomain.UnifiedOp{},
 		&paymentdomain.PaymentChannel{},
 		&paymentdomain.Payment{},
 		&settingsstore.SettingRecord{},
@@ -1876,5 +1877,361 @@ func TestManualConfirmWalletRechargeValidatesPaymentAndRecordsProviderRef(t *tes
 			}
 			assertWalletRechargeSuccessState(t, db, payment.ID, recharge.ID, recharge.UserID, recharge.Amount.Decimal)
 		})
+	}
+}
+
+type fakeUnifiedBalanceBridge struct {
+	mu            sync.Mutex
+	balance       map[uint]decimal.Decimal
+	debits        map[string]decimal.Decimal
+	credits       map[string]decimal.Decimal
+	creditFailCnt int
+	debitStarted  chan string
+	debitRelease  chan struct{}
+	debitOps      []string
+	creditOps     []string
+}
+
+func newFakeUnifiedBalanceBridge(initial map[uint]string) *fakeUnifiedBalanceBridge {
+	b := &fakeUnifiedBalanceBridge{
+		balance: make(map[uint]decimal.Decimal, len(initial)),
+		debits:  make(map[string]decimal.Decimal),
+		credits: make(map[string]decimal.Decimal),
+	}
+	for uid, val := range initial {
+		b.balance[uid] = decimal.RequireFromString(val)
+	}
+	return b
+}
+
+func (f *fakeUnifiedBalanceBridge) Enabled() bool { return true }
+
+func (f *fakeUnifiedBalanceBridge) SiteCurrency() string { return "CNY" }
+
+func (f *fakeUnifiedBalanceBridge) FetchBalance(_ context.Context, userID uint, _ string) (money.Amount, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return money.FromDecimal(f.balance[userID]), true, nil
+}
+
+func (f *fakeUnifiedBalanceBridge) Credit(_ context.Context, userID uint, amount money.Amount, _ string, opID, _ string) (money.Amount, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.creditFailCnt > 0 {
+		f.creditFailCnt--
+		return money.Amount{}, errors.New("simulated newapi credit failure")
+	}
+	if _, exists := f.credits[opID]; exists {
+		return money.FromDecimal(f.balance[userID]), nil
+	}
+	f.creditOps = append(f.creditOps, opID)
+	f.credits[opID] = amount.Decimal.Round(2)
+	f.balance[userID] = f.balance[userID].Add(amount.Decimal.Round(2)).Round(2)
+	return money.FromDecimal(f.balance[userID]), nil
+}
+
+func (f *fakeUnifiedBalanceBridge) Debit(_ context.Context, userID uint, maxAmount money.Amount, _ string, allowPartial bool, opID, _ string) (money.Amount, money.Amount, bool, error) {
+	if f.debitStarted != nil {
+		select {
+		case f.debitStarted <- opID:
+		default:
+		}
+	}
+	if f.debitRelease != nil {
+		<-f.debitRelease
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, rolledBack := f.credits[opID+":rollback"]; rolledBack {
+		return money.Amount{}, money.Amount{}, false, errors.New("operation_rolled_back")
+	}
+	if prev, exists := f.debits[opID]; exists {
+		return money.FromDecimal(prev), money.FromDecimal(f.balance[userID]), true, nil
+	}
+	f.debitOps = append(f.debitOps, opID)
+	avail := f.balance[userID]
+	req := maxAmount.Decimal.Round(2)
+	if !allowPartial && avail.LessThan(req) {
+		return money.Amount{}, money.FromDecimal(avail), false, walletcontract.ErrInsufficientBalance
+	}
+	deduct := avail
+	if deduct.GreaterThan(req) {
+		deduct = req
+	}
+	if deduct.LessThanOrEqual(decimal.Zero) {
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(avail), false, nil
+	}
+	f.debits[opID] = deduct
+	f.balance[userID] = avail.Sub(deduct).Round(2)
+	return money.FromDecimal(deduct), money.FromDecimal(f.balance[userID]), false, nil
+}
+
+func (f *fakeUnifiedBalanceBridge) Redeem(_ context.Context, _ uint, _, _ string) (*walletcontract.UnifiedBalanceRedeemResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeUnifiedBalanceBridge) balanceOf(userID uint) decimal.Decimal {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.balance[userID]
+}
+
+func TestUnifiedBalanceDebitReplayProtectionAndPendingReuseGuard(t *testing.T) {
+	svc, db := setupPaymentServiceWalletTest(t)
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	user := &userdomain.User{Email: "unified-p0@example.com", PasswordHash: "hash", Status: constants.UserStatusActive}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+	bridge := newFakeUnifiedBalanceBridge(map[uint]string{user.ID: "40.00"})
+	svc.walletSvc.SetUnifiedBalanceBridge(bridge)
+
+	channel := &paymentdomain.PaymentChannel{
+		Name: "Epay Test", ProviderType: constants.PaymentProviderEpay, ChannelType: constants.PaymentChannelTypeAlipay,
+		InteractionMode: constants.PaymentInteractionRedirect, IsActive: true, ConfigJSON: jsonmap.JSON{},
+	}
+	if err := db.Create(channel).Error; err != nil {
+		t.Fatal(err)
+	}
+	var gatewayAmounts []string
+	registerTestGateway(t, svc, channel.ProviderType, channel.ChannelType, emptyProviderRefProvider{onCreate: func(input paymentcontract.GatewayCreateInput) {
+		gatewayAmounts = append(gatewayAmounts, input.Amount.Decimal.StringFixed(2))
+	}})
+
+	createOrder := func(no, total string) *orderdomain.Order {
+		t.Helper()
+		o := &orderdomain.Order{
+			OrderNo: no, UserID: user.ID, Status: constants.OrderStatusPendingPayment, Currency: "CNY",
+			OriginalAmount:   money.FromDecimal(decimal.RequireFromString(total)),
+			TotalAmount:      money.FromDecimal(decimal.RequireFromString(total)),
+			OnlinePaidAmount: money.FromDecimal(decimal.RequireFromString(total)),
+			WalletPaidAmount: money.FromDecimal(decimal.Zero),
+		}
+		if err := db.Create(o).Error; err != nil {
+			t.Fatal(err)
+		}
+		return o
+	}
+
+	// 1. 回滚后禁止重放零元购：先以 ChannelID=0 且余额不足全额失败 -> 自动冲正退回；再次选渠道发起必须使用新 op_id 真实扣款。
+	order1 := createOrder("DJUNIFIED001", "100.00")
+	if _, err := svc.CreatePayment(CreatePaymentInput{OrderID: order1.ID, ChannelID: 0, UseBalance: true}); !errors.Is(err, ErrPaymentInvalid) {
+		t.Fatalf("expected ErrPaymentInvalid when balance partial without channel, got %v", err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("40.00")) {
+		t.Fatalf("balance after rollback = %s, want 40.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+	var ops []walletdomain.UnifiedOp
+	if err := db.Where("order_id = ?", order1.ID).Order("id ASC").Find(&ops).Error; err != nil || len(ops) != 1 || ops[0].Status != walletdomain.UnifiedOpStatusRolledBack {
+		t.Fatalf("expected rolled_back op, got %+v err=%v", ops, err)
+	}
+	firstOpID := ops[0].OpID
+
+	res1, err := svc.CreatePayment(CreatePaymentInput{OrderID: order1.ID, ChannelID: channel.ID, UseBalance: true})
+	if err != nil {
+		t.Fatalf("retry payment after rollback failed: %v", err)
+	}
+	if !res1.WalletPaidAmount.Decimal.Equal(decimal.RequireFromString("40.00")) || !res1.OnlinePayAmount.Decimal.Equal(decimal.RequireFromString("60.00")) {
+		t.Fatalf("unexpected split amounts: wallet=%s online=%s", res1.WalletPaidAmount.String(), res1.OnlinePayAmount.String())
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.Zero) {
+		t.Fatalf("balance after retry debit = %s, want 0.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+	if err := db.Where("order_id = ?", order1.ID).Order("id ASC").Find(&ops).Error; err != nil || len(ops) != 2 || ops[1].OpID == firstOpID || ops[1].Status != walletdomain.UnifiedOpStatusApplied {
+		t.Fatalf("expected second distinct applied op, got %+v err=%v", ops, err)
+	}
+
+	// 2. 反向切回纯在线支付：不得复用旧差额链接，必须退回余额并通过确定性 Outbox 同步回 NewAPI。
+	resSwitch, err := svc.CreatePayment(CreatePaymentInput{OrderID: order1.ID, ChannelID: channel.ID, UseBalance: false})
+	if err != nil {
+		t.Fatalf("switch back to online payment failed: %v", err)
+	}
+	if !resSwitch.WalletPaidAmount.Decimal.Equal(decimal.Zero) || !resSwitch.OnlinePayAmount.Decimal.Equal(decimal.RequireFromString("100.00")) {
+		t.Fatalf("expected wallet=0 online=100 after switching online, got wallet=%s online=%s", resSwitch.WalletPaidAmount.String(), resSwitch.OnlinePayAmount.String())
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("40.00")) {
+		t.Fatalf("balance after switch_online credit = %s, want 40.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+
+	// 3. 旧在线支付链接复用守卫：当前已有 100 元 pending 链接（含 PayURL），再次勾选 UseBalance=true 选同渠道时绝不能复用旧链接白扣余额。
+	if err := db.Model(&paymentdomain.Payment{}).Where("id = ?", resSwitch.Payment.ID).Update("pay_url", "https://pay.example.com/old").Error; err != nil {
+		t.Fatal(err)
+	}
+	resWithBal, err := svc.CreatePayment(CreatePaymentInput{OrderID: order1.ID, ChannelID: channel.ID, UseBalance: true})
+	if err != nil {
+		t.Fatalf("enable balance over existing pending link failed: %v", err)
+	}
+	if resWithBal.Payment.ID == resSwitch.Payment.ID {
+		t.Fatalf("must not reuse old full-online pending payment when applying balance")
+	}
+	if !resWithBal.WalletPaidAmount.Decimal.Equal(decimal.RequireFromString("40.00")) || !resWithBal.OnlinePayAmount.Decimal.Equal(decimal.RequireFromString("60.00")) {
+		t.Fatalf("unexpected amounts after applying balance over pending link: wallet=%s online=%s", resWithBal.WalletPaidAmount.String(), resWithBal.OnlinePayAmount.String())
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.Zero) {
+		t.Fatalf("balance must be 0.00 after applying to order, got %s", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+
+	// 4. 并发双请求防误回滚：第一个请求阻塞在 NewAPI Debit 期间，第二个请求必须收到 ErrUnifiedOpInProgress 且不触发回滚。
+	order2 := createOrder("DJUNIFIED002", "20.00")
+	bridge.mu.Lock()
+	bridge.balance[user.ID] = decimal.RequireFromString("50.00")
+	bridge.debitStarted = make(chan string, 1)
+	bridge.debitRelease = make(chan struct{})
+	bridge.mu.Unlock()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, e := svc.CreatePayment(CreatePaymentInput{OrderID: order2.ID, ChannelID: 0, UseBalance: true})
+		errCh <- e
+	}()
+	<-bridge.debitStarted
+	if _, err := svc.CreatePayment(CreatePaymentInput{OrderID: order2.ID, ChannelID: 0, UseBalance: true}); !errors.Is(err, walletcontract.ErrUnifiedOpInProgress) {
+		close(bridge.debitRelease)
+		t.Fatalf("expected ErrUnifiedOpInProgress for concurrent request, got %v", err)
+	}
+	close(bridge.debitRelease)
+	if err := <-errCh; err != nil {
+		t.Fatalf("first concurrent payment failed: %v", err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("30.00")) {
+		t.Fatalf("balance after concurrent payment = %s, want 30.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+
+	// 5. 进程崩溃遗留孤儿 debited 记录：超过 5 分钟后 RecoverUnifiedOps 自动冲正退回 NewAPI。
+	staleTime := time.Now().Add(-10 * time.Minute)
+	orphanOrderID := order2.ID
+	orphanOp := &walletdomain.UnifiedOp{
+		OpID: "order:orphan:debit:crash1", Direction: walletdomain.UnifiedOpDirectionDebit,
+		Status: walletdomain.UnifiedOpStatusDebited, UserID: user.ID, OrderID: &orphanOrderID,
+		Amount: money.FromDecimal(decimal.RequireFromString("12.00")), Currency: "CNY",
+		Remark: "crash orphan", CreatedAt: staleTime, UpdatedAt: staleTime,
+	}
+	if err := db.Create(orphanOp).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.walletSvc.RecoverUnifiedOps(); err != nil {
+		t.Fatalf("RecoverUnifiedOps failed: %v", err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("42.00")) {
+		t.Fatalf("balance after orphan recovery = %s, want 42.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+	var reloadedOrphan walletdomain.UnifiedOp
+	if err := db.First(&reloadedOrphan, orphanOp.ID).Error; err != nil || reloadedOrphan.Status != walletdomain.UnifiedOpStatusRolledBack {
+		t.Fatalf("expected orphan rolled_back, got %+v err=%v", reloadedOrphan, err)
+	}
+}
+
+func TestUnifiedBalanceOutboxUnderpaidRefundAndAdminAdjust(t *testing.T) {
+	svc, db := setupPaymentServiceWalletTest(t)
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	user := &userdomain.User{Email: "unified-p1@example.com", PasswordHash: "hash", Status: constants.UserStatusActive}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+	bridge := newFakeUnifiedBalanceBridge(map[uint]string{user.ID: "10.00"})
+	svc.walletSvc.SetUnifiedBalanceBridge(bridge)
+
+	// 1. 欠付回调转余额：首次 NewAPI Credit 失败时保留 credit_pending Outbox，恢复后 RecoverUnifiedOps 自动补齐。
+	bridge.creditFailCnt = 1
+	order := &orderdomain.Order{
+		OrderNo: "DJUNDERPAID001", UserID: user.ID, Status: constants.OrderStatusPendingPayment, Currency: "CNY",
+		OriginalAmount:   money.FromDecimal(decimal.RequireFromString("100.00")),
+		TotalAmount:      money.FromDecimal(decimal.RequireFromString("100.00")),
+		OnlinePaidAmount: money.FromDecimal(decimal.RequireFromString("100.00")),
+	}
+	if err := db.Create(order).Error; err != nil {
+		t.Fatal(err)
+	}
+	pay := &paymentdomain.Payment{
+		OrderID: order.ID, ChannelID: 1, ProviderType: constants.PaymentProviderEpay,
+		ChannelType: constants.PaymentChannelTypeAlipay, InteractionMode: constants.PaymentInteractionRedirect,
+		Amount: money.FromDecimal(decimal.RequireFromString("35.00")), Currency: "CNY",
+		Status: constants.PaymentStatusPending,
+	}
+	if err := db.Create(pay).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.HandleCallback(PaymentCallbackInput{
+		PaymentID: pay.ID, OrderNo: order.OrderNo, ChannelID: 1, Status: constants.PaymentStatusSuccess,
+		ProviderRef: "UNDERPAID-1", Amount: money.FromDecimal(decimal.RequireFromString("35.00")), Currency: "CNY",
+	}); err != nil {
+		t.Fatalf("underpaid callback failed: %v", err)
+	}
+	var outbox walletdomain.UnifiedOp
+	opID := fmt.Sprintf("payment:%d:underpaid_credit", pay.ID)
+	if err := db.Where("op_id = ?", opID).First(&outbox).Error; err != nil || outbox.Status != walletdomain.UnifiedOpStatusCreditPending {
+		t.Fatalf("expected credit_pending outbox after transient failure, got %+v err=%v", outbox, err)
+	}
+	// 将 next_retry_at 拨回过去触发重试恢复
+	past := time.Now().Add(-time.Minute)
+	if err := db.Model(&outbox).Update("next_retry_at", &past).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.walletSvc.RecoverUnifiedOps(); err != nil {
+		t.Fatalf("RecoverUnifiedOps failed: %v", err)
+	}
+	if err := db.Where("op_id = ?", opID).First(&outbox).Error; err != nil || outbox.Status != walletdomain.UnifiedOpStatusCredited {
+		t.Fatalf("expected credited outbox after recovery, got %+v err=%v", outbox, err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("45.00")) {
+		t.Fatalf("balance after underpaid credit recovery = %s, want 45.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+
+	// 2. 后台调额：正数走 Outbox 同步 NewAPI；负数超额被 NewAPI 严格拒绝，不落本地扣款。
+	if _, _, err := svc.walletSvc.AdminAdjustBalance(walletcontract.AdjustBalanceInput{
+		UserID: user.ID, OperatorAdminID: 1, Delta: money.FromDecimal(decimal.RequireFromString("15.00")), Currency: "CNY", Remark: "人工补偿",
+	}); err != nil {
+		t.Fatalf("admin credit adjust failed: %v", err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("60.00")) {
+		t.Fatalf("balance after admin credit = %s, want 60.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+	if _, _, err := svc.walletSvc.AdminAdjustBalance(walletcontract.AdjustBalanceInput{
+		UserID: user.ID, OperatorAdminID: 1, Delta: money.FromDecimal(decimal.RequireFromString("-999.00")), Currency: "CNY", Remark: "超额扣减",
+	}); err == nil {
+		t.Fatalf("expected over-debit admin adjust to fail")
+	}
+	if _, _, err := svc.walletSvc.AdminAdjustBalance(walletcontract.AdjustBalanceInput{
+		UserID: user.ID, OperatorAdminID: 1, Delta: money.FromDecimal(decimal.RequireFromString("-20.00")), Currency: "CNY", Remark: "扣回误发",
+	}); err != nil {
+		t.Fatalf("admin debit adjust failed: %v", err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("40.00")) {
+		t.Fatalf("balance after admin debit = %s, want 40.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+
+	// 3. 充值退款：严格先扣 NewAPI，成功则同步扣回。
+	rechargeOrder := &walletdomain.RechargeOrder{
+		RechargeNo: "DJRECHARGE001", UserID: user.ID, PaymentID: 999,
+		Amount:        money.FromDecimal(decimal.RequireFromString("25.00")),
+		PayableAmount: money.FromDecimal(decimal.RequireFromString("25.00")),
+		Currency:      "CNY", Status: constants.WalletRechargeStatusSuccess,
+	}
+	if err := db.Create(rechargeOrder).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.walletSvc.RefundRecharge(walletcontract.RechargeRefundInput{
+		RechargeID: rechargeOrder.ID,
+		AdminID:    1,
+		RequestID:  "req_refund_unified_0001",
+		Amount:     money.FromDecimal(decimal.RequireFromString("25.00")),
+		Remark:     "充值原路退回",
+	}); err != nil {
+		t.Fatalf("RefundRecharge failed: %v", err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("15.00")) {
+		t.Fatalf("balance after recharge refund = %s, want 15.00", bridge.balanceOf(user.ID).StringFixed(2))
 	}
 }

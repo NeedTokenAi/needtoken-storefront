@@ -80,6 +80,7 @@ high_risk_cases=(
   "internal/modules/radarsubscription/application/service.go"
   "internal/modules/notification/infrastructure/smtp/radar_reset_template.go"
   "internal/app/radar_notify_service.go"
+  "internal/app/paid_fulfillment_service.go"
   "frontend/user/src/api/radar.ts"
   "frontend/user/src/api/wallet.ts"
   "frontend/user/src/style.css"

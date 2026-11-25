@@ -59,6 +59,40 @@ func (s *Service) RefundRecharge(input walletcontract.RechargeRefundInput) error
 	if err != nil {
 		return err
 	}
+
+	reference := fmt.Sprintf("recharge:%d:refund:%s", recharge.ID, requestID)
+	var unifiedDebitOp *walletdomain.UnifiedOp
+	if s.HasUnifiedBalance() {
+		existingPre, preErr := s.repository.GetTransactionByReference(reference)
+		if preErr != nil {
+			return preErr
+		}
+		if existingPre == nil {
+			// 仅非幂等重试且预检通过时，在事务外先严格扣减 NewAPI 权威余额。
+			if recharge.Status != constants.WalletRechargeStatusSuccess &&
+				recharge.Status != constants.WalletRechargeStatusPartiallyRefunded && recharge.Status != constants.WalletRechargeStatusRefunded {
+				return walletcontract.ErrRechargeStatusInvalid
+			}
+			if settingscontract.IsOrderRefundWindowExpired(recharge.CreatedAt, recharge.PaidAt, refundConfig.MaxRefundDays, time.Now()) {
+				return walletcontract.ErrRechargeRefundExpired
+			}
+			if recharge.RefundedAmount.Decimal.Add(amount).GreaterThan(recharge.Amount.Decimal) {
+				return walletcontract.ErrRefundExceeded
+			}
+			debitOp, debitErr := s.ReserveAndDebitStrictForAdminOp(
+				recharge.UserID,
+				input.Amount,
+				recharge.Currency,
+				reference,
+				cleanRemark(input.Remark, "管理员充值退款扣回余额"),
+			)
+			if debitErr != nil {
+				return debitErr
+			}
+			unifiedDebitOp = debitOp
+		}
+	}
+
 	var refundID uint
 	var refundStatus string
 	err = s.transactions.WithinTransaction(func(tx walletcontract.Transaction) error {
@@ -70,7 +104,6 @@ func (s *Service) RefundRecharge(input walletcontract.RechargeRefundInput) error
 		if locked == nil {
 			return walletcontract.ErrRechargeNotFound
 		}
-		reference := fmt.Sprintf("recharge:%d:refund:%s", locked.ID, requestID)
 		existing, err := repo.GetTransactionByReference(reference)
 		if err != nil {
 			return err
@@ -112,7 +145,18 @@ func (s *Service) RefundRecharge(input walletcontract.RechargeRefundInput) error
 		if err != nil {
 			return err
 		}
-		if account == nil || account.Balance.Decimal.LessThan(amount) {
+		if unifiedDebitOp != nil {
+			if account == nil {
+				account, err = ensureAccountForUpdate(repo, locked.UserID, now)
+				if err != nil {
+					return err
+				}
+			}
+			if account.Balance.Decimal.LessThan(amount) {
+				// NewAPI 已实扣权威余额，同步对齐本地镜像。
+				account.Balance = money.FromDecimal(amount)
+			}
+		} else if account == nil || account.Balance.Decimal.LessThan(amount) {
 			return walletcontract.ErrInsufficientBalance
 		}
 		before := account.Balance
@@ -144,10 +188,18 @@ func (s *Service) RefundRecharge(input walletcontract.RechargeRefundInput) error
 		if err := repo.ApplyRechargeRefund(locked.UserID, amount); err != nil {
 			return err
 		}
+		if unifiedDebitOp != nil {
+			if err := s.MarkUnifiedDebitAppliedInTx(tx, unifiedDebitOp.OpID); err != nil {
+				return err
+			}
+		}
 		refundID, refundStatus = transaction.ID, locked.Status
 		return nil
 	})
 	if err != nil {
+		if unifiedDebitOp != nil {
+			s.CompensateUnifiedDebit(unifiedDebitOp, "充值退款本地事务失败，退回余额")
+		}
 		return err
 	}
 	// 仅在新退款事务提交后通知；幂等重试不重复发送，队列失败不回滚已完成的退款。

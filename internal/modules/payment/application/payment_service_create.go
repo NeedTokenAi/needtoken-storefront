@@ -17,6 +17,7 @@ import (
 
 	"github.com/dujiao-next/internal/constants"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/money"
 
@@ -98,36 +99,99 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 	}
 
 	var (
-		unifiedDebitedAmount money.Amount
-		unifiedDebitOpID     string
-		unifiedDebitUserID   uint
-		unifiedDebitCurrency string
-		releasedAmountInTx   decimal.Decimal
-		releasedUserIDInTx   uint
-		releasedCurrencyInTx string
+		unifiedDebitOp        *walletdomain.UnifiedOp
+		hasExactUnifiedDebit  bool
+		unifiedDebitedAmount  money.Amount
+		switchOnlineUnifiedOp *walletdomain.UnifiedOp
 	)
-	if input.UseBalance && s.walletSvc != nil && s.walletSvc.HasUnifiedBalance() && s.orderRepo != nil {
-		if preOrder, preErr := s.orderRepo.GetByID(input.OrderID); preErr == nil && preOrder != nil &&
-			preOrder.ParentID == nil && preOrder.UserID > 0 &&
-			preOrder.Status == constants.OrderStatusPendingPayment &&
-			preOrder.WalletPaidAmount.Decimal.LessThanOrEqual(decimal.Zero) &&
-			preOrder.TotalAmount.Decimal.GreaterThan(decimal.Zero) {
-			round := int64(1)
-			if s.walletRepo != nil {
-				if cnt, cntErr := s.walletRepo.CountOrderTransactionsByType(preOrder.ID, constants.WalletTxnTypeOrderPay); cntErr == nil && cnt >= 0 {
-					round = cnt + 1
+	if input.UseBalance && s.walletSvc != nil && s.walletSvc.HasUnifiedBalance() {
+		var alreadyDebited bool
+		if reserveErr := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
+			preloaded, err := tx.Orders().GetByIDForUpdateWithChildren(input.OrderID)
+			if err != nil {
+				return orderapp.ErrOrderFetchFailed
+			}
+			if preloaded == nil {
+				return orderapp.ErrOrderNotFound
+			}
+			lockedOrder := *preloaded
+			if lockedOrder.ParentID != nil {
+				return ErrPaymentInvalid
+			}
+			if lockedOrder.Status != constants.OrderStatusPendingPayment {
+				return orderapp.ErrOrderStatusInvalid
+			}
+			if lockedOrder.ExpiresAt != nil && !lockedOrder.ExpiresAt.After(time.Now()) {
+				return orderapp.ErrOrderStatusInvalid
+			}
+			if err := planEvidence.CheckLocked(&lockedOrder); err != nil {
+				return err
+			}
+			if err := s.Guard.Check(tx, &lockedOrder, time.Now()); err != nil {
+				return err
+			}
+			if input.ChannelID != 0 {
+				resolvedChannel, err := tx.PaymentChannels().GetByID(input.ChannelID)
+				if err != nil {
+					return err
 				}
+				if resolvedChannel == nil {
+					return ErrPaymentChannelNotFound
+				}
+				if !resolvedChannel.IsActive {
+					return ErrPaymentChannelInactive
+				}
+				resolvedFeeRate := resolvedChannel.FeeRate.Decimal.Round(2)
+				if resolvedFeeRate.LessThan(decimal.Zero) || resolvedFeeRate.GreaterThan(decimal.NewFromInt(100)) {
+					return ErrPaymentChannelConfigInvalid
+				}
+				if err := validateOrderChannelEligibility(*resolvedChannel, &lockedOrder); err != nil {
+					return err
+				}
+				allItems := lockedOrder.Items
+				for _, child := range lockedOrder.Children {
+					allItems = append(allItems, child.Items...)
+				}
+				if err := s.validateProductPaymentChannel(allItems, resolvedChannel.ID, tx.Products()); err != nil {
+					return err
+				}
+				channel = resolvedChannel
+				feeRate = resolvedFeeRate
 			}
-			opID := fmt.Sprintf("order:%d:pay:%d", preOrder.ID, round)
-			debited, debitErr := s.walletSvc.SyncDebitFromUnified(preOrder.UserID, preOrder.TotalAmount, preOrder.Currency, true, opID, "订单余额支付")
-			if debitErr != nil {
-				return nil, ErrPaymentCreateFailed
+			if lockedOrder.UserID > 0 &&
+				lockedOrder.WalletPaidAmount.Decimal.LessThanOrEqual(decimal.Zero) &&
+				lockedOrder.TotalAmount.Decimal.GreaterThan(decimal.Zero) {
+				op, debitedBefore, opErr := s.walletSvc.ReserveOrderUnifiedDebitInTx(
+					tx.Wallets(),
+					lockedOrder.UserID,
+					lockedOrder.ID,
+					lockedOrder.TotalAmount,
+					lockedOrder.Currency,
+					"订单余额支付",
+				)
+				if opErr != nil {
+					return opErr
+				}
+				unifiedDebitOp = op
+				alreadyDebited = debitedBefore
 			}
-			if debited.Decimal.GreaterThan(decimal.Zero) {
+			return nil
+		}); reserveErr != nil {
+			return nil, reserveErr
+		}
+		if unifiedDebitOp != nil {
+			hasExactUnifiedDebit = true
+			if alreadyDebited {
+				unifiedDebitedAmount = unifiedDebitOp.Amount
+			} else {
+				debited, _, debitErr := s.walletSvc.ExecuteUnifiedDebit(unifiedDebitOp, true)
+				if debitErr != nil {
+					return nil, ErrPaymentCreateFailed
+				}
 				unifiedDebitedAmount = debited
-				unifiedDebitOpID = opID
-				unifiedDebitUserID = preOrder.UserID
-				unifiedDebitCurrency = preOrder.Currency
+				if debited.Decimal.LessThanOrEqual(decimal.Zero) {
+					unifiedDebitOp = nil
+				}
 			}
 		}
 	}
@@ -192,39 +256,71 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 				return err
 			}
 
-			existing, err := paymentRepo.GetLatestPendingByOrderChannel(lockedOrder.ID, channel.ID, time.Now())
-			if err != nil {
-				return ErrPaymentCreateFailed
-			}
-			if existing != nil && hasProviderResult(existing) {
-				legacyFeePayment := existing.FeeAmount.Decimal.IsPositive() &&
-					(existing.FeePolicy == "" || existing.FeePolicy == constants.PaymentFeePolicyLegacyCustomerSurcharge)
-				if !legacyFeePayment || feeConfig.ReuseLegacyOrderFeePayment {
-					if _, err := paymentRepo.SupersedePendingByOrderID(lockedOrder.ID, existing.ID, time.Now()); err != nil {
-						return ErrPaymentCreateFailed
+			walletIntentChanges := (input.UseBalance && lockedOrder.WalletPaidAmount.Decimal.LessThanOrEqual(decimal.Zero)) ||
+				(!input.UseBalance && lockedOrder.WalletPaidAmount.Decimal.GreaterThan(decimal.Zero))
+			canReusePending := unifiedDebitedAmount.Decimal.LessThanOrEqual(decimal.Zero) &&
+				(!walletIntentChanges || (hasExactUnifiedDebit && input.UseBalance && lockedOrder.WalletPaidAmount.Decimal.LessThanOrEqual(decimal.Zero)))
+			if canReusePending {
+				existing, err := paymentRepo.GetLatestPendingByOrderChannel(lockedOrder.ID, channel.ID, time.Now())
+				if err != nil {
+					return ErrPaymentCreateFailed
+				}
+				if existing != nil && hasProviderResult(existing) {
+					legacyFeePayment := existing.FeeAmount.Decimal.IsPositive() &&
+						(existing.FeePolicy == "" || existing.FeePolicy == constants.PaymentFeePolicyLegacyCustomerSurcharge)
+					if !legacyFeePayment || feeConfig.ReuseLegacyOrderFeePayment {
+						if _, err := paymentRepo.SupersedePendingByOrderID(lockedOrder.ID, existing.ID, time.Now()); err != nil {
+							return ErrPaymentCreateFailed
+						}
+						reusedPending = true
+						payment = existing
+						order = &lockedOrder
+						return nil
 					}
-					reusedPending = true
-					payment = existing
-					order = &lockedOrder
-					return nil
 				}
 			}
 		}
 
 		if s.walletSvc != nil {
 			if input.UseBalance {
-				if _, err := orderapp.ApplyWalletBalance(s.walletSvc, tx, &lockedOrder, true); err != nil {
-					return err
+				if hasExactUnifiedDebit {
+					if _, err := orderapp.ApplyWalletBalance(s.walletSvc, tx, &lockedOrder, true, unifiedDebitedAmount); err != nil {
+						return err
+					}
+					if unifiedDebitOp != nil {
+						if err := s.walletSvc.MarkUnifiedDebitAppliedInTx(tx.Wallets(), unifiedDebitOp.OpID); err != nil {
+							return err
+						}
+					}
+				} else {
+					if _, err := orderapp.ApplyWalletBalance(s.walletSvc, tx, &lockedOrder, true); err != nil {
+						return err
+					}
 				}
 			} else if lockedOrder.WalletPaidAmount.Decimal.GreaterThan(decimal.Zero) {
 				released, err := orderapp.ReleaseWalletBalance(s.walletSvc, tx, &lockedOrder, constants.WalletTxnTypeOrderRefund, "用户改为在线支付，退回余额")
 				if err != nil {
 					return err
 				}
-				if released.GreaterThan(decimal.Zero) {
-					releasedAmountInTx = released
-					releasedUserIDInTx = lockedOrder.UserID
-					releasedCurrencyInTx = lockedOrder.Currency
+				if released.GreaterThan(decimal.Zero) && s.walletSvc.HasUnifiedBalance() {
+					refundRound, countErr := tx.Wallets().Wallets().CountOrderTransactionsByType(lockedOrder.ID, constants.WalletTxnTypeOrderRefund)
+					if countErr != nil || refundRound <= 0 {
+						refundRound = 1
+					}
+					orderID := lockedOrder.ID
+					op, enqErr := s.walletSvc.EnqueueUnifiedCreditInTx(
+						tx.Wallets(),
+						lockedOrder.UserID,
+						&orderID,
+						money.FromDecimal(released),
+						lockedOrder.Currency,
+						fmt.Sprintf("order:%d:switch_online:%d", lockedOrder.ID, refundRound),
+						"用户改为在线支付，退回余额",
+					)
+					if enqErr != nil {
+						return enqErr
+					}
+					switchOnlineUnifiedOp = op
 				}
 			}
 		}
@@ -329,13 +425,13 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 		return nil
 	})
 	if err != nil {
-		if unifiedDebitedAmount.Decimal.GreaterThan(decimal.Zero) && s.walletSvc != nil {
-			s.walletSvc.SyncCreditToUnified(unifiedDebitUserID, unifiedDebitedAmount, unifiedDebitCurrency, unifiedDebitOpID+":rollback", "订单余额支付回滚退回")
+		if unifiedDebitOp != nil && unifiedDebitedAmount.Decimal.GreaterThan(decimal.Zero) && s.walletSvc != nil {
+			s.walletSvc.CompensateUnifiedDebit(unifiedDebitOp, "订单余额支付回滚退回")
 		}
 		return nil, err
 	}
-	if releasedAmountInTx.GreaterThan(decimal.Zero) && s.walletSvc != nil {
-		s.walletSvc.SyncCreditToUnified(releasedUserIDInTx, money.FromDecimal(releasedAmountInTx), releasedCurrencyInTx, fmt.Sprintf("order:%d:switch_online:%d", input.OrderID, time.Now().UnixNano()), "用户改为在线支付，退回余额")
+	if switchOnlineUnifiedOp != nil && s.walletSvc != nil {
+		s.walletSvc.FlushUnifiedCreditOp(switchOnlineUnifiedOp)
 	}
 
 	if order == nil {
@@ -384,7 +480,7 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 	// takenOver 非空表示网关请求期间订单已被并发支付接管，记录接管后的订单快照。
 	var takenOver *orderdomain.Order
 	if err := s.applyProviderPayment(input, order, channel, payment); err != nil {
-		var providerRollbackReleased decimal.Decimal
+		var providerFailUnifiedOp *walletdomain.UnifiedOp
 		rollbackErr := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
 			lockedOrder, current, newerID, lockErr := lockPaymentAttempt(tx, order.ID, payment.ID)
 			if lockErr != nil {
@@ -404,13 +500,29 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 				return nil
 			}
 			released, refundErr := orderapp.ReleaseWalletBalance(s.walletSvc, tx, lockedOrder, constants.WalletTxnTypeOrderRefund, "在线支付创建失败，退回余额")
-			if refundErr == nil {
-				providerRollbackReleased = released
+			if refundErr != nil {
+				return refundErr
 			}
-			return refundErr
+			if released.GreaterThan(decimal.Zero) && s.walletSvc.HasUnifiedBalance() {
+				orderID := lockedOrder.ID
+				op, enqErr := s.walletSvc.EnqueueUnifiedCreditInTx(
+					tx.Wallets(),
+					lockedOrder.UserID,
+					&orderID,
+					money.FromDecimal(released),
+					lockedOrder.Currency,
+					fmt.Sprintf("order:%d:provider_fail:%d", lockedOrder.ID, payment.ID),
+					"在线支付创建失败，退回余额",
+				)
+				if enqErr != nil {
+					return enqErr
+				}
+				providerFailUnifiedOp = op
+			}
+			return nil
 		})
-		if rollbackErr == nil && providerRollbackReleased.GreaterThan(decimal.Zero) && s.walletSvc != nil {
-			s.walletSvc.SyncCreditToUnified(order.UserID, money.FromDecimal(providerRollbackReleased), order.Currency, fmt.Sprintf("order:%d:provider_fail:%d", order.ID, payment.ID), "在线支付创建失败，退回余额")
+		if rollbackErr == nil && providerFailUnifiedOp != nil && s.walletSvc != nil {
+			s.walletSvc.FlushUnifiedCreditOp(providerFailUnifiedOp)
 		}
 		if rollbackErr != nil {
 			log.Errorw("payment_create_provider_failed_with_rollback_error",

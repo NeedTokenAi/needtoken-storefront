@@ -30,6 +30,8 @@ import (
 	ordergormstore "github.com/dujiao-next/internal/modules/order/infrastructure/gormstore"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	paymentgormstore "github.com/dujiao-next/internal/modules/payment/infrastructure/gormstore"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
+	walletgormstore "github.com/dujiao-next/internal/modules/wallet/infrastructure/gormstore"
 	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/money"
 	"github.com/gin-gonic/gin"
@@ -68,6 +70,7 @@ func setupOpsBridgeTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		&orderdomain.Order{},
 		&orderdomain.OrderItem{},
 		&paymentdomain.PaymentChannel{},
+		&walletdomain.Transaction{},
 	); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
@@ -100,11 +103,13 @@ func setupOpsBridgeTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		ProductSKURepo:      skuRepo,
 		ProductAdminService: prodServices.Admin,
 		CardSecretRepo:      cardSecretRepo,
+		WalletRepo:          walletgormstore.New(db),
 	}
 
 	h := NewHandler(c)
 	r := gin.New()
 	g := r.Group("/api/v1/channel/needtoken-ops")
+	g.GET("/universal-gift-cards/claims/:claim_id", h.LookupUniversalGiftCardClaim)
 	g.GET("/catalog/categories", h.Categories)
 	g.POST("/catalog/categories", h.CreateCategory)
 	g.PUT("/catalog/categories/:id", h.UpdateCategory)
@@ -446,5 +451,59 @@ func TestOpsBridgeCatalogCRUDAndSafeDeletesOnSQLite(t *testing.T) {
 	w = doOpsJSON(t, r, http.MethodDelete, fmt.Sprintf("/api/v1/channel/needtoken-ops/catalog/categories/%d", rootID), nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("delete empty root category failed: status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestOpsBridgeLookupUniversalGiftCardClaim(t *testing.T) {
+	r, db := setupOpsBridgeTestRouter(t)
+
+	// 1. Missing claim returns HTTP 200 with found=false.
+	w := doOpsJSON(t, r, http.MethodGet, "/api/v1/channel/needtoken-ops/universal-gift-cards/claims/sf_missing_1", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("lookup missing claim status=%d body=%s", w.Code, w.Body.String())
+	}
+	var missResp struct {
+		StatusCode int                                      `json:"status_code"`
+		Data       opscontract.UniversalGiftCardClaimStatus `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &missResp); err != nil {
+		t.Fatalf("decode missing claim response: %v", err)
+	}
+	if missResp.StatusCode != 0 || missResp.Data.Found || missResp.Data.ClaimID != "sf_missing_1" {
+		t.Fatalf("unexpected missing claim payload: %+v", missResp)
+	}
+
+	// 2. Existing wallet transaction referenced by universal_gift_card:<claim_id> returns found=true and exact txn_ref.
+	now := time.Now().UTC()
+	txn := &walletdomain.Transaction{
+		UserID:        42,
+		Type:          constants.WalletTxnTypeGiftCard,
+		Direction:     constants.WalletTxnDirectionIn,
+		Amount:        money.FromDecimal(decimal.RequireFromString("72.50")),
+		BalanceBefore: money.FromDecimal(decimal.Zero),
+		BalanceAfter:  money.FromDecimal(decimal.RequireFromString("72.50")),
+		Currency:      "CNY",
+		Reference:     "universal_gift_card:sf_claim_ok_1",
+		Remark:        "通用礼品卡兑换",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := db.Create(txn).Error; err != nil {
+		t.Fatalf("seed wallet txn: %v", err)
+	}
+	w = doOpsJSON(t, r, http.MethodGet, "/api/v1/channel/needtoken-ops/universal-gift-cards/claims/sf_claim_ok_1", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("lookup credited claim status=%d body=%s", w.Code, w.Body.String())
+	}
+	var hitResp struct {
+		StatusCode int                                      `json:"status_code"`
+		Data       opscontract.UniversalGiftCardClaimStatus `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &hitResp); err != nil {
+		t.Fatalf("decode hit claim response: %v", err)
+	}
+	wantRef := fmt.Sprintf("storefront:wallet_txn:%d", txn.ID)
+	if !hitResp.Data.Found || hitResp.Data.UserID != 42 || hitResp.Data.TxnRef != wantRef || hitResp.Data.CreditDisplay != "72.50 CNY" {
+		t.Fatalf("unexpected hit claim payload: %+v", hitResp.Data)
 	}
 }

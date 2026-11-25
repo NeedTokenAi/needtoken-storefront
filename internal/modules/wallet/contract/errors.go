@@ -16,4 +16,5 @@ var (
 	ErrRechargeRefundExpired   = errors.New("wallet recharge refund expired")
 	ErrOnlyPaymentRequired     = errors.New("wallet only payment required")
 	ErrTransactionRequired     = errors.New("wallet transaction required")
+	ErrUnifiedOpInProgress     = errors.New("unified wallet operation already in progress")
 )

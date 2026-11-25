@@ -53,6 +53,7 @@ func registerChannelRoutes(
 		channelAPI.PATCH("/needtoken-ops/coupons/:id/status", opsHandler.UpdateCouponStatus)
 		channelAPI.GET("/needtoken-ops/gift-cards", opsHandler.GiftCards)
 		channelAPI.POST("/needtoken-ops/gift-cards/generate", opsHandler.GenerateGiftCards)
+		channelAPI.GET("/needtoken-ops/universal-gift-cards/claims/:claim_id", opsHandler.LookupUniversalGiftCardClaim)
 		channelAPI.GET("/needtoken-ops/pricing", opsHandler.Pricing)
 		channelAPI.PATCH("/needtoken-ops/pricing", opsHandler.UpdatePricing)
 		channelAPI.GET("/needtoken-ops/acquiring/channels", opsHandler.AcquiringChannels)

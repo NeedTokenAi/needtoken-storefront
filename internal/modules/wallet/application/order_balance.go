@@ -38,13 +38,24 @@ func (s *Service) ApplyOrderBalance(tx walletcontract.Transaction, input walletc
 	if err != nil {
 		return money.Amount{}, err
 	}
-	available := account.Balance.Decimal.Round(2)
-	if available.LessThanOrEqual(decimal.Zero) {
-		return money.FromDecimal(decimal.Zero), nil
-	}
-	deduct := available
-	if deduct.GreaterThan(total) {
-		deduct = total
+	var deduct decimal.Decimal
+	if input.ExactDebitAmount != nil {
+		deduct = input.ExactDebitAmount.Decimal.Round(2)
+		if deduct.LessThanOrEqual(decimal.Zero) {
+			return money.FromDecimal(decimal.Zero), nil
+		}
+		if deduct.GreaterThan(total) {
+			deduct = total
+		}
+	} else {
+		available := account.Balance.Decimal.Round(2)
+		if available.LessThanOrEqual(decimal.Zero) {
+			return money.FromDecimal(decimal.Zero), nil
+		}
+		deduct = available
+		if deduct.GreaterThan(total) {
+			deduct = total
+		}
 	}
 	reference, err := orderAllocationReference(repository, input.OrderID, constants.WalletTxnTypeOrderPay)
 	if err != nil {
@@ -59,6 +70,10 @@ func (s *Service) ApplyOrderBalance(tx walletcontract.Transaction, input walletc
 	}
 
 	before := account.Balance.Decimal.Round(2)
+	if input.ExactDebitAmount != nil && before.LessThan(deduct) {
+		// 统一余额已由 NewAPI 实扣，若本地镜像因并发读取略小，先对齐镜像避免订单落账失败。
+		before = deduct
+	}
 	after := before.Sub(deduct).Round(2)
 	if after.LessThan(decimal.Zero) {
 		return money.Amount{}, walletcontract.ErrInsufficientBalance

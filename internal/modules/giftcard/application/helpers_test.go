@@ -135,7 +135,7 @@ func TestRedeemUniversalGiftCardFallbackAndRollbackRelease(t *testing.T) {
 	if !univ.confirmed || univ.released || univ.confirmTxnRef != "storefront:wallet_txn:88" {
 		t.Fatalf("expected Confirm called once and Release not called: %+v", univ)
 	}
-	if len(tx.creditCalls) != 1 || tx.creditCalls[0].Reference != "universal_gift_card:NTGC-ABCD-1234" {
+	if len(tx.creditCalls) != 1 || tx.creditCalls[0].Reference != "universal_gift_card:sf_claim_1" {
 		t.Fatalf("unexpected wallet credit reference: %+v", tx.creditCalls)
 	}
 

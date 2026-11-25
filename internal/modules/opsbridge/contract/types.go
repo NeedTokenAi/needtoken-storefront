@@ -721,6 +721,28 @@ type SLORevokeHandler interface {
 	RevokeUserSLO(input SLORevokeUserInput) (*SLORevokeUserResult, error)
 }
 
+type UniversalGiftCardClaimStatus struct {
+	Source        string     `json:"source"`
+	CollectedAt   time.Time  `json:"collected_at"`
+	ClaimID       string     `json:"claim_id"`
+	Found         bool       `json:"found"`
+	UserID        uint       `json:"user_id,omitempty"`
+	TransactionID uint       `json:"transaction_id,omitempty"`
+	Amount        string     `json:"amount,omitempty"`
+	Currency      string     `json:"currency,omitempty"`
+	TxnRef        string     `json:"txn_ref,omitempty"`
+	CreditDisplay string     `json:"credit_display,omitempty"`
+	CreatedAt     *time.Time `json:"created_at,omitempty"`
+}
+
+type UniversalGiftCardClaimStore interface {
+	LookupUniversalGiftCardClaim(claimID string) (*UniversalGiftCardClaimStatus, error)
+}
+
+type UniversalGiftCardClaimLookup interface {
+	LookupUniversalGiftCardClaim(claimID string) (*UniversalGiftCardClaimStatus, error)
+}
+
 type ManualConfirmPaymentInput struct {
 	PaymentID   uint   `json:"payment_id,omitempty"`
 	ProviderRef string `json:"provider_ref,omitempty"`
