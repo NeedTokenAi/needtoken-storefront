@@ -107,6 +107,10 @@
       </div>
     </div>
 
+    <div v-if="$slots['before-metrics']" class="api-hero-before-metrics">
+      <slot name="before-metrics" />
+    </div>
+
     <!-- 实时网关指标条 -->
     <dl class="api-metrics-strip" :aria-label="t('needtoken.apiConnect.metrics.label')">
       <div class="metric-cell">
@@ -330,7 +334,10 @@ onUnmounted(() => {
 .preview-footer { justify-content: flex-start; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--ui-border); background: var(--ui-bg-soft); font-size: 11px; }
 .preview-footer > span { margin-left: auto; }
 
-.api-metrics-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 32px; }
+.api-hero-before-metrics { margin-top: 36px; }
+.api-hero-before-metrics :deep(.routing-showcase) { padding-block: 0; border-top: 0; }
+
+.api-metrics-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
 .metric-cell { padding: 16px 18px; border: 1px solid var(--ui-border); border-radius: 16px; background: var(--ui-bg-elevated); }
 .metric-cell dt { font-size: 11.5px; color: var(--ui-text-muted); font-weight: 500; }
 .metric-cell dd { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }

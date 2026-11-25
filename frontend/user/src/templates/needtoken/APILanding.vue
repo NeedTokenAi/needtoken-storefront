@@ -1,11 +1,13 @@
 <template>
   <div class="api-landing">
-    <!-- 1. Hero 区域（直显 API 地址 + 创建/查看 API Key + 前往仪表盘 + 保留截图 4 请求预览卡） -->
-    <ApiGatewayHero />
+    <!-- 1. Hero 区域（含智能路由可视化架构图与实时指标卡） -->
+    <ApiGatewayHero>
+      <template #before-metrics>
+        <ApiSmartRoutingShowcase />
+      </template>
+    </ApiGatewayHero>
 
-    <ApiAccountLinkBanner class="mb-8" next-path="/api-services" />
-
-    <!-- 2. 三步使用步骤（参考截图 6） -->
+    <!-- 2. 三步使用步骤 -->
     <section class="api-steps-section" aria-labelledby="api-steps-title">
       <h2 id="api-steps-title" class="sr-only">{{ t('needtoken.apiServices.steps.title') }}</h2>
       <ol class="steps-grid">
@@ -34,11 +36,11 @@
         </RouterLink>
       </header>
 
-      <!-- 核心套餐矩阵亮点：官方定价基准 · 多模型混合 · 2x/3x 倍率 · 多专享卡叠加 · 超额自动扣余额 -->
+      <!-- 核心套餐矩阵亮点：官方定价基准 · 多模型混合 · 动态套餐额度 · 多专享卡叠加 · 超额自动扣余额 -->
       <div class="plan-advantage-bar">
         <span v-for="adv in planAdvantages" :key="adv.key" class="adv-pill">
           <component :is="adv.icon" :size="14" aria-hidden="true" />
-          <span>{{ t(`needtoken.apiServices.plansSection.advantages.${adv.key}`) }}</span>
+          <span>{{ adv.label }}</span>
         </span>
       </div>
 
@@ -46,7 +48,7 @@
         <article v-for="track in planTracks" :key="track.key" class="plan-track-card">
           <div class="plan-track-top">
             <strong>{{ t(`needtoken.apiServices.plansSection.tracks.${track.key}.title`) }}</strong>
-            <span v-if="track.badge" class="track-badge">{{ track.badge }}</span>
+            <span class="track-badge">{{ track.badge }}</span>
           </div>
           <p>{{ t(`needtoken.apiServices.plansSection.tracks.${track.key}.desc`) }}</p>
         </article>
@@ -80,10 +82,7 @@
       </div>
     </section>
 
-    <!-- 4. 智能路由可视化架构图（参考截图 9） -->
-    <ApiSmartRoutingShowcase />
-
-    <!-- 5. 动态模型精选折扣卡片（图 7）与全模型实时比价表（图 8） -->
+    <!-- 4. 动态模型精选折扣卡片与全模型实时比价表 -->
     <ApiPricingShowcase @quick-start="onQuickStartModel" />
 
     <!-- 6. CC Switch 双栏场景配置工作台（图 5） -->
@@ -97,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ArrowRight,
@@ -113,8 +112,9 @@ import {
 import { usePageSeo } from '../../composables/usePageSeo'
 import { useUserAuthStore } from '../../stores/userAuth'
 import { useApiPlanCatalog } from './composables/useApiPlanCatalog'
+import { usePricing } from './lib/usePricing'
+import type { PublicPlanOffer } from './lib/pricing'
 import ApiGatewayHero from './components/ApiGatewayHero.vue'
-import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
 import ApiSmartRoutingShowcase from './components/ApiSmartRoutingShowcase.vue'
 import ApiPricingShowcase from './components/ApiPricingShowcase.vue'
 import ApiIntegrationGuide from './components/ApiIntegrationGuide.vue'
@@ -124,6 +124,7 @@ import ServiceProductCard from './components/ServiceProductCard.vue'
 const { t } = useI18n()
 const userAuth = useUserAuthStore()
 const planCatalog = useApiPlanCatalog({ pageSize: 6, syncRoute: false })
+const pricing = usePricing()
 const selectedGuideModel = ref('')
 
 const steps = [
@@ -132,22 +133,77 @@ const steps = [
   { key: 'monitor', icon: BarChart3 },
 ] as const
 
-const planAdvantages = [
-  { key: 'officialBase', icon: ShieldCheck },
-  { key: 'mixedModels', icon: Layers },
-  { key: 'multipliers', icon: Sparkles },
-  { key: 'stackable', icon: Repeat },
-  { key: 'overflow', icon: Wallet },
-] as const
+const formatMultiplierBadge = (mult: number): string => {
+  const rounded = Math.round(mult * 10) / 10
+  return Number.isInteger(rounded) ? `${rounded}x` : `${rounded.toFixed(1)}x`
+}
 
-const planTracks = [
-  { key: 'openai', badge: '2x' },
-  { key: 'claude', badge: '2x' },
-  { key: 'gemini', badge: '专享' },
-  { key: 'xai', badge: '专享' },
-  { key: 'image', badge: '2x' },
-  { key: 'video', badge: '专项' },
-] as const
+const maxActiveMultiplier = computed(() => {
+  let maxMult = 0
+  for (const plan of pricing.activePlans.value) {
+    if (Number.isFinite(plan.multiplier) && plan.multiplier > maxMult) {
+      maxMult = plan.multiplier
+    }
+  }
+  return maxMult
+})
+
+const planAdvantages = computed(() => [
+  { key: 'officialBase', icon: ShieldCheck, label: t('needtoken.apiServices.plansSection.advantages.officialBase') },
+  { key: 'mixedModels', icon: Layers, label: t('needtoken.apiServices.plansSection.advantages.mixedModels') },
+  {
+    key: 'multipliers',
+    icon: Sparkles,
+    label: maxActiveMultiplier.value > 1.05
+      ? t('needtoken.apiServices.plansSection.advantages.multipliersDynamic', { mult: formatMultiplierBadge(maxActiveMultiplier.value) })
+      : t('needtoken.apiServices.plansSection.advantages.multipliers'),
+  },
+  { key: 'stackable', icon: Repeat, label: t('needtoken.apiServices.plansSection.advantages.stackable') },
+  { key: 'overflow', icon: Wallet, label: t('needtoken.apiServices.plansSection.advantages.overflow') },
+])
+
+const TRACK_KEYWORDS = {
+  openai: ['openai', 'codex', 'gpt', 'o3', 'o4'],
+  claude: ['claude', 'anthropic', 'opus', 'sonnet'],
+  gemini: ['gemini', 'google'],
+  xai: ['xai', 'grok'],
+  image: ['image', 'img', 'midjourney', 'flux', 'dalle', '图片', '生图', '繪圖', '圖片'],
+  video: ['video', 'sora', 'veo', 'kling', 'runway', '视频', '影片'],
+} as const
+
+type TrackKey = keyof typeof TRACK_KEYWORDS
+
+const matchPlanTrack = (plan: PublicPlanOffer, key: TrackKey): boolean => {
+  const haystack = [
+    plan.title || '',
+    plan.subtitle || '',
+    plan.upgrade_group || '',
+    ...(plan.allowed_groups || []),
+  ].join(' ').toLowerCase()
+  return TRACK_KEYWORDS[key].some(keyword => haystack.includes(keyword))
+}
+
+const planTrackKeys: readonly TrackKey[] = ['openai', 'claude', 'gemini', 'xai', 'image', 'video']
+
+const planTracks = computed(() => {
+  const exclusiveLabel = t('needtoken.apiServices.plansSection.exclusiveBadge')
+  return planTrackKeys.map((key) => {
+    let bestMult = 0
+    for (const plan of pricing.activePlans.value) {
+      if (matchPlanTrack(plan, key) && Number.isFinite(plan.multiplier) && plan.multiplier > bestMult) {
+        bestMult = plan.multiplier
+      }
+    }
+    return {
+      key,
+      badge: bestMult > 1.05 ? formatMultiplierBadge(bestMult) : exclusiveLabel,
+    }
+  })
+})
+
+onMounted(() => {
+  void pricing.ensureLoaded()
+})
 
 const onQuickStartModel = (modelId: string) => {
   selectedGuideModel.value = modelId
