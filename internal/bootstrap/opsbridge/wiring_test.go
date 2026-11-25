@@ -19,6 +19,7 @@ import (
 	categoryapp "github.com/dujiao-next/internal/modules/catalog/category/application"
 	categorydomain "github.com/dujiao-next/internal/modules/catalog/category/domain"
 	categorygormstore "github.com/dujiao-next/internal/modules/catalog/category/infrastructure/gormstore"
+	mappingapp "github.com/dujiao-next/internal/modules/catalog/mapping/application"
 	mappingdomain "github.com/dujiao-next/internal/modules/catalog/mapping/domain"
 	mappinggormstore "github.com/dujiao-next/internal/modules/catalog/mapping/infrastructure/gormstore"
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
@@ -34,6 +35,7 @@ import (
 	walletgormstore "github.com/dujiao-next/internal/modules/wallet/infrastructure/gormstore"
 	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/money"
+	"github.com/dujiao-next/internal/upstream"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/shopspring/decimal"
@@ -505,5 +507,103 @@ func TestOpsBridgeLookupUniversalGiftCardClaim(t *testing.T) {
 	wantRef := fmt.Sprintf("storefront:wallet_txn:%d", txn.ID)
 	if !hitResp.Data.Found || hitResp.Data.UserID != 42 || hitResp.Data.TxnRef != wantRef || hitResp.Data.CreditDisplay != "72.50 CNY" {
 		t.Fatalf("unexpected hit claim payload: %+v", hitResp.Data)
+	}
+}
+
+type fakeUpstreamMappingSvc struct {
+	products      []upstream.UpstreamProduct
+	syncedIDs     []uint
+	batchImported [][]uint
+}
+
+func (f *fakeUpstreamMappingSvc) ListUpstreamCategories(uint) ([]upstream.UpstreamCategory, bool, error) {
+	return nil, false, nil
+}
+
+func (f *fakeUpstreamMappingSvc) ListUpstreamProducts(_ uint, page, _ int) (*upstream.ProductListResult, error) {
+	if page > 1 {
+		return &upstream.ProductListResult{Items: nil, Total: len(f.products)}, nil
+	}
+	return &upstream.ProductListResult{Items: f.products, Total: len(f.products)}, nil
+}
+
+func (f *fakeUpstreamMappingSvc) SyncProduct(mappingID uint) error {
+	f.syncedIDs = append(f.syncedIDs, mappingID)
+	return nil
+}
+
+func (f *fakeUpstreamMappingSvc) BatchImportUpstreamProducts(_ uint, ids []uint, _ uint, _ bool) ([]mappingapp.BatchUpstreamProductImportOutcome, error) {
+	f.batchImported = append(f.batchImported, append([]uint(nil), ids...))
+	out := make([]mappingapp.BatchUpstreamProductImportOutcome, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, mappingapp.BatchUpstreamProductImportOutcome{UpstreamProductID: id})
+	}
+	return out, nil
+}
+
+func TestUpstreamStoreAdapterImportOrSyncSingleSKUStockOnly(t *testing.T) {
+	_, db := setupOpsBridgeTestRouter(t)
+	mappingRepo := mappinggormstore.NewMappingStore(db)
+	if err := mappingRepo.Create(&mappingdomain.Mapping{
+		ConnectionID:      7,
+		UpstreamProductID: 3000001,
+		LocalProductID:    101,
+		IsActive:          true,
+	}); err != nil {
+		t.Fatalf("seed mapping 1: %v", err)
+	}
+	if err := mappingRepo.Create(&mappingdomain.Mapping{
+		ConnectionID:      7,
+		UpstreamProductID: 3000002,
+		LocalProductID:    102,
+		IsActive:          true,
+	}); err != nil {
+		t.Fatalf("seed mapping 2: %v", err)
+	}
+
+	fakeSvc := &fakeUpstreamMappingSvc{
+		products: []upstream.UpstreamProduct{
+			{ID: 3000001, Slug: "asset-chatgpt-plus", IsActive: false, SKUs: []upstream.UpstreamSKU{{ID: 1, SKUCode: "chatgpt-plus-30d"}}},
+			{ID: 3000002, Slug: "asset-cursor-pro", IsActive: true, SKUs: []upstream.UpstreamSKU{{ID: 2, SKUCode: "cursor-pro-30d"}}},
+			{ID: 3000003, Slug: "asset-unmapped", IsActive: true, SKUs: []upstream.UpstreamSKU{{ID: 3, SKUCode: "claude-pro-30d"}}},
+		},
+	}
+	adapter := &upstreamStoreAdapter{mappings: fakeSvc, mappingRepo: mappingRepo}
+
+	// 1. Single SKU stock-only sync matches even inactive upstream product and syncs ONLY that mapping.
+	res, err := adapter.ImportOrSync(7, opscontract.ImportUpstreamProductsInput{
+		SyncStockOnly: true,
+		SKUCode:       "CHATGPT-PLUS-30D",
+	})
+	if err != nil {
+		t.Fatalf("single SKU sync err: %v", err)
+	}
+	if res.Requested != 1 || res.SyncedCount != 1 || res.ImportedCount != 0 || len(fakeSvc.syncedIDs) != 1 || len(fakeSvc.batchImported) != 0 {
+		t.Fatalf("single SKU sync must not fall back to full import: res=%+v synced=%v imported=%v", res, fakeSvc.syncedIDs, fakeSvc.batchImported)
+	}
+
+	// 2. Unknown SKU does NOT fall back to full catalog sync.
+	fakeSvc.syncedIDs = nil
+	resMiss, err := adapter.ImportOrSync(7, opscontract.ImportUpstreamProductsInput{
+		SyncStockOnly: true,
+		SKUCode:       "nonexistent-sku",
+	})
+	if err != nil {
+		t.Fatalf("missing SKU sync err: %v", err)
+	}
+	if resMiss.Requested != 0 || resMiss.SyncedCount != 0 || resMiss.SkippedReason != "sku_not_found_in_upstream_catalog" || len(fakeSvc.syncedIDs) != 0 || len(fakeSvc.batchImported) != 0 {
+		t.Fatalf("missing SKU must not sync unrelated products: res=%+v synced=%v", resMiss, fakeSvc.syncedIDs)
+	}
+
+	// 3. Unmapped SKU with sync_stock_only=true skips instead of auto-importing.
+	resUnmapped, err := adapter.ImportOrSync(7, opscontract.ImportUpstreamProductsInput{
+		SyncStockOnly: true,
+		SKUCode:       "claude-pro-30d",
+	})
+	if err != nil {
+		t.Fatalf("unmapped SKU sync err: %v", err)
+	}
+	if resUnmapped.SyncedCount != 0 || resUnmapped.ImportedCount != 0 || resUnmapped.SkippedCount != 1 || resUnmapped.SkippedReason != "target_sku_not_mapped" || len(fakeSvc.batchImported) != 0 {
+		t.Fatalf("sync_stock_only must not import unmapped products: res=%+v imported=%v", resUnmapped, fakeSvc.batchImported)
 	}
 }
