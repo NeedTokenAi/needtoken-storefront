@@ -1,6 +1,55 @@
 <template>
   <div ref="scopeEl" class="nt-scope" @pointerover.passive="prefetchLink" @focusin="prefetchLink" @touchstart.passive="prefetchLink">
-    <header class="nt-site-header sticky top-0 z-50 border-b border-border backdrop-blur">
+    <!-- 会员控制台（/me/*）：独立全视口 App Shell，隐藏店面顶栏与巨型页脚，保留右下角客服浮窗 -->
+    <template v-if="isMemberConsoleRoute">
+      <main class="relative isolate flex-1">
+        <slot />
+      </main>
+      <SupportWidget :support="support" :raised="false" />
+    </template>
+
+    <!-- 登录/注册/找回密码：轻量专注顶栏 + 一屏居中内容，隐藏页脚与客服浮窗 -->
+    <template v-else-if="isAuthFocusedRoute">
+      <header class="nt-site-header nt-auth-header sticky top-0 z-50 border-b border-border backdrop-blur">
+        <div class="nt-header-inner mx-auto flex h-[52px] w-full max-w-[1320px] items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <RouterLink to="/" class="nt-brand flex min-w-0 items-center gap-2 text-[15px] font-bold tracking-tight text-foreground sm:shrink-0 sm:text-[16px]" :title="brandName" :aria-label="brandName">
+              <BrandMark v-if="!appStore.isResellerTenant" class="h-6 w-6 shrink-0" />
+              <img v-else-if="resellerLogo" :src="resellerLogo" alt="" class="h-6 w-6 rounded-md object-contain" />
+              <span class="truncate">{{ brandName }}</span>
+            </RouterLink>
+            <span class="h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+            <RouterLink to="/" class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+              <ArrowLeft class="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{{ t('auth.login.backHome') }}</span>
+            </RouterLink>
+          </div>
+
+          <div class="flex shrink-0 items-center gap-2">
+            <div ref="langEl" class="relative" @focusout="onLanguageFocusOut">
+              <button type="button" class="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground" :aria-label="t('navbar.selectLanguage')" :aria-expanded="langOpen" aria-controls="nt-auth-language-options" @click="langOpen = !langOpen; openGroup = null">
+                <Languages class="h-[17px] w-[17px]" />
+              </button>
+              <Transition name="nt-menu" @before-enter="showEnteringPanel" @before-leave="hideLeavingPanel">
+              <div v-if="langOpen" id="nt-auth-language-options" class="nt-language-options absolute right-0 top-[calc(100%+8px)] z-[60] flex min-w-[150px] flex-col rounded-md border border-border bg-card p-2">
+                <button v-for="lang in languages" :key="lang.code" type="button" class="rounded px-3 py-2 text-left text-sm hover:bg-secondary" :class="appStore.locale === lang.code ? 'text-primary' : 'text-muted-foreground'" @click="changeLanguage(lang.code)">{{ lang.name }}</button>
+              </div>
+              </Transition>
+            </div>
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      <main class="relative isolate flex flex-1 flex-col">
+        <GhostFibersBackground variant="subtle" />
+        <div class="nt-page-content relative z-[1] flex flex-1 flex-col"><slot /></div>
+      </main>
+    </template>
+
+    <!-- 标准店面页面 -->
+    <template v-else>
+      <header class="nt-site-header sticky top-0 z-50 border-b border-border backdrop-blur">
       <div class="nt-header-inner mx-auto flex h-16 w-full max-w-[1320px] items-center gap-2 sm:gap-4">
         <RouterLink to="/" class="nt-brand flex min-w-0 items-center gap-2 text-[15px] font-bold tracking-tight text-foreground sm:shrink-0 sm:text-[17px]" :title="brandName" :aria-label="brandName">
           <BrandMark v-if="!appStore.isResellerTenant" class="h-7 w-7 shrink-0" />
@@ -161,13 +210,14 @@
       </div>
     </header>
 
-    <main class="relative isolate flex-1">
-      <GhostFibersBackground :variant="route.path === '/' ? 'hero' : 'subtle'" />
-      <div class="nt-page-content relative z-[1]"><slot /></div>
-    </main>
+      <main class="relative isolate flex-1">
+        <GhostFibersBackground :variant="route.path === '/' ? 'hero' : 'subtle'" />
+        <div class="nt-page-content relative z-[1]"><slot /></div>
+      </main>
 
-    <NeedtokenFooter :brand-name="brandName" :reseller-logo="resellerLogo" :support="support" />
-    <SupportWidget :support="support" :raised="raiseSupport" />
+      <NeedtokenFooter :brand-name="brandName" :reseller-logo="resellerLogo" :support="support" />
+      <SupportWidget :support="support" :raised="raiseSupport" />
+    </template>
   </div>
 </template>
 
@@ -177,6 +227,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Activity,
+  ArrowLeft,
   ArrowUpRight,
   ChevronDown,
   ClipboardList,
@@ -218,6 +269,8 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const authStore = useUserAuthStore()
+const isAuthFocusedRoute = computed(() => ['/auth/login', '/auth/register', '/auth/forgot'].includes(route.path))
+const isMemberConsoleRoute = computed(() => route.path === '/me' || route.path.startsWith('/me/'))
 const { summary: apiSummary, loadSummary } = useApiAccountLink()
 const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/me'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))

@@ -4197,7 +4197,13 @@
         "affiliateReferral": "Affiliate Referral",
         "resellerSystem": "Reseller System",
         "profileCardHint": "Open profile and security settings",
-        "security": "Account & Security"
+        "security": "Account & Security",
+        "consoleBadge": "Console",
+        "backToStore": "Back to Store",
+        "collapseSidebar": "Collapse sidebar",
+        "expandSidebar": "Expand sidebar",
+        "openMenu": "Open navigation menu",
+        "closeMenu": "Close navigation menu"
       },
       "reseller": {
         "title": "Reseller System",
@@ -4234,6 +4240,8 @@
         "trendEmpty": "No gateway usage in the last 7 days"
       },
       "quick": {
+        "title": "Quick Actions",
+        "apiEndpoint": "API Endpoint",
         "manageKeys": "Manage API Keys",
         "buyPlans": "Browse Gateway Plans",
         "viewUsage": "View Usage & Logs",
