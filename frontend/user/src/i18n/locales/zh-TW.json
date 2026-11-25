@@ -2247,24 +2247,26 @@
       "plansSection": {
         "eyebrow": "NEED GATEWAY PLANS",
         "title": "Need 網關套餐與優勢",
-        "subtitle": "統一以官方價格為透明基準，提供 2x–3x 高倍率套餐額度；支援不同模型自由混合呼叫或多專享卡同時疊加，超出套餐額度無縫按 API Key 餘額扣費。",
+        "subtitle": "統一以官方價格為透明基準，支援不同模型自由混合呼叫或套餐疊加，超出額度無縫按 API Key 餘額扣費。",
         "viewAll": "查看全部套餐",
         "fallbackHint": "目前正在同步最新在售套餐，您也可以直接前往 Need 網關套餐頁查看完整清單。",
+        "exclusiveBadge": "專享",
         "advantages": {
           "officialBase": "官方價格透明基準",
           "mixedModels": "多模型混合自由呼叫",
-          "multipliers": "2x / 3x 額度倍率放大",
+          "multipliers": "高倍率套餐額度靈活配置",
+          "multipliersDynamic": "最高 {mult} 套餐額度放大",
           "stackable": "多專享套餐並行疊加",
           "overflow": "超出自動按 API Key 餘額扣費"
         },
         "tracks": {
           "openai": {
             "title": "OpenAI 專享",
-            "desc": "GPT-5 / Codex / o3 專線分組，2x 額度放大，編程與推理主力首選。"
+            "desc": "GPT-5 / Codex / o3 專線分組，官方價透明基準，編程與推理主力首選。"
           },
           "claude": {
             "title": "Claude 專享",
-            "desc": "Claude Opus / Sonnet 原生快取協議，2x 倍率暢跑 Claude Code。"
+            "desc": "Claude Opus / Sonnet 原生快取協議，高穩定直連暢跑 Claude Code。"
           },
           "gemini": {
             "title": "Gemini 專享",
@@ -2275,12 +2277,12 @@
             "desc": "Grok 全系即時推理與搜尋能力，獨立分組精準計費。"
           },
           "image": {
-            "title": "圖片專項",
-            "desc": "主流生圖與修圖模型 2x 額度加成，按次透明結算。"
+            "title": "圖片專享",
+            "desc": "主流生圖與修圖模型專享額度通道，按官方基準透明結算。"
           },
           "video": {
-            "title": "影片專項",
-            "desc": "新一代影片生成模型專屬通道，大算力任務穩定交付。"
+            "title": "影片專享",
+            "desc": "新一代影片生成模型專享通道，大算力任務穩定交付。"
           }
         }
       },
@@ -3873,7 +3875,7 @@
           "step1": "開啟 Cherry Studio 設定 → 模型服務 → 新增自訂 OpenAI 服務商。",
           "step2": "貼上下方 Base URL 與您的 NeedToken API Key。",
           "step3": "點擊取得模型清單或手動填入模型 ID 即可開始使用。",
-          "note": "支援同步開啟圖片與影片專項模型，按需混用互不干擾。"
+          "note": "支援同步開啟圖片與影片專享模型，按需混用互不干擾。"
         }
       },
       "reference": "版面參考 · CC Switch 官方",
@@ -3910,6 +3912,17 @@
       "openingPayment": "正在開啟付款頁面，請稍候。付款結果以訂單狀態為準",
       "paymentRouteFailed": "付款頁面暫未能開啟，訂單已保留。請繼續付款，無需重新下單",
       "continuePayment": "繼續前往付款"
+    },
+    "checkoutGiftCard": {
+      "title": "禮品卡 / 兌換碼折抵",
+      "hint": "兌換後即時入帳統一餘額並自動用於本單折抵，餘額覆蓋全額免線上付款",
+      "placeholder": "輸入禮品卡或 API 兌換碼",
+      "previewAction": "查詢面額",
+      "redeemAction": "兌換並折抵",
+      "redeeming": "兌換中...",
+      "previewResult": "可兌換面額：{amount}（{name}）",
+      "previewFailed": "卡密無效或暫不可兌換",
+      "redeemSuccess": "已入帳 {amount} 至統一餘額，並自動開啟餘額折抵"
     },
     "radarStats": {
       "title": "重置統計與日曆",
@@ -3986,10 +3999,23 @@
         "preview": "官方預告"
       },
       "delivery": {
-        "direct": "瀏覽器直連公開來源",
+        "direct": "邊緣快取同步",
         "cached_proxy": "邊緣快取同步",
-        "cacheNote": "本地快取 5 分鐘 · 不高頻請求後端",
+        "cacheNote": "本地快取 5 分鐘",
         "refresh": "重新整理"
+      },
+      "subscribe": {
+        "action": "訂閱訊息",
+        "subscribedAction": "已訂閱訊息",
+        "panelTitle": "訂閱重置郵件提醒",
+        "panelDesc": "偵測到以下渠道觸發額度重置或發放重置卡時，將自動發送郵件通知到您的會員郵箱。",
+        "emailLabel": "接收郵箱",
+        "bindEmailHint": "目前帳號尚未綁定真實郵箱，無法接收重置郵件提醒。",
+        "bindEmailAction": "前往帳號安全綁定郵箱",
+        "savedEnabled": "已開啟 {channel} 重置郵件通知",
+        "savedDisabled": "已關閉 {channel} 重置郵件通知",
+        "loadFailed": "載入訂閱狀態失敗，請稍後重試",
+        "saveFailed": "更新訂閱狀態失敗，請稍後重試"
       },
       "channels": {
         "claude": {
@@ -4189,10 +4215,13 @@
         "subTabProfile": "資質與申請"
       },
       "overview": {
-        "apiTotalQuota": "Need 網關可用總額",
+        "apiTotalQuota": "統一可用餘額",
         "apiQuotaBreakdown": "餘額 {balance} · 方案剩餘 {plan}",
-        "storeWallet": "店面錢包餘額",
-        "storeWalletHint": "結帳折抵 · 禮品卡入帳",
+        "storeWallet": "統一可用餘額",
+        "storeWalletHint": "店面下單與 API 呼叫通用 · 儲值與禮品卡即時入帳",
+        "unifiedBalanceApiHint": "約合 API {usd} · 店面下單與 API 通用",
+        "apiPlanQuota": "生效方案額度",
+        "apiPlanQuotaHint": "共 {count} 個生效方案 · 超出扣統一餘額",
         "affiliateCommission": "推廣可提領佣金",
         "affiliateNotOpened": "開啟推廣邀請賺取佣金",
         "affiliatePendingHint": "待結算 {pending}",
@@ -4219,12 +4248,14 @@
         "emptyHint": "選購 Need 網關方案即可用低於官方的價格混合呼叫主流大模型"
       },
       "assets": {
-        "title": "資產總覽與禮品卡",
-        "subtitle": "統一查看 Need 網關額度、店面錢包餘額與推廣佣金，並線上兌換禮品卡或查看流水",
+        "title": "統一資產與禮品卡",
+        "subtitle": "統一管理店面與 API 共用餘額、生效方案額度及推廣佣金，支援線上儲值與禮品卡兌換",
         "walletUsageNote": "用於店面商品下單折抵，禮品卡兌換即時入帳",
+        "unifiedWalletNote": "約合 API {usd} · 店面下單與 API 扣費共用，儲值及禮品卡即時入帳",
+        "planQuotaNote": "僅限 Need 網關 API 優先扣減，超出無縫按統一餘額扣費",
         "goWithdraw": "前往提領",
         "tabGiftCard": "禮品卡兌換",
-        "tabWallet": "錢包儲值與流水"
+        "tabWallet": "餘額儲值與流水"
       },
       "keys": {
         "title": "API 金鑰管理",

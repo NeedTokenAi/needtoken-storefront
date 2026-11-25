@@ -11,6 +11,7 @@ import (
 	"github.com/dujiao-next/internal/app/container"
 	"github.com/dujiao-next/internal/app/httpserver/middleware"
 	"github.com/dujiao-next/internal/authz"
+	accountlinkbootstrap "github.com/dujiao-next/internal/bootstrap/accountlink"
 	adminauthwiring "github.com/dujiao-next/internal/bootstrap/adminauth"
 	adminauthzwiring "github.com/dujiao-next/internal/bootstrap/adminauthz"
 	adminuserwiring "github.com/dujiao-next/internal/bootstrap/adminuser"
@@ -155,6 +156,9 @@ func SetupRouter(cfg *config.Config, c *container.Container) *gin.Engine {
 	userAuditLogHandler := auditlogtransport.NewUserHandler(c.UserLoginLogService)
 	adminCouponHandler := coupontransport.NewAdminHandler(c.CouponAdminService)
 	c.GiftCardService.SetUniversalRedeemer(giftcardwiring.NewUniversalRedeemer(c))
+	unifiedWallet := accountlinkbootstrap.NewUnifiedBalanceBridge(c)
+	c.WalletService.SetUnifiedBalanceBridge(unifiedWallet)
+	c.GiftCardService.SetUnifiedRedeemer(unifiedWallet)
 	adminGiftCardHandler := giftcardtransport.NewAdminHandler(c.GiftCardService)
 	userGiftCardHandler := giftcardtransport.NewUserHandler(c.GiftCardService, captchaVerifier)
 	channelGiftCardHandler := giftcardtransport.NewChannelHandler(

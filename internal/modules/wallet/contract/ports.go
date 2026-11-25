@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"context"
 	"time"
 
 	"github.com/dujiao-next/internal/shared/money"
@@ -74,3 +75,24 @@ type UseCase interface {
 // ReleaseClaim atomically clears the order-side wallet allocation before the
 // wallet credit is written. Returning false means another attempt already won.
 type ReleaseClaim func(now time.Time) (bool, error)
+
+// UnifiedBalanceRedeemResult holds the result of redeeming a gift card or
+// redemption code directly into the unified NeedToken API balance.
+type UnifiedBalanceRedeemResult struct {
+	Source       string
+	Credited     money.Amount
+	BalanceAfter money.Amount
+	Currency     string
+}
+
+// UnifiedBalanceBridge synchronizes storefront wallet reads, credits, debits,
+// and redemptions with the authoritative NeedToken API User.Quota ledger.
+// All bridge calls MUST be invoked outside local SQLite/GORM transactions.
+type UnifiedBalanceBridge interface {
+	Enabled() bool
+	SiteCurrency() string
+	FetchBalance(ctx context.Context, userID uint, siteCurrency string) (money.Amount, bool, error)
+	Credit(ctx context.Context, userID uint, amount money.Amount, currency, operationID, remark string) (money.Amount, error)
+	Debit(ctx context.Context, userID uint, maxAmount money.Amount, currency string, allowPartial bool, operationID, remark string) (debited money.Amount, balanceAfter money.Amount, err error)
+	Redeem(ctx context.Context, userID uint, code, siteCurrency string) (*UnifiedBalanceRedeemResult, error)
+}

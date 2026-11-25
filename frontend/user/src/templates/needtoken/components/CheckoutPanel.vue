@@ -71,6 +71,65 @@
             <p v-if="useBalance && !walletOnlyPayment">{{ t('payment.onlinePayLabel') }}：{{ expectedOnlinePayDisplay }}</p>
             <p v-if="walletOnlyPayment && expectedOnlinePayCents > 0">{{ t('payment.walletInsufficientHint') }}</p>
           </div>
+
+          <div v-if="userAuthStore.isAuthenticated && !isResellerTenant" class="nt-checkout-giftcard">
+            <div class="nt-checkout-giftcard-head">
+              <span><Gift :size="14" aria-hidden="true" />{{ t('needtoken.checkoutGiftCard.title') }}</span>
+              <small>{{ t('needtoken.checkoutGiftCard.hint') }}</small>
+            </div>
+            <div class="nt-checkout-giftcard-row">
+              <Input
+                v-model="giftCardCode"
+                type="text"
+                maxlength="80"
+                autocomplete="off"
+                :disabled="giftCardBusy"
+                :placeholder="t('needtoken.checkoutGiftCard.placeholder')"
+                class="nt-checkout-giftcard-input"
+                @keydown.enter.prevent="handleRedeemGiftCard"
+              />
+            </div>
+            <div v-if="giftCardCaptchaEnabled && normalizedGiftCardCode" class="nt-checkout-captcha">
+              <p>{{ t('auth.common.captchaLabel') }}</p>
+              <ImageCaptcha
+                v-if="captchaProvider === 'image'"
+                ref="giftCardImageCaptchaRef"
+                v-model="giftCardCaptchaPayload"
+                :disabled="giftCardBusy"
+                @config-stale="handleGiftCardCaptchaConfigStale"
+              />
+              <TurnstileCaptcha
+                v-else-if="captchaProvider === 'turnstile'"
+                ref="giftCardTurnstileRef"
+                v-model="giftCardTurnstileToken"
+                :site-key="giftCardTurnstileSiteKey"
+              />
+            </div>
+            <div class="nt-checkout-giftcard-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                :disabled="giftCardBusy || !normalizedGiftCardCode"
+                @click="handlePreviewGiftCard"
+              >
+                {{ giftCardPreviewing ? t('common.loading') : t('needtoken.checkoutGiftCard.previewAction') }}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                :disabled="giftCardBusy || !normalizedGiftCardCode"
+                @click="handleRedeemGiftCard"
+              >
+                {{ giftCardRedeeming ? t('needtoken.checkoutGiftCard.redeeming') : t('needtoken.checkoutGiftCard.redeemAction') }}
+              </Button>
+            </div>
+            <p v-if="giftCardPreview" class="nt-checkout-giftcard-msg is-info" role="status">
+              {{ t('needtoken.checkoutGiftCard.previewResult', { amount: formatPrice(giftCardPreview.amount, giftCardPreview.currency || previewCurrency), name: giftCardPreview.name || giftCardPreview.code }) }}
+            </p>
+            <p v-if="giftCardSuccess" class="nt-checkout-giftcard-msg is-success" role="status">{{ giftCardSuccess }}</p>
+            <p v-if="giftCardError" class="nt-checkout-giftcard-msg is-error" role="alert">{{ giftCardError }}</p>
+          </div>
           <div v-if="!walletOnlyPayment && requiresOnlineChannel && paymentChannels.length" class="nt-checkout-channels">
             <button v-for="channel in paymentChannels" :key="channel.id" type="button" :disabled="isChannelDisabledForAmount(channel)" :aria-pressed="selectedChannelId === channel.id && !isChannelDisabledForAmount(channel)" :title="isChannelDisabledForAmount(channel) ? channelAmountLimitHint(channel) : ''" :class="{ selected: selectedChannelId === channel.id && !isChannelDisabledForAmount(channel) }" @click="handleSelectChannel(channel)">
               <span class="nt-checkout-channel-name"><img v-if="channel.icon" :src="getImageUrl(channel.icon)" alt="" /><span>{{ channel.name }}</span><Check v-if="selectedChannelId === channel.id && !isChannelDisabledForAmount(channel)" :size="15" class="nt-checkout-channel-check" aria-hidden="true" /></span>
@@ -112,10 +171,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowRight, ArrowUpRight, Check, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-vue-next'
+import { ArrowRight, ArrowUpRight, Check, Gift, LoaderCircle, LockKeyhole, ShieldCheck } from 'lucide-vue-next'
+import { giftCardAPI, type CaptchaPayload, type GiftCardPreviewResult, type GiftCardRedeemResult } from '../../../api'
 import { pageAlertVariant } from '../../../utils/alerts'
 import ImageCaptcha from '../../../components/captcha/ImageCaptcha.vue'
 import TurnstileCaptcha from '../../../components/captcha/TurnstileCaptcha.vue'
@@ -128,6 +188,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useCheckout } from '../../../composables/useCheckout'
 import { useAppStore } from '../../../stores/app'
+import { useUserProfileStore } from '../../../stores/userProfile'
 import { shouldShowCheckoutWalletBox } from '../lib/walletVisibility'
 import InvoiceRequestEditor from './InvoiceRequestEditor.vue'
 import ApiAccountLinkBanner from './ApiAccountLinkBanner.vue'
@@ -137,6 +198,7 @@ const emit = defineEmits<{ pendingChange: [pending: boolean]; orderCreated: [cre
 const route = useRoute()
 const { t } = useI18n()
 const appStore = useAppStore()
+const userProfileStore = useUserProfileStore()
 const memberLoginTarget = computed(() => ({ path: '/auth/login', query: { redirect: route.fullPath } }))
 const {
   userAuthStore, getLocalizedText, formatPrice, getImageUrl,
@@ -150,13 +212,139 @@ const {
   guestImageCaptchaRef, guestTurnstileRef, handleGuestCaptchaConfigStale,
   previewCurrency, previewOriginal, previewCoupon, previewPromotion, previewWholesale, previewMemberDiscount, previewTotal,
   previewLoading, couponRefreshing, previewStatusText, formatDiscountPrice, checkoutAlert,
-  showBalanceOption, walletLoading, walletBalance, useBalance, walletOnlyPayment,
+  showBalanceOption, walletLoading, walletBalance, useBalance, walletOnlyPayment, loadWalletBalance,
   expectedWalletPaidDisplay, expectedOnlinePayDisplay, expectedOnlinePayCents,
   requiresOnlineChannel, paymentChannels, selectedChannelId, isChannelDisabledForAmount, channelAmountLimitHint,
   handleSelectChannel, formatChannelFeeRate, formatChannelFixedFee,
   submitting, paymentTarget, paymentNavigationFailed, retryPaymentNavigation, canSubmit, handleSubmit,
 } = useCheckout({ source: props.embedded ? 'buynow' : undefined })
 const showNeedtokenBalanceOption = computed(() => showBalanceOption.value && shouldShowCheckoutWalletBox(appStore.config, walletBalance.value))
+
+const giftCardCode = ref('')
+const normalizedGiftCardCode = computed(() => giftCardCode.value.trim().toUpperCase())
+const giftCardPreviewing = ref(false)
+const giftCardRedeeming = ref(false)
+const giftCardBusy = computed(() => giftCardPreviewing.value || giftCardRedeeming.value)
+const giftCardPreview = ref<GiftCardPreviewResult | null>(null)
+const giftCardSuccess = ref('')
+const giftCardError = ref('')
+const giftCardCaptchaPayload = ref<CaptchaPayload>({})
+const giftCardTurnstileToken = ref('')
+const giftCardImageCaptchaRef = ref<InstanceType<typeof ImageCaptcha> | null>(null)
+const giftCardTurnstileRef = ref<InstanceType<typeof TurnstileCaptcha> | null>(null)
+
+const giftCardCaptchaEnabled = computed(() => {
+  const cfg = appStore.config?.captcha
+  return Boolean(cfg?.scenes?.gift_card_redeem && String(cfg?.provider || 'none') !== 'none')
+})
+const giftCardTurnstileSiteKey = computed(() => String(appStore.config?.captcha?.turnstile?.site_key || ''))
+
+watch(normalizedGiftCardCode, () => {
+  giftCardPreview.value = null
+  giftCardError.value = ''
+})
+
+const handleGiftCardCaptchaConfigStale = async () => {
+  await appStore.loadConfig(true)
+  giftCardCaptchaPayload.value = {}
+  giftCardTurnstileToken.value = ''
+}
+
+const getGiftCardCaptchaPayload = (): CaptchaPayload | undefined => {
+  if (!giftCardCaptchaEnabled.value) return undefined
+  if (captchaProvider.value === 'image') {
+    return {
+      captcha_id: giftCardCaptchaPayload.value.captcha_id || '',
+      captcha_code: giftCardCaptchaPayload.value.captcha_code || '',
+    }
+  }
+  if (captchaProvider.value === 'turnstile') {
+    return giftCardTurnstileRef.value?.getPayload() ?? {
+      turnstile_token: giftCardTurnstileToken.value || '',
+    }
+  }
+  return undefined
+}
+
+const isGiftCardCaptchaReady = () => {
+  if (!giftCardCaptchaEnabled.value) return true
+  if (captchaProvider.value === 'image') {
+    return Boolean(giftCardCaptchaPayload.value.captcha_id && giftCardCaptchaPayload.value.captcha_code)
+  }
+  if (captchaProvider.value === 'turnstile') {
+    return Boolean(giftCardTurnstileRef.value?.hasPayload() ?? giftCardTurnstileToken.value)
+  }
+  return false
+}
+
+const handlePreviewGiftCard = async () => {
+  const code = normalizedGiftCardCode.value
+  if (!code || giftCardBusy.value) return
+  giftCardPreviewing.value = true
+  giftCardPreview.value = null
+  giftCardError.value = ''
+  giftCardSuccess.value = ''
+  try {
+    const response = await giftCardAPI.preview(code)
+    giftCardPreview.value = (response.data?.data || null) as GiftCardPreviewResult | null
+  } catch (err: any) {
+    giftCardError.value = err?.message || t('needtoken.checkoutGiftCard.previewFailed')
+  } finally {
+    giftCardPreviewing.value = false
+  }
+}
+
+const handleRedeemGiftCard = async () => {
+  const code = normalizedGiftCardCode.value
+  if (!code || giftCardBusy.value) return
+  giftCardError.value = ''
+  giftCardSuccess.value = ''
+  if (!isGiftCardCaptchaReady()) {
+    giftCardError.value = t('auth.common.captchaRequired')
+    return
+  }
+  giftCardRedeeming.value = true
+  try {
+    const response = await giftCardAPI.redeem({
+      code,
+      captcha_payload: getGiftCardCaptchaPayload(),
+    })
+    const payload = (response.data?.data || {}) as Partial<GiftCardRedeemResult>
+    await loadWalletBalance()
+    if (payload.wallet) {
+      userProfileStore.syncWalletAccount({
+        balance: String(payload.wallet.balance ?? walletBalance.value),
+        currency: String(payload.gift_card?.currency || previewCurrency.value || appStore.config?.currency || 'CNY'),
+      })
+    } else {
+      void userProfileStore.loadWalletAccount()
+    }
+    useBalance.value = true
+    const creditedAmount = String(payload.wallet_delta || payload.gift_card?.amount || '')
+    const creditedCurrency = String(payload.gift_card?.currency || previewCurrency.value || appStore.config?.currency || 'CNY')
+    giftCardSuccess.value = t('needtoken.checkoutGiftCard.redeemSuccess', {
+      amount: formatPrice(creditedAmount, creditedCurrency),
+    })
+    giftCardCode.value = ''
+    giftCardPreview.value = null
+    giftCardCaptchaPayload.value = {}
+    giftCardTurnstileToken.value = ''
+    giftCardImageCaptchaRef.value?.refresh()
+    giftCardTurnstileRef.value?.reset()
+  } catch (err: any) {
+    giftCardError.value = err?.message || t('personalCenter.giftCard.errors.redeemFailed')
+    if (captchaProvider.value === 'image') {
+      giftCardImageCaptchaRef.value?.refresh()
+    }
+    if (captchaProvider.value === 'turnstile') {
+      giftCardTurnstileRef.value?.reset()
+      giftCardTurnstileToken.value = ''
+    }
+  } finally {
+    giftCardRedeeming.value = false
+  }
+}
+
 watch(submitting, value => emit('pendingChange', value), { immediate: true, flush: 'sync' })
 watch(paymentTarget, value => emit('orderCreated', !!value), { immediate: true, flush: 'sync' })
 onBeforeRouteUpdate(() => !props.embedded || (!submitting.value && !paymentTarget.value))
@@ -164,6 +352,8 @@ onBeforeRouteLeave(to => !props.embedded || !submitting.value || to.path === '/p
 
 void guestImageCaptchaRef
 void guestTurnstileRef
+void giftCardImageCaptchaRef
+void giftCardTurnstileRef
 </script>
 
 <style scoped>
@@ -226,6 +416,18 @@ void guestTurnstileRef
 .nt-checkout-wallet label { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; }
 .nt-checkout-wallet input { accent-color: var(--ui-accent); width: 16px; height: 16px; }
 .nt-checkout-wallet p { color: var(--ui-text-muted); font-size: 12px; line-height: 1.8; }
+.nt-checkout-giftcard { display: grid; gap: 10px; margin-top: 12px; padding: 14px 16px; border: 1px dashed var(--ui-border-strong); border-radius: 12px; background: var(--ui-bg-soft); font-size: 13px; }
+.nt-checkout-giftcard-head { display: grid; gap: 4px; }
+.nt-checkout-giftcard-head > span { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--ui-text-primary); }
+.nt-checkout-giftcard-head > span svg { color: var(--ui-accent); flex: none; }
+.nt-checkout-giftcard-head > small { color: var(--ui-text-muted); font-size: 12px; line-height: 1.6; }
+.nt-checkout-giftcard-input { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; text-transform: uppercase; letter-spacing: 0.04em; }
+.nt-checkout-giftcard-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.nt-checkout-giftcard-actions :deep(button) { flex: 1 1 auto; min-height: 36px; border-radius: 8px; font-size: 12px; }
+.nt-checkout-giftcard-msg { font-size: 12px; line-height: 1.6; }
+.nt-checkout-giftcard-msg.is-info { color: var(--ui-text-secondary); }
+.nt-checkout-giftcard-msg.is-success { color: var(--ui-accent); font-weight: 500; }
+.nt-checkout-giftcard-msg.is-error { color: var(--nt-warning-ink); }
 .nt-checkout-channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 12px; margin-top: 12px; }
 .nt-checkout-channels button { display: grid; align-content: center; gap: 8px; min-width: 0; min-height: 56px; padding: 12px; border: 1px solid var(--ui-border); border-radius: 12px; background: transparent; text-align: left; font-size: 13px; transition: border-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), background-color var(--nt-motion-enter, 180ms) var(--nt-motion-ease), color var(--nt-motion-fast, 120ms) var(--nt-motion-ease), box-shadow var(--nt-motion-enter, 180ms) var(--nt-motion-ease), transform var(--nt-duration-rebound, 480ms) var(--nt-ease-spring); }
 .nt-checkout-channel-name { display: flex; align-items: center; gap: 8px; }

@@ -1215,6 +1215,7 @@ export function useCheckout(options: { source?: 'buynow' } = {}) {
     walletBalance,
     useBalance,
     walletOnlyPayment,
+    loadWalletBalance,
     expectedWalletPaidDisplay,
     expectedOnlinePayDisplay,
     expectedOnlinePayCents,

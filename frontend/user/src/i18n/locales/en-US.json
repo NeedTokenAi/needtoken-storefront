@@ -2247,24 +2247,26 @@
       "plansSection": {
         "eyebrow": "NEED GATEWAY PLANS",
         "title": "Need Gateway Plans & Advantages",
-        "subtitle": "Anchored to official list pricing with 2x–3x quota multipliers. Mix models freely or stack dedicated packs side by side, with seamless overflow to your API Key balance.",
+        "subtitle": "Anchored to official list pricing. Mix models freely or stack plans side by side, with seamless overflow to your API Key balance.",
         "viewAll": "View All Plans",
         "fallbackHint": "Live catalog items are syncing — open the Need Gateway Plans page to view all available offers.",
+        "exclusiveBadge": "Dedicated",
         "advantages": {
           "officialBase": "Official List-Price Baseline",
           "mixedModels": "Multi-Model Mixed Calling",
-          "multipliers": "2x / 3x Quota Multipliers",
+          "multipliers": "Flexible Plan Quota Boost",
+          "multipliersDynamic": "Up to {mult} Plan Quota Boost",
           "stackable": "Stackable Dedicated Packs",
           "overflow": "Auto Overflow to Key Balance"
         },
         "tracks": {
           "openai": {
             "title": "OpenAI Dedicated",
-            "desc": "GPT-5 / Codex / o3 route with 2x quota boost for heavy coding & reasoning."
+            "desc": "GPT-5 / Codex / o3 route anchored to official pricing for heavy coding & reasoning."
           },
           "claude": {
             "title": "Claude Dedicated",
-            "desc": "Opus & Sonnet native caching route with 2x quota built for Claude Code."
+            "desc": "Opus & Sonnet native caching route tuned for Claude Code."
           },
           "gemini": {
             "title": "Gemini Dedicated",
@@ -2275,11 +2277,11 @@
             "desc": "Dedicated Grok reasoning and real-time search capacity."
           },
           "image": {
-            "title": "Image Pack",
-            "desc": "2x quota boost for flagship image generation & editing models."
+            "title": "Image Dedicated",
+            "desc": "Dedicated quota channel for flagship image generation & editing models."
           },
           "video": {
-            "title": "Video Pack",
+            "title": "Video Dedicated",
             "desc": "Dedicated high-compute route for next-gen video generation models."
           }
         }
@@ -3911,6 +3913,17 @@
       "paymentRouteFailed": "The payment page could not open. Your order is saved; continue to payment without placing another order",
       "continuePayment": "Continue to payment"
     },
+    "checkoutGiftCard": {
+      "title": "Gift Card / Redemption Code",
+      "hint": "Redeems directly into your unified balance and applies to this order automatically; full coverage skips online payment.",
+      "placeholder": "Enter gift card or API redemption code",
+      "previewAction": "Check Value",
+      "redeemAction": "Redeem & Apply",
+      "redeeming": "Redeeming...",
+      "previewResult": "Redeemable value: {amount} ({name})",
+      "previewFailed": "Invalid or unavailable code",
+      "redeemSuccess": "Credited {amount} to your unified balance and enabled balance deduction."
+    },
     "radarStats": {
       "title": "Reset statistics and calendar",
       "averageRemaining": "Until the historical average interval",
@@ -3986,10 +3999,23 @@
         "preview": "Official preview"
       },
       "delivery": {
-        "direct": "Direct browser feed",
+        "direct": "Edge-cached sync",
         "cached_proxy": "Edge-cached sync",
-        "cacheNote": "5m client cache · minimal origin load",
+        "cacheNote": "5m local cache",
         "refresh": "Refresh"
+      },
+      "subscribe": {
+        "action": "Subscribe",
+        "subscribedAction": "Subscribed",
+        "panelTitle": "Reset Email Alerts",
+        "panelDesc": "Receive an automatic email alert whenever a tracked provider announces a quota reset or reset card.",
+        "emailLabel": "Alert email",
+        "bindEmailHint": "Your account does not have a real email bound yet, so reset alerts cannot be delivered.",
+        "bindEmailAction": "Bind email in Security Settings",
+        "savedEnabled": "Enabled reset alerts for {channel}",
+        "savedDisabled": "Disabled reset alerts for {channel}",
+        "loadFailed": "Failed to load alert preferences. Please try again.",
+        "saveFailed": "Failed to update alert preferences. Please try again."
       },
       "channels": {
         "claude": {
@@ -4189,10 +4215,13 @@
         "subTabProfile": "Application & Profile"
       },
       "overview": {
-        "apiTotalQuota": "Need Gateway Total Quota",
+        "apiTotalQuota": "Unified Balance",
         "apiQuotaBreakdown": "Balance {balance} · Plan {plan}",
-        "storeWallet": "Store Wallet Balance",
-        "storeWalletHint": "Checkout deduction · Gift card credit",
+        "storeWallet": "Unified Balance",
+        "storeWalletHint": "Shared for store orders & API · Top-ups & gift cards credit live",
+        "unifiedBalanceApiHint": "≈ {usd} API credit · Shared for store & API",
+        "apiPlanQuota": "Active Plan Quota",
+        "apiPlanQuotaHint": "{count} active plans · Overflow bills unified balance",
         "affiliateCommission": "Available Commission",
         "affiliateNotOpened": "Join affiliate program to earn commissions",
         "affiliatePendingHint": "Pending {pending}",
@@ -4219,12 +4248,14 @@
         "emptyHint": "Subscribe to Need Gateway plans to mix flagship models below official rates."
       },
       "assets": {
-        "title": "Assets & Gift Cards",
-        "subtitle": "View Need Gateway quota, store wallet balance, and affiliate commissions in one place, or redeem gift cards.",
+        "title": "Unified Assets & Gift Cards",
+        "subtitle": "Manage your unified store & API balance, active plan quota, and affiliate commissions, or top up and redeem gift cards.",
         "walletUsageNote": "Usable at storefront checkout; gift cards credit immediately.",
+        "unifiedWalletNote": "≈ {usd} API credit · Shared across store orders and API overflow billing",
+        "planQuotaNote": "Deducted first for eligible Need Gateway API calls; overflow uses unified balance.",
         "goWithdraw": "Withdraw",
         "tabGiftCard": "Gift Card Redemption",
-        "tabWallet": "Wallet & Transactions"
+        "tabWallet": "Balance Top-up & History"
       },
       "keys": {
         "title": "API Key Management",

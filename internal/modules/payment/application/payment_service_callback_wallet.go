@@ -1,6 +1,7 @@
 package application
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -59,6 +60,15 @@ func (s *PaymentService) handleWalletRechargeCallback(payment *paymentdomain.Pay
 			recharge.Status = constants.WalletRechargeStatusSuccess
 			recharge.PaidAt = updated.PaidAt
 			recharge.UpdatedAt = updated.UpdatedAt
+			if s.walletSvc != nil && s.walletSvc.HasUnifiedBalance() {
+				s.walletSvc.SyncCreditToUnified(
+					recharge.UserID,
+					recharge.Amount,
+					recharge.Currency,
+					fmt.Sprintf("recharge:%d:success", recharge.ID),
+					strings.TrimSpace(recharge.Remark),
+				)
+			}
 		}
 		if s.memberLevelSvc != nil && recharge != nil && recharge.UserID > 0 {
 			if err := s.memberLevelSvc.OnRechargeCompleted(recharge.UserID, recharge.Amount.Decimal); err != nil {

@@ -154,6 +154,15 @@ export interface GiftCardData {
     redeemed_at?: string
 }
 
+export interface GiftCardPreviewResult {
+    code: string
+    name: string
+    amount: string
+    currency: string
+    face_usd_cents?: number
+    expires_at?: string | null
+}
+
 export interface GiftCardRedeemResult {
     gift_card: GiftCardData
     wallet: WalletAccountData
