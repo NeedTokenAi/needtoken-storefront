@@ -47,7 +47,77 @@
           </div>
           <span v-else class="tool-capability">{{ t('needtoken.radarLayout.scope') }}</span>
 
-          <div class="hero-source-actions">
+          <div ref="subscribeBoxEl" class="hero-source-actions">
+            <div class="radar-subscribe-wrap">
+              <button
+                type="button"
+                class="radar-subscribe-btn"
+                :class="{ 'is-subscribed': isActiveChannelSubscribed }"
+                :aria-expanded="subscribePanelOpen"
+                aria-haspopup="dialog"
+                @click="handleSubscribeButtonClick"
+              >
+                <BellRing v-if="isActiveChannelSubscribed" :size="13" aria-hidden="true" />
+                <Bell v-else :size="13" aria-hidden="true" />
+                <span>{{ isActiveChannelSubscribed ? t('needtoken.radarV2.subscribe.subscribedAction') : t('needtoken.radarV2.subscribe.action') }}</span>
+                <span v-if="subscribedTotalCount > 0" class="radar-sub-count">{{ subscribedTotalCount }}</span>
+              </button>
+
+              <Transition name="cal-tip">
+                <div
+                  v-if="subscribePanelOpen"
+                  class="radar-subscribe-popover"
+                  role="dialog"
+                  :aria-label="t('needtoken.radarV2.subscribe.panelTitle')"
+                >
+                  <div class="radar-sub-head">
+                    <strong>{{ t('needtoken.radarV2.subscribe.panelTitle') }}</strong>
+                    <p>{{ t('needtoken.radarV2.subscribe.panelDesc') }}</p>
+                  </div>
+
+                  <div v-if="subLoading && !subPrefs" class="radar-sub-state">
+                    {{ t('needtoken.common.loading') }}
+                  </div>
+
+                  <template v-else-if="subPrefs">
+                    <div v-if="!subPrefs.email_bound" class="radar-sub-warning" role="alert">
+                      <p>{{ t('needtoken.radarV2.subscribe.bindEmailHint') }}</p>
+                      <RouterLink to="/me/security" class="radar-sub-bind-link" @click="subscribePanelOpen = false">
+                        {{ t('needtoken.radarV2.subscribe.bindEmailAction') }}
+                      </RouterLink>
+                    </div>
+                    <p v-else class="radar-sub-email">
+                      <span>{{ t('needtoken.radarV2.subscribe.emailLabel') }}</span>
+                      <strong>{{ subPrefs.email }}</strong>
+                    </p>
+
+                    <ul class="radar-sub-list">
+                      <li v-for="ch in channels" :key="ch.id" class="radar-sub-item" :class="{ 'is-current': ch.id === activeChannel }">
+                        <span class="radar-sub-item-info">
+                          <ProductBrandMark :brand="ch.brand" class="radar-sub-brand" />
+                          <span>{{ t(`needtoken.radarV2.tabs.${ch.id}`) }}</span>
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          class="radar-sub-switch"
+                          :class="{ 'is-on': Boolean(subPrefs.channels[ch.id]) }"
+                          :aria-checked="Boolean(subPrefs.channels[ch.id])"
+                          :disabled="subSavingChannel === ch.id || (!subPrefs.email_bound && !subPrefs.channels[ch.id])"
+                          @click="toggleChannelSubscription(ch.id)"
+                        >
+                          <span class="radar-sub-switch-thumb" />
+                        </button>
+                      </li>
+                    </ul>
+                  </template>
+
+                  <p v-if="subError" class="radar-sub-error" role="alert">{{ subError }}</p>
+                  <p v-else-if="subSuccess" class="radar-sub-success" role="status">{{ subSuccess }}</p>
+                </div>
+              </Transition>
+            </div>
+
             <button
               type="button"
               class="radar-refresh-btn"
@@ -267,12 +337,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowUpRight, ChevronDown, Clock3, Info, RotateCw, Ticket } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowUpRight, Bell, BellRing, ChevronDown, Clock3, Info, RotateCw, Ticket } from 'lucide-vue-next'
 import ProductBrandMark from './components/ProductBrandMark.vue'
 import RadarCalendar from './components/RadarCalendar.vue'
 import RadarRecordText from './components/RadarRecordText.vue'
 import { useSlidingIndicator } from './composables/useSlidingIndicator'
 import { usePageSeo } from '../../composables/usePageSeo'
+import { useUserAuthStore } from '../../stores/userAuth'
+import { radarSubscriptionAPI, type RadarSubscriptionPreferences } from '../../api/radar'
 import {
   fetchChannelResetFeed,
   geminiDailyResetSchedule,
@@ -291,8 +364,101 @@ import {
 
 const channels = RADAR_CHANNELS
 const { t, locale } = useI18n()
-const activeChannel = ref<RadarChannelId>('codex')
+const route = useRoute()
+const router = useRouter()
+const userAuth = useUserAuthStore()
+const initialChannelQuery = typeof route.query.channel === 'string' ? route.query.channel.toLowerCase() : ''
+const initialChannel: RadarChannelId = channels.some(c => c.id === initialChannelQuery)
+  ? (initialChannelQuery as RadarChannelId)
+  : 'codex'
+const activeChannel = ref<RadarChannelId>(initialChannel)
 const activeChannelMeta = computed(() => channels.find(c => c.id === activeChannel.value) ?? channels[0]!)
+
+const subscribeBoxEl = ref<HTMLElement | null>(null)
+const subscribePanelOpen = ref(false)
+const subLoading = ref(false)
+const subSavingChannel = ref<RadarChannelId | null>(null)
+const subPrefs = ref<RadarSubscriptionPreferences | null>(null)
+const subError = ref('')
+const subSuccess = ref('')
+
+const isActiveChannelSubscribed = computed(() => Boolean(subPrefs.value?.channels?.[activeChannel.value]))
+const subscribedTotalCount = computed(() => subPrefs.value?.subscribed_count ?? 0)
+
+async function loadSubscriptionPreferences() {
+  if (!userAuth.isAuthenticated) {
+    subPrefs.value = null
+    return
+  }
+  subLoading.value = true
+  subError.value = ''
+  try {
+    const res = await radarSubscriptionAPI.getPreferences()
+    subPrefs.value = res.data?.data ?? null
+  } catch (err: any) {
+    subError.value = err?.response?.data?.msg || t('needtoken.radarV2.subscribe.loadFailed')
+  } finally {
+    subLoading.value = false
+  }
+}
+
+async function handleSubscribeButtonClick() {
+  if (!userAuth.isAuthenticated) {
+    void router.push({
+      path: '/auth/login',
+      query: { redirect: `/tools/radar?channel=${activeChannel.value}` },
+    })
+    return
+  }
+  subscribePanelOpen.value = !subscribePanelOpen.value
+  subSuccess.value = ''
+  subError.value = ''
+  if (subscribePanelOpen.value) {
+    await loadSubscriptionPreferences()
+  }
+}
+
+async function toggleChannelSubscription(channel: RadarChannelId) {
+  if (!subPrefs.value || subSavingChannel.value) return
+  const nextEnabled = !subPrefs.value.channels[channel]
+  subSavingChannel.value = channel
+  subError.value = ''
+  subSuccess.value = ''
+  try {
+    const res = await radarSubscriptionAPI.updatePreferences({ [channel]: nextEnabled })
+    if (res.data?.data) {
+      subPrefs.value = res.data.data
+    }
+    subSuccess.value = nextEnabled
+      ? t('needtoken.radarV2.subscribe.savedEnabled', { channel: t(`needtoken.radarV2.tabs.${channel}`) })
+      : t('needtoken.radarV2.subscribe.savedDisabled', { channel: t(`needtoken.radarV2.tabs.${channel}`) })
+  } catch (err: any) {
+    subError.value = err?.response?.data?.msg || t('needtoken.radarV2.subscribe.saveFailed')
+  } finally {
+    subSavingChannel.value = null
+  }
+}
+
+function handleDocumentPointerDown(event: MouseEvent) {
+  if (!subscribePanelOpen.value) return
+  if (event.target instanceof Node && subscribeBoxEl.value?.contains(event.target)) return
+  subscribePanelOpen.value = false
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && subscribePanelOpen.value) {
+    subscribePanelOpen.value = false
+  }
+}
+
+watch(() => userAuth.isAuthenticated, (authed) => {
+  if (authed) {
+    void loadSubscriptionPreferences()
+  } else {
+    subPrefs.value = null
+    subscribePanelOpen.value = false
+  }
+})
 
 const tabRailEl = ref<HTMLElement | null>(null)
 const tabEls: Array<HTMLButtonElement | null> = []
@@ -358,9 +524,7 @@ const channelHeadingSubtitle = computed(() =>
 )
 const deliveryLabel = computed(() => {
   if (stale.value) return t('needtoken.radarLive.stale')
-  if (usableFeed.value?.delivery === 'direct') return t('needtoken.radarV2.delivery.direct')
-  if (usableFeed.value?.delivery === 'cached_proxy') return t('needtoken.radarV2.delivery.cached_proxy')
-  return t('needtoken.radarLayout.scope')
+  return t('needtoken.radarV2.delivery.cached_proxy')
 })
 
 watch(filter, () => { recordLimit.value = RESET_RECORD_PAGE_SIZE })
@@ -510,11 +674,16 @@ usePageSeo({
 
 onMounted(() => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('mousedown', handleDocumentPointerDown)
+  document.addEventListener('keydown', handleDocumentKeydown)
   // Local clock tick only (0 network requests) to keep elapsed & daily countdown fresh.
   clockTimer = setInterval(() => {
     if (!document.hidden) now.value = Date.now()
   }, 30_000)
   void loadChannel(activeChannel.value)
+  if (userAuth.isAuthenticated) {
+    void loadSubscriptionPreferences()
+  }
 })
 
 onUnmounted(() => {
@@ -525,6 +694,8 @@ onUnmounted(() => {
   }
   if (clockTimer !== undefined) clearInterval(clockTimer)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('mousedown', handleDocumentPointerDown)
+  document.removeEventListener('keydown', handleDocumentKeydown)
 })
 </script>
 
@@ -698,6 +869,200 @@ onUnmounted(() => {
 .radar-refresh-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.radar-subscribe-wrap {
+  position: relative;
+}
+
+.radar-subscribe-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-bg-elevated);
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+.radar-subscribe-btn:hover {
+  border-color: var(--nt-accent-border-strong);
+  color: var(--ui-accent);
+}
+.radar-subscribe-btn.is-subscribed {
+  border-color: var(--nt-accent-border-strong, var(--ui-accent));
+  background: var(--nt-accent-subtle, rgba(16, 185, 129, 0.1));
+  color: var(--ui-accent);
+}
+.radar-sub-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ui-accent);
+  color: var(--ui-text-on-accent);
+  font: 700 10px var(--nt-font-mono);
+}
+
+.radar-subscribe-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: min(320px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 16px;
+  background: var(--ui-bg-elevated);
+  box-shadow: var(--nt-popover-shadow, 0 18px 42px rgba(0, 0, 0, 0.28));
+}
+
+.radar-sub-head strong {
+  display: block;
+  color: var(--ui-text-primary);
+  font-size: 14px;
+  font-weight: 650;
+}
+.radar-sub-head p {
+  margin-top: 4px;
+  color: var(--ui-text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.radar-sub-state {
+  margin-top: 12px;
+  color: var(--ui-text-muted);
+  font-size: 12.5px;
+}
+
+.radar-sub-email {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg-soft);
+  font-size: 12px;
+  color: var(--ui-text-muted);
+}
+.radar-sub-email strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-text-primary);
+  font-weight: 600;
+}
+
+.radar-sub-warning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--nt-warning-border, rgba(245, 158, 11, 0.35));
+  background: color-mix(in srgb, var(--nt-warning-ink, #f59e0b) 8%, transparent);
+  color: var(--nt-warning-ink, #d97706);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.radar-sub-bind-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--ui-accent);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.radar-sub-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.radar-sub-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg-soft);
+}
+.radar-sub-item.is-current {
+  border-color: var(--nt-accent-border, var(--ui-accent));
+}
+.radar-sub-item-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ui-text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.radar-sub-brand {
+  width: 15px;
+  height: 15px;
+}
+.radar-sub-brand :deep(.product-brand-symbol) {
+  width: 15px;
+  height: 15px;
+}
+
+.radar-sub-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 999px;
+  background: var(--ui-bg-elevated);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.radar-sub-switch.is-on {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+}
+.radar-sub-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.radar-sub-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ui-text-secondary);
+  transition: transform 150ms ease, background 150ms ease;
+}
+.radar-sub-switch.is-on .radar-sub-switch-thumb {
+  transform: translateX(14px);
+  background: var(--ui-text-on-accent, #04130f);
+}
+
+.radar-sub-error {
+  margin-top: 10px;
+  color: var(--ui-danger, #ef4444);
+  font-size: 12px;
+}
+.radar-sub-success {
+  margin-top: 10px;
+  color: var(--ui-accent);
+  font-size: 12px;
 }
 .is-spinning {
   animation: nt-radar-spin 0.9s linear infinite;

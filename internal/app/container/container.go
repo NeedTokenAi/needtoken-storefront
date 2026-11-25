@@ -31,6 +31,7 @@ import (
 	coupongormstore "github.com/dujiao-next/internal/modules/coupon/infrastructure/gormstore"
 	dashboardapp "github.com/dujiao-next/internal/modules/dashboard/application"
 	dashboardcontract "github.com/dujiao-next/internal/modules/dashboard/contract"
+	diagnosticscontract "github.com/dujiao-next/internal/modules/diagnostics/contract"
 	downstreamcallbackapp "github.com/dujiao-next/internal/modules/downstreamcallback/application"
 	downstreamcallbackcontract "github.com/dujiao-next/internal/modules/downstreamcallback/contract"
 	fulfillmentapp "github.com/dujiao-next/internal/modules/fulfillment/application"
@@ -65,6 +66,8 @@ import (
 	procurementgormstore "github.com/dujiao-next/internal/modules/procurement/infrastructure/gormstore"
 	promotionapp "github.com/dujiao-next/internal/modules/promotion/application"
 	promotiongormstore "github.com/dujiao-next/internal/modules/promotion/infrastructure/gormstore"
+	radarsubscriptionapp "github.com/dujiao-next/internal/modules/radarsubscription/application"
+	radarsubscriptioncontract "github.com/dujiao-next/internal/modules/radarsubscription/contract"
 	reconciliationapp "github.com/dujiao-next/internal/modules/reconciliation/application"
 	reconciliationcontract "github.com/dujiao-next/internal/modules/reconciliation/contract"
 	reseller "github.com/dujiao-next/internal/modules/reseller/application"
@@ -131,6 +134,7 @@ type Container struct {
 	MemberLevelPriceRepo   *memberlevelgormstore.PriceStore
 	MemberLevelUserRepo    memberlevelcontract.UserRepository
 	UserProductPriceRepo   *memberlevelgormstore.UserPriceStore
+	RadarSubscriptionRepo  radarsubscriptioncontract.Store
 
 	// Services
 	AuthzService                  *authz.Service
@@ -194,6 +198,8 @@ type Container struct {
 	AdProxyService                *adproxyapp.Service
 	OrderRiskControlService       *orderriskapp.Service
 	ComplianceService             *complianceapp.Service
+	ResetFeed                     diagnosticscontract.ChannelResetFeedReader
+	RadarSubscriptionService      *radarsubscriptionapp.Service
 
 	PaymentProviderRegistry *paymentprovider.Registry
 }

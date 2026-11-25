@@ -10,13 +10,23 @@ import (
 	diagnosticstransport "github.com/dujiao-next/internal/modules/diagnostics/transport/http"
 )
 
-func NewResetHandler() *diagnosticstransport.ResetHandler {
+func NewResetFeed() diagnosticscontract.ChannelResetFeedReader {
 	tsalon := resetsources.NewTSalonClient(nil)
-	feeds := diagnosticsapplication.NewMultiChannelResetFeed(map[string]diagnosticscontract.ResetFeedReader{
+	return diagnosticsapplication.NewMultiChannelResetFeed(map[string]diagnosticscontract.ResetFeedReader{
 		"codex":  diagnosticsapplication.NewResetFeedWithOptions(codexresets.NewClient(nil), "https://codex-resets.com/", 5*time.Minute),
 		"claude": diagnosticsapplication.NewResetFeedWithOptions(tsalon.ChannelSource("claude"), resetsources.TSalonSourceURL, 5*time.Minute),
 		"gemini": diagnosticsapplication.NewResetFeedWithOptions(resetsources.NewAntigravityClient(nil), resetsources.AntigravitySourceURL, 10*time.Minute),
 		"grok":   diagnosticsapplication.NewResetFeedWithOptions(tsalon.ChannelSource("grok"), resetsources.TSalonSourceURL, 5*time.Minute),
 	})
-	return diagnosticstransport.NewResetHandler(feeds)
+}
+
+func NewResetHandler() *diagnosticstransport.ResetHandler {
+	return diagnosticstransport.NewResetHandler(NewResetFeed())
+}
+
+func NewResetHandlerWithFeed(feed diagnosticscontract.ResetFeedReader) *diagnosticstransport.ResetHandler {
+	if feed == nil {
+		return NewResetHandler()
+	}
+	return diagnosticstransport.NewResetHandler(feed)
 }

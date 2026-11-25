@@ -51,6 +51,9 @@ func BuildRunner(cfg *config.Config, mode string) (*Runner, error) {
 	}
 
 	services = append(services, &paidFulfillmentService{payments: paidfulfillment.New(dependencies.PaymentStore, dependencies.ProcurementOrderService, dependencies.PaymentService)})
+	if dependencies.RadarSubscriptionService != nil {
+		services = append(services, &radarNotifyService{poller: dependencies.RadarSubscriptionService})
+	}
 	return NewRunner(services...), nil
 }
 

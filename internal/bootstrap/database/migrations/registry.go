@@ -32,6 +32,7 @@ import (
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	procurementdomain "github.com/dujiao-next/internal/modules/procurement/domain"
 	promotiondomain "github.com/dujiao-next/internal/modules/promotion/domain"
+	radarsubscriptiondomain "github.com/dujiao-next/internal/modules/radarsubscription/domain"
 	reconciliationdomain "github.com/dujiao-next/internal/modules/reconciliation/domain"
 	resellerstore "github.com/dujiao-next/internal/modules/reseller/infrastructure/gormstore"
 	settingsstore "github.com/dujiao-next/internal/modules/settings/infrastructure/gormstore"
@@ -100,6 +101,9 @@ func AutoMigrate() error {
 		&memberleveldomain.MemberLevelPrice{},
 		&memberleveldomain.UserProductPrice{},
 		&contentdomain.Media{},
+		&radarsubscriptiondomain.Subscription{},
+		&radarsubscriptiondomain.SeenEvent{},
+		&radarsubscriptiondomain.EventDelivery{},
 	); err != nil {
 		return err
 	}
