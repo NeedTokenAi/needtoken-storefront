@@ -77,6 +77,15 @@ high_risk_cases=(
   "frontend/admin/src/components/captcha/TurnstileCaptcha.vue"
   "frontend/user/src/utils/chunkRecovery.ts"
   "frontend/admin/src/utils/chunkRecovery.ts"
+  "internal/modules/radarsubscription/application/service.go"
+  "internal/modules/notification/infrastructure/smtp/radar_reset_template.go"
+  "internal/app/radar_notify_service.go"
+  "frontend/user/src/api/radar.ts"
+  "frontend/user/src/api/wallet.ts"
+  "frontend/user/src/style.css"
+  "frontend/user/src/components/ui/select/SelectContent.vue"
+  "frontend/user/src/composables/useCheckout.ts"
+  "frontend/user/src/views/personal/WalletPanel.vue"
 )
 
 for path in "${high_risk_cases[@]}" "internal/modules/identity/user/contract/store.go"; do
