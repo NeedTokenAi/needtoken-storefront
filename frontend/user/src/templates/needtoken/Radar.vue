@@ -880,23 +880,27 @@ onUnmounted(() => {
   align-items: center;
   gap: 5px;
   padding: 4px 11px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--ui-accent);
   border-radius: 999px;
-  background: var(--ui-bg-elevated);
-  color: var(--ui-text-secondary);
+  background: var(--ui-accent);
+  color: var(--ui-text-on-accent);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+  transition: filter 150ms ease, box-shadow 150ms ease, transform 150ms ease, opacity 150ms ease;
 }
 .radar-subscribe-btn:hover {
-  border-color: var(--nt-accent-border-strong);
-  color: var(--ui-accent);
+  filter: brightness(1.06);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ui-accent) 28%, transparent);
+}
+.radar-subscribe-btn:active {
+  transform: scale(0.97);
 }
 .radar-subscribe-btn.is-subscribed {
-  border-color: var(--nt-accent-border-strong, var(--ui-accent));
-  background: var(--nt-accent-subtle, rgba(16, 185, 129, 0.1));
-  color: var(--ui-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  color: var(--ui-text-on-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 24%, transparent);
 }
 .radar-sub-count {
   display: inline-flex;
@@ -906,7 +910,7 @@ onUnmounted(() => {
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--ui-accent);
+  background: color-mix(in srgb, var(--ui-text-on-accent) 20%, transparent);
   color: var(--ui-text-on-accent);
   font: 700 10px var(--nt-font-mono);
 }
