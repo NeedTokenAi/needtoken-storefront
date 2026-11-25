@@ -27,6 +27,11 @@ func (s *Service) GetAccount(userID uint) (*walletdomain.Account, error) {
 	if userID == 0 {
 		return nil, walletcontract.ErrAccountNotFound
 	}
+	if s.HasUnifiedBalance() {
+		if synced, syncErr := s.SyncLocalBalanceFromUnified(userID); syncErr == nil && synced != nil {
+			return synced, nil
+		}
+	}
 	account, err := s.repository.GetAccountByUserID(userID)
 	if err != nil || account != nil {
 		return account, err

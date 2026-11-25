@@ -18,6 +18,8 @@ export const walletAPI = {
 }
 
 export const giftCardAPI = {
+    preview: (code: string) =>
+        userApi.post('/gift-cards/preview', { code }),
     redeem: (data: { code: string; captcha_payload?: CaptchaPayload }) =>
         userApi.post('/gift-cards/redeem', data),
 }

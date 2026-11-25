@@ -251,6 +251,12 @@ func (s *PaymentService) applyPaymentUpdate(payment *paymentdomain.Payment, orde
 	returnVal := payment
 	processedOrder := order
 	orderPaid := false
+	var (
+		callbackReleasedAmount   decimal.Decimal
+		callbackReleasedOrderID  uint
+		callbackReleasedUserID   uint
+		callbackReleasedCurrency string
+	)
 
 	err := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
 		paymentRepo := tx.Payments()
@@ -404,8 +410,15 @@ func (s *PaymentService) applyPaymentUpdate(payment *paymentdomain.Payment, orde
 				return ErrPaymentUpdateFailed
 			}
 			if newerActivePaymentID(payments, lockedPayment.ID) == 0 {
-				if _, err := orderapp.ReleaseWalletBalance(s.walletSvc, tx, lockedOrder, constants.WalletTxnTypeOrderRefund, "在线支付失败，退回余额"); err != nil {
+				released, err := orderapp.ReleaseWalletBalance(s.walletSvc, tx, lockedOrder, constants.WalletTxnTypeOrderRefund, "在线支付失败，退回余额")
+				if err != nil {
 					return err
+				}
+				if released.GreaterThan(decimal.Zero) {
+					callbackReleasedAmount = released
+					callbackReleasedOrderID = lockedOrder.ID
+					callbackReleasedUserID = lockedOrder.UserID
+					callbackReleasedCurrency = lockedOrder.Currency
 				}
 			}
 		}
@@ -414,6 +427,9 @@ func (s *PaymentService) applyPaymentUpdate(payment *paymentdomain.Payment, orde
 	})
 	if err != nil {
 		return nil, nil, false, err
+	}
+	if callbackReleasedAmount.GreaterThan(decimal.Zero) && s.walletSvc != nil {
+		s.walletSvc.SyncCreditToUnified(callbackReleasedUserID, money.FromDecimal(callbackReleasedAmount), callbackReleasedCurrency, fmt.Sprintf("order:%d:cb_fail:%d", callbackReleasedOrderID, payment.ID), "在线支付失败，退回余额")
 	}
 	return returnVal, processedOrder, orderPaid, nil
 }

@@ -9,6 +9,7 @@ import (
 	assetclaimbootstrap "github.com/dujiao-next/internal/bootstrap/assetclaim"
 	diagnosticsbootstrap "github.com/dujiao-next/internal/bootstrap/diagnostics"
 	orderbootstrap "github.com/dujiao-next/internal/bootstrap/order"
+	radarsubscriptionbootstrap "github.com/dujiao-next/internal/bootstrap/radarsubscription"
 	"github.com/dujiao-next/internal/config"
 	affiliatetransport "github.com/dujiao-next/internal/modules/affiliate/transport/http"
 	apicredentialtransport "github.com/dujiao-next/internal/modules/apicredential/transport/http"
@@ -29,6 +30,7 @@ import (
 	authorizationtransport "github.com/dujiao-next/internal/modules/order/transport/http/subscriptionauthorization"
 	paymenttransport "github.com/dujiao-next/internal/modules/payment/transport/http"
 	paymentcallbacktransport "github.com/dujiao-next/internal/modules/payment/transport/http/callback"
+	radarsubscriptiontransport "github.com/dujiao-next/internal/modules/radarsubscription/transport/http"
 	resellertransport "github.com/dujiao-next/internal/modules/reseller/transport/http/user"
 	publicconfigtransport "github.com/dujiao-next/internal/modules/settings/transport/http/public"
 	wallettransport "github.com/dujiao-next/internal/modules/wallet/transport/http"
@@ -108,7 +110,7 @@ func registerStorefrontRoutes(
 			Prefix: "public_account_diagnostic", WindowSeconds: 60, MaxRequests: 5, BlockSeconds: 60,
 		}, middleware.KeyByIP))
 		diagnosticstransport.RegisterPublicRoutes(accountTools, diagnosticsbootstrap.NewHandler())
-		resetHandler := diagnosticsbootstrap.NewResetHandler()
+		resetHandler := diagnosticsbootstrap.NewResetHandlerWithFeed(c.ResetFeed)
 		resetTools := public.Group("/tools")
 		resetTools.Use(diagnosticstransport.NoStore(), middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
 			Prefix: "public_codex_resets", WindowSeconds: 60, MaxRequests: 30, BlockSeconds: 60,
@@ -224,6 +226,17 @@ func registerStorefrontRoutes(
 		giftCardRedeem := user.Group("", middleware.RateLimitMiddleware(redisClient, giftCardRedeemRule, middleware.KeyByUserIDAndIP))
 		giftcardtransport.RegisterUserRoutes(giftCardRedeem, userGiftCardHandler)
 		affiliatetransport.RegisterUserRoutes(user, affiliateHandler)
+		if c.RadarSubscriptionService != nil {
+			radarSubHandler := radarsubscriptionbootstrap.NewHandler(c)
+			radarSubRoutes := user.Group("", middleware.RateLimitMiddleware(redisClient, middleware.RateLimitRule{
+				Prefix:        "user_radar_subscription",
+				WindowSeconds: 60,
+				MaxRequests:   30,
+				BlockSeconds:  60,
+				MessageKey:    "error.rate_limited",
+			}, middleware.KeyByUserIDAndIP))
+			radarsubscriptiontransport.RegisterUserRoutes(radarSubRoutes, radarSubHandler)
+		}
 
 		resellerConsole := user.Group("/reseller")
 		resellerConsole.Use(middleware.RequireMainTenantForResellerConsole())

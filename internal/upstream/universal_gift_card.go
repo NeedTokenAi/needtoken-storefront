@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	UniversalGiftCardPreviewPath = "/api/v1/upstream/universal-gift-cards/preview"
 	UniversalGiftCardClaimPath   = "/api/v1/upstream/universal-gift-cards/claim"
 	UniversalGiftCardConfirmPath = "/api/v1/upstream/universal-gift-cards/confirm"
 	UniversalGiftCardReleasePath = "/api/v1/upstream/universal-gift-cards/release"
@@ -24,9 +25,20 @@ var (
 	ErrUniversalGiftCardInvalid     = errors.New("universal gift card invalid")
 	ErrUniversalGiftCardNotFound    = errors.New("universal gift card not found")
 	ErrUniversalGiftCardRedeemed    = errors.New("universal gift card redeemed")
+	ErrUniversalGiftCardInProgress  = errors.New("universal gift card in progress")
 	ErrUniversalGiftCardDisabled    = errors.New("universal gift card disabled")
 	ErrUniversalGiftCardExpired     = errors.New("universal gift card expired")
 )
+
+type UniversalGiftCardPreviewResult struct {
+	OK           bool       `json:"ok"`
+	CardID       string     `json:"card_id"`
+	BatchNo      string     `json:"batch_no"`
+	Name         string     `json:"name"`
+	Code         string     `json:"code"`
+	FaceUSDCents int64      `json:"face_usd_cents"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+}
 
 type UniversalGiftCardClaimInput struct {
 	Code    string `json:"code"`
@@ -57,6 +69,17 @@ type UniversalGiftCardReleaseInput struct {
 	Code    string `json:"code"`
 	ClaimID string `json:"claim_id"`
 	Reason  string `json:"reason,omitempty"`
+}
+
+func (a *DujiaoNextAdapter) PreviewUniversalGiftCard(ctx context.Context, code string) (UniversalGiftCardPreviewResult, error) {
+	var out UniversalGiftCardPreviewResult
+	if err := a.universalGiftCardRequest(ctx, http.MethodPost, UniversalGiftCardPreviewPath, map[string]string{"code": code}, &out); err != nil {
+		return UniversalGiftCardPreviewResult{}, err
+	}
+	if !out.OK || out.FaceUSDCents <= 0 {
+		return UniversalGiftCardPreviewResult{}, ErrUniversalGiftCardUnavailable
+	}
+	return out, nil
 }
 
 func (a *DujiaoNextAdapter) ClaimUniversalGiftCard(ctx context.Context, input UniversalGiftCardClaimInput) (UniversalGiftCardClaimResult, error) {
@@ -140,8 +163,10 @@ func mapUniversalGiftCardError(statusCode int, body []byte) error {
 	switch payload.ErrorCode {
 	case "not_found":
 		return ErrUniversalGiftCardNotFound
-	case "already_redeemed", "card_in_progress":
+	case "already_redeemed":
 		return ErrUniversalGiftCardRedeemed
+	case "card_in_progress":
+		return ErrUniversalGiftCardInProgress
 	case "card_disabled":
 		return ErrUniversalGiftCardDisabled
 	case "card_expired":

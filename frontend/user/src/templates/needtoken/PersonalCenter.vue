@@ -203,29 +203,6 @@
             <!-- 四格一体化资产与网关聚合卡 -->
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <button
-                v-if="showGatewayFeatures"
-                type="button"
-                class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
-                @click="navigateToSection('assets')"
-              >
-                <div class="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                  <span>{{ t('needtoken.memberConsole.overview.apiTotalQuota') }}</span>
-                  <Cpu class="h-4 w-4 text-primary" />
-                </div>
-                <p class="mt-2 font-mono text-2xl font-black text-primary">
-                  {{ gatewayLoading && !apiSummary ? '—' : formatApiQuotaUsd(combinedApiQuota) }}
-                </p>
-                <p class="mt-1.5 text-[11.5px] text-muted-foreground">
-                  {{
-                    t('needtoken.memberConsole.overview.apiQuotaBreakdown', {
-                      balance: formatApiQuotaUsd(apiSummary?.quota ?? 0),
-                      plan: formatApiQuotaUsd(subscriptionRemainingQuota),
-                    })
-                  }}
-                </p>
-              </button>
-
-              <button
                 type="button"
                 class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
                 @click="navigateToSection('assets')"
@@ -234,11 +211,39 @@
                   <span>{{ t('needtoken.memberConsole.overview.storeWallet') }}</span>
                   <Wallet class="h-4 w-4 text-primary" />
                 </div>
-                <p class="mt-2 font-mono text-2xl font-black text-foreground">
+                <p class="mt-2 font-mono text-2xl font-black text-primary">
                   {{ userProfileStore.loadingWallet ? '—' : storeWalletDisplay }}
                 </p>
                 <p class="mt-1.5 text-[11.5px] text-muted-foreground">
-                  {{ t('needtoken.memberConsole.overview.storeWalletHint') }}
+                  {{
+                    showGatewayFeatures && apiSummary
+                      ? t('needtoken.memberConsole.overview.unifiedBalanceApiHint', {
+                        usd: formatApiQuotaUsd(apiSummary.quota ?? 0),
+                      })
+                      : t('needtoken.memberConsole.overview.storeWalletHint')
+                  }}
+                </p>
+              </button>
+
+              <button
+                v-if="showGatewayFeatures"
+                type="button"
+                class="rounded-2xl border bg-card p-5 text-left shadow-sm transition-all hover:border-primary/40 hover:shadow-md"
+                @click="navigateToSection('plans')"
+              >
+                <div class="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span>{{ t('needtoken.memberConsole.overview.apiPlanQuota') }}</span>
+                  <Cpu class="h-4 w-4 text-primary" />
+                </div>
+                <p class="mt-2 font-mono text-2xl font-black text-foreground">
+                  {{ gatewayLoading && !apiSummary ? '—' : formatApiQuotaUsd(subscriptionRemainingQuota) }}
+                </p>
+                <p class="mt-1.5 text-[11.5px] text-muted-foreground">
+                  {{
+                    t('needtoken.memberConsole.overview.apiPlanQuotaHint', {
+                      count: activeSubscriptions.length,
+                    })
+                  }}
                 </p>
               </button>
 
@@ -556,28 +561,29 @@
               </div>
 
               <div class="grid grid-cols-1 gap-3.5 md:grid-cols-3">
-                <div v-if="showGatewayFeatures" class="rounded-xl border border-primary/25 bg-primary/5 p-4">
-                  <p class="text-xs font-medium text-muted-foreground">{{ t('needtoken.memberConsole.overview.apiTotalQuota') }}</p>
+                <div class="rounded-xl border border-primary/25 bg-primary/5 p-4">
+                  <p class="text-xs font-medium text-muted-foreground">{{ t('needtoken.memberConsole.overview.storeWallet') }}</p>
                   <p class="mt-1.5 font-mono text-xl font-black text-primary">
-                    {{ formatApiQuotaUsd(combinedApiQuota) }}
+                    {{ userProfileStore.loadingWallet ? '—' : storeWalletDisplay }}
                   </p>
                   <p class="mt-1 text-[11.5px] text-muted-foreground">
                     {{
-                      t('needtoken.memberConsole.overview.apiQuotaBreakdown', {
-                        balance: formatApiQuotaUsd(apiSummary?.quota ?? 0),
-                        plan: formatApiQuotaUsd(subscriptionRemainingQuota),
-                      })
+                      showGatewayFeatures && apiSummary
+                        ? t('needtoken.memberConsole.assets.unifiedWalletNote', {
+                          usd: formatApiQuotaUsd(apiSummary.quota ?? 0),
+                        })
+                        : t('needtoken.memberConsole.assets.walletUsageNote')
                     }}
                   </p>
                 </div>
 
-                <div class="rounded-xl border bg-muted/20 p-4">
-                  <p class="text-xs font-medium text-muted-foreground">{{ t('needtoken.memberConsole.overview.storeWallet') }}</p>
+                <div v-if="showGatewayFeatures" class="rounded-xl border bg-muted/20 p-4">
+                  <p class="text-xs font-medium text-muted-foreground">{{ t('needtoken.memberConsole.overview.apiPlanQuota') }}</p>
                   <p class="mt-1.5 font-mono text-xl font-black text-foreground">
-                    {{ userProfileStore.loadingWallet ? '—' : storeWalletDisplay }}
+                    {{ gatewayLoading && !apiSummary ? '—' : formatApiQuotaUsd(subscriptionRemainingQuota) }}
                   </p>
                   <p class="mt-1 text-[11.5px] text-muted-foreground">
-                    {{ t('needtoken.memberConsole.assets.walletUsageNote') }}
+                    {{ t('needtoken.memberConsole.assets.planQuotaNote') }}
                   </p>
                 </div>
 
@@ -622,7 +628,7 @@
               </div>
             </div>
 
-            <GiftCardPanel v-if="assetsSubTab === 'giftCard'" />
+            <GiftCardPanel v-if="assetsSubTab === 'giftCard'" @redeemed="handleAssetsChanged" />
             <WalletPanel v-else />
           </template>
 
@@ -701,7 +707,6 @@ import {
   formatSubscriptionExpiry,
 } from './lib/apiAccountLinkPolicy'
 import {
-  computeCombinedApiQuota,
   normalizeNeedtokenMemberSection,
   sumSubscriptionRemainingQuota,
   type NeedtokenMemberSection,
@@ -887,7 +892,20 @@ const overviewBarPercent = (quota: number) => {
 const displayNativeUserId = computed(() => apiStatus.value?.native_user_id || apiSummary.value?.native_user_id || 0)
 const activeSubscriptions = computed(() => apiSummary.value?.active_subscriptions ?? [])
 const subscriptionRemainingQuota = computed(() => sumSubscriptionRemainingQuota(activeSubscriptions.value))
-const combinedApiQuota = computed(() => computeCombinedApiQuota(apiSummary.value?.quota, activeSubscriptions.value))
+
+const handleAssetsChanged = async () => {
+  const tasks: Array<Promise<unknown>> = [userProfileStore.loadWalletAccount()]
+  if (showGatewayFeatures.value && userAuth.isAuthenticated) {
+    tasks.push(loadApiSummary(true))
+  }
+  await Promise.all(tasks)
+}
+
+watch(activeSection, (next) => {
+  if (next === 'assets' || next === 'overview') {
+    void handleAssetsChanged()
+  }
+})
 
 const storeWalletDisplay = computed(() => {
   const bal = userProfileStore.walletBalance || '0.00'

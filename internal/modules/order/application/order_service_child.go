@@ -2,6 +2,7 @@ package application
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/logger"
+	"github.com/dujiao-next/internal/shared/money"
+	"github.com/shopspring/decimal"
 )
 
 // cancelOrderWithChildren 取消父订单并级联子订单
@@ -20,6 +23,7 @@ func (s *OrderService) cancelOrderWithChildren(order *orderdomain.Order, rollbac
 		return ErrOrderNotFound
 	}
 	now := time.Now()
+	var canceledReleasedAmount decimal.Decimal
 	err := s.orderStore.WithinTransaction(func(tx ordercontract.Transaction) error {
 		orderStore := tx.Orders()
 		productRepo := tx.Products()
@@ -98,8 +102,12 @@ func (s *OrderService) cancelOrderWithChildren(order *orderdomain.Order, rollbac
 			}
 		}
 		if s.walletService != nil {
-			if _, err := ReleaseWalletBalance(s.walletService, tx, order, constants.WalletTxnTypeOrderRefund, "订单取消退回余额"); err != nil {
+			released, err := ReleaseWalletBalance(s.walletService, tx, order, constants.WalletTxnTypeOrderRefund, "订单取消退回余额")
+			if err != nil {
 				return err
+			}
+			if released.GreaterThan(decimal.Zero) {
+				canceledReleasedAmount = released
 			}
 		}
 		orderIDs := []uint{order.ID}
@@ -115,6 +123,9 @@ func (s *OrderService) cancelOrderWithChildren(order *orderdomain.Order, rollbac
 	})
 	if err != nil {
 		return err
+	}
+	if canceledReleasedAmount.GreaterThan(decimal.Zero) && s.walletService != nil {
+		s.walletService.SyncCreditToUnified(order.UserID, money.FromDecimal(canceledReleasedAmount), order.Currency, fmt.Sprintf("order:%d:cancel", order.ID), "订单取消退回余额")
 	}
 	order.Status = constants.OrderStatusCanceled
 	order.CanceledAt = &now

@@ -204,8 +204,8 @@
   --ui-price-original: #8e8e93;
 }
 
+/* Keep html overflow visible so body scroll locks propagate to the viewport without breaking position: sticky headers. */
 html {
-  overflow-y: scroll;
   scrollbar-gutter: stable;
 }
 

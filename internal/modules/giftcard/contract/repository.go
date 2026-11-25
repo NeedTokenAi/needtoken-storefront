@@ -84,10 +84,30 @@ type UniversalGiftCardClaim struct {
 	ExpiresAt    *time.Time
 }
 
+// UniversalGiftCardPreview 描述只读预览通用礼品卡返回的面额与有效期。
+type UniversalGiftCardPreview struct {
+	Code         string
+	Name         string
+	BatchNo      string
+	CreditAmount money.Amount
+	Currency     string
+	FaceUSDCents int64
+	ExpiresAt    *time.Time
+}
+
 // UniversalGiftCardRedeemer 提供双端通用礼品卡（一卡两用防超售）的跨系统二阶段核销端口。
 // 所有调用必须在本地数据库事务外执行，避免占用 SQLite 写锁或长事务。
 type UniversalGiftCardRedeemer interface {
+	Preview(code string, siteCurrency string) (*UniversalGiftCardPreview, error)
 	Claim(code string, userID uint, siteCurrency string) (*UniversalGiftCardClaim, error)
 	Confirm(code, claimID, txnRef, creditDisplay string) error
 	Release(code, claimID, reason string) error
+}
+
+// UnifiedGiftCardRedeemer 允许直接把礼品卡/API 兑换码核销入统一的 NeedToken API 余额，
+// 或将本地礼品卡入账金额同步至统一余额。所有调用必须在本地数据库事务外执行。
+type UnifiedGiftCardRedeemer interface {
+	Enabled() bool
+	RedeemCode(userID uint, code, siteCurrency string) (credited money.Amount, balanceAfter money.Amount, source string, err error)
+	SyncLocalCredit(userID uint, amount money.Amount, currency, operationID, remark string) error
 }

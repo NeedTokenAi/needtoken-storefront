@@ -13,14 +13,18 @@ import (
 	"github.com/dujiao-next/internal/app/container"
 	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/constants"
+	giftcardcontract "github.com/dujiao-next/internal/modules/giftcard/contract"
 	"github.com/dujiao-next/internal/modules/order/application/accountlink"
 	accountlinkhttp "github.com/dujiao-next/internal/modules/order/transport/http/accountlink"
 	siteconnectiondomain "github.com/dujiao-next/internal/modules/siteconnection/domain"
+	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
+	"github.com/dujiao-next/internal/shared/money"
 	"github.com/dujiao-next/internal/telegramidentity"
 	"github.com/dujiao-next/internal/upstream"
+	"github.com/shopspring/decimal"
 )
 
-func NewHandler(c *container.Container) *accountlinkhttp.Handler {
+func NewService(c *container.Container) *accountlink.Service {
 	var connID uint
 	if raw := strings.TrimSpace(os.Getenv("STOREFRONT_ACCOUNT_LINK_CONNECTION_ID")); raw != "" {
 		if parsed, err := strconv.ParseUint(raw, 10, strconv.IntSize); err == nil && parsed > 0 {
@@ -28,10 +32,13 @@ func NewHandler(c *container.Container) *accountlinkhttp.Handler {
 		}
 	}
 	reader := memberIdentityReader{c: c}
-	svc := accountlink.New(upstreamBridge{c: c, configuredConnectionID: connID}).
+	return accountlink.New(upstreamBridge{c: c, configuredConnectionID: connID}).
 		WithIdentityReader(reader).
 		WithSessionRevoker(reader)
-	return accountlinkhttp.New(svc)
+}
+
+func NewHandler(c *container.Container) *accountlinkhttp.Handler {
+	return accountlinkhttp.New(NewService(c))
 }
 
 type memberIdentityReader struct {
@@ -336,3 +343,265 @@ func translateUpstreamError(err error) error {
 		return accountlink.ErrUnavailable
 	}
 }
+
+const needTokenQuotaPerUSD int64 = 500000
+
+// UnifiedBalanceAdapter bridges storefront wallet and gift card operations to
+// the authoritative NeedToken API User.Quota ledger via Glue.
+type UnifiedBalanceAdapter struct {
+	c      *container.Container
+	svc    *accountlink.Service
+	bridge upstreamBridge
+}
+
+func NewUnifiedBalanceBridge(c *container.Container) *UnifiedBalanceAdapter {
+	var connID uint
+	if raw := strings.TrimSpace(os.Getenv("STOREFRONT_ACCOUNT_LINK_CONNECTION_ID")); raw != "" {
+		if parsed, err := strconv.ParseUint(raw, 10, strconv.IntSize); err == nil && parsed > 0 {
+			connID = uint(parsed)
+		}
+	}
+	bridge := upstreamBridge{c: c, configuredConnectionID: connID}
+	reader := memberIdentityReader{c: c}
+	svc := accountlink.New(bridge).
+		WithIdentityReader(reader).
+		WithSessionRevoker(reader)
+	return &UnifiedBalanceAdapter{c: c, svc: svc, bridge: bridge}
+}
+
+func (a *UnifiedBalanceAdapter) Enabled() bool {
+	if a == nil || a.c == nil || a.svc == nil {
+		return false
+	}
+	_, enabled, err := a.bridge.resolveAdapter()
+	return err == nil && enabled
+}
+
+func (a *UnifiedBalanceAdapter) SiteCurrency() string {
+	if a == nil || a.c == nil || a.c.SettingService == nil {
+		return constants.SiteCurrencyDefault
+	}
+	currency, err := a.c.SettingService.GetSiteCurrency(constants.SiteCurrencyDefault)
+	if err != nil || strings.TrimSpace(currency) == "" {
+		return constants.SiteCurrencyDefault
+	}
+	return strings.ToUpper(strings.TrimSpace(currency))
+}
+
+// ResolveUSDExchangeRate reads the official USD->CNY rate configured in
+// site_config.needtoken_pricing.usd_cny_rate instead of abusing SiteConnection.ExchangeRate.
+func ResolveUSDExchangeRate(c *container.Container, targetCurrency string) (decimal.Decimal, bool) {
+	curr := strings.ToUpper(strings.TrimSpace(targetCurrency))
+	if curr == "" || curr == "USD" {
+		return decimal.NewFromInt(1), true
+	}
+	if c != nil && c.SettingService != nil {
+		if rawMap, err := c.SettingService.GetByKey(constants.SettingKeySiteConfig); err == nil && rawMap != nil {
+			if pricing, ok := rawMap["needtoken_pricing"].(map[string]interface{}); ok {
+				if rawRate, ok := pricing["usd_cny_rate"]; ok {
+					rateStr := strings.TrimSpace(asString(rawRate))
+					if parsed, parseErr := decimal.NewFromString(rateStr); parseErr == nil && parsed.GreaterThan(decimal.Zero) {
+						return parsed, true
+					}
+				}
+			}
+		}
+	}
+	return decimal.Zero, false
+}
+
+func asString(v interface{}) string {
+	switch val := v.(type) {
+	case string:
+		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(val)
+	case int64:
+		return strconv.FormatInt(val, 10)
+	default:
+		return ""
+	}
+}
+
+func (a *UnifiedBalanceAdapter) quotaToCurrencyAmount(quota int64, currency string) money.Amount {
+	if quota <= 0 {
+		return money.FromDecimal(decimal.Zero)
+	}
+	usd := decimal.NewFromInt(quota).Div(decimal.NewFromInt(needTokenQuotaPerUSD))
+	rate, ok := ResolveUSDExchangeRate(a.c, currency)
+	if !ok {
+		rate = decimal.NewFromInt(1)
+	}
+	return money.FromDecimal(usd.Mul(rate).Round(2))
+}
+
+func (a *UnifiedBalanceAdapter) currencyAmountToQuota(amount money.Amount, currency string) (int64, error) {
+	dec := amount.Decimal.Round(2)
+	if dec.LessThanOrEqual(decimal.Zero) {
+		return 0, nil
+	}
+	rate, ok := ResolveUSDExchangeRate(a.c, currency)
+	if !ok || rate.LessThanOrEqual(decimal.Zero) {
+		if strings.EqualFold(strings.TrimSpace(currency), "USD") {
+			rate = decimal.NewFromInt(1)
+		} else {
+			return 0, errors.New("needtoken_pricing.usd_cny_rate is required for non-USD unified balance conversion")
+		}
+	}
+	usd := dec.Div(rate)
+	quotaDec := usd.Mul(decimal.NewFromInt(needTokenQuotaPerUSD)).Round(0)
+	return quotaDec.IntPart(), nil
+}
+
+func (a *UnifiedBalanceAdapter) FetchBalance(ctx context.Context, userID uint, siteCurrency string) (money.Amount, bool, error) {
+	if !a.Enabled() || userID == 0 {
+		return money.Amount{}, false, nil
+	}
+	summary, err := a.svc.APISummary(ctx, userID)
+	if err != nil {
+		return money.Amount{}, false, err
+	}
+	if !summary.Linked {
+		ensured, ensureErr := a.svc.Ensure(ctx, userID)
+		if ensureErr != nil || !ensured.Linked {
+			return money.Amount{}, false, nil
+		}
+		summary, err = a.svc.APISummary(ctx, userID)
+		if err != nil || !summary.Linked {
+			return money.Amount{}, false, err
+		}
+	}
+	curr := strings.TrimSpace(siteCurrency)
+	if curr == "" {
+		curr = a.SiteCurrency()
+	}
+	return a.quotaToCurrencyAmount(summary.Quota, curr), true, nil
+}
+
+func (a *UnifiedBalanceAdapter) Credit(ctx context.Context, userID uint, amount money.Amount, currency, operationID, remark string) (money.Amount, error) {
+	if !a.Enabled() || userID == 0 {
+		return money.Amount{}, nil
+	}
+	curr := strings.TrimSpace(currency)
+	if curr == "" {
+		curr = a.SiteCurrency()
+	}
+	quota, err := a.currencyAmountToQuota(amount, curr)
+	if err != nil || quota <= 0 {
+		return money.Amount{}, err
+	}
+	body, err := json.Marshal(map[string]any{
+		"operation_id": strings.TrimSpace(operationID),
+		"quota":        quota,
+		"remark":       strings.TrimSpace(remark),
+	})
+	if err != nil {
+		return money.Amount{}, err
+	}
+	raw, err := a.svc.GatewayConsole(ctx, userID, "POST", "/wallet/credit", nil, body)
+	if err != nil {
+		return money.Amount{}, err
+	}
+	var resp struct {
+		BalanceQuota int64 `json:"balance_quota"`
+	}
+	_ = json.Unmarshal(raw, &resp)
+	return a.quotaToCurrencyAmount(resp.BalanceQuota, curr), nil
+}
+
+func (a *UnifiedBalanceAdapter) Debit(ctx context.Context, userID uint, maxAmount money.Amount, currency string, allowPartial bool, operationID, remark string) (money.Amount, money.Amount, error) {
+	if !a.Enabled() || userID == 0 {
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), nil
+	}
+	curr := strings.TrimSpace(currency)
+	if curr == "" {
+		curr = a.SiteCurrency()
+	}
+	maxQuota, err := a.currencyAmountToQuota(maxAmount, curr)
+	if err != nil || maxQuota <= 0 {
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+	}
+	body, err := json.Marshal(map[string]any{
+		"operation_id":  strings.TrimSpace(operationID),
+		"quota":         maxQuota,
+		"allow_partial": allowPartial,
+		"remark":        strings.TrimSpace(remark),
+	})
+	if err != nil {
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+	}
+	raw, err := a.svc.GatewayConsole(ctx, userID, "POST", "/wallet/debit", nil, body)
+	if err != nil {
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+	}
+	var resp struct {
+		AppliedQuota int64 `json:"applied_quota"`
+		BalanceQuota int64 `json:"balance_quota"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+	}
+	debited := a.quotaToCurrencyAmount(resp.AppliedQuota, curr)
+	if debited.Decimal.GreaterThan(maxAmount.Decimal.Round(2)) {
+		debited = money.FromDecimal(maxAmount.Decimal.Round(2))
+	}
+	balanceAfter := a.quotaToCurrencyAmount(resp.BalanceQuota, curr)
+	return debited, balanceAfter, nil
+}
+
+func (a *UnifiedBalanceAdapter) Redeem(ctx context.Context, userID uint, code, siteCurrency string) (*walletcontract.UnifiedBalanceRedeemResult, error) {
+	if !a.Enabled() || userID == 0 {
+		return nil, accountlink.ErrUnavailable
+	}
+	curr := strings.TrimSpace(siteCurrency)
+	if curr == "" {
+		curr = a.SiteCurrency()
+	}
+	body, err := json.Marshal(map[string]string{
+		"code": strings.TrimSpace(code),
+	})
+	if err != nil {
+		return nil, err
+	}
+	raw, err := a.svc.GatewayConsole(ctx, userID, "POST", "/wallet/redeem", nil, body)
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Source        string `json:"source"`
+		CreditedQuota int64  `json:"credited_quota"`
+		BalanceQuota  int64  `json:"balance_quota"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil || resp.CreditedQuota <= 0 {
+		return nil, accountlink.ErrInvalid
+	}
+	return &walletcontract.UnifiedBalanceRedeemResult{
+		Source:       strings.TrimSpace(resp.Source),
+		Credited:     a.quotaToCurrencyAmount(resp.CreditedQuota, curr),
+		BalanceAfter: a.quotaToCurrencyAmount(resp.BalanceQuota, curr),
+		Currency:     curr,
+	}, nil
+}
+
+func (a *UnifiedBalanceAdapter) RedeemCode(userID uint, code, siteCurrency string) (money.Amount, money.Amount, string, error) {
+	res, err := a.Redeem(context.Background(), userID, code, siteCurrency)
+	if err != nil {
+		if errors.Is(err, accountlink.ErrInvalid) {
+			return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrNotFound
+		}
+		return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrFetchFailed
+	}
+	return res.Credited, res.BalanceAfter, res.Source, nil
+}
+
+func (a *UnifiedBalanceAdapter) SyncLocalCredit(userID uint, amount money.Amount, currency, operationID, remark string) error {
+	_, err := a.Credit(context.Background(), userID, amount, currency, operationID, remark)
+	return err
+}
+
+var (
+	_ walletcontract.UnifiedBalanceBridge      = (*UnifiedBalanceAdapter)(nil)
+	_ giftcardcontract.UnifiedGiftCardRedeemer = (*UnifiedBalanceAdapter)(nil)
+)

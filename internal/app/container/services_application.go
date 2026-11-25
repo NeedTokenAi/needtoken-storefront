@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"time"
 
 	"github.com/dujiao-next/internal/logger"
 	"github.com/dujiao-next/internal/modules/content/infrastructure/gormstore"
@@ -16,6 +17,10 @@ import (
 	contentapp "github.com/dujiao-next/internal/modules/content/application"
 	couponapp "github.com/dujiao-next/internal/modules/coupon/application"
 	couponproductadapter "github.com/dujiao-next/internal/modules/coupon/infrastructure/productadapter"
+	diagnosticsapp "github.com/dujiao-next/internal/modules/diagnostics/application"
+	diagnosticscontract "github.com/dujiao-next/internal/modules/diagnostics/contract"
+	"github.com/dujiao-next/internal/modules/diagnostics/infrastructure/codexresets"
+	"github.com/dujiao-next/internal/modules/diagnostics/infrastructure/resetsources"
 	fulfillmentapp "github.com/dujiao-next/internal/modules/fulfillment/application"
 	fulfillmentqueue "github.com/dujiao-next/internal/modules/fulfillment/infrastructure/queueadapter"
 	giftcardapp "github.com/dujiao-next/internal/modules/giftcard/application"
@@ -27,6 +32,7 @@ import (
 	orderriskapp "github.com/dujiao-next/internal/modules/orderrisk/application"
 	orderrisklimiter "github.com/dujiao-next/internal/modules/orderrisk/infrastructure/redislimiter"
 	promotionapp "github.com/dujiao-next/internal/modules/promotion/application"
+	radarsubscriptionapp "github.com/dujiao-next/internal/modules/radarsubscription/application"
 	sitemapapp "github.com/dujiao-next/internal/modules/sitemap/application"
 	sitemapcontract "github.com/dujiao-next/internal/modules/sitemap/contract"
 	sitemapcache "github.com/dujiao-next/internal/modules/sitemap/infrastructure/cacheadapter"
@@ -151,4 +157,18 @@ func (c *Container) initApplicationServices() {
 		gormstore.NewBannerStore(gormdb.DB),
 		contentapp.SystemClock{},
 	)
+	tsalon := resetsources.NewTSalonClient(nil)
+	c.ResetFeed = diagnosticsapp.NewMultiChannelResetFeed(map[string]diagnosticscontract.ResetFeedReader{
+		"codex":  diagnosticsapp.NewResetFeedWithOptions(codexresets.NewClient(nil), "https://codex-resets.com/", 5*time.Minute),
+		"claude": diagnosticsapp.NewResetFeedWithOptions(tsalon.ChannelSource("claude"), resetsources.TSalonSourceURL, 5*time.Minute),
+		"gemini": diagnosticsapp.NewResetFeedWithOptions(resetsources.NewAntigravityClient(nil), resetsources.AntigravitySourceURL, 10*time.Minute),
+		"grok":   diagnosticsapp.NewResetFeedWithOptions(tsalon.ChannelSource("grok"), resetsources.TSalonSourceURL, 5*time.Minute),
+	})
+	c.RadarSubscriptionService = radarsubscriptionapp.NewService(radarsubscriptionapp.Options{
+		Store:         c.RadarSubscriptionRepo,
+		UserStore:     c.UserStore,
+		Feed:          c.ResetFeed,
+		EmailSender:   c.EmailSender,
+		BrandResolver: c.EmailBrandResolver,
+	})
 }

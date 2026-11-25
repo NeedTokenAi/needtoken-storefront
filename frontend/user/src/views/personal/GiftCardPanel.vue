@@ -126,6 +126,10 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
+const emit = defineEmits<{
+  redeemed: []
+}>()
+
 const { t } = useI18n()
 const appStore = useAppStore()
 const userProfileStore = useUserProfileStore()
@@ -259,6 +263,7 @@ const submitRedeem = async () => {
     }
     redeemForm.code = ''
     resetCaptcha()
+    emit('redeemed')
   } catch (err: any) {
     panelAlert.value = {
       level: 'error',

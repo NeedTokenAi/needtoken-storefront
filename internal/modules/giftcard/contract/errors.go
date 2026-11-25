@@ -8,6 +8,7 @@ var (
 	ErrExpired           = errors.New("gift card expired")
 	ErrDisabled          = errors.New("gift card disabled")
 	ErrRedeemed          = errors.New("gift card redeemed")
+	ErrInProgress        = errors.New("gift card redemption in progress")
 	ErrCreateFailed      = errors.New("gift card create failed")
 	ErrFetchFailed       = errors.New("gift card fetch failed")
 	ErrUpdateFailed      = errors.New("gift card update failed")

@@ -43,6 +43,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { walletAPI } from '../../api'
 import { useAppStore } from '../../stores/app'
+import { useUserProfileStore } from '../../stores/userProfile'
 import type { PageAlert } from '../../utils/alerts'
 import { amountToCents, basisPointsToPercent, calculateFeeCents, centsToAmount, rateToBasisPoints } from '../../utils/money'
 import WalletBalanceCard from '../../components/wallet/WalletBalanceCard.vue'
@@ -53,6 +54,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
+const userProfileStore = useUserProfileStore()
 
 const loading = ref(true)
 const recharging = ref(false)
@@ -276,6 +278,12 @@ const balanceDisplay = computed(() => formatMoney(wallet.value?.balance, String(
 const loadWallet = async () => {
   const response = await walletAPI.account()
   wallet.value = response.data.data
+  if (wallet.value) {
+    userProfileStore.syncWalletAccount({
+      balance: String(wallet.value.balance ?? '0'),
+      currency: String(wallet.value.currency || appStore.config?.currency || 'CNY'),
+    })
+  }
 }
 
 const loadTransactions = async (page = 1) => {

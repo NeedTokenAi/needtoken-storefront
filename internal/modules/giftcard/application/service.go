@@ -9,6 +9,7 @@ type Service struct {
 	currency  giftcardcontract.CurrencyProvider
 	redeemer  giftcardcontract.RedeemTransactionRunner
 	universal giftcardcontract.UniversalGiftCardRedeemer
+	unified   giftcardcontract.UnifiedGiftCardRedeemer
 }
 
 // Options 组装管理用例依赖。
@@ -18,6 +19,7 @@ type Options struct {
 	Currency  giftcardcontract.CurrencyProvider
 	Redeemer  giftcardcontract.RedeemTransactionRunner
 	Universal giftcardcontract.UniversalGiftCardRedeemer
+	Unified   giftcardcontract.UnifiedGiftCardRedeemer
 }
 
 func NewService(opts Options) *Service {
@@ -30,6 +32,7 @@ func NewService(opts Options) *Service {
 		currency:  opts.Currency,
 		redeemer:  opts.Redeemer,
 		universal: opts.Universal,
+		unified:   opts.Unified,
 	}
 }
 
@@ -39,4 +42,12 @@ func (s *Service) SetUniversalRedeemer(u giftcardcontract.UniversalGiftCardRedee
 		return
 	}
 	s.universal = u
+}
+
+// SetUnifiedRedeemer 挂载可选的统一余额核销与同步端口（由 bootstrap 装配）。
+func (s *Service) SetUnifiedRedeemer(u giftcardcontract.UnifiedGiftCardRedeemer) {
+	if s == nil {
+		return
+	}
+	s.unified = u
 }

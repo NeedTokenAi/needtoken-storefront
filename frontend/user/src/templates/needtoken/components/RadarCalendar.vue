@@ -132,7 +132,9 @@ const monthLabels = computed(() => {
   const formatter = new Intl.DateTimeFormat(locale.value, { month: 'short', timeZone: 'UTC' })
   let lastShownIdx = -4
   let lastMonth = -1
+  const totalWeeks = weeks.value.length
   return weeks.value.map((week, idx) => {
+    if (idx >= totalWeeks - 2) return ''
     const firstOfMonth = week.find(day => day.date.endsWith('-01'))
     if (!firstOfMonth) return ''
     const dateObj = new Date(`${firstOfMonth.date}T00:00:00Z`)
@@ -206,10 +208,12 @@ async function openTooltip(day: ResetCalendarRichDay, anchorEl: HTMLElement | nu
   if (!tooltipEl.value || !canvasEl.value) return
   const stage = canvasEl.value.getBoundingClientRect()
   const cell = anchorEl.getBoundingClientRect()
-  const tip = tooltipEl.value.getBoundingClientRect()
+  const tipRect = tooltipEl.value.getBoundingClientRect()
+  const tipWidth = tooltipEl.value.offsetWidth || tipRect.width
+  const tipHeight = tooltipEl.value.offsetHeight || tipRect.height
   const centerX = cell.left - stage.left + cell.width / 2
-  const left = Math.max(8, Math.min(centerX - tip.width / 2, stage.width - tip.width - 8))
-  const aboveTop = cell.top - stage.top - tip.height - 10
+  const left = Math.max(8, Math.min(centerX - tipWidth / 2, stage.width - tipWidth - 8))
+  const aboveTop = cell.top - stage.top - tipHeight - 10
   const belowTop = cell.bottom - stage.top + 10
   const top = aboveTop >= -16 ? aboveTop : belowTop
   tooltipStyle.value = {
@@ -294,13 +298,15 @@ onMounted(() => {
 
 .cal-scroll {
   overflow-x: auto;
-  overflow-y: visible;
-  padding-bottom: 6px;
+  overflow-y: hidden;
+  padding-bottom: 4px;
 }
 
 .cal-grid-wrap {
+  box-sizing: border-box;
   min-width: 720px;
   width: 100%;
+  padding: 6px 8px 6px 2px;
 }
 
 .cal-months {

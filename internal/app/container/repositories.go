@@ -28,6 +28,7 @@ import (
 	paymentgormstore "github.com/dujiao-next/internal/modules/payment/infrastructure/gormstore"
 	procurementgormstore "github.com/dujiao-next/internal/modules/procurement/infrastructure/gormstore"
 	promotiongormstore "github.com/dujiao-next/internal/modules/promotion/infrastructure/gormstore"
+	radarsubscriptiongormstore "github.com/dujiao-next/internal/modules/radarsubscription/infrastructure/gormstore"
 	reconciliationgormstore "github.com/dujiao-next/internal/modules/reconciliation/infrastructure/gormstore"
 	resellergormstore "github.com/dujiao-next/internal/modules/reseller/infrastructure/gormstore"
 	settingsstore "github.com/dujiao-next/internal/modules/settings/infrastructure/gormstore"
@@ -85,5 +86,6 @@ func (c *Container) initRepositories() error {
 	c.MemberLevelPriceRepo = memberlevelgormstore.NewPriceStore(db)
 	c.UserProductPriceRepo = memberlevelgormstore.NewUserPriceStore(db)
 	c.MemberLevelUserRepo = memberlevelgormstore.NewUserStore(db)
+	c.RadarSubscriptionRepo = radarsubscriptiongormstore.New(db)
 	return nil
 }

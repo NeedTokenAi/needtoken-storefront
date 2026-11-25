@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -96,6 +97,41 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 		}
 	}
 
+	var (
+		unifiedDebitedAmount money.Amount
+		unifiedDebitOpID     string
+		unifiedDebitUserID   uint
+		unifiedDebitCurrency string
+		releasedAmountInTx   decimal.Decimal
+		releasedUserIDInTx   uint
+		releasedCurrencyInTx string
+	)
+	if input.UseBalance && s.walletSvc != nil && s.walletSvc.HasUnifiedBalance() && s.orderRepo != nil {
+		if preOrder, preErr := s.orderRepo.GetByID(input.OrderID); preErr == nil && preOrder != nil &&
+			preOrder.ParentID == nil && preOrder.UserID > 0 &&
+			preOrder.Status == constants.OrderStatusPendingPayment &&
+			preOrder.WalletPaidAmount.Decimal.LessThanOrEqual(decimal.Zero) &&
+			preOrder.TotalAmount.Decimal.GreaterThan(decimal.Zero) {
+			round := int64(1)
+			if s.walletRepo != nil {
+				if cnt, cntErr := s.walletRepo.CountOrderTransactionsByType(preOrder.ID, constants.WalletTxnTypeOrderPay); cntErr == nil && cnt >= 0 {
+					round = cnt + 1
+				}
+			}
+			opID := fmt.Sprintf("order:%d:pay:%d", preOrder.ID, round)
+			debited, debitErr := s.walletSvc.SyncDebitFromUnified(preOrder.UserID, preOrder.TotalAmount, preOrder.Currency, true, opID, "订单余额支付")
+			if debitErr != nil {
+				return nil, ErrPaymentCreateFailed
+			}
+			if debited.Decimal.GreaterThan(decimal.Zero) {
+				unifiedDebitedAmount = debited
+				unifiedDebitOpID = opID
+				unifiedDebitUserID = preOrder.UserID
+				unifiedDebitCurrency = preOrder.Currency
+			}
+		}
+	}
+
 	err = s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
 		preloaded, err := tx.Orders().GetByIDForUpdateWithChildren(input.OrderID)
 		if err != nil {
@@ -181,8 +217,14 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 					return err
 				}
 			} else if lockedOrder.WalletPaidAmount.Decimal.GreaterThan(decimal.Zero) {
-				if _, err := orderapp.ReleaseWalletBalance(s.walletSvc, tx, &lockedOrder, constants.WalletTxnTypeOrderRefund, "用户改为在线支付，退回余额"); err != nil {
+				released, err := orderapp.ReleaseWalletBalance(s.walletSvc, tx, &lockedOrder, constants.WalletTxnTypeOrderRefund, "用户改为在线支付，退回余额")
+				if err != nil {
 					return err
+				}
+				if released.GreaterThan(decimal.Zero) {
+					releasedAmountInTx = released
+					releasedUserIDInTx = lockedOrder.UserID
+					releasedCurrencyInTx = lockedOrder.Currency
 				}
 			}
 		}
@@ -287,7 +329,13 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 		return nil
 	})
 	if err != nil {
+		if unifiedDebitedAmount.Decimal.GreaterThan(decimal.Zero) && s.walletSvc != nil {
+			s.walletSvc.SyncCreditToUnified(unifiedDebitUserID, unifiedDebitedAmount, unifiedDebitCurrency, unifiedDebitOpID+":rollback", "订单余额支付回滚退回")
+		}
 		return nil, err
+	}
+	if releasedAmountInTx.GreaterThan(decimal.Zero) && s.walletSvc != nil {
+		s.walletSvc.SyncCreditToUnified(releasedUserIDInTx, money.FromDecimal(releasedAmountInTx), releasedCurrencyInTx, fmt.Sprintf("order:%d:switch_online:%d", input.OrderID, time.Now().UnixNano()), "用户改为在线支付，退回余额")
 	}
 
 	if order == nil {
@@ -336,6 +384,7 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 	// takenOver 非空表示网关请求期间订单已被并发支付接管，记录接管后的订单快照。
 	var takenOver *orderdomain.Order
 	if err := s.applyProviderPayment(input, order, channel, payment); err != nil {
+		var providerRollbackReleased decimal.Decimal
 		rollbackErr := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
 			lockedOrder, current, newerID, lockErr := lockPaymentAttempt(tx, order.ID, payment.ID)
 			if lockErr != nil {
@@ -354,9 +403,15 @@ func (s *PaymentService) CreatePayment(input CreatePaymentInput) (*CreatePayment
 			if s.walletSvc == nil || newerID != 0 || lockedOrder.Status != constants.OrderStatusPendingPayment {
 				return nil
 			}
-			_, refundErr := orderapp.ReleaseWalletBalance(s.walletSvc, tx, lockedOrder, constants.WalletTxnTypeOrderRefund, "在线支付创建失败，退回余额")
+			released, refundErr := orderapp.ReleaseWalletBalance(s.walletSvc, tx, lockedOrder, constants.WalletTxnTypeOrderRefund, "在线支付创建失败，退回余额")
+			if refundErr == nil {
+				providerRollbackReleased = released
+			}
 			return refundErr
 		})
+		if rollbackErr == nil && providerRollbackReleased.GreaterThan(decimal.Zero) && s.walletSvc != nil {
+			s.walletSvc.SyncCreditToUnified(order.UserID, money.FromDecimal(providerRollbackReleased), order.Currency, fmt.Sprintf("order:%d:provider_fail:%d", order.ID, payment.ID), "在线支付创建失败，退回余额")
+		}
 		if rollbackErr != nil {
 			log.Errorw("payment_create_provider_failed_with_rollback_error",
 				"payment_id", payment.ID,

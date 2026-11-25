@@ -26,6 +26,7 @@ type CaptchaVerifier interface {
 
 // UserService 是用户侧礼品卡兑换端口。
 type UserService interface {
+	PreviewGiftCard(code string) (*giftcardapp.PreviewResult, error)
 	RedeemGiftCard(input giftcardapp.RedeemInput) (*giftcarddomain.GiftCard, *walletdomain.Account, *walletdomain.Transaction, error)
 }
 
@@ -45,6 +46,28 @@ func NewUserHandler(cards UserService, captcha CaptchaVerifier) *UserHandler {
 type redeemRequest struct {
 	Code           string                            `json:"code" binding:"required"`
 	CaptchaPayload captchahttp.CaptchaPayloadRequest `json:"captcha_payload"`
+}
+
+type previewRequest struct {
+	Code string `json:"code" binding:"required"`
+}
+
+// Preview 只读预览礼品卡面额，不消费卡密。
+func (h *UserHandler) Preview(c *gin.Context) {
+	if _, ok := ginutil.GetUserID(c); !ok {
+		return
+	}
+	var req previewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ginutil.RespondBindError(c, err)
+		return
+	}
+	res, err := h.cards.PreviewGiftCard(strings.TrimSpace(req.Code))
+	if err != nil {
+		respondUserGiftCardError(c, err)
+		return
+	}
+	response.Success(c, res)
 }
 
 // Redeem 用户兑换礼品卡。
@@ -98,6 +121,8 @@ func respondUserGiftCardError(c *gin.Context, err error) {
 		ginutil.RespondError(c, response.CodeBadRequest, "error.gift_card_expired", nil)
 	case errors.Is(err, giftcardcontract.ErrDisabled):
 		ginutil.RespondError(c, response.CodeBadRequest, "error.gift_card_disabled", nil)
+	case errors.Is(err, giftcardcontract.ErrInProgress):
+		ginutil.RespondError(c, response.CodeBadRequest, "error.gift_card_in_progress", nil)
 	case errors.Is(err, giftcardcontract.ErrRedeemed):
 		ginutil.RespondError(c, response.CodeBadRequest, "error.gift_card_redeemed", nil)
 	default:

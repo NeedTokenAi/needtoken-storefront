@@ -9,9 +9,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dujiao-next/internal/app/container"
+	accountlinkwiring "github.com/dujiao-next/internal/bootstrap/accountlink"
 	"github.com/dujiao-next/internal/constants"
+	"github.com/dujiao-next/internal/logger"
 	giftcardcontract "github.com/dujiao-next/internal/modules/giftcard/contract"
 	siteconnectiondomain "github.com/dujiao-next/internal/modules/siteconnection/domain"
 	"github.com/dujiao-next/internal/shared/money"
@@ -82,6 +85,50 @@ func newUniversalClaimID() string {
 	return "sf_" + hex.EncodeToString(buf[:])
 }
 
+func (r *universalGlueRedeemer) convertUSDToSiteCurrency(usdAmount decimal.Decimal, targetCurrency string, conn *siteconnectiondomain.Connection) decimal.Decimal {
+	curr := strings.ToUpper(strings.TrimSpace(targetCurrency))
+	if curr == "" || curr == "USD" {
+		return usdAmount.Round(2)
+	}
+	if rate, ok := accountlinkwiring.ResolveUSDExchangeRate(r.c, curr); ok && rate.GreaterThan(decimal.Zero) {
+		return usdAmount.Mul(rate).Round(2)
+	}
+	if conn != nil && conn.ExchangeRate.GreaterThan(decimal.NewFromInt(1)) {
+		return usdAmount.Mul(conn.ExchangeRate).Round(2)
+	}
+	return usdAmount.Round(2)
+}
+
+func (r *universalGlueRedeemer) Preview(code string, siteCurrency string) (*giftcardcontract.UniversalGiftCardPreview, error) {
+	adapter, conn, err := r.resolveAdapter()
+	if err != nil {
+		return nil, err
+	}
+	res, err := adapter.PreviewUniversalGiftCard(context.Background(), code)
+	if err != nil {
+		return nil, mapUniversalError(err)
+	}
+	usdAmount := decimal.New(res.FaceUSDCents, -2)
+	targetCurrency := strings.TrimSpace(strings.ToUpper(siteCurrency))
+	if targetCurrency == "" {
+		targetCurrency = constants.SiteCurrencyDefault
+	}
+	creditDec := r.convertUSDToSiteCurrency(usdAmount, targetCurrency, conn)
+	name := strings.TrimSpace(res.Name)
+	if name == "" {
+		name = "NeedToken 通用礼品卡"
+	}
+	return &giftcardcontract.UniversalGiftCardPreview{
+		Code:         res.Code,
+		Name:         name,
+		BatchNo:      res.BatchNo,
+		CreditAmount: money.FromDecimal(creditDec),
+		Currency:     targetCurrency,
+		FaceUSDCents: res.FaceUSDCents,
+		ExpiresAt:    res.ExpiresAt,
+	}, nil
+}
+
 func (r *universalGlueRedeemer) Claim(code string, userID uint, siteCurrency string) (*giftcardcontract.UniversalGiftCardClaim, error) {
 	adapter, conn, err := r.resolveAdapter()
 	if err != nil {
@@ -103,12 +150,7 @@ func (r *universalGlueRedeemer) Claim(code string, userID uint, siteCurrency str
 	if targetCurrency == "" {
 		targetCurrency = constants.SiteCurrencyDefault
 	}
-	creditDec := usdAmount
-	if targetCurrency != "USD" && conn != nil && conn.ExchangeRate.GreaterThan(decimal.Zero) {
-		creditDec = usdAmount.Mul(conn.ExchangeRate).Round(2)
-	} else {
-		creditDec = usdAmount.Round(2)
-	}
+	creditDec := r.convertUSDToSiteCurrency(usdAmount, targetCurrency, conn)
 
 	name := strings.TrimSpace(res.Name)
 	if name == "" {
@@ -131,12 +173,26 @@ func (r *universalGlueRedeemer) Confirm(code, claimID, txnRef, creditDisplay str
 	if err != nil {
 		return err
 	}
-	return adapter.ConfirmUniversalGiftCard(context.Background(), upstream.UniversalGiftCardConfirmInput{
-		Code:          code,
-		ClaimID:       claimID,
-		TxnRef:        txnRef,
-		CreditDisplay: creditDisplay,
-	})
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if callErr := adapter.ConfirmUniversalGiftCard(context.Background(), upstream.UniversalGiftCardConfirmInput{
+			Code:          code,
+			ClaimID:       claimID,
+			TxnRef:        txnRef,
+			CreditDisplay: creditDisplay,
+		}); callErr == nil {
+			return nil
+		} else {
+			lastErr = callErr
+			if attempt < 2 {
+				time.Sleep(time.Duration(attempt+1) * 150 * time.Millisecond)
+			}
+		}
+	}
+	if lastErr != nil {
+		logger.Warnw("universal_gift_card_confirm_failed", "code", code, "claim_id", claimID, "txn_ref", txnRef, "error", lastErr)
+	}
+	return lastErr
 }
 
 func (r *universalGlueRedeemer) Release(code, claimID, reason string) error {
@@ -157,6 +213,8 @@ func mapUniversalError(err error) error {
 		return giftcardcontract.ErrNotFound
 	case errors.Is(err, upstream.ErrUniversalGiftCardRedeemed):
 		return giftcardcontract.ErrRedeemed
+	case errors.Is(err, upstream.ErrUniversalGiftCardInProgress):
+		return giftcardcontract.ErrInProgress
 	case errors.Is(err, upstream.ErrUniversalGiftCardDisabled):
 		return giftcardcontract.ErrDisabled
 	case errors.Is(err, upstream.ErrUniversalGiftCardExpired):

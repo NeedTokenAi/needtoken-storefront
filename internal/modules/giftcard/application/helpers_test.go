@@ -81,6 +81,24 @@ func (u *stubUniversalRedeemer) Confirm(code, claimID, txnRef, creditDisplay str
 	u.confirmTxnRef = txnRef
 	return nil
 }
+func (u *stubUniversalRedeemer) Preview(code string, siteCurrency string) (*giftcardcontract.UniversalGiftCardPreview, error) {
+	if u.claimErr != nil {
+		return nil, u.claimErr
+	}
+	if u.claimOut == nil {
+		return nil, giftcardcontract.ErrNotFound
+	}
+	return &giftcardcontract.UniversalGiftCardPreview{
+		Code:         u.claimOut.Code,
+		Name:         u.claimOut.Name,
+		BatchNo:      u.claimOut.BatchNo,
+		CreditAmount: u.claimOut.CreditAmount,
+		Currency:     u.claimOut.Currency,
+		FaceUSDCents: u.claimOut.FaceUSDCents,
+		ExpiresAt:    u.claimOut.ExpiresAt,
+	}, nil
+}
+
 func (u *stubUniversalRedeemer) Release(code, claimID, reason string) error {
 	u.released = true
 	u.releaseReason = reason

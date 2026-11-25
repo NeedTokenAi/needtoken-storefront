@@ -26,8 +26,12 @@ is_high_risk_path() {
       return 0
       ;;
     # NeedToken 二开保护区
-    internal/constants/constants.go | internal/app/container/bootstrap.go | internal/app/container/bootstrap_test.go | \
-      internal/modules/diagnostics/* | internal/modules/opsbridge/* | internal/modules/apipublic/* | \
+    internal/constants/constants.go | internal/app/bootstrap.go | internal/app/radar_notify_service.go | \
+      internal/app/container/bootstrap.go | internal/app/container/bootstrap_test.go | \
+      internal/app/container/container.go | internal/app/container/repositories.go | internal/app/container/services_application.go | \
+      internal/modules/diagnostics/* | internal/modules/radarsubscription/* | \
+      internal/modules/notification/infrastructure/smtp/radar_reset_template.go | \
+      internal/modules/opsbridge/* | internal/modules/apipublic/* | \
       internal/modules/identity/userauth/application/service.go | \
       internal/modules/identity/userauth/transport/http/user_login_handler.go | \
       internal/modules/identity/userauth/transport/http/user_2fa_handler.go | \
@@ -42,6 +46,9 @@ is_high_risk_path() {
       frontend/user/public/dj.svg | frontend/user/src/main.ts | \
       frontend/user/src/stores/app.ts | frontend/user/src/utils/storefrontStartup.ts | \
       frontend/user/src/router/index.ts | frontend/user/src/api/order.ts | frontend/user/src/api/auth.ts | \
+      frontend/user/src/api/radar.ts | frontend/user/src/api/wallet.ts | frontend/user/src/api/types.ts | frontend/user/src/api/index.ts | \
+      frontend/user/src/style.css | frontend/user/src/components/ui/select/SelectContent.vue | \
+      frontend/user/src/composables/useCheckout.ts | \
       frontend/user/src/stores/userAuth.ts | frontend/user/src/stores/userProfile.ts | \
       frontend/user/src/composables/usePersonalCenter.ts | \
       frontend/user/src/composables/useForgot.ts | frontend/user/src/composables/useNotFound.ts | \
@@ -53,6 +60,7 @@ is_high_risk_path() {
       frontend/user/src/utils/subscriptionAuthorization.ts | \
       frontend/user/src/views/OrderDetail.vue | frontend/user/src/views/GuestOrderDetail.vue | \
       frontend/user/src/views/PersonalCenter.vue | frontend/user/src/views/personal/GiftCardPanel.vue | \
+      frontend/user/src/views/personal/WalletPanel.vue | \
       frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts | \
       frontend/user/src/utils/chunkRecovery.ts | frontend/admin/src/utils/chunkRecovery.ts | \
       frontend/user/src/components/captcha/TurnstileCaptcha.vue | \
