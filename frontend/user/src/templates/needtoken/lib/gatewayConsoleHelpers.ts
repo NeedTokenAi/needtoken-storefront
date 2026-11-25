@@ -114,3 +114,16 @@ export function computeCombinedApiQuota(
   const base = typeof walletQuota === 'number' && Number.isFinite(walletQuota) ? Math.max(0, walletQuota) : 0
   return base + sumSubscriptionRemainingQuota(subs)
 }
+
+export function isNeedtokenMemberConsolePath(rawPath?: string | null): boolean {
+  const clean = String(rawPath || '').trim()
+  return clean === '/me' || clean.startsWith('/me/')
+}
+
+export function resolveNeedtokenRouteTransitionKey(rawPath?: string | null): string {
+  const clean = String(rawPath || '').trim()
+  if (isNeedtokenMemberConsolePath(clean)) {
+    return '/me'
+  }
+  return clean
+}

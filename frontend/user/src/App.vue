@@ -25,7 +25,7 @@
               <NeedtokenSkeleton :kind="route.path === '/' ? 'prices' : 'page'" :count="route.path === '/' ? 4 : 3" />
             </div>
             <Transition name="nt-page" mode="out-in">
-              <component :is="Component" v-if="Component" :key="route.path" />
+              <component :is="Component" v-if="Component" :key="needtokenRouteKey" />
             </Transition>
           </RouterView>
         </ErrorBoundary>
@@ -74,6 +74,7 @@ import { useI18n } from 'vue-i18n'
 import { ConfigProvider } from 'reka-ui'
 import { useAppStore } from './stores/app'
 import { getActiveTemplate, rememberTemplate } from './templates/registry'
+import { isNeedtokenMemberConsolePath, resolveNeedtokenRouteTransitionKey } from './templates/needtoken/lib/gatewayConsoleHelpers'
 import { shouldBrandNeedtokenStartup, storefrontStartupPhase } from './utils/storefrontStartup'
 import { isChunkLoadError, lazyImportWithRetry, recoverFromChunkError } from './utils/chunkRecovery'
 import NeedtokenStartup from './templates/needtoken/components/NeedtokenStartup.vue'
@@ -117,6 +118,7 @@ const isResellerConsole = computed(() => route.meta.resellerConsole === true)
 // getActiveTemplate 读取 appStore.config（响应式），config 加载后会重新计算
 const activeTemplate = computed(() => getActiveTemplate())
 const isNeedtoken = computed(() => activeTemplate.value === 'needtoken')
+const needtokenRouteKey = computed(() => resolveNeedtokenRouteTransitionKey(route.path))
 
 const initialRouteReady = ref(false)
 const initialRouteFailed = ref(false)
@@ -140,7 +142,11 @@ watch(() => appStore.config, config => {
   } catch { /* Only a non-sensitive brand hint is stored. */ }
 }, { immediate: true })
 void router.isReady().then(() => { initialRouteReady.value = true }).catch(() => { initialRouteFailed.value = true })
-const removeBeforeGuard = router.beforeEach(() => { navigationPending.value = true; routeLoadFailed.value = false })
+const removeBeforeGuard = router.beforeEach((to, from) => {
+  const sameMemberConsole = isNeedtokenMemberConsolePath(from.path) && isNeedtokenMemberConsolePath(to.path)
+  navigationPending.value = !sameMemberConsole
+  routeLoadFailed.value = false
+})
 const removeAfterGuard = router.afterEach(() => { navigationPending.value = false })
 const removeErrorHandler = router.onError((error, destination) => {
   navigationPending.value = false

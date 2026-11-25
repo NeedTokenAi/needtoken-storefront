@@ -62,6 +62,7 @@ high_risk_cases=(
   "frontend/user/src/views/PersonalCenter.vue"
   "frontend/user/src/views/personal/GiftCardPanel.vue"
   "frontend/user/index.html"
+  "frontend/user/src/App.vue"
   "frontend/user/public/dj.svg"
   "frontend/user/src/main.ts"
   "frontend/user/src/stores/app.ts"
@@ -108,7 +109,7 @@ for path in "${low_risk_cases[@]}"; do
   fi
 done
 
-filtered=$(printf '%s\n' "README.md" "internal/modules/payment/a.go" "frontend/user/src/App.vue" ".github/workflows/ci.yml" | filter_high_risk_paths)
+filtered=$(printf '%s\n' "README.md" "internal/modules/payment/a.go" "frontend/user/src/views/Home.vue" ".github/workflows/ci.yml" | filter_high_risk_paths)
 expected=$(printf '%s\n' "internal/modules/payment/a.go" ".github/workflows/ci.yml")
 [[ $filtered == "$expected" ]] || fail "unexpected filter output: $filtered"
 

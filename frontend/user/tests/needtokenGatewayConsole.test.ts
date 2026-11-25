@@ -2,9 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   computeCombinedApiQuota,
+  isNeedtokenMemberConsolePath,
   mapLegacyResellerPath,
   normalizeNeedtokenMemberSection,
   rawQuotaToUsdNumber,
+  resolveNeedtokenRouteTransitionKey,
   resolveResellerViewFromPath,
   sumSubscriptionRemainingQuota,
   usdToRawQuota,
@@ -79,4 +81,22 @@ test('quota helpers convert USD safely and combine wallet quota with active subs
   ]
   assert.equal(sumSubscriptionRemainingQuota(subs), 7_500_000)
   assert.equal(computeCombinedApiQuota(1_500_000, subs), 9_000_000)
+})
+
+test('member console paths share one stable shell transition key', () => {
+  assert.equal(isNeedtokenMemberConsolePath('/me'), true)
+  assert.equal(isNeedtokenMemberConsolePath('/me/keys'), true)
+  assert.equal(isNeedtokenMemberConsolePath('/me/reseller/orders/ORD-1'), true)
+  assert.equal(isNeedtokenMemberConsolePath('/'), false)
+  assert.equal(isNeedtokenMemberConsolePath('/media'), false)
+  assert.equal(isNeedtokenMemberConsolePath('/products/chatgpt'), false)
+  assert.equal(isNeedtokenMemberConsolePath('/reseller'), false)
+
+  assert.equal(resolveNeedtokenRouteTransitionKey('/me'), '/me')
+  assert.equal(resolveNeedtokenRouteTransitionKey('/me/keys'), '/me')
+  assert.equal(resolveNeedtokenRouteTransitionKey('/me/orders'), '/me')
+  assert.equal(resolveNeedtokenRouteTransitionKey('/me/reseller/products'), '/me')
+  assert.equal(resolveNeedtokenRouteTransitionKey('/products/a'), '/products/a')
+  assert.equal(resolveNeedtokenRouteTransitionKey('/products/b'), '/products/b')
+  assert.equal(resolveNeedtokenRouteTransitionKey('/media'), '/media')
 })
