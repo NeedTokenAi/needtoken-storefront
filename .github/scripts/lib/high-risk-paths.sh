@@ -26,7 +26,7 @@ is_high_risk_path() {
       return 0
       ;;
     # NeedToken 二开保护区
-    internal/constants/constants.go | internal/app/bootstrap.go | internal/app/radar_notify_service.go | \
+    internal/constants/constants.go | internal/app/bootstrap.go | internal/app/paid_fulfillment_service.go | internal/app/radar_notify_service.go | \
       internal/app/container/bootstrap.go | internal/app/container/bootstrap_test.go | \
       internal/app/container/container.go | internal/app/container/repositories.go | internal/app/container/services_application.go | \
       internal/modules/diagnostics/* | internal/modules/radarsubscription/* | \

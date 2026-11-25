@@ -2,6 +2,7 @@
 interface TurnstileRenderOptions {
   sitekey: string
   theme?: 'auto' | 'light' | 'dark'
+  size?: 'normal' | 'compact' | 'flexible'
   callback?: (token: string) => void
   'expired-callback'?: () => void
   'error-callback'?: () => void
@@ -174,10 +175,12 @@ const renderWidget = async () => {
   }
 
   containerRef.value.innerHTML = ''
+  const theme: 'light' | 'dark' = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   try {
     widgetID.value = window.turnstile.render(containerRef.value, {
       sitekey: props.siteKey,
-      theme: 'auto',
+      theme,
+      size: 'flexible',
       callback: (token: string) => {
         clearSlowTimer()
         showSlowSwitch.value = false
@@ -278,7 +281,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="w-full space-y-2">
     <template v-if="mode === 'fallback'">
       <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{{ t('auth.common.turnstileFallbackNotice') }}</span>
@@ -301,7 +304,7 @@ defineExpose({
       <div v-if="mode === 'loading'" class="text-xs text-muted-foreground">
         {{ t('auth.common.turnstileLoading') }}
       </div>
-      <div ref="containerRef" class="min-h-[65px]"></div>
+      <div ref="containerRef" class="turnstile-widget-host w-full min-h-[65px]"></div>
       <div v-if="showSlowSwitch" class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{{ t('auth.common.turnstileSlowHint') }}</span>
         <button
@@ -316,3 +319,12 @@ defineExpose({
     </template>
   </div>
 </template>
+
+<style scoped>
+.turnstile-widget-host :deep(> div),
+.turnstile-widget-host :deep(iframe) {
+  width: 100% !important;
+  max-width: 100%;
+  display: block;
+}
+</style>

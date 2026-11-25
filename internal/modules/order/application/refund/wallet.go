@@ -51,6 +51,7 @@ func (s *Service) AdminRefundToWallet(
 	var (
 		transactionResult  *walletdomain.Transaction
 		refundRecordResult *orderdomain.OrderRefundRecord
+		unifiedCreditOp    *walletdomain.UnifiedOp
 	)
 
 	config := settingsapp.DefaultOrderRefundConfig()
@@ -175,12 +176,31 @@ func (s *Service) AdminRefundToWallet(
 		if err := orderRepository.ApplyOrderRefund(order.UserID, amount); err != nil {
 			return err
 		}
+		if s.wallets != nil && s.wallets.HasUnifiedBalance() {
+			oid := order.ID
+			op, opErr := s.wallets.EnqueueUnifiedCreditInTx(
+				tx.Wallets(),
+				order.UserID,
+				&oid,
+				money.FromDecimal(amount),
+				currency,
+				fmt.Sprintf("order:%d:refund:%d", order.ID, record.ID),
+				walletRemark,
+			)
+			if opErr != nil {
+				return opErr
+			}
+			unifiedCreditOp = op
+		}
 		transactionResult = transaction
 		refundRecordResult = record
 		return nil
 	})
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if unifiedCreditOp != nil && s.wallets != nil {
+		s.wallets.FlushUnifiedCreditOp(unifiedCreditOp)
 	}
 
 	order, err := s.orderStore.GetByID(input.OrderID)

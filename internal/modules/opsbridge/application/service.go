@@ -51,6 +51,7 @@ type Service struct {
 	orderEnricher   opscontract.OrderEnricher
 	orderActions    opscontract.OrderActionStore
 	users           opscontract.UserStore
+	ugcClaims       opscontract.UniversalGiftCardClaimStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -140,6 +141,22 @@ func (s *Service) WithSKUDeleteUoW(uow opscontract.SKUDeleteUnitOfWork) *Service
 func (s *Service) WithUserSessionRevoker(revoker opscontract.UserSessionRevoker) *Service {
 	s.sessionRevoker = revoker
 	return s
+}
+
+func (s *Service) WithUniversalGiftCardClaims(store opscontract.UniversalGiftCardClaimStore) *Service {
+	s.ugcClaims = store
+	return s
+}
+
+func (s *Service) LookupUniversalGiftCardClaim(claimID string) (*opscontract.UniversalGiftCardClaimStatus, error) {
+	if s.ugcClaims == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	claimID = strings.TrimSpace(claimID)
+	if claimID == "" || len(claimID) > 128 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	return s.ugcClaims.LookupUniversalGiftCardClaim(claimID)
 }
 
 func (s *Service) Orders(page, pageSize int) (*opscontract.OrdersResult, error) {

@@ -276,12 +276,16 @@ func (s *Service) redeemUniversalGiftCard(userID uint, code string) (*giftcarddo
 		resultTxn *walletdomain.Transaction
 	)
 	txErr := s.redeemer.WithinRedeemTransaction(func(tx giftcardcontract.RedeemTransaction) error {
+		ref := "universal_gift_card:" + strings.TrimSpace(claim.ClaimID)
+		if strings.TrimSpace(claim.ClaimID) == "" {
+			ref = "universal_gift_card:" + claim.Code
+		}
 		account, txn, creditErr := tx.CreditWallet(giftcardcontract.WalletCreditInput{
 			UserID:    userID,
 			Amount:    claim.CreditAmount,
 			Currency:  creditCurrency,
 			TxnType:   constants.WalletTxnTypeGiftCard,
-			Reference: "universal_gift_card:" + claim.Code,
+			Reference: ref,
 			Remark:    remark,
 		})
 		if creditErr != nil {
@@ -301,7 +305,25 @@ func (s *Service) redeemUniversalGiftCard(userID uint, code string) (*giftcarddo
 		txnRef = fmt.Sprintf("storefront:wallet_txn:%d", resultTxn.ID)
 	}
 	creditDisplay := fmt.Sprintf("%s %s", claim.CreditAmount.StringFixed(2), creditCurrency)
-	_ = s.universal.Confirm(claim.Code, claim.ClaimID, txnRef, creditDisplay)
+	var confirmErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		confirmErr = s.universal.Confirm(claim.Code, claim.ClaimID, txnRef, creditDisplay)
+		if confirmErr == nil {
+			break
+		}
+		if attempt < 2 {
+			time.Sleep(time.Duration(attempt+1) * 150 * time.Millisecond)
+		}
+	}
+	if confirmErr != nil {
+		logger.Errorw("universal_gift_card_confirm_failed",
+			"code", claim.Code,
+			"claim_id", claim.ClaimID,
+			"user_id", userID,
+			"txn_ref", txnRef,
+			"error", confirmErr,
+		)
+	}
 
 	now := time.Now()
 	var txnIDPtr *uint

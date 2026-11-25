@@ -72,6 +72,9 @@ type OrderBalanceInput struct {
 	WalletPaidAmount money.Amount
 	Currency         string
 	UseBalance       bool
+	// ExactDebitAmount 若非空，表示已由外部权威统一余额系统（NewAPI）实扣的精确金额，
+	// 本地订单事务必须严格按此金额落账，不受并发读取本地镜像余额干扰。
+	ExactDebitAmount *money.Amount
 }
 
 type OrderReleaseInput struct {

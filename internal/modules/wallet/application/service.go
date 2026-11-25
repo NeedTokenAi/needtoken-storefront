@@ -93,10 +93,26 @@ func (s *Service) SyncLocalBalanceFromUnified(userID uint) (*walletdomain.Accoun
 }
 
 // SyncCreditToUnified idempotently credits the authoritative NeedToken API User.Quota
-// outside any local DB transaction.
+// outside any local DB transaction. When a unit of work is wired, the credit is
+// first persisted to wallet_unified_ops so transient failures are retried automatically.
 func (s *Service) SyncCreditToUnified(userID uint, amount money.Amount, currency, operationID, remark string) {
 	if !s.HasUnifiedBalance() || userID == 0 || amount.Decimal.Round(2).LessThanOrEqual(decimal.Zero) {
 		return
+	}
+	if s.transactions != nil && strings.TrimSpace(operationID) != "" {
+		var op *walletdomain.UnifiedOp
+		_ = s.transactions.WithinTransaction(func(tx walletcontract.Transaction) error {
+			created, err := s.EnqueueUnifiedCreditInTx(tx, userID, nil, amount, currency, operationID, remark)
+			if err != nil {
+				return err
+			}
+			op = created
+			return nil
+		})
+		if op != nil {
+			s.FlushUnifiedCreditOp(op)
+			return
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
@@ -117,7 +133,7 @@ func (s *Service) SyncDebitFromUnified(userID uint, maxAmount money.Amount, curr
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
-	debited, balanceAfter, err := s.unified.Debit(ctx, userID, maxAmount, currency, allowPartial, operationID, remark)
+	debited, balanceAfter, _, err := s.unified.Debit(ctx, userID, maxAmount, currency, allowPartial, operationID, remark)
 	if err != nil {
 		return money.FromDecimal(decimal.Zero), err
 	}

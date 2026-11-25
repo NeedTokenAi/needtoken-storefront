@@ -76,6 +76,9 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 	if c.GiftCardRepo != nil {
 		svc.WithGiftCards(c.GiftCardRepo)
 	}
+	if c.WalletRepo != nil {
+		svc.WithUniversalGiftCardClaims(&universalGiftCardClaimAdapter{wallets: c.WalletRepo})
+	}
 	if c.PaymentChannelStore != nil || c.SettingService != nil {
 		var defaultEmail config.EmailConfig
 		if c.Config != nil {
@@ -1150,4 +1153,45 @@ func (a *userSessionRevokerAdapter) RevokeUserSessions(userID uint) (bool, error
 	}
 	_ = cache.SetUserAuthState(context.Background(), cache.BuildUserAuthState(user))
 	return true, nil
+}
+
+type universalGiftCardClaimAdapter struct {
+	wallets walletcontract.Repository
+}
+
+func (a *universalGiftCardClaimAdapter) LookupUniversalGiftCardClaim(claimID string) (*opscontract.UniversalGiftCardClaimStatus, error) {
+	if a == nil || a.wallets == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	claimID = strings.TrimSpace(claimID)
+	if claimID == "" {
+		return nil, opscontract.ErrInvalidInput
+	}
+	now := time.Now().UTC()
+	txn, err := a.wallets.GetTransactionByReference("universal_gift_card:" + claimID)
+	if err != nil {
+		return nil, err
+	}
+	if txn == nil {
+		return &opscontract.UniversalGiftCardClaimStatus{
+			Source:      "storefront",
+			CollectedAt: now,
+			ClaimID:     claimID,
+			Found:       false,
+		}, nil
+	}
+	createdAt := txn.CreatedAt.UTC()
+	return &opscontract.UniversalGiftCardClaimStatus{
+		Source:        "storefront",
+		CollectedAt:   now,
+		ClaimID:       claimID,
+		Found:         true,
+		UserID:        txn.UserID,
+		TransactionID: txn.ID,
+		Amount:        txn.Amount.Decimal.StringFixed(2),
+		Currency:      strings.TrimSpace(txn.Currency),
+		TxnRef:        fmt.Sprintf("storefront:wallet_txn:%d", txn.ID),
+		CreditDisplay: fmt.Sprintf("%s %s", txn.Amount.Decimal.StringFixed(2), strings.TrimSpace(txn.Currency)),
+		CreatedAt:     &createdAt,
+	}, nil
 }

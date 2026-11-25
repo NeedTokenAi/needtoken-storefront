@@ -37,6 +37,12 @@ type Repository interface {
 	GetRechargeOrdersByPaymentIDs(paymentIDs []uint) ([]walletdomain.RechargeOrder, error)
 	ListRechargeOrdersAdmin(filter RechargeListFilter) ([]walletdomain.RechargeOrder, int64, error)
 	StatsRechargeOrders(filter RechargeListFilter) (map[string]int64, error)
+
+	CreateUnifiedOp(op *walletdomain.UnifiedOp) error
+	GetUnifiedOpByOpID(opID string) (*walletdomain.UnifiedOp, error)
+	GetActiveOrderDebitUnifiedOpForUpdate(orderID uint) (*walletdomain.UnifiedOp, error)
+	UpdateUnifiedOp(op *walletdomain.UnifiedOp) error
+	ListPendingUnifiedOps(now time.Time, orphanBefore time.Time, limit int) ([]walletdomain.UnifiedOp, error)
 }
 
 // Transaction is the wallet-owned view of an already-open database
@@ -93,6 +99,6 @@ type UnifiedBalanceBridge interface {
 	SiteCurrency() string
 	FetchBalance(ctx context.Context, userID uint, siteCurrency string) (money.Amount, bool, error)
 	Credit(ctx context.Context, userID uint, amount money.Amount, currency, operationID, remark string) (money.Amount, error)
-	Debit(ctx context.Context, userID uint, maxAmount money.Amount, currency string, allowPartial bool, operationID, remark string) (debited money.Amount, balanceAfter money.Amount, err error)
+	Debit(ctx context.Context, userID uint, maxAmount money.Amount, currency string, allowPartial bool, operationID, remark string) (debited money.Amount, balanceAfter money.Amount, replayed bool, err error)
 	Redeem(ctx context.Context, userID uint, code, siteCurrency string) (*UnifiedBalanceRedeemResult, error)
 }

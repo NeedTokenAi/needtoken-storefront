@@ -511,9 +511,9 @@ func (a *UnifiedBalanceAdapter) Credit(ctx context.Context, userID uint, amount 
 	return a.quotaToCurrencyAmount(resp.BalanceQuota, curr), nil
 }
 
-func (a *UnifiedBalanceAdapter) Debit(ctx context.Context, userID uint, maxAmount money.Amount, currency string, allowPartial bool, operationID, remark string) (money.Amount, money.Amount, error) {
+func (a *UnifiedBalanceAdapter) Debit(ctx context.Context, userID uint, maxAmount money.Amount, currency string, allowPartial bool, operationID, remark string) (money.Amount, money.Amount, bool, error) {
 	if !a.Enabled() || userID == 0 {
-		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), nil
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), false, nil
 	}
 	curr := strings.TrimSpace(currency)
 	if curr == "" {
@@ -521,7 +521,7 @@ func (a *UnifiedBalanceAdapter) Debit(ctx context.Context, userID uint, maxAmoun
 	}
 	maxQuota, err := a.currencyAmountToQuota(maxAmount, curr)
 	if err != nil || maxQuota <= 0 {
-		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), false, err
 	}
 	body, err := json.Marshal(map[string]any{
 		"operation_id":  strings.TrimSpace(operationID),
@@ -530,25 +530,26 @@ func (a *UnifiedBalanceAdapter) Debit(ctx context.Context, userID uint, maxAmoun
 		"remark":        strings.TrimSpace(remark),
 	})
 	if err != nil {
-		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), false, err
 	}
 	raw, err := a.svc.GatewayConsole(ctx, userID, "POST", "/wallet/debit", nil, body)
 	if err != nil {
-		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), false, err
 	}
 	var resp struct {
 		AppliedQuota int64 `json:"applied_quota"`
 		BalanceQuota int64 `json:"balance_quota"`
+		Replayed     bool  `json:"replayed"`
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), err
+		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), false, err
 	}
 	debited := a.quotaToCurrencyAmount(resp.AppliedQuota, curr)
 	if debited.Decimal.GreaterThan(maxAmount.Decimal.Round(2)) {
 		debited = money.FromDecimal(maxAmount.Decimal.Round(2))
 	}
 	balanceAfter := a.quotaToCurrencyAmount(resp.BalanceQuota, curr)
-	return debited, balanceAfter, nil
+	return debited, balanceAfter, resp.Replayed, nil
 }
 
 func (a *UnifiedBalanceAdapter) Redeem(ctx context.Context, userID uint, code, siteCurrency string) (*walletcontract.UnifiedBalanceRedeemResult, error) {
@@ -597,6 +598,10 @@ func (a *UnifiedBalanceAdapter) RedeemCode(userID uint, code, siteCurrency strin
 }
 
 func (a *UnifiedBalanceAdapter) SyncLocalCredit(userID uint, amount money.Amount, currency, operationID, remark string) error {
+	if a.c != nil && a.c.WalletService != nil {
+		a.c.WalletService.SyncCreditToUnified(userID, amount, currency, operationID, remark)
+		return nil
+	}
 	_, err := a.Credit(context.Background(), userID, amount, currency, operationID, remark)
 	return err
 }

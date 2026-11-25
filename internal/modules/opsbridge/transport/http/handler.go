@@ -14,9 +14,10 @@ import (
 )
 
 type Handler struct {
-	reader opscontract.Reader
-	bridge opscontract.Bridge
-	slo    opscontract.SLORevokeHandler
+	reader    opscontract.Reader
+	bridge    opscontract.Bridge
+	slo       opscontract.SLORevokeHandler
+	ugcClaims opscontract.UniversalGiftCardClaimLookup
 }
 
 func New(reader opscontract.Reader) *Handler {
@@ -26,6 +27,9 @@ func New(reader opscontract.Reader) *Handler {
 	}
 	if s, ok := reader.(opscontract.SLORevokeHandler); ok {
 		h.slo = s
+	}
+	if u, ok := reader.(opscontract.UniversalGiftCardClaimLookup); ok {
+		h.ugcClaims = u
 	}
 	return h
 }
@@ -736,6 +740,24 @@ func (h *Handler) RevokeUserSLO(c *gin.Context) {
 		return
 	}
 	result, err := h.slo.RevokeUserSLO(req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) LookupUniversalGiftCardClaim(c *gin.Context) {
+	if h.ugcClaims == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	claimID := strings.TrimSpace(c.Param("claim_id"))
+	if claimID == "" {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.ugcClaims.LookupUniversalGiftCardClaim(claimID)
 	if err != nil {
 		fail(c, err)
 		return

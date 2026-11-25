@@ -11,6 +11,7 @@ import (
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/shared/jsonmap"
@@ -252,10 +253,8 @@ func (s *PaymentService) applyPaymentUpdate(payment *paymentdomain.Payment, orde
 	processedOrder := order
 	orderPaid := false
 	var (
-		callbackReleasedAmount   decimal.Decimal
-		callbackReleasedOrderID  uint
-		callbackReleasedUserID   uint
-		callbackReleasedCurrency string
+		underpaidUnifiedOp       *walletdomain.UnifiedOp
+		callbackReleaseUnifiedOp *walletdomain.UnifiedOp
 	)
 
 	err := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
@@ -399,9 +398,11 @@ func (s *PaymentService) applyPaymentUpdate(payment *paymentdomain.Payment, orde
 		}
 		if underpaid {
 			// 订单不履约，但用户的钱不能吞：转入余额，用户可用余额补齐后重新支付。
-			if err := s.creditUnderpaidToWallet(tx, lockedOrder, lockedPayment, coveredOnlineAmount, requiredOnlineAmount); err != nil {
+			op, err := s.creditUnderpaidToWallet(tx, lockedOrder, lockedPayment, coveredOnlineAmount, requiredOnlineAmount)
+			if err != nil {
 				return err
 			}
+			underpaidUnifiedOp = op
 		}
 		// 已被替代或已有更新尝试时，钱包占款归更新的尝试所有，旧链接的失败/过期回调不能退还。
 		if (status == constants.PaymentStatusFailed || status == constants.PaymentStatusExpired) && lockedOrder.Status == constants.OrderStatusPendingPayment && s.walletSvc != nil && lockedPayment.SupersededAt == nil {
@@ -414,11 +415,21 @@ func (s *PaymentService) applyPaymentUpdate(payment *paymentdomain.Payment, orde
 				if err != nil {
 					return err
 				}
-				if released.GreaterThan(decimal.Zero) {
-					callbackReleasedAmount = released
-					callbackReleasedOrderID = lockedOrder.ID
-					callbackReleasedUserID = lockedOrder.UserID
-					callbackReleasedCurrency = lockedOrder.Currency
+				if released.GreaterThan(decimal.Zero) && s.walletSvc.HasUnifiedBalance() {
+					orderID := lockedOrder.ID
+					op, enqErr := s.walletSvc.EnqueueUnifiedCreditInTx(
+						tx.Wallets(),
+						lockedOrder.UserID,
+						&orderID,
+						money.FromDecimal(released),
+						lockedOrder.Currency,
+						fmt.Sprintf("order:%d:cb_fail:%d", lockedOrder.ID, payment.ID),
+						"在线支付失败，退回余额",
+					)
+					if enqErr != nil {
+						return enqErr
+					}
+					callbackReleaseUnifiedOp = op
 				}
 			}
 		}
@@ -428,8 +439,11 @@ func (s *PaymentService) applyPaymentUpdate(payment *paymentdomain.Payment, orde
 	if err != nil {
 		return nil, nil, false, err
 	}
-	if callbackReleasedAmount.GreaterThan(decimal.Zero) && s.walletSvc != nil {
-		s.walletSvc.SyncCreditToUnified(callbackReleasedUserID, money.FromDecimal(callbackReleasedAmount), callbackReleasedCurrency, fmt.Sprintf("order:%d:cb_fail:%d", callbackReleasedOrderID, payment.ID), "在线支付失败，退回余额")
+	if underpaidUnifiedOp != nil && s.walletSvc != nil {
+		s.walletSvc.FlushUnifiedCreditOp(underpaidUnifiedOp)
+	}
+	if callbackReleaseUnifiedOp != nil && s.walletSvc != nil {
+		s.walletSvc.FlushUnifiedCreditOp(callbackReleaseUnifiedOp)
 	}
 	return returnVal, processedOrder, orderPaid, nil
 }
@@ -444,9 +458,9 @@ func (s *PaymentService) creditUnderpaidToWallet(
 	payment *paymentdomain.Payment,
 	coveredAmount decimal.Decimal,
 	requiredAmount decimal.Decimal,
-) error {
+) (*walletdomain.UnifiedOp, error) {
 	if order == nil || payment == nil {
-		return nil
+		return nil, nil
 	}
 	log := paymentLogger(
 		"payment_id", payment.ID,
@@ -457,23 +471,42 @@ func (s *PaymentService) creditUnderpaidToWallet(
 	)
 	if s.walletSvc == nil || order.UserID == 0 || !coveredAmount.IsPositive() {
 		log.Warnw("payment_callback_underpaid_credit_skipped", "user_id", order.UserID)
-		return nil
+		return nil, nil
 	}
 	orderID := order.ID
+	ref := fmt.Sprintf("payment:%d:underpaid_credit", payment.ID)
+	remark := "支付金额不足以完成订单，款项已转入余额"
 	if _, _, err := s.walletSvc.CreditInTransaction(tx.Wallets(), walletcontract.CreditInput{
 		UserID:    order.UserID,
 		Amount:    money.FromDecimal(coveredAmount),
 		Currency:  order.Currency,
 		Type:      constants.WalletTxnTypeOrderUnderpaidCredit,
-		Reference: fmt.Sprintf("payment:%d:underpaid_credit", payment.ID),
-		Remark:    "支付金额不足以完成订单，款项已转入余额",
+		Reference: ref,
+		Remark:    remark,
 		OrderID:   &orderID,
 	}); err != nil {
 		log.Errorw("payment_callback_underpaid_credit_failed", "user_id", order.UserID, "error", err)
-		return err
+		return nil, err
+	}
+	var unifiedOp *walletdomain.UnifiedOp
+	if s.walletSvc.HasUnifiedBalance() {
+		op, enqErr := s.walletSvc.EnqueueUnifiedCreditInTx(
+			tx.Wallets(),
+			order.UserID,
+			&orderID,
+			money.FromDecimal(coveredAmount),
+			order.Currency,
+			ref,
+			remark,
+		)
+		if enqErr != nil {
+			log.Errorw("payment_callback_underpaid_unified_enqueue_failed", "user_id", order.UserID, "error", enqErr)
+			return nil, enqErr
+		}
+		unifiedOp = op
 	}
 	log.Warnw("payment_callback_underpaid_credited_to_wallet", "user_id", order.UserID)
-	return nil
+	return unifiedOp, nil
 }
 
 // mergeProviderPayload 合并第三方回调原文，同时保留创建支付阶段写入的展示快照等元数据。

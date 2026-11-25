@@ -21,6 +21,7 @@ func ApplyWalletBalance(
 	tx ordercontract.Transaction,
 	order *orderdomain.Order,
 	useBalance bool,
+	exactDebit ...money.Amount,
 ) (decimal.Decimal, error) {
 	if tx == nil {
 		return decimal.Zero, ErrOrderUpdateFailed
@@ -32,6 +33,11 @@ func ApplyWalletBalance(
 		return decimal.Zero, walletcontract.ErrAccountNotFound
 	}
 
+	var exactPtr *money.Amount
+	if len(exactDebit) > 0 {
+		val := exactDebit[0]
+		exactPtr = &val
+	}
 	amount, err := wallets.ApplyOrderBalance(tx.Wallets(), walletcontract.OrderBalanceInput{
 		OrderID:          order.ID,
 		UserID:           order.UserID,
@@ -39,6 +45,7 @@ func ApplyWalletBalance(
 		WalletPaidAmount: order.WalletPaidAmount,
 		Currency:         order.Currency,
 		UseBalance:       useBalance,
+		ExactDebitAmount: exactPtr,
 	})
 	if err != nil {
 		return decimal.Zero, err

@@ -13,6 +13,7 @@ import (
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/logger"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	"github.com/dujiao-next/internal/shared/money"
 	"github.com/shopspring/decimal"
 )
@@ -23,7 +24,7 @@ func (s *OrderService) cancelOrderWithChildren(order *orderdomain.Order, rollbac
 		return ErrOrderNotFound
 	}
 	now := time.Now()
-	var canceledReleasedAmount decimal.Decimal
+	var canceledCreditOp *walletdomain.UnifiedOp
 	err := s.orderStore.WithinTransaction(func(tx ordercontract.Transaction) error {
 		orderStore := tx.Orders()
 		productRepo := tx.Products()
@@ -106,8 +107,21 @@ func (s *OrderService) cancelOrderWithChildren(order *orderdomain.Order, rollbac
 			if err != nil {
 				return err
 			}
-			if released.GreaterThan(decimal.Zero) {
-				canceledReleasedAmount = released
+			if released.GreaterThan(decimal.Zero) && s.walletService.HasUnifiedBalance() {
+				oid := order.ID
+				op, opErr := s.walletService.EnqueueUnifiedCreditInTx(
+					tx.Wallets(),
+					order.UserID,
+					&oid,
+					money.FromDecimal(released),
+					order.Currency,
+					fmt.Sprintf("order:%d:cancel", order.ID),
+					"订单取消退回余额",
+				)
+				if opErr != nil {
+					return opErr
+				}
+				canceledCreditOp = op
 			}
 		}
 		orderIDs := []uint{order.ID}
@@ -124,8 +138,8 @@ func (s *OrderService) cancelOrderWithChildren(order *orderdomain.Order, rollbac
 	if err != nil {
 		return err
 	}
-	if canceledReleasedAmount.GreaterThan(decimal.Zero) && s.walletService != nil {
-		s.walletService.SyncCreditToUnified(order.UserID, money.FromDecimal(canceledReleasedAmount), order.Currency, fmt.Sprintf("order:%d:cancel", order.ID), "订单取消退回余额")
+	if canceledCreditOp != nil && s.walletService != nil {
+		s.walletService.FlushUnifiedCreditOp(canceledCreditOp)
 	}
 	order.Status = constants.OrderStatusCanceled
 	order.CanceledAt = &now
@@ -308,15 +322,21 @@ func (s *OrderService) UpdateOrderStatus(orderID uint, targetStatus string) (*or
 		updates["canceled_at"] = now
 	}
 
+	var singleCancelCreditOp *walletdomain.UnifiedOp
 	if target == constants.OrderStatusCanceled {
 		err = s.orderStore.WithinTransaction(func(tx ordercontract.Transaction) error {
-			return s.cancelSingleOrderInTx(tx, order, target, updates)
+			op, txErr := s.cancelSingleOrderInTx(tx, order, target, updates)
+			singleCancelCreditOp = op
+			return txErr
 		})
 	} else {
 		err = s.orderStore.UpdateStatus(order.ID, target, updates)
 	}
 	if err != nil {
 		return nil, ErrOrderUpdateFailed
+	}
+	if singleCancelCreditOp != nil && s.walletService != nil {
+		s.walletService.FlushUnifiedCreditOp(singleCancelCreditOp)
 	}
 	if target == constants.OrderStatusCanceled && s.affiliateSvc != nil {
 		if err := s.affiliateSvc.HandleOrderCanceled(order.ID, "order_canceled_by_admin"); err != nil {
@@ -395,26 +415,44 @@ func (s *OrderService) completeParentOrderInTx(tx ordercontract.Transaction, ord
 	return nil
 }
 
-func (s *OrderService) cancelSingleOrderInTx(tx ordercontract.Transaction, order *orderdomain.Order, target string, updates map[string]interface{}) error {
+func (s *OrderService) cancelSingleOrderInTx(tx ordercontract.Transaction, order *orderdomain.Order, target string, updates map[string]interface{}) (*walletdomain.UnifiedOp, error) {
 	if order == nil {
-		return ErrOrderNotFound
+		return nil, ErrOrderNotFound
 	}
 	orderStore := tx.Orders()
 	productRepo := tx.Products()
 	productSKURepo := tx.ProductSKUs()
 	if err := orderStore.UpdateStatus(order.ID, target, updates); err != nil {
-		return ErrOrderUpdateFailed
+		return nil, ErrOrderUpdateFailed
 	}
 	secretRepo := tx.CardSecrets()
 	if _, err := secretRepo.ReleaseByOrder(order.ID); err != nil {
-		return err
+		return nil, err
 	}
 	if err := releaseManualStockByItems(productRepo, productSKURepo, order.Items); err != nil {
-		return err
+		return nil, err
 	}
+	var creditOp *walletdomain.UnifiedOp
 	if s.walletService != nil {
-		if _, err := ReleaseWalletBalance(s.walletService, tx, order, constants.WalletTxnTypeOrderRefund, "订单取消退回余额"); err != nil {
-			return err
+		released, err := ReleaseWalletBalance(s.walletService, tx, order, constants.WalletTxnTypeOrderRefund, "订单取消退回余额")
+		if err != nil {
+			return nil, err
+		}
+		if released.GreaterThan(decimal.Zero) && s.walletService.HasUnifiedBalance() {
+			oid := order.ID
+			op, opErr := s.walletService.EnqueueUnifiedCreditInTx(
+				tx.Wallets(),
+				order.UserID,
+				&oid,
+				money.FromDecimal(released),
+				order.Currency,
+				fmt.Sprintf("order:%d:cancel", order.ID),
+				"订单取消退回余额",
+			)
+			if opErr != nil {
+				return nil, opErr
+			}
+			creditOp = op
 		}
 	}
 	if target == constants.OrderStatusCanceled {
@@ -425,10 +463,10 @@ func (s *OrderService) cancelSingleOrderInTx(tx ordercontract.Transaction, order
 			}
 		}
 		if _, err := tx.ExpirePendingPaymentsByOrderIDs([]uint{order.ID}, expiredAt); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return creditOp, nil
 }
 
 // CancelExpiredOrder 超时取消订单

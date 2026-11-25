@@ -28,3 +28,24 @@ func (s *paidFulfillmentService) Start(ctx context.Context) error {
 	}
 }
 func (*paidFulfillmentService) Stop(context.Context) error { return nil }
+
+type unifiedWalletRecoverer interface{ RecoverUnifiedOps() error }
+
+type unifiedWalletRecoveryService struct{ wallets unifiedWalletRecoverer }
+
+func (*unifiedWalletRecoveryService) Name() string { return "unified-wallet-outbox" }
+func (s *unifiedWalletRecoveryService) Start(ctx context.Context) error {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		if err := s.wallets.RecoverUnifiedOps(); err != nil {
+			logger.Warnw("unified_wallet_recovery_failed", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+	}
+}
+func (*unifiedWalletRecoveryService) Stop(context.Context) error { return nil }
