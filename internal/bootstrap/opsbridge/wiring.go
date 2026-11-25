@@ -38,6 +38,7 @@ import (
 	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/jsonslice"
 	"github.com/dujiao-next/internal/shared/money"
+	"github.com/dujiao-next/internal/upstream"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -651,9 +652,16 @@ func (a *acquiringStoreAdapter) MailHealth() (*opscontract.MailHealthResult, err
 	return res, nil
 }
 
+type upstreamMappingService interface {
+	ListUpstreamCategories(connectionID uint) ([]upstream.UpstreamCategory, bool, error)
+	ListUpstreamProducts(connectionID uint, page, pageSize int) (*upstream.ProductListResult, error)
+	SyncProduct(mappingID uint) error
+	BatchImportUpstreamProducts(connectionID uint, upstreamProductIDs []uint, categoryID uint, autoCreateCategory bool) ([]mappingapp.BatchUpstreamProductImportOutcome, error)
+}
+
 type upstreamStoreAdapter struct {
 	connections *siteconnectionapp.Service
-	mappings    *mappingapp.Service
+	mappings    upstreamMappingService
 	mappingRepo mappingcontract.MappingRepository
 }
 
@@ -867,6 +875,12 @@ func (u *upstreamStoreAdapter) FetchCatalog(connectionID uint) (*opscontract.Ups
 		total = prodRes.Total
 		for _, item := range prodRes.Items {
 			m, isMapped := mappedByUpID[item.ID]
+			skuCodes := make([]string, 0, len(item.SKUs))
+			for _, sku := range item.SKUs {
+				if code := strings.TrimSpace(sku.SKUCode); code != "" {
+					skuCodes = append(skuCodes, code)
+				}
+			}
 			allProducts = append(allProducts, opscontract.UpstreamCatalogProduct{
 				ID:                      item.ID,
 				CategoryID:              item.CategoryID,
@@ -876,6 +890,7 @@ func (u *upstreamStoreAdapter) FetchCatalog(connectionID uint) (*opscontract.Ups
 				Currency:                item.Currency,
 				IsActive:                item.IsActive,
 				SKUCount:                len(item.SKUs),
+				SKUCodes:                skuCodes,
 				RequiresReservation:     item.RequiresReservation,
 				EntitlementContractHash: item.EntitlementContractHash,
 				Mapped:                  isMapped,
@@ -918,8 +933,52 @@ func (u *upstreamStoreAdapter) ImportOrSync(connectionID uint, input opscontract
 	if input.AutoCreateCategory != nil {
 		autoCreate = *input.AutoCreateCategory
 	}
-	targetIDs := input.UpstreamProductIDs
-	if len(targetIDs) == 0 {
+	skuCode := strings.TrimSpace(input.SKUCode)
+	targetIDs := append([]uint(nil), input.UpstreamProductIDs...)
+	res := &opscontract.ImportUpstreamProductsResult{
+		Source:       "storefront",
+		CollectedAt:  time.Now().UTC(),
+		ConnectionID: connectionID,
+	}
+
+	if len(targetIDs) == 0 && skuCode != "" {
+		cat, err := u.FetchCatalog(connectionID)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range cat.Products {
+			matched := strings.EqualFold(strings.TrimSpace(p.Slug), skuCode)
+			if !matched {
+				for _, sc := range p.SKUCodes {
+					if strings.EqualFold(strings.TrimSpace(sc), skuCode) {
+						matched = true
+						break
+					}
+				}
+			}
+			if matched {
+				targetIDs = append(targetIDs, p.ID)
+			}
+		}
+		if len(targetIDs) == 0 {
+			res.SkippedReason = "sku_not_found_in_upstream_catalog"
+			return res, nil
+		}
+	} else if len(targetIDs) == 0 && input.SyncStockOnly {
+		existingList, _, err := u.mappingRepo.List(mappingcontract.ListFilter{ConnectionID: connectionID, Page: 1, PageSize: 500})
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range existingList {
+			if m.UpstreamProductID > 0 {
+				targetIDs = append(targetIDs, m.UpstreamProductID)
+			}
+		}
+		if len(targetIDs) == 0 {
+			res.SkippedReason = "no_mapped_products"
+			return res, nil
+		}
+	} else if len(targetIDs) == 0 {
 		cat, err := u.FetchCatalog(connectionID)
 		if err != nil {
 			return nil, err
@@ -931,12 +990,7 @@ func (u *upstreamStoreAdapter) ImportOrSync(connectionID uint, input opscontract
 		}
 	}
 
-	res := &opscontract.ImportUpstreamProductsResult{
-		Source:       "storefront",
-		CollectedAt:  time.Now().UTC(),
-		ConnectionID: connectionID,
-		Requested:    len(targetIDs),
-	}
+	res.Requested = len(targetIDs)
 	var toImport []uint
 	for _, upID := range targetIDs {
 		if upID == 0 {
@@ -955,7 +1009,14 @@ func (u *upstreamStoreAdapter) ImportOrSync(connectionID uint, input opscontract
 			}
 			continue
 		}
+		if input.SyncStockOnly {
+			res.SkippedCount++
+			continue
+		}
 		toImport = append(toImport, upID)
+	}
+	if input.SyncStockOnly && res.SyncedCount == 0 && res.SkippedCount > 0 && len(res.Failures) == 0 {
+		res.SkippedReason = "target_sku_not_mapped"
 	}
 	if len(toImport) > 0 {
 		outcomes, err := u.mappings.BatchImportUpstreamProducts(connectionID, toImport, input.LocalCategoryID, autoCreate)

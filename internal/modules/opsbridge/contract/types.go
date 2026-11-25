@@ -622,6 +622,7 @@ type UpstreamCatalogProduct struct {
 	Currency                string         `json:"currency"`
 	IsActive                bool           `json:"is_active"`
 	SKUCount                int            `json:"sku_count"`
+	SKUCodes                []string       `json:"sku_codes,omitempty"`
 	RequiresReservation     bool           `json:"requires_reservation"`
 	EntitlementContractHash string         `json:"entitlement_contract_hash,omitempty"`
 	Mapped                  bool           `json:"mapped"`
@@ -644,6 +645,8 @@ type ImportUpstreamProductsInput struct {
 	UpstreamProductIDs []uint `json:"upstream_product_ids,omitempty"`
 	LocalCategoryID    uint   `json:"local_category_id,omitempty"`
 	AutoCreateCategory *bool  `json:"auto_create_category,omitempty"`
+	SyncStockOnly      bool   `json:"sync_stock_only,omitempty"`
+	SKUCode            string `json:"sku_code,omitempty"`
 }
 
 type ImportUpstreamProductsFailure struct {
@@ -658,6 +661,8 @@ type ImportUpstreamProductsResult struct {
 	Requested     int                             `json:"requested"`
 	ImportedCount int                             `json:"imported_count"`
 	SyncedCount   int                             `json:"synced_count"`
+	SkippedCount  int                             `json:"skipped_count,omitempty"`
+	SkippedReason string                          `json:"skipped_reason,omitempty"`
 	Failures      []ImportUpstreamProductsFailure `json:"failures,omitempty"`
 }
 
