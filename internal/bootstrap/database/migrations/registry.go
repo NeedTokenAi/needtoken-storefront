@@ -20,6 +20,7 @@ import (
 	fulfillmentdomain "github.com/dujiao-next/internal/modules/fulfillment/domain"
 	giftcarddomain "github.com/dujiao-next/internal/modules/giftcard/domain"
 	admindomain "github.com/dujiao-next/internal/modules/identity/admin/domain"
+	adminapitokendomain "github.com/dujiao-next/internal/modules/identity/adminapitoken/domain"
 	emailverificationdomain "github.com/dujiao-next/internal/modules/identity/emailverification/domain"
 	externalidentitydomain "github.com/dujiao-next/internal/modules/identity/externalidentity/domain"
 	invitecodedomain "github.com/dujiao-next/internal/modules/identity/invitecode/domain"
@@ -46,6 +47,7 @@ func AutoMigrate() error {
 	db := gormdb.DB
 	if err := db.AutoMigrate(
 		&admindomain.Admin{},
+		&adminapitokendomain.Token{},
 		&userdomain.User{},
 		&externalidentitydomain.Identity{},
 		&invitecodedomain.InviteCode{},
@@ -143,6 +145,9 @@ func AutoMigrate() error {
 		return err
 	}
 	if err := ensureOrderItemOriginalPriceMigration(); err != nil {
+		return err
+	}
+	if err := ensureProductAffiliateRateMigration(); err != nil {
 		return err
 	}
 	if err := ensureCartForeignKeyConstraints(); err != nil {

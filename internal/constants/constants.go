@@ -550,6 +550,7 @@ const (
 	StorefrontTemplateVault   = "vault"
 	// StorefrontTemplateNeedtoken needtoken.io 官网模板（深色科技风 + 模型广场）
 	StorefrontTemplateNeedtoken = "needtoken"
+	StorefrontTemplateAtelier   = "atelier"
 	StorefrontTemplateDefault   = StorefrontTemplateClassic
 )
 

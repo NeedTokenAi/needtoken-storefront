@@ -345,13 +345,14 @@ func normalizeSiteTemplateMode(raw interface{}) string {
 	return "card"
 }
 
-// normalizeStorefrontTemplate 归一化店面模板，允许 "classic"、"vault" 或 "needtoken"，默认 "classic"。
+// normalizeStorefrontTemplate 归一化店面模板，允许 "classic"、"vault"、"needtoken" 或 "atelier"，默认 "classic"。
 func normalizeStorefrontTemplate(raw interface{}) string {
 	switch value := normalizeSettingText(raw); value {
-	case constants.StorefrontTemplateVault, constants.StorefrontTemplateNeedtoken:
+	case constants.StorefrontTemplateVault, constants.StorefrontTemplateNeedtoken, constants.StorefrontTemplateAtelier:
 		return value
+	default:
+		return constants.StorefrontTemplateDefault
 	}
-	return constants.StorefrontTemplateDefault
 }
 
 func normalizeNavConfig(value map[string]interface{}) jsonmap.JSON {
