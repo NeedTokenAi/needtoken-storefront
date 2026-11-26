@@ -36,8 +36,8 @@
         </div>
         <div class="rounded-xl border bg-muted/20 p-4">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.subscriptions.defaultGroup') }}</p>
-          <p class="mt-1 truncate text-base font-black text-foreground" :title="defaultGroupDisplay">
-            {{ defaultGroupDisplay }}
+          <p class="mt-1 truncate font-mono text-xl font-black text-foreground" :title="userGroup || 'default'">
+            {{ userGroup || 'default' }}
           </p>
           <p class="mt-1 text-[11px] text-muted-foreground">
             {{ t('needtoken.memberConsole.subscriptions.historyCount', { count: allSubs.length }) }}
@@ -198,7 +198,6 @@ import {
   formatSubscriptionExpiry,
 } from '../../lib/apiAccountLinkPolicy'
 import {
-  buildSelectableGroupOptions,
   formatConsoleGroupLabel,
   sumSubscriptionRemainingQuota,
 } from '../../lib/gatewayConsoleHelpers'
@@ -232,17 +231,6 @@ const activeRemainingQuota = computed(() => sumSubscriptionRemainingQuota(active
 
 const formatGroup = (code: string) =>
   formatConsoleGroupLabel(code, groupMeta.value, usableGroups.value, groupRatio.value)
-
-const defaultGroupDisplay = computed(() => {
-  const selectable = buildSelectableGroupOptions({
-    usableGroups: usableGroups.value,
-    groupMeta: groupMeta.value,
-    groupRatio: groupRatio.value,
-    defaultGroup: userGroup.value,
-  })
-  const preferred = selectable.find(g => g.code === userGroup.value) || selectable[0]
-  return preferred ? preferred.label : formatGroup(userGroup.value || 'default')
-})
 
 const filteredHistory = computed(() => {
   if (statusFilter.value === 'all') return allSubs.value

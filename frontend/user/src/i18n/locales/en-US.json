@@ -4316,7 +4316,6 @@
       "keys": {
         "title": "API Key Management",
         "subtitle": "Create, edit, toggle, or delete Need Gateway API keys directly here for OpenAI, Claude, and Gemini clients.",
-        "quickConnect": "Quick Connect",
         "quickUse": "Quick Use",
         "allGroupsFilter": "All Authorized Groups",
         "createButton": "New Key",
@@ -4495,6 +4494,8 @@
         "closeDrawer": "Close quick use drawer",
         "selectKey": "My API Key",
         "selectModel": "Default Model",
+        "modelModeLabel": "Model Sync Mode",
+        "autoAllModelsLabel": "Auto-sync all gateway models ({n} live)",
         "includeRealKey": "Fill real key",
         "placeholderKeyMode": "Use placeholder",
         "noKeyBanner": "No active API key yet. Templates currently use a placeholder — create a key for one-click setup.",
@@ -4515,6 +4516,10 @@
         "backToList": "Back to Tools",
         "downloaded": "Downloaded",
         "importTriggered": "App Launched",
+        "launchingClient": "Launching…",
+        "deeplinkNotInstalledHint": "{name} did not open and may not be installed. We recommend using \"Copy AI Prompt\" for automatic setup, or downloading the app first.",
+        "useAiPromptInstead": "Use Copy AI Prompt",
+        "downloadClient": "Download App",
         "gatewayEndpoint": "Gateway URL"
       }
     }

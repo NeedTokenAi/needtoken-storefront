@@ -197,8 +197,8 @@ function isGenericGroupLabel(code: string, raw?: string | null): boolean {
 }
 
 /**
- * Formats any member-facing group consistently as:
- * "渠道名称 - 分组代号 - ×倍率" (falling back cleanly when channel name or custom label is absent).
+ * Formats any API/channel routing group consistently as:
+ * "分组代号 - 可用渠道名称 - ×倍率" (falling back cleanly when channel name or custom label is absent).
  */
 export function formatConsoleGroupLabel(
   codeRaw?: string | null,
@@ -219,7 +219,7 @@ export function formatConsoleGroupLabel(
     ? meta.ratio
     : (typeof groupRatio?.[code] === 'number' && Number.isFinite(groupRatio[code]) ? groupRatio[code] : 1)
   const ratioStr = formatGroupRatioText(ratioVal)
-  return lead ? `${lead} - ${code} - ${ratioStr}` : `${code} - ${ratioStr}`
+  return lead ? `${code} - ${lead} - ${ratioStr}` : `${code} - ${ratioStr}`
 }
 
 export function formatTokenGroupsSummary(
@@ -431,18 +431,39 @@ export interface QuickToolRenderVars {
   apiKey: string
   baseUrl: string
   baseUrlV1: string
+  modelsEndpoint?: string
   model: string
+  allModels?: string[]
   tokenName: string
   group: string
+}
+
+export function buildQuickToolModelsMapJson(models: string[]): string {
+  const clean = [...new Set((models || []).map(s => String(s || '').trim()).filter(Boolean))]
+  const obj: Record<string, { name: string }> = {}
+  for (const m of clean) {
+    obj[m] = { name: m }
+  }
+  return JSON.stringify(obj, null, 2)
 }
 
 export function renderQuickToolTemplate(template: string, vars: QuickToolRenderVars, encodeForUrl = false): string {
   if (!template) return ''
   const v = (raw: string) => (encodeForUrl ? encodeURIComponent(raw) : raw)
+  const modelsEndpoint = vars.modelsEndpoint || `${vars.baseUrlV1.replace(/\/+$/, '')}/models`
+  const modelList = [...new Set((vars.allModels || []).map(s => String(s || '').trim()).filter(Boolean))]
+  if (!modelList.length && vars.model) {
+    modelList.push(vars.model)
+  }
+  const allModelsJson = JSON.stringify(modelList)
+  const allModelsMapJson = buildQuickToolModelsMapJson(modelList)
   return template
     .replace(/\{\{API_KEY\}\}/g, v(vars.apiKey))
+    .replace(/\{\{MODELS_ENDPOINT\}\}/g, v(modelsEndpoint))
     .replace(/\{\{BASE_URL_V1\}\}/g, v(vars.baseUrlV1))
     .replace(/\{\{BASE_URL\}\}/g, v(vars.baseUrl))
+    .replace(/\{\{ALL_MODELS_MAP_JSON\}\}/g, v(allModelsMapJson))
+    .replace(/\{\{ALL_MODELS_JSON\}\}/g, v(allModelsJson))
     .replace(/\{\{MODEL\}\}/g, v(vars.model))
     .replace(/\{\{TOKEN_NAME\}\}/g, v(vars.tokenName))
     .replace(/\{\{GROUP\}\}/g, v(vars.group))

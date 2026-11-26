@@ -30,6 +30,10 @@
         document.documentElement.dataset.bootLocale = /^(zh-TW|zh-HK|zh-Hant)/i.test(lang) ? 'zh-TW' : /^en/i.test(lang) ? 'en-US' : 'zh-CN';
       } catch { /* Unknown tenants retain neutral startup placeholders. */ }
 
+      if (/^\/me(?:\/|$)/.test(location.pathname)) {
+        document.documentElement.dataset.bootLayout = 'console';
+      }
+
       if (brandNeedtoken) {
         document.documentElement.dataset.bootBrand = 'needtoken';
         document.title = 'NeedToken.AI';
@@ -65,7 +69,32 @@
     html[data-boot-brand="needtoken"] .nt-preboot-catalogue{display:block;max-width:1200px;margin:auto;padding:48px 24px 0;box-sizing:border-box}.nt-preboot-catalogue-row{display:flex;align-items:center;justify-content:space-between;gap:24px}.nt-preboot-catalogue-row:first-child{min-height:56px}.nt-preboot-catalogue-row:first-child i:first-child{width:100px;height:28px}.nt-preboot-catalogue-row:first-child i:last-child{width:min(40%,300px);height:40px}.nt-preboot-catalogue-row:nth-child(2){margin-top:24px}.nt-preboot-catalogue-row:nth-child(2) i:first-child{width:388px;max-width:48%;height:48px}.nt-preboot-catalogue-row:nth-child(2) i:last-child{width:440px;max-width:48%;height:36px}.nt-preboot-catalogue-filters{display:flex;gap:12px;margin-top:20px}.nt-preboot-catalogue-filters i{width:104px;height:36px;border-radius:18px!important}
     html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-header{max-width:1320px;box-sizing:border-box}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards{max-width:1200px;padding:24px;gap:16px}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article{position:relative;display:grid;grid-template-columns:24px 1fr;grid-template-rows:24px 20px 1fr;column-gap:8px;row-gap:12px;min-height:180px;padding:20px;border-color:#dde5e0;border-radius:20px;background:#ffffff}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article i{position:relative;overflow:hidden;width:auto;height:auto;margin:0;border-radius:6px;background:#e3ebe6}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article i:first-child{width:24px;height:24px}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article i:nth-child(2){align-self:center;width:72%;height:16px}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article i:nth-child(3){grid-column:1/-1;width:108px;height:20px;border-radius:10px}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article i:last-child{grid-column:1/-1;align-self:end;width:112px;height:28px}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article::after{content:"";position:absolute;right:20px;bottom:20px;width:56px;height:56px;border-radius:12px;background:#e3ebe6}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards i::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,#ffffff80 45%,transparent 70%);transform:translateX(-100%);animation:nt-preboot-skeleton 1.8s ease-in-out infinite}
     html.dark[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article{border-color:#94a3b829;background:#0e1218}html.dark[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article i,html.dark[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article::after{background:#182028}html.dark[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards i::after{background:linear-gradient(100deg,transparent 20%,#ffffff12 45%,transparent 70%)}
-    #nt-preboot[data-failed] .nt-preboot-catalogue{display:none}@media(min-width:1440px){html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:1100px){html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){html[data-boot-brand="needtoken"] .nt-preboot-catalogue{padding:32px 20px 0}.nt-preboot-catalogue-row:first-child{gap:16px}.nt-preboot-catalogue-row:first-child i:last-child{width:60%;height:28px}.nt-preboot-catalogue-row:nth-child(2){flex-direction:column;gap:16px;margin-top:20px}.nt-preboot-catalogue-row:nth-child(2) i:first-child{width:100%;max-width:none}.nt-preboot-catalogue-row:nth-child(2) i:last-child{align-self:flex-end;width:84%;max-width:none}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards{grid-template-columns:1fr;padding:24px 20px;gap:14px}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article{min-height:176px;padding:22px}}@keyframes nt-preboot-skeleton{to{transform:translateX(100%)}}@media(prefers-reduced-motion:reduce){html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards i::after{animation:none}}
+    #nt-preboot[data-failed] .nt-preboot-catalogue{display:none}@media(min-width:1440px){html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:1100px){html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){html[data-boot-brand="needtoken"] .nt-preboot-catalogue{padding:32px 20px 0}.nt-preboot-catalogue-row:first-child{gap:16px}.nt-preboot-catalogue-row:first-child i:last-child{width:60%;height:28px}.nt-preboot-catalogue-row:nth-child(2){flex-direction:column;gap:16px;margin-top:20px}.nt-preboot-catalogue-row:nth-child(2) i:first-child{width:100%;max-width:none}.nt-preboot-catalogue-row:nth-child(2) i:last-child{align-self:flex-end;width:84%;max-width:none}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards{grid-template-columns:1fr;padding:24px 20px;gap:14px}html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards article{min-height:176px;padding:22px}}@keyframes nt-preboot-skeleton{to{transform:translateX(100%)}}@media(prefers-reduced-motion:reduce){html[data-boot-brand="needtoken"] #nt-preboot .nt-preboot-cards i::after,.nt-preboot-console i::after{animation:none}}
+    .nt-preboot-console{display:none}
+    html[data-boot-layout="console"] #nt-preboot .nt-preboot-header,html[data-boot-layout="console"] #nt-preboot .nt-preboot-catalogue,html[data-boot-layout="console"] #nt-preboot .nt-preboot-cards,html[data-boot-layout="console"] #nt-preboot .nt-preboot-scene{display:none}
+    html[data-boot-layout="console"] #nt-preboot[data-failed] .nt-preboot-console{display:none}
+    html[data-boot-layout="console"] #nt-preboot[data-failed] .nt-preboot-scene{display:flex;min-height:240px;padding:40px 24px}
+    html[data-boot-layout="console"] #nt-preboot .nt-preboot-console{display:flex;min-height:100svh;background:var(--boot-bg)}
+    .nt-pc-aside{width:232px;flex:none;border-right:1px solid #0f171418;background:#ffffffd9;display:flex;flex-direction:column}
+    .nt-pc-aside-top{height:56px;padding:0 16px;border-bottom:1px solid #0f171414;display:flex;align-items:center;gap:10px}
+    .nt-pc-aside-nav{padding:16px 12px;display:flex;flex-direction:column;gap:10px}
+    .nt-pc-main{flex:1;min-width:0;display:flex;flex-direction:column}
+    .nt-pc-topbar{height:56px;padding:0 24px;border-bottom:1px solid #0f171414;background:#ffffffe6;display:flex;align-items:center;justify-content:space-between;gap:16px}
+    .nt-pc-body{width:100%;max-width:1440px;box-sizing:border-box;margin:0 auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+    .nt-pc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+    .nt-pc-kpi,.nt-pc-panel{border:1px solid #0f171416;border-radius:16px;background:#ffffff;padding:18px;box-sizing:border-box}
+    .nt-pc-kpi{min-height:112px;display:flex;flex-direction:column;gap:12px}
+    .nt-pc-grid{display:grid;grid-template-columns:8fr 4fr;gap:16px}
+    .nt-pc-panel{min-height:240px;display:flex;flex-direction:column;gap:14px}
+    .nt-preboot-console i{position:relative;overflow:hidden;display:block;border-radius:8px;background:#e3ebe6}
+    .nt-preboot-console i::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,#ffffff80 45%,transparent 70%);transform:translateX(-100%);animation:nt-preboot-skeleton 1.8s ease-in-out infinite}
+    html.dark .nt-pc-aside{border-right-color:#94a3b826;background:#0e1218d9}
+    html.dark .nt-pc-aside-top,html.dark .nt-pc-topbar{border-bottom-color:#94a3b826;background:#0e1218e6}
+    html.dark .nt-pc-kpi,html.dark .nt-pc-panel{border-color:#94a3b829;background:#0e1218}
+    html.dark .nt-preboot-console i{background:#182028}
+    html.dark .nt-preboot-console i::after{background:linear-gradient(100deg,transparent 20%,#ffffff12 45%,transparent 70%)}
+    @media(max-width:1023px){.nt-pc-aside{display:none}.nt-pc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.nt-pc-grid{grid-template-columns:1fr}.nt-pc-body{padding:16px}}
+    @media(max-width:639px){.nt-pc-kpis{grid-template-columns:1fr}}
   </style>
 </head>
 
@@ -83,6 +112,36 @@
       </div>
       <div class="nt-preboot-catalogue" aria-hidden="true"><div class="nt-preboot-catalogue-row"><i></i><i></i></div><div class="nt-preboot-catalogue-row"><i></i><i></i></div><div class="nt-preboot-catalogue-filters"><i></i><i></i></div></div>
       <div class="nt-preboot-cards" aria-hidden="true"><article><i></i><i></i><i></i><i></i></article><article><i></i><i></i><i></i><i></i></article><article><i></i><i></i><i></i><i></i></article><article class="nt-preboot-fourth"><i></i><i></i><i></i><i></i></article></div>
+      <div class="nt-preboot-console" aria-hidden="true">
+        <aside class="nt-pc-aside">
+          <div class="nt-pc-aside-top"><i style="width:26px;height:26px;border-radius:8px"></i><i style="width:110px;height:16px"></i></div>
+          <div class="nt-pc-aside-nav">
+            <i style="width:54px;height:10px;margin:4px 8px"></i>
+            <i style="width:100%;height:34px;border-radius:10px"></i>
+            <i style="width:100%;height:34px;border-radius:10px"></i>
+            <i style="width:100%;height:34px;border-radius:10px"></i>
+            <i style="width:100%;height:34px;border-radius:10px"></i>
+            <i style="width:62px;height:10px;margin:14px 8px 4px"></i>
+            <i style="width:100%;height:34px;border-radius:10px"></i>
+            <i style="width:100%;height:34px;border-radius:10px"></i>
+          </div>
+        </aside>
+        <div class="nt-pc-main">
+          <div class="nt-pc-topbar"><i style="width:120px;height:18px"></i><div style="display:flex;gap:10px"><i style="width:140px;height:32px;border-radius:10px"></i><i style="width:92px;height:32px;border-radius:999px"></i></div></div>
+          <div class="nt-pc-body">
+            <div class="nt-pc-kpis">
+              <div class="nt-pc-kpi"><i style="width:48%;height:12px"></i><i style="width:62%;height:26px"></i><i style="width:74%;height:11px"></i></div>
+              <div class="nt-pc-kpi"><i style="width:45%;height:12px"></i><i style="width:58%;height:26px"></i><i style="width:68%;height:11px"></i></div>
+              <div class="nt-pc-kpi"><i style="width:52%;height:12px"></i><i style="width:55%;height:26px"></i><i style="width:70%;height:11px"></i></div>
+              <div class="nt-pc-kpi"><i style="width:50%;height:12px"></i><i style="width:50%;height:26px"></i><i style="width:64%;height:11px"></i></div>
+            </div>
+            <div class="nt-pc-grid">
+              <div class="nt-pc-panel"><i style="width:36%;height:16px"></i><i style="width:100%;height:130px;border-radius:12px"></i><i style="width:60%;height:14px"></i></div>
+              <div class="nt-pc-panel"><i style="width:44%;height:16px"></i><i style="width:100%;height:48px;border-radius:12px"></i><i style="width:100%;height:48px;border-radius:12px"></i><i style="width:100%;height:48px;border-radius:12px"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <script data-cfasync="false">
@@ -100,7 +159,7 @@
       window.addEventListener('storefront:mounted', () => {
         clearTimeout(timer); window.removeEventListener('error', onError, true);
         root?.querySelector('.nt-preboot-retry')?.removeEventListener('click', retry);
-        delete document.documentElement.dataset.bootBrand; delete document.documentElement.dataset.bootLocale;
+        delete document.documentElement.dataset.bootBrand; delete document.documentElement.dataset.bootLocale; delete document.documentElement.dataset.bootLayout;
       }, { once: true });
     })();
   </script>

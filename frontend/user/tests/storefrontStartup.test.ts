@@ -128,5 +128,7 @@ test('storefront HTML injects main-host favicon in head and ships without public
   const headSection = indexHtml.slice(0, indexHtml.indexOf('</head>'))
   assert.match(headSection, /needtoken-icon\.svg/)
   assert.match(headSection, /data-nt-boot-head|ntBootHead/)
+  assert.match(indexHtml, /bootLayout\s*=\s*'console'/)
+  assert.match(indexHtml, /class="nt-preboot-console"/)
   assert.equal(existsSync(new URL('../public/dj.svg', import.meta.url)), false)
 })

@@ -12,10 +12,6 @@
             <Zap class="mr-1.5 h-3.5 w-3.5" />
             {{ t('needtoken.memberConsole.keys.quickUse') }}
           </Button>
-          <Button variant="outline" size="sm" @click="showSnippets = !showSnippets">
-            <Terminal class="mr-1.5 h-3.5 w-3.5 text-primary" />
-            {{ t('needtoken.memberConsole.keys.quickConnect') }}
-          </Button>
           <Button variant="outline" size="sm" :disabled="loading" @click="loadTokens">
             <RefreshCw class="mr-1.5 h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" />
             {{ t('needtoken.common.refresh') }}
@@ -43,30 +39,6 @@
             <span>{{ copiedKey === 'endpoint' ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
           </button>
         </div>
-      </div>
-
-      <!-- 一键接入代码片段（cURL / Python / Claude Code / Codex / OpenCode） -->
-      <div v-if="showSnippets" class="mt-4 rounded-xl border bg-muted/20 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex flex-wrap items-center gap-1.5">
-            <button
-              v-for="tab in snippetTabs"
-              :key="tab.key"
-              type="button"
-              class="rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors"
-              :class="activeSnippet === tab.key ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'"
-              @click="activeSnippet = tab.key"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
-          <Button variant="outline" size="sm" class="h-7 px-2.5 text-xs" @click="copyText(activeSnippetCode, `snippet:${activeSnippet}`)">
-            <Check v-if="copiedKey === `snippet:${activeSnippet}`" class="mr-1 h-3 w-3 text-primary" />
-            <Copy v-else class="mr-1 h-3 w-3" />
-            {{ copiedKey === `snippet:${activeSnippet}` ? t('needtoken.common.copied') : t('needtoken.common.copy') }}
-          </Button>
-        </div>
-        <pre class="mt-3 overflow-x-auto rounded-lg border bg-background p-3 font-mono text-[11.5px] leading-relaxed text-foreground">{{ activeSnippetCode }}</pre>
       </div>
     </div>
 
@@ -556,12 +528,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check, Copy, Eye, EyeOff, KeyRound, Pencil, Plus, RefreshCw, Search, Terminal, Trash2, X, Zap } from 'lucide-vue-next'
+import { Check, Copy, Eye, EyeOff, KeyRound, Pencil, Plus, RefreshCw, Search, Trash2, X, Zap } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import NeedtokenSelect from '../NeedtokenSelect.vue'
-import { API_BASE_URL, DEFAULT_MODELS } from '../../config'
-import { apiPreviewCode, integrationTemplate } from '../../lib/apiIntegrations'
+import { API_BASE_URL } from '../../config'
 import { formatApiQuotaUsd } from '../../lib/apiAccountLinkPolicy'
 import {
   buildSelectableGroupOptions,
@@ -613,30 +584,11 @@ const newlyCreatedTokenId = ref<number | null>(null)
 const confirmDeleteId = ref<number | null>(null)
 const modalOpen = ref(false)
 const editingToken = ref<GatewayTokenItem | null>(null)
-const showSnippets = ref(false)
-const activeSnippet = ref<'curl' | 'python' | 'claude' | 'codex' | 'opencode'>('curl')
 
 const modelSearchQuery = ref('')
 const modelVendorFilter = ref<'all' | ConsoleModelVendorKey>('all')
 const modelGroupFilter = ref('all')
 const customModelDraft = ref('')
-
-const snippetTabs: Array<{ key: 'curl' | 'python' | 'claude' | 'codex' | 'opencode'; label: string }> = [
-  { key: 'curl', label: 'cURL' },
-  { key: 'python', label: 'Python SDK' },
-  { key: 'claude', label: 'Claude Code' },
-  { key: 'codex', label: 'Codex CLI' },
-  { key: 'opencode', label: 'OpenCode' },
-]
-
-const activeSnippetCode = computed(() => {
-  const model = DEFAULT_MODELS[0] || 'claude-sonnet-4-6'
-  if (activeSnippet.value === 'python') return apiPreviewCode('python', API_BASE_URL, model)
-  if (activeSnippet.value === 'claude') return integrationTemplate('claudecode', API_BASE_URL, model) || `export ANTHROPIC_BASE_URL="${API_BASE_URL.replace(/\/v1$/, '')}"\nexport ANTHROPIC_AUTH_TOKEN="<YOUR_NEEDTOKEN_API_KEY>"`
-  if (activeSnippet.value === 'codex') return integrationTemplate('codex', API_BASE_URL, model) || `export OPENAI_BASE_URL="${API_BASE_URL}"\nexport OPENAI_API_KEY="<YOUR_NEEDTOKEN_API_KEY>"`
-  if (activeSnippet.value === 'opencode') return integrationTemplate('opencode', API_BASE_URL, model) || apiPreviewCode('curl', API_BASE_URL, model)
-  return apiPreviewCode('curl', API_BASE_URL, model)
-})
 
 const form = reactive({
   name: '',

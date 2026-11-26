@@ -4316,7 +4316,6 @@
       "keys": {
         "title": "API 密钥管理",
         "subtitle": "在站内直接创建、编辑、启停或删除 Need 网关 API Key，适配 OpenAI / Claude / Gemini 协议",
-        "quickConnect": "快速接入代码",
         "quickUse": "快捷使用",
         "allGroupsFilter": "全部授权分组",
         "createButton": "新建密钥",
@@ -4495,6 +4494,8 @@
         "closeDrawer": "关闭快捷使用抽屉",
         "selectKey": "我的 API 密钥",
         "selectModel": "推荐模型",
+        "modelModeLabel": "模型同步模式",
+        "autoAllModelsLabel": "自动跟随网关全部模型（动态同步 {n} 个）",
         "includeRealKey": "代入真实密钥",
         "placeholderKeyMode": "使用占位符",
         "noKeyBanner": "您还没有启用中的 API 密钥，当前配置将使用占位符，可先创建密钥再一键接入",
@@ -4515,6 +4516,10 @@
         "backToList": "返回工具列表",
         "downloaded": "已下载",
         "importTriggered": "已唤起客户端",
+        "launchingClient": "正在唤起…",
+        "deeplinkNotInstalledHint": "未检测到 {name} 启动，可能尚未安装。推荐优先点击「复制给 AI 配置」自动完成接入，或先下载安装客户端。",
+        "useAiPromptInstead": "改用复制给 AI 配置",
+        "downloadClient": "下载客户端",
         "gatewayEndpoint": "网关地址"
       }
     }
