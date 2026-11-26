@@ -17,13 +17,19 @@ var (
 // Store persists member radar notification preferences, seen event baselines, and email deliveries.
 type Store interface {
 	ListByUser(userID uint) ([]radarsubscriptiondomain.Subscription, error)
+	ListAllSubscriptions() ([]radarsubscriptiondomain.Subscription, error)
 	UpsertUserChannels(userID uint, channels map[string]bool) error
 	ListSubscribedUserIDs(channel string) ([]uint, error)
+	ListExcludedUserIDs(userIDs []uint) (map[uint]bool, error)
+	ListAllExclusions() ([]radarsubscriptiondomain.MemberExclusion, error)
+	UpsertMemberExclusion(userID uint, excluded bool, reason, updatedBy string) (*radarsubscriptiondomain.MemberExclusion, error)
 	CountSeenEvents(channel string) (int64, error)
 	GetSeenRecordIDs(channel string, recordIDs []string) (map[string]bool, error)
 	MarkEventsSeen(events []radarsubscriptiondomain.SeenEvent) error
 	HasSentDelivery(channel, recordID string, userID uint) (bool, error)
 	UpsertDelivery(delivery *radarsubscriptiondomain.EventDelivery) error
+	ListAllDeliveries() ([]radarsubscriptiondomain.EventDelivery, error)
+	ListUserDeliveries(userID uint, limit int) ([]radarsubscriptiondomain.EventDelivery, error)
 }
 
 // EmailSender sends reset notification emails to subscribed members.

@@ -329,6 +329,12 @@ func (b upstreamBridge) GatewayConsoleRequest(ctx context.Context, method, merch
 
 func translateUpstreamError(err error) error {
 	switch {
+	case errors.Is(err, upstream.ErrUniversalGiftCardNotFound),
+		errors.Is(err, upstream.ErrUniversalGiftCardRedeemed),
+		errors.Is(err, upstream.ErrUniversalGiftCardInProgress),
+		errors.Is(err, upstream.ErrUniversalGiftCardDisabled),
+		errors.Is(err, upstream.ErrUniversalGiftCardExpired):
+		return err
 	case errors.Is(err, upstream.ErrCustomerLinkNotLinked):
 		return accountlink.ErrNotLinked
 	case errors.Is(err, upstream.ErrCustomerLinkInvalid):
@@ -589,10 +595,20 @@ func (a *UnifiedBalanceAdapter) Redeem(ctx context.Context, userID uint, code, s
 func (a *UnifiedBalanceAdapter) RedeemCode(userID uint, code, siteCurrency string) (money.Amount, money.Amount, string, error) {
 	res, err := a.Redeem(context.Background(), userID, code, siteCurrency)
 	if err != nil {
-		if errors.Is(err, accountlink.ErrInvalid) {
+		switch {
+		case errors.Is(err, upstream.ErrUniversalGiftCardRedeemed):
+			return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrRedeemed
+		case errors.Is(err, upstream.ErrUniversalGiftCardInProgress):
+			return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrInProgress
+		case errors.Is(err, upstream.ErrUniversalGiftCardDisabled):
+			return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrDisabled
+		case errors.Is(err, upstream.ErrUniversalGiftCardExpired):
+			return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrExpired
+		case errors.Is(err, upstream.ErrUniversalGiftCardNotFound), errors.Is(err, accountlink.ErrInvalid):
 			return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrNotFound
+		default:
+			return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrFetchFailed
 		}
-		return money.Amount{}, money.Amount{}, "", giftcardcontract.ErrFetchFailed
 	}
 	return res.Credited, res.BalanceAfter, res.Source, nil
 }

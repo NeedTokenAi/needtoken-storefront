@@ -20,6 +20,7 @@ type fakeRadarStore struct {
 	subs       map[uint]map[string]bool
 	seen       map[string]map[string]bool
 	deliveries map[string]radarsubscriptiondomain.EventDelivery
+	exclusions map[uint]radarsubscriptiondomain.MemberExclusion
 }
 
 func newFakeRadarStore() *fakeRadarStore {
@@ -27,6 +28,7 @@ func newFakeRadarStore() *fakeRadarStore {
 		subs:       make(map[uint]map[string]bool),
 		seen:       make(map[string]map[string]bool),
 		deliveries: make(map[string]radarsubscriptiondomain.EventDelivery),
+		exclusions: make(map[uint]radarsubscriptiondomain.MemberExclusion),
 	}
 }
 
@@ -94,6 +96,67 @@ func (f *fakeRadarStore) HasSentDelivery(channel, recordID string, userID uint) 
 func (f *fakeRadarStore) UpsertDelivery(delivery *radarsubscriptiondomain.EventDelivery) error {
 	f.deliveries[deliveryKey(delivery.Channel, delivery.RecordID, delivery.UserID)] = *delivery
 	return nil
+}
+
+func (f *fakeRadarStore) ListAllSubscriptions() ([]radarsubscriptiondomain.Subscription, error) {
+	var out []radarsubscriptiondomain.Subscription
+	for uid, chs := range f.subs {
+		for ch, enabled := range chs {
+			out = append(out, radarsubscriptiondomain.Subscription{UserID: uid, Channel: ch, Enabled: enabled})
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRadarStore) ListExcludedUserIDs(userIDs []uint) (map[uint]bool, error) {
+	out := make(map[uint]bool)
+	for _, uid := range userIDs {
+		if ex, ok := f.exclusions[uid]; ok && ex.Excluded {
+			out[uid] = true
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRadarStore) ListAllExclusions() ([]radarsubscriptiondomain.MemberExclusion, error) {
+	var out []radarsubscriptiondomain.MemberExclusion
+	for _, ex := range f.exclusions {
+		out = append(out, ex)
+	}
+	return out, nil
+}
+
+func (f *fakeRadarStore) UpsertMemberExclusion(userID uint, excluded bool, reason, updatedBy string) (*radarsubscriptiondomain.MemberExclusion, error) {
+	row := radarsubscriptiondomain.MemberExclusion{
+		UserID:    userID,
+		Excluded:  excluded,
+		Reason:    reason,
+		UpdatedBy: updatedBy,
+		UpdatedAt: time.Now().UTC(),
+	}
+	f.exclusions[userID] = row
+	return &row, nil
+}
+
+func (f *fakeRadarStore) ListAllDeliveries() ([]radarsubscriptiondomain.EventDelivery, error) {
+	var out []radarsubscriptiondomain.EventDelivery
+	for _, d := range f.deliveries {
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+func (f *fakeRadarStore) ListUserDeliveries(userID uint, limit int) ([]radarsubscriptiondomain.EventDelivery, error) {
+	var out []radarsubscriptiondomain.EventDelivery
+	for _, d := range f.deliveries {
+		if d.UserID == userID {
+			out = append(out, d)
+		}
+	}
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 type fakeUserStore struct {
@@ -222,5 +285,46 @@ func TestRadarSubscriptionLifecycleAndNotifications(t *testing.T) {
 	}
 	if len(mailer.sent) != 1 {
 		t.Fatalf("duplicate notification sent on repeat poll: %d", len(mailer.sent))
+	}
+
+	// 7. Excluded member is silently skipped on new announcement, while preferences stay intact.
+	if _, err := store.UpsertMemberExclusion(1, true, "bounce", "ops-admin"); err != nil {
+		t.Fatalf("exclude member failed: %v", err)
+	}
+	prefsAfterExclude, err := svc.GetUserPreferences(1)
+	if err != nil {
+		t.Fatalf("GetUserPreferences failed: %v", err)
+	}
+	if !prefsAfterExclude.Channels["claude"] {
+		t.Fatalf("foreground subscription preference must stay unchanged when excluded")
+	}
+	feed.snapshots["claude"] = diagnosticscontract.ResetFeedSnapshot{
+		Records: []diagnosticscontract.ResetRecord{
+			{ID: "claude-new-3", Type: "regular", AnnouncedAt: now.Add(-5 * time.Minute), Text: "Third reset", TextZH: "第三次重置"},
+			{ID: "claude-new-2", Type: "banked", AnnouncedAt: now.Add(-10 * time.Minute), Text: "Reset card issued", TextZH: "发放重置卡"},
+		},
+	}
+	if err := svc.PollAndNotify(context.Background()); err != nil {
+		t.Fatalf("fourth poll failed: %v", err)
+	}
+	if len(mailer.sent) != 1 {
+		t.Fatalf("excluded member must not receive new emails, got %d", len(mailer.sent))
+	}
+
+	// 8. Re-including member restores delivery for subsequent announcements.
+	if _, err := store.UpsertMemberExclusion(1, false, "", "ops-admin"); err != nil {
+		t.Fatalf("re-include member failed: %v", err)
+	}
+	feed.snapshots["claude"] = diagnosticscontract.ResetFeedSnapshot{
+		Records: []diagnosticscontract.ResetRecord{
+			{ID: "claude-new-4", Type: "regular", AnnouncedAt: now.Add(-1 * time.Minute), Text: "Fourth reset", TextZH: "第四次重置"},
+			{ID: "claude-new-3", Type: "regular", AnnouncedAt: now.Add(-5 * time.Minute), Text: "Third reset", TextZH: "第三次重置"},
+		},
+	}
+	if err := svc.PollAndNotify(context.Background()); err != nil {
+		t.Fatalf("fifth poll failed: %v", err)
+	}
+	if len(mailer.sent) != 2 || mailer.sent[1].summary != "第四次重置" {
+		t.Fatalf("expected restored email delivery, got %+v", mailer.sent)
 	}
 }

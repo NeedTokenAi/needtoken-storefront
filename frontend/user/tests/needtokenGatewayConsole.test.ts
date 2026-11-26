@@ -1,9 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   computeCombinedApiQuota,
   isNeedtokenMemberConsolePath,
   mapLegacyResellerPath,
+  matchesWalletRecordCategory,
   normalizeNeedtokenMemberSection,
   rawQuotaToUsdNumber,
   resolveNeedtokenRouteTransitionKey,
@@ -99,4 +103,52 @@ test('member console paths share one stable shell transition key', () => {
   assert.equal(resolveNeedtokenRouteTransitionKey('/products/a'), '/products/a')
   assert.equal(resolveNeedtokenRouteTransitionKey('/products/b'), '/products/b')
   assert.equal(resolveNeedtokenRouteTransitionKey('/media'), '/media')
+})
+
+test('matchesWalletRecordCategory classifies wallet top-ups, gift cards, and spend/refunds consistently', () => {
+  assert.equal(matchesWalletRecordCategory('gift_card_redeem', 'all'), true)
+  assert.equal(matchesWalletRecordCategory('gift_card_redeem', 'gift_card'), true)
+  assert.equal(matchesWalletRecordCategory('gift_card_redeem', 'recharge'), false)
+  assert.equal(matchesWalletRecordCategory('recharge', 'recharge'), true)
+  assert.equal(matchesWalletRecordCategory('admin_adjust', 'recharge'), true)
+  assert.equal(matchesWalletRecordCategory('order_pay', 'spend'), true)
+  assert.equal(matchesWalletRecordCategory('order_refund', 'spend'), true)
+  assert.equal(matchesWalletRecordCategory('order_pay', 'gift_card'), false)
+})
+
+test('member console locales keep Wallet Balance, Plan Quota, and My Wallet labels unified across zh-CN, zh-TW, and en-US', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const loadLocale = (file: string) => JSON.parse(readFileSync(resolve(here, '../src/i18n/locales', file), 'utf8'))
+  const zhCN = loadLocale('zh-CN.json').needtoken.memberConsole
+  const zhTW = loadLocale('zh-TW.json').needtoken.memberConsole
+  const enUS = loadLocale('en-US.json').needtoken.memberConsole
+
+  assert.equal(zhCN.nav.assets, '我的钱包')
+  assert.equal(zhCN.assets.title, '我的钱包')
+  assert.equal(zhCN.overview.storeWallet, '钱包余额')
+  assert.equal(zhCN.subscriptions.walletQuota, '钱包余额')
+  assert.equal(zhCN.overview.apiPlanQuota, '套餐额度')
+  assert.equal(zhCN.subscriptions.activeRemaining, '套餐额度')
+
+  assert.equal(zhTW.nav.assets, '我的錢包')
+  assert.equal(zhTW.assets.title, '我的錢包')
+  assert.equal(zhTW.overview.storeWallet, '錢包餘額')
+  assert.equal(zhTW.subscriptions.walletQuota, '錢包餘額')
+  assert.equal(zhTW.overview.apiPlanQuota, '套餐額度')
+  assert.equal(zhTW.subscriptions.activeRemaining, '套餐額度')
+
+  assert.equal(enUS.nav.assets, 'My Wallet')
+  assert.equal(enUS.assets.title, 'My Wallet')
+  assert.equal(enUS.overview.storeWallet, 'Wallet Balance')
+  assert.equal(enUS.subscriptions.walletQuota, 'Wallet Balance')
+  assert.equal(enUS.overview.apiPlanQuota, 'Plan Quota')
+  assert.equal(enUS.subscriptions.activeRemaining, 'Plan Quota')
+
+  for (const mc of [zhCN, zhTW, enUS]) {
+    assert.ok(mc.assets.redeemGiftCardBtn)
+    assert.ok(mc.assets.rechargeBalanceBtn)
+    assert.ok(mc.assets.helpWalletRule)
+    assert.ok(mc.assets.recordsTitle)
+    assert.ok(mc.assets.filterGiftCard)
+  }
 })

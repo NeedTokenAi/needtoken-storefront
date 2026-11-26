@@ -601,3 +601,12 @@ body.nt-tokens :is(a, button).nt-button-purchase:is(:disabled, [aria-disabled="t
   :is(.nt-scope, body.nt-tokens) .nt-specular-overlay::after { display: none; }
   .nt-scope .nt-glass-pill:is([aria-pressed="true"], [aria-selected="true"]) { outline: 2px solid Highlight; outline-offset: 2px; }
 }
+dialog.nt-modal-dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog.nt-modal-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}

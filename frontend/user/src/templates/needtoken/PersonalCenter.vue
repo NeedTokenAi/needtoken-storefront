@@ -853,90 +853,24 @@
           <!-- 7. 我的订单 -->
           <OrdersPanel v-else-if="activeSection === 'orders'" />
 
-          <!-- 8. 资产与礼品卡（集合展示 API 额度 + 店面钱包 + 推广佣金 + 礼品卡兑换 + 钱包流水） -->
-          <template v-else-if="activeSection === 'assets'">
-            <div class="rounded-2xl border bg-card p-6 shadow-xs">
-              <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 class="text-lg font-bold text-foreground">{{ t('needtoken.memberConsole.assets.title') }}</h2>
-                  <p class="mt-1 text-xs text-muted-foreground">{{ t('needtoken.memberConsole.assets.subtitle') }}</p>
-                </div>
-                <Button v-if="showGatewayFeatures" as-child size="sm">
-                  <RouterLink to="/plans">{{ t('needtoken.memberConsole.quick.buyPlans') }}</RouterLink>
-                </Button>
-              </div>
-
-              <div class="grid grid-cols-1 gap-3.5 md:grid-cols-3">
-                <div class="rounded-xl border border-primary/25 bg-primary/5 p-4">
-                  <p class="text-xs font-medium text-muted-foreground">{{ t('needtoken.memberConsole.overview.storeWallet') }}</p>
-                  <p class="mt-1.5 font-mono text-xl font-black text-primary">
-                    {{ userProfileStore.loadingWallet ? '—' : storeWalletDisplay }}
-                  </p>
-                  <p class="mt-1 text-[11.5px] text-muted-foreground">
-                    {{
-                      showGatewayFeatures && apiSummary
-                        ? t('needtoken.memberConsole.assets.unifiedWalletNote', {
-                          usd: formatApiQuotaUsd(apiSummary.quota ?? 0),
-                        })
-                        : t('needtoken.memberConsole.assets.walletUsageNote')
-                    }}
-                  </p>
-                </div>
-
-                <div v-if="showGatewayFeatures" class="rounded-xl border bg-muted/20 p-4">
-                  <p class="text-xs font-medium text-muted-foreground">{{ t('needtoken.memberConsole.overview.apiPlanQuota') }}</p>
-                  <p class="mt-1.5 font-mono text-xl font-black text-foreground">
-                    {{ gatewayLoading && !apiSummary ? '—' : formatApiQuotaUsd(subscriptionRemainingQuota) }}
-                  </p>
-                  <p class="mt-1 text-[11.5px] text-muted-foreground">
-                    {{ t('needtoken.memberConsole.assets.planQuotaNote') }}
-                  </p>
-                </div>
-
-                <div class="rounded-xl border bg-muted/20 p-4">
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs font-medium text-muted-foreground">{{ t('needtoken.memberConsole.overview.affiliateCommission') }}</p>
-                    <button
-                      type="button"
-                      class="text-[11px] font-semibold text-primary hover:underline"
-                      @click="navigateToSection('affiliate')"
-                    >
-                      {{ t('needtoken.memberConsole.assets.goWithdraw') }}
-                    </button>
-                  </div>
-                  <p class="mt-1.5 font-mono text-xl font-black text-foreground">
-                    {{ affiliateLoading ? '—' : affiliateAvailableDisplay }}
-                  </p>
-                  <p class="mt-1 text-[11.5px] text-muted-foreground">{{ affiliateHintText }}</p>
-                </div>
-              </div>
-
-              <!-- 礼品卡兑换 / 钱包充值与流水 轻量切换 -->
-              <div class="mt-5 flex items-center gap-2 border-t pt-4">
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-colors"
-                  :class="assetsSubTab === 'giftCard' ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground hover:text-foreground'"
-                  @click="assetsSubTab = 'giftCard'"
-                >
-                  <Gift class="h-3.5 w-3.5" />
-                  <span>{{ t('needtoken.memberConsole.assets.tabGiftCard') }}</span>
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-colors"
-                  :class="assetsSubTab === 'wallet' ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground hover:text-foreground'"
-                  @click="assetsSubTab = 'wallet'"
-                >
-                  <Wallet class="h-3.5 w-3.5" />
-                  <span>{{ t('needtoken.memberConsole.assets.tabWallet') }}</span>
-                </button>
-              </div>
-            </div>
-
-            <GiftCardPanel v-if="assetsSubTab === 'giftCard'" @redeemed="handleAssetsChanged" />
-            <WalletPanel v-else />
-          </template>
+          <!-- 8. 我的钱包（统一钱包余额、套餐额度、弹窗充值与礼品卡兑换、合并资金与兑换记录） -->
+          <MemberWalletPanel
+            v-else-if="activeSection === 'assets'"
+            ref="memberWalletPanelRef"
+            :show-gateway-features="showGatewayFeatures"
+            :store-wallet-display="storeWalletDisplay"
+            :api-quota-display="apiSummary ? formatApiQuotaUsd(apiSummary.quota ?? 0) : ''"
+            :has-api-summary="!!apiSummary"
+            :gateway-loading="gatewayLoading"
+            :plan-quota-display="formatApiQuotaUsd(subscriptionRemainingQuota)"
+            :active-plan-count="activeSubscriptions.length"
+            :affiliate-loading="affiliateLoading"
+            :affiliate-available-display="affiliateAvailableDisplay"
+            :affiliate-hint-text="affiliateHintText"
+            :initial-modal="pendingWalletModal"
+            @changed="handleAssetsChanged"
+            @navigate="navigateToSection"
+          />
 
           <!-- 9. 推广拉新 -->
           <AffiliatePanel v-else-if="activeSection === 'affiliate'" />
@@ -1002,8 +936,6 @@ import { Button } from '@/components/ui/button'
 import ProfilePanel from '../../views/personal/ProfilePanel.vue'
 import SecurityPanel from '../../views/personal/SecurityPanel.vue'
 import OrdersPanel from '../../views/personal/OrdersPanel.vue'
-import WalletPanel from '../../views/personal/WalletPanel.vue'
-import GiftCardPanel from '../../views/personal/GiftCardPanel.vue'
 import AffiliatePanel from '../../views/personal/AffiliatePanel.vue'
 import ApiAccountLinkBanner from './components/ApiAccountLinkBanner.vue'
 import BrandMark from './components/BrandMark.vue'
@@ -1013,6 +945,7 @@ import GatewayModelsPanel from './components/member/GatewayModelsPanel.vue'
 import GatewayPlansPanel from './components/member/GatewayPlansPanel.vue'
 import GatewayPlaygroundPanel from './components/member/GatewayPlaygroundPanel.vue'
 import GatewayUsagePanel from './components/member/GatewayUsagePanel.vue'
+import MemberWalletPanel from './components/member/MemberWalletPanel.vue'
 import ResellerWorkspacePanel from './components/member/ResellerWorkspacePanel.vue'
 import { API_BASE_URL, NEEDTOKEN_BRAND_NAME } from './config'
 import { useApiAccountLink } from './composables/useApiAccountLink'
@@ -1130,12 +1063,19 @@ const onProfileFocusOut = (event: FocusEvent) => {
   }
 }
 
-const assetsSubTab = ref<'giftCard' | 'wallet'>(props.section === 'wallet' ? 'wallet' : 'giftCard')
+const memberWalletPanelRef = ref<InstanceType<typeof MemberWalletPanel> | null>(null)
+const pendingWalletModal = ref<'redeem' | 'recharge' | null>(props.section === 'giftCard' ? 'redeem' : null)
 watch(
   () => props.section,
   (next) => {
-    if (next === 'wallet') assetsSubTab.value = 'wallet'
-    else if (next === 'giftCard') assetsSubTab.value = 'giftCard'
+    if (next === 'giftCard') {
+      pendingWalletModal.value = 'redeem'
+      if (activeSection.value === 'assets') {
+        void memberWalletPanelRef.value?.openRedeemModal()
+      }
+    } else if (next !== 'assets') {
+      pendingWalletModal.value = null
+    }
   },
 )
 
@@ -1273,7 +1213,12 @@ const navigateToSection = (section: string) => {
 }
 
 const openAssetsSubTab = (tab: 'giftCard' | 'wallet') => {
-  assetsSubTab.value = tab
+  pendingWalletModal.value = tab === 'giftCard' ? 'redeem' : 'recharge'
+  if (activeSection.value === 'assets') {
+    if (tab === 'giftCard') void memberWalletPanelRef.value?.openRedeemModal()
+    else void memberWalletPanelRef.value?.openRechargeModal()
+    return
+  }
   navigateToSection('assets')
 }
 
