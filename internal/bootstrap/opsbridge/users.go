@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/constants"
@@ -22,6 +26,8 @@ import (
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	procurementapp "github.com/dujiao-next/internal/modules/procurement/application"
 	procurementcontract "github.com/dujiao-next/internal/modules/procurement/contract"
+	radarsubscriptioncontract "github.com/dujiao-next/internal/modules/radarsubscription/contract"
+	radarsubscriptiondomain "github.com/dujiao-next/internal/modules/radarsubscription/domain"
 	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
 	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
@@ -621,5 +627,407 @@ func (a *orderActionStoreAdapter) RetryProcurement(id uint) (*opscontract.RetryP
 		CollectedAt:   time.Now().UTC(),
 		ProcurementID: id,
 		Status:        constants.ProcurementStatusPending,
+	}, nil
+}
+
+type radarSubscriptionAdapter struct {
+	radar radarsubscriptioncontract.Store
+	users usercontract.Store
+}
+
+type radarMemberAccumulator struct {
+	userID             uint
+	channelsMap        map[string]bool
+	subUpdatedAt       *time.Time
+	sentCount          int
+	failedCount        int
+	totalDeliveries    int
+	lastDeliveryStatus string
+	lastDeliveryAt     *time.Time
+	lastDeliveryEmail  string
+	lastError          string
+	lastFailedAt       *time.Time
+	excluded           bool
+	excludeReason      string
+	excludedBy         string
+	excludedAt         *time.Time
+	latestActivityAt   *time.Time
+}
+
+func (a *radarSubscriptionAdapter) ensureMember(members map[uint]*radarMemberAccumulator, userID uint) *radarMemberAccumulator {
+	if acc, ok := members[userID]; ok {
+		return acc
+	}
+	acc := &radarMemberAccumulator{
+		userID:      userID,
+		channelsMap: make(map[string]bool),
+	}
+	members[userID] = acc
+	return acc
+}
+
+func bumpLatestTime(dst **time.Time, candidate time.Time) {
+	if candidate.IsZero() {
+		return
+	}
+	utc := candidate.UTC()
+	if *dst == nil || utc.After(**dst) {
+		*dst = &utc
+	}
+}
+
+func truncateRunes(s string, maxRunes int) string {
+	s = strings.TrimSpace(s)
+	if maxRunes <= 0 || utf8.RuneCountInString(s) <= maxRunes {
+		return s
+	}
+	runes := []rune(s)
+	return string(runes[:maxRunes])
+}
+
+func (a *radarSubscriptionAdapter) RadarSubscribers(filter opscontract.RadarSubscribersFilter) (*opscontract.RadarSubscribersResult, error) {
+	if a.radar == nil || a.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	subs, err := a.radar.ListAllSubscriptions()
+	if err != nil {
+		return nil, err
+	}
+	exclusions, err := a.radar.ListAllExclusions()
+	if err != nil {
+		return nil, err
+	}
+	deliveries, err := a.radar.ListAllDeliveries()
+	if err != nil {
+		return nil, err
+	}
+
+	members := make(map[uint]*radarMemberAccumulator)
+	for _, sub := range subs {
+		if sub.UserID == 0 {
+			continue
+		}
+		ch, ok := radarsubscriptiondomain.NormalizeChannel(sub.Channel)
+		if !ok {
+			continue
+		}
+		acc := a.ensureMember(members, sub.UserID)
+		acc.channelsMap[ch] = sub.Enabled
+		bumpLatestTime(&acc.subUpdatedAt, sub.UpdatedAt)
+		bumpLatestTime(&acc.latestActivityAt, sub.UpdatedAt)
+	}
+	for _, ex := range exclusions {
+		if ex.UserID == 0 {
+			continue
+		}
+		acc := a.ensureMember(members, ex.UserID)
+		acc.excluded = ex.Excluded
+		acc.excludeReason = strings.TrimSpace(ex.Reason)
+		acc.excludedBy = strings.TrimSpace(ex.UpdatedBy)
+		if ex.Excluded && !ex.UpdatedAt.IsZero() {
+			t := ex.UpdatedAt.UTC()
+			acc.excludedAt = &t
+		}
+		bumpLatestTime(&acc.latestActivityAt, ex.UpdatedAt)
+	}
+	for _, d := range deliveries {
+		if d.UserID == 0 {
+			continue
+		}
+		acc := a.ensureMember(members, d.UserID)
+		acc.totalDeliveries++
+		switch d.Status {
+		case radarsubscriptiondomain.DeliveryStatusSent:
+			acc.sentCount++
+		case radarsubscriptiondomain.DeliveryStatusFailed:
+			acc.failedCount++
+		}
+		eventTime := d.UpdatedAt
+		if d.SentAt != nil && !d.SentAt.IsZero() {
+			eventTime = *d.SentAt
+		}
+		if acc.lastDeliveryAt == nil || eventTime.UTC().After(*acc.lastDeliveryAt) {
+			t := eventTime.UTC()
+			acc.lastDeliveryAt = &t
+			acc.lastDeliveryStatus = d.Status
+			if strings.TrimSpace(d.Email) != "" {
+				acc.lastDeliveryEmail = strings.TrimSpace(d.Email)
+			}
+		}
+		if d.Status == radarsubscriptiondomain.DeliveryStatusFailed {
+			if acc.lastFailedAt == nil || eventTime.UTC().After(*acc.lastFailedAt) {
+				t := eventTime.UTC()
+				acc.lastFailedAt = &t
+				acc.lastError = strings.TrimSpace(d.LastError)
+			}
+		}
+		bumpLatestTime(&acc.latestActivityAt, eventTime)
+	}
+
+	allIDs := make([]uint, 0, len(members))
+	for uid := range members {
+		allIDs = append(allIDs, uid)
+	}
+	userMap := make(map[uint]userdomain.User, len(allIDs))
+	if len(allIDs) > 0 {
+		loadedUsers, err := a.users.ListByIDs(allIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, u := range loadedUsers {
+			userMap[u.ID] = u
+		}
+	}
+
+	channelCounts := make(map[string]int, len(radarsubscriptiondomain.ValidChannels))
+	for _, ch := range radarsubscriptiondomain.ValidChannels {
+		channelCounts[ch] = 0
+	}
+	summary := opscontract.RadarSubscribersSummary{
+		ChannelCounts: channelCounts,
+	}
+
+	allItems := make([]opscontract.RadarSubscriberItem, 0, len(members))
+	for _, acc := range members {
+		channels := make([]string, 0, len(radarsubscriptiondomain.ValidChannels))
+		for _, ch := range radarsubscriptiondomain.ValidChannels {
+			if acc.channelsMap[ch] {
+				channels = append(channels, ch)
+				summary.ChannelCounts[ch]++
+			}
+		}
+		if len(channels) > 0 {
+			summary.SubscribedMembers++
+		}
+		summary.TotalMembers++
+		summary.TotalSent += acc.sentCount
+		summary.TotalFailed += acc.failedCount
+		hasFailure := acc.failedCount > 0 || acc.lastDeliveryStatus == radarsubscriptiondomain.DeliveryStatusFailed
+		if hasFailure {
+			summary.FailedMembers++
+		}
+		if acc.excluded {
+			summary.ExcludedMembers++
+		}
+
+		email := acc.lastDeliveryEmail
+		displayName := ""
+		userStatus := "unknown"
+		if u, ok := userMap[acc.userID]; ok {
+			if strings.TrimSpace(u.Email) != "" {
+				email = strings.TrimSpace(u.Email)
+			}
+			displayName = strings.TrimSpace(u.DisplayName)
+			userStatus = strings.TrimSpace(u.Status)
+		}
+
+		allItems = append(allItems, opscontract.RadarSubscriberItem{
+			UserID:             acc.userID,
+			Email:              email,
+			DisplayName:        displayName,
+			UserStatus:         userStatus,
+			Channels:           channels,
+			SubscribedCount:    len(channels),
+			SentCount:          acc.sentCount,
+			FailedCount:        acc.failedCount,
+			TotalDeliveries:    acc.totalDeliveries,
+			HasFailure:         hasFailure,
+			LastDeliveryStatus: acc.lastDeliveryStatus,
+			LastDeliveryAt:     acc.lastDeliveryAt,
+			LastError:          acc.lastError,
+			LastFailedAt:       acc.lastFailedAt,
+			Excluded:           acc.excluded,
+			ExcludeReason:      acc.excludeReason,
+			ExcludedBy:         acc.excludedBy,
+			ExcludedAt:         acc.excludedAt,
+			UpdatedAt:          acc.latestActivityAt,
+		})
+	}
+
+	kw := strings.ToLower(strings.TrimSpace(filter.Keyword))
+	channelFilter := ""
+	if filter.Channel != "" && filter.Channel != "all" {
+		if normalized, ok := radarsubscriptiondomain.NormalizeChannel(filter.Channel); ok {
+			channelFilter = normalized
+		} else {
+			return nil, opscontract.ErrInvalidInput
+		}
+	}
+
+	filtered := make([]opscontract.RadarSubscriberItem, 0, len(allItems))
+	for _, item := range allItems {
+		switch filter.Scope {
+		case "subscribed":
+			if item.SubscribedCount == 0 {
+				continue
+			}
+		case "unsubscribed":
+			if item.SubscribedCount > 0 {
+				continue
+			}
+		}
+		if channelFilter != "" && !slices.Contains(item.Channels, channelFilter) {
+			continue
+		}
+		switch filter.DeliveryState {
+		case "failed":
+			if !item.HasFailure {
+				continue
+			}
+		case "ok", "sent":
+			if item.HasFailure || item.SentCount == 0 {
+				continue
+			}
+		case "none", "unsent":
+			if item.TotalDeliveries > 0 {
+				continue
+			}
+		}
+		switch filter.Excluded {
+		case "excluded", "true", "1":
+			if !item.Excluded {
+				continue
+			}
+		case "normal", "false", "0":
+			if item.Excluded {
+				continue
+			}
+		}
+		if kw != "" {
+			idStr := strconv.FormatUint(uint64(item.UserID), 10)
+			hay := strings.ToLower(idStr + " " + item.Email + " " + item.DisplayName)
+			if !strings.Contains(hay, kw) {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+
+	sort.Slice(filtered, func(i, j int) bool {
+		aItem, bItem := filtered[i], filtered[j]
+		aSub := aItem.SubscribedCount > 0
+		bSub := bItem.SubscribedCount > 0
+		if aSub != bSub {
+			return aSub
+		}
+		if aItem.HasFailure != bItem.HasFailure {
+			return aItem.HasFailure
+		}
+		var aTime, bTime time.Time
+		if aItem.UpdatedAt != nil {
+			aTime = *aItem.UpdatedAt
+		}
+		if bItem.UpdatedAt != nil {
+			bTime = *bItem.UpdatedAt
+		}
+		if !aTime.Equal(bTime) {
+			return aTime.After(bTime)
+		}
+		return aItem.UserID < bItem.UserID
+	})
+
+	total := int64(len(filtered))
+	start := (filter.Page - 1) * filter.PageSize
+	if start > len(filtered) {
+		start = len(filtered)
+	}
+	end := start + filter.PageSize
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	paged := filtered[start:end]
+
+	return &opscontract.RadarSubscribersResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		Freshness:   "fresh",
+		Summary:     summary,
+		Items:       paged,
+		Total:       total,
+		Page:        filter.Page,
+		PageSize:    filter.PageSize,
+	}, nil
+}
+
+func (a *radarSubscriptionAdapter) RadarSubscriberDeliveries(userID uint, limit int) (*opscontract.RadarDeliveriesResult, error) {
+	if a.radar == nil || a.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	user, err := a.users.GetByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := a.radar.ListUserDeliveries(userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil && len(rows) == 0 {
+		return nil, opscontract.ErrNotFound
+	}
+	items := make([]opscontract.RadarDeliveryItem, 0, len(rows))
+	email := ""
+	displayName := ""
+	if user != nil {
+		email = strings.TrimSpace(user.Email)
+		displayName = strings.TrimSpace(user.DisplayName)
+	}
+	for _, r := range rows {
+		if email == "" && strings.TrimSpace(r.Email) != "" {
+			email = strings.TrimSpace(r.Email)
+		}
+		items = append(items, opscontract.RadarDeliveryItem{
+			ID:        r.ID,
+			Channel:   r.Channel,
+			RecordID:  r.RecordID,
+			UserID:    r.UserID,
+			Email:     r.Email,
+			Status:    r.Status,
+			Attempts:  r.Attempts,
+			LastError: r.LastError,
+			SentAt:    r.SentAt,
+			CreatedAt: r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
+		})
+	}
+	return &opscontract.RadarDeliveriesResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		Freshness:   "fresh",
+		UserID:      userID,
+		Email:       email,
+		DisplayName: displayName,
+		Items:       items,
+		Total:       len(items),
+	}, nil
+}
+
+func (a *radarSubscriptionAdapter) SetRadarSubscriberExclusion(userID uint, input opscontract.UpdateRadarExclusionInput) (*opscontract.RadarExclusionResult, error) {
+	if a.radar == nil || a.users == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	user, err := a.users.GetByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, opscontract.ErrNotFound
+	}
+	reason := truncateRunes(input.Reason, 255)
+	if !input.Excluded {
+		reason = ""
+	}
+	operator := truncateRunes(input.Operator, 128)
+	saved, err := a.radar.UpsertMemberExclusion(userID, input.Excluded, reason, operator)
+	if err != nil {
+		return nil, err
+	}
+	return &opscontract.RadarExclusionResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		UserID:      saved.UserID,
+		Excluded:    saved.Excluded,
+		Reason:      saved.Reason,
+		UpdatedBy:   saved.UpdatedBy,
+		UpdatedAt:   saved.UpdatedAt,
 	}, nil
 }

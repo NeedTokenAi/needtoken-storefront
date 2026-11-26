@@ -25,6 +25,14 @@ func (s *Store) ListByUser(userID uint) ([]radarsubscriptiondomain.Subscription,
 	return rows, nil
 }
 
+func (s *Store) ListAllSubscriptions() ([]radarsubscriptiondomain.Subscription, error) {
+	var rows []radarsubscriptiondomain.Subscription
+	if err := s.db.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
 func (s *Store) UpsertUserChannels(userID uint, channels map[string]bool) error {
 	if len(channels) == 0 {
 		return nil
@@ -61,6 +69,59 @@ func (s *Store) ListSubscribedUserIDs(channel string) ([]uint, error) {
 		return nil, err
 	}
 	return userIDs, nil
+}
+
+func (s *Store) ListExcludedUserIDs(userIDs []uint) (map[uint]bool, error) {
+	excluded := make(map[uint]bool)
+	if len(userIDs) == 0 {
+		return excluded, nil
+	}
+	var ids []uint
+	if err := s.db.Model(&radarsubscriptiondomain.MemberExclusion{}).
+		Where("user_id IN ? AND excluded = ?", userIDs, true).
+		Pluck("user_id", &ids).Error; err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		excluded[id] = true
+	}
+	return excluded, nil
+}
+
+func (s *Store) ListAllExclusions() ([]radarsubscriptiondomain.MemberExclusion, error) {
+	var rows []radarsubscriptiondomain.MemberExclusion
+	if err := s.db.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (s *Store) UpsertMemberExclusion(userID uint, excluded bool, reason, updatedBy string) (*radarsubscriptiondomain.MemberExclusion, error) {
+	now := time.Now().UTC()
+	row := radarsubscriptiondomain.MemberExclusion{
+		UserID:    userID,
+		Excluded:  excluded,
+		Reason:    reason,
+		UpdatedBy: updatedBy,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "user_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"excluded":   excluded,
+			"reason":     reason,
+			"updated_by": updatedBy,
+			"updated_at": now,
+		}),
+	}).Create(&row).Error; err != nil {
+		return nil, err
+	}
+	var persisted radarsubscriptiondomain.MemberExclusion
+	if err := s.db.Where("user_id = ?", userID).First(&persisted).Error; err != nil {
+		return nil, err
+	}
+	return &persisted, nil
 }
 
 func (s *Store) CountSeenEvents(channel string) (int64, error) {
@@ -130,6 +191,28 @@ func (s *Store) UpsertDelivery(delivery *radarsubscriptiondomain.EventDelivery) 
 			"updated_at": now,
 		}),
 	}).Create(delivery).Error
+}
+
+func (s *Store) ListAllDeliveries() ([]radarsubscriptiondomain.EventDelivery, error) {
+	var rows []radarsubscriptiondomain.EventDelivery
+	if err := s.db.Order("updated_at DESC, id DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (s *Store) ListUserDeliveries(userID uint, limit int) ([]radarsubscriptiondomain.EventDelivery, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	var rows []radarsubscriptiondomain.EventDelivery
+	if err := s.db.Where("user_id = ?", userID).Order("updated_at DESC, id DESC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
 }
 
 var _ radarsubscriptioncontract.Store = (*Store)(nil)

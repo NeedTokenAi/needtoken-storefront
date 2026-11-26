@@ -85,3 +85,18 @@ type EventDelivery struct {
 func (EventDelivery) TableName() string {
 	return "radar_event_deliveries"
 }
+
+// MemberExclusion tracks members silently excluded by OPS from future radar reset emails.
+type MemberExclusion struct {
+	ID        uint   `gorm:"primaryKey"`
+	UserID    uint   `gorm:"not null;uniqueIndex:idx_radar_exclusion_user"`
+	Excluded  bool   `gorm:"not null;index"`
+	Reason    string `gorm:"size:255"`
+	UpdatedBy string `gorm:"size:128"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (MemberExclusion) TableName() string {
+	return "radar_member_exclusions"
+}

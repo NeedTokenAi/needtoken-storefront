@@ -18,6 +18,7 @@ type Handler struct {
 	bridge    opscontract.Bridge
 	slo       opscontract.SLORevokeHandler
 	ugcClaims opscontract.UniversalGiftCardClaimLookup
+	radar     opscontract.RadarSubscriptionHandler
 }
 
 func New(reader opscontract.Reader) *Handler {
@@ -30,6 +31,9 @@ func New(reader opscontract.Reader) *Handler {
 	}
 	if u, ok := reader.(opscontract.UniversalGiftCardClaimLookup); ok {
 		h.ugcClaims = u
+	}
+	if r, ok := reader.(opscontract.RadarSubscriptionHandler); ok {
+		h.radar = r
 	}
 	return h
 }
@@ -893,6 +897,71 @@ func (h *Handler) UnbindUserOAuth(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{"unbound": true, "user_id": uint(id), "provider": strings.ToLower(strings.TrimSpace(c.Param("provider")))})
+}
+
+func (h *Handler) RadarSubscribers(c *gin.Context) {
+	if h.radar == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	result, err := h.radar.RadarSubscribers(opscontract.RadarSubscribersFilter{
+		Page:          page,
+		PageSize:      pageSize,
+		Keyword:       c.Query("keyword"),
+		Channel:       c.Query("channel"),
+		DeliveryState: c.Query("delivery_state"),
+		Excluded:      c.Query("excluded"),
+		Scope:         c.Query("scope"),
+	})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) RadarSubscriberDeliveries(c *gin.Context) {
+	if h.radar == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	userID, err := strconv.ParseUint(c.Param("user_id"), 10, 64)
+	if err != nil || userID == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	result, err := h.radar.RadarSubscriberDeliveries(uint(userID), limit)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *Handler) SetRadarSubscriberExclusion(c *gin.Context) {
+	if h.radar == nil {
+		fail(c, opscontract.ErrNotConfigured)
+		return
+	}
+	userID, err := strconv.ParseUint(c.Param("user_id"), 10, 64)
+	if err != nil || userID == 0 {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	var req opscontract.UpdateRadarExclusionInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, opscontract.ErrInvalidInput)
+		return
+	}
+	result, err := h.radar.SetRadarSubscriberExclusion(uint(userID), req)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, result)
 }
 
 func fail(c *gin.Context, err error) {

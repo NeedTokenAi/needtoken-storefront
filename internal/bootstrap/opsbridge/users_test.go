@@ -25,6 +25,8 @@ import (
 	procurementapp "github.com/dujiao-next/internal/modules/procurement/application"
 	procurementdomain "github.com/dujiao-next/internal/modules/procurement/domain"
 	procurementstore "github.com/dujiao-next/internal/modules/procurement/infrastructure/gormstore"
+	radarsubscriptiondomain "github.com/dujiao-next/internal/modules/radarsubscription/domain"
+	radarsubscriptiongormstore "github.com/dujiao-next/internal/modules/radarsubscription/infrastructure/gormstore"
 	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	walletgormstore "github.com/dujiao-next/internal/modules/wallet/infrastructure/gormstore"
@@ -364,5 +366,143 @@ func TestOpsBridgeOrdersFilteredAndActions(t *testing.T) {
 	retryRes, err := svc.RetryProcurement(procOrder.ID)
 	if err != nil || retryRes.Status != constants.ProcurementStatusPending {
 		t.Fatalf("RetryProcurement failed: %+v err=%v", retryRes, err)
+	}
+}
+
+func TestOpsBridgeRadarSubscribersAggregationAndExclusion(t *testing.T) {
+	dsn := fmt.Sprintf("file:opsbridge_radar_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(
+		&userdomain.User{},
+		&radarsubscriptiondomain.Subscription{},
+		&radarsubscriptiondomain.EventDelivery{},
+		&radarsubscriptiondomain.MemberExclusion{},
+	); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	uStore := userstore.New(db)
+	rStore := radarsubscriptiongormstore.New(db)
+
+	alice := &userdomain.User{Email: "alice@example.com", DisplayName: "Alice", Status: constants.UserStatusActive}
+	bob := &userdomain.User{Email: "bob@example.com", DisplayName: "Bob", Status: constants.UserStatusActive}
+	if err := uStore.Create(alice); err != nil {
+		t.Fatalf("create alice: %v", err)
+	}
+	if err := uStore.Create(bob); err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+
+	if err := rStore.UpsertUserChannels(alice.ID, map[string]bool{
+		radarsubscriptiondomain.ChannelCodex:  true,
+		radarsubscriptiondomain.ChannelClaude: true,
+		radarsubscriptiondomain.ChannelGemini: true,
+	}); err != nil {
+		t.Fatalf("upsert alice subs: %v", err)
+	}
+	if err := rStore.UpsertUserChannels(bob.ID, map[string]bool{
+		radarsubscriptiondomain.ChannelGrok: true,
+	}); err != nil {
+		t.Fatalf("upsert bob subs: %v", err)
+	}
+
+	now := time.Now().UTC()
+	sentAt := now.Add(-10 * time.Minute)
+	if err := rStore.UpsertDelivery(&radarsubscriptiondomain.EventDelivery{
+		Channel:  radarsubscriptiondomain.ChannelCodex,
+		RecordID: "rec-1",
+		UserID:   alice.ID,
+		Email:    alice.Email,
+		Status:   radarsubscriptiondomain.DeliveryStatusSent,
+		Attempts: 1,
+		SentAt:   &sentAt,
+	}); err != nil {
+		t.Fatalf("upsert alice delivery: %v", err)
+	}
+	if err := rStore.UpsertDelivery(&radarsubscriptiondomain.EventDelivery{
+		Channel:   radarsubscriptiondomain.ChannelGrok,
+		RecordID:  "rec-2",
+		UserID:    bob.ID,
+		Email:     bob.Email,
+		Status:    radarsubscriptiondomain.DeliveryStatusFailed,
+		Attempts:  1,
+		LastError: "smtp 550 mailbox unavailable",
+	}); err != nil {
+		t.Fatalf("upsert bob delivery: %v", err)
+	}
+
+	svc := opsapp.New(nil, nil, nil).WithRadarSubscriptions(&radarSubscriptionAdapter{
+		radar: rStore,
+		users: uStore,
+	})
+
+	// 1. Exclude Bob
+	exRes, err := svc.SetRadarSubscriberExclusion(bob.ID, opscontract.UpdateRadarExclusionInput{
+		Excluded: true,
+		Reason:   "mailbox bounced",
+		Operator: "ops-owner",
+	})
+	if err != nil {
+		t.Fatalf("exclude bob: %v", err)
+	}
+	if !exRes.Excluded || exRes.Reason != "mailbox bounced" || exRes.UpdatedBy != "ops-owner" {
+		t.Fatalf("unexpected exclusion result: %+v", exRes)
+	}
+
+	// 2. Query summary & all items
+	res, err := svc.RadarSubscribers(opscontract.RadarSubscribersFilter{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("RadarSubscribers: %v", err)
+	}
+	if res.Summary.SubscribedMembers != 2 || res.Summary.TotalSent != 1 || res.Summary.TotalFailed != 1 ||
+		res.Summary.FailedMembers != 1 || res.Summary.ExcludedMembers != 1 ||
+		res.Summary.ChannelCounts["codex"] != 1 || res.Summary.ChannelCounts["grok"] != 1 {
+		t.Fatalf("unexpected summary: %+v", res.Summary)
+	}
+	if len(res.Items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(res.Items))
+	}
+	// Bob has failure so sorts ahead of Alice among active subscribers.
+	if res.Items[0].UserID != bob.ID || !res.Items[0].HasFailure || !res.Items[0].Excluded || res.Items[0].LastError != "smtp 550 mailbox unavailable" {
+		t.Fatalf("unexpected first item (bob): %+v", res.Items[0])
+	}
+	if res.Items[1].UserID != alice.ID || res.Items[1].SubscribedCount != 3 || res.Items[1].SentCount != 1 || res.Items[1].HasFailure {
+		t.Fatalf("unexpected second item (alice): %+v", res.Items[1])
+	}
+
+	// 3. Filter failed & excluded
+	failedOnly, err := svc.RadarSubscribers(opscontract.RadarSubscribersFilter{
+		Page:          1,
+		PageSize:      20,
+		DeliveryState: "failed",
+		Excluded:      "excluded",
+	})
+	if err != nil {
+		t.Fatalf("filtered query failed: %v", err)
+	}
+	if failedOnly.Total != 1 || failedOnly.Items[0].UserID != bob.ID {
+		t.Fatalf("unexpected filtered items: %+v", failedOnly)
+	}
+
+	// 4. Fetch Bob deliveries
+	delivRes, err := svc.RadarSubscriberDeliveries(bob.ID, 20)
+	if err != nil {
+		t.Fatalf("RadarSubscriberDeliveries: %v", err)
+	}
+	if delivRes.Total != 1 || delivRes.Items[0].LastError != "smtp 550 mailbox unavailable" {
+		t.Fatalf("unexpected deliveries: %+v", delivRes)
+	}
+
+	// 5. Re-include Bob
+	incRes, err := svc.SetRadarSubscriberExclusion(bob.ID, opscontract.UpdateRadarExclusionInput{
+		Excluded: false,
+		Reason:   "ignored",
+		Operator: "ops-owner",
+	})
+	if err != nil || incRes.Excluded || incRes.Reason != "" {
+		t.Fatalf("unexpected re-include result: %+v err=%v", incRes, err)
 	}
 }

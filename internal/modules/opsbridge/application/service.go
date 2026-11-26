@@ -52,6 +52,7 @@ type Service struct {
 	orderActions    opscontract.OrderActionStore
 	users           opscontract.UserStore
 	ugcClaims       opscontract.UniversalGiftCardClaimStore
+	radarStore      opscontract.RadarSubscriptionStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -145,6 +146,11 @@ func (s *Service) WithUserSessionRevoker(revoker opscontract.UserSessionRevoker)
 
 func (s *Service) WithUniversalGiftCardClaims(store opscontract.UniversalGiftCardClaimStore) *Service {
 	s.ugcClaims = store
+	return s
+}
+
+func (s *Service) WithRadarSubscriptions(store opscontract.RadarSubscriptionStore) *Service {
+	s.radarStore = store
 	return s
 }
 
@@ -2115,4 +2121,53 @@ func (s *Service) UnbindUserOAuth(id uint, provider string) error {
 		return opscontract.ErrInvalidInput
 	}
 	return s.users.UnbindUserOAuth(id, provider)
+}
+
+func (s *Service) RadarSubscribers(filter opscontract.RadarSubscribersFilter) (*opscontract.RadarSubscribersResult, error) {
+	if s.radarStore == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 50
+	}
+	if filter.PageSize > 200 {
+		filter.PageSize = 200
+	}
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
+	filter.Channel = strings.ToLower(strings.TrimSpace(filter.Channel))
+	filter.DeliveryState = strings.ToLower(strings.TrimSpace(filter.DeliveryState))
+	filter.Excluded = strings.ToLower(strings.TrimSpace(filter.Excluded))
+	filter.Scope = strings.ToLower(strings.TrimSpace(filter.Scope))
+	return s.radarStore.RadarSubscribers(filter)
+}
+
+func (s *Service) RadarSubscriberDeliveries(userID uint, limit int) (*opscontract.RadarDeliveriesResult, error) {
+	if s.radarStore == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if userID == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	return s.radarStore.RadarSubscriberDeliveries(userID, limit)
+}
+
+func (s *Service) SetRadarSubscriberExclusion(userID uint, input opscontract.UpdateRadarExclusionInput) (*opscontract.RadarExclusionResult, error) {
+	if s.radarStore == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	if userID == 0 {
+		return nil, opscontract.ErrInvalidInput
+	}
+	input.Reason = strings.TrimSpace(input.Reason)
+	input.Operator = strings.TrimSpace(input.Operator)
+	return s.radarStore.SetRadarSubscriberExclusion(userID, input)
 }

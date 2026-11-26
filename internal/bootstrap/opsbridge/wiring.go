@@ -126,6 +126,12 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 			procurements: c.ProcurementOrderService,
 		})
 	}
+	if c.RadarSubscriptionRepo != nil && c.UserStore != nil {
+		svc.WithRadarSubscriptions(&radarSubscriptionAdapter{
+			radar: c.RadarSubscriptionRepo,
+			users: c.UserStore,
+		})
+	}
 	return opstransport.New(svc)
 }
 

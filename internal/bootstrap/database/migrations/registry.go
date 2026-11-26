@@ -107,6 +107,7 @@ func AutoMigrate() error {
 		&radarsubscriptiondomain.Subscription{},
 		&radarsubscriptiondomain.SeenEvent{},
 		&radarsubscriptiondomain.EventDelivery{},
+		&radarsubscriptiondomain.MemberExclusion{},
 	); err != nil {
 		return err
 	}

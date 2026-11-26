@@ -891,6 +891,112 @@ type UserStore interface {
 	UnbindUserOAuth(id uint, provider string) error
 }
 
+type RadarSubscribersFilter struct {
+	Page          int
+	PageSize      int
+	Keyword       string
+	Channel       string
+	DeliveryState string
+	Excluded      string
+	Scope         string
+}
+
+type RadarSubscribersSummary struct {
+	SubscribedMembers int            `json:"subscribed_members"`
+	TotalMembers      int            `json:"total_members"`
+	ChannelCounts     map[string]int `json:"channel_counts"`
+	TotalSent         int            `json:"total_sent"`
+	TotalFailed       int            `json:"total_failed"`
+	FailedMembers     int            `json:"failed_members"`
+	ExcludedMembers   int            `json:"excluded_members"`
+}
+
+type RadarSubscriberItem struct {
+	UserID             uint       `json:"user_id"`
+	Email              string     `json:"email"`
+	DisplayName        string     `json:"display_name"`
+	UserStatus         string     `json:"user_status"`
+	Channels           []string   `json:"channels"`
+	SubscribedCount    int        `json:"subscribed_count"`
+	SentCount          int        `json:"sent_count"`
+	FailedCount        int        `json:"failed_count"`
+	TotalDeliveries    int        `json:"total_deliveries"`
+	HasFailure         bool       `json:"has_failure"`
+	LastDeliveryStatus string     `json:"last_delivery_status,omitempty"`
+	LastDeliveryAt     *time.Time `json:"last_delivery_at,omitempty"`
+	LastError          string     `json:"last_error,omitempty"`
+	LastFailedAt       *time.Time `json:"last_failed_at,omitempty"`
+	Excluded           bool       `json:"excluded"`
+	ExcludeReason      string     `json:"exclude_reason,omitempty"`
+	ExcludedBy         string     `json:"excluded_by,omitempty"`
+	ExcludedAt         *time.Time `json:"excluded_at,omitempty"`
+	UpdatedAt          *time.Time `json:"updated_at,omitempty"`
+}
+
+type RadarSubscribersResult struct {
+	Source      string                  `json:"source"`
+	CollectedAt time.Time               `json:"collected_at"`
+	Freshness   string                  `json:"freshness"`
+	Summary     RadarSubscribersSummary `json:"summary"`
+	Items       []RadarSubscriberItem   `json:"items"`
+	Total       int64                   `json:"total"`
+	Page        int                     `json:"page"`
+	PageSize    int                     `json:"page_size"`
+}
+
+type RadarDeliveryItem struct {
+	ID        uint       `json:"id"`
+	Channel   string     `json:"channel"`
+	RecordID  string     `json:"record_id"`
+	UserID    uint       `json:"user_id"`
+	Email     string     `json:"email"`
+	Status    string     `json:"status"`
+	Attempts  int        `json:"attempts"`
+	LastError string     `json:"last_error,omitempty"`
+	SentAt    *time.Time `json:"sent_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+type RadarDeliveriesResult struct {
+	Source      string              `json:"source"`
+	CollectedAt time.Time           `json:"collected_at"`
+	Freshness   string              `json:"freshness"`
+	UserID      uint                `json:"user_id"`
+	Email       string              `json:"email"`
+	DisplayName string              `json:"display_name"`
+	Items       []RadarDeliveryItem `json:"items"`
+	Total       int                 `json:"total"`
+}
+
+type UpdateRadarExclusionInput struct {
+	Excluded bool   `json:"excluded"`
+	Reason   string `json:"reason,omitempty"`
+	Operator string `json:"operator,omitempty"`
+}
+
+type RadarExclusionResult struct {
+	Source      string    `json:"source"`
+	CollectedAt time.Time `json:"collected_at"`
+	UserID      uint      `json:"user_id"`
+	Excluded    bool      `json:"excluded"`
+	Reason      string    `json:"reason,omitempty"`
+	UpdatedBy   string    `json:"updated_by,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type RadarSubscriptionStore interface {
+	RadarSubscribers(filter RadarSubscribersFilter) (*RadarSubscribersResult, error)
+	RadarSubscriberDeliveries(userID uint, limit int) (*RadarDeliveriesResult, error)
+	SetRadarSubscriberExclusion(userID uint, input UpdateRadarExclusionInput) (*RadarExclusionResult, error)
+}
+
+type RadarSubscriptionHandler interface {
+	RadarSubscribers(filter RadarSubscribersFilter) (*RadarSubscribersResult, error)
+	RadarSubscriberDeliveries(userID uint, limit int) (*RadarDeliveriesResult, error)
+	SetRadarSubscriberExclusion(userID uint, input UpdateRadarExclusionInput) (*RadarExclusionResult, error)
+}
+
 type Reader interface {
 	Orders(page, pageSize int) (*OrdersResult, error)
 	Overview() (*Overview, error)

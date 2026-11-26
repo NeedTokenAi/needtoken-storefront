@@ -248,6 +248,22 @@ func (s *Service) pollChannel(ctx context.Context, channel string) error {
 	if err != nil || len(userIDs) == 0 {
 		return err
 	}
+	excludedUsers, err := s.store.ListExcludedUserIDs(userIDs)
+	if err != nil {
+		return err
+	}
+	if len(excludedUsers) > 0 {
+		filtered := make([]uint, 0, len(userIDs))
+		for _, uid := range userIDs {
+			if !excludedUsers[uid] {
+				filtered = append(filtered, uid)
+			}
+		}
+		userIDs = filtered
+	}
+	if len(userIDs) == 0 {
+		return nil
+	}
 	users, err := s.userStore.ListByIDs(userIDs)
 	if err != nil || len(users) == 0 {
 		return err
