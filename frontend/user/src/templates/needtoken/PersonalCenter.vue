@@ -649,9 +649,9 @@
                               <span
                                 v-for="grp in splitGroups(sub.allowed_groups)"
                                 :key="grp"
-                                class="rounded-md border bg-background px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-muted-foreground"
+                                class="rounded-md border bg-background px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground"
                               >
-                                {{ grp }}
+                                {{ formatOverviewGroup(grp) }}
                               </span>
                             </div>
                           </div>
@@ -738,6 +738,23 @@
                 <!-- 快捷工作台 -->
                 <div class="rounded-2xl border bg-card p-4 shadow-xs">
                   <h2 class="mb-3 text-sm font-bold text-foreground">{{ t('needtoken.memberConsole.quick.title') }}</h2>
+                  <button
+                    v-if="showGatewayFeatures"
+                    type="button"
+                    class="mb-2.5 flex w-full items-center justify-between gap-2 rounded-xl border border-primary/35 bg-primary/8 px-3.5 py-2.5 text-left transition-colors hover:border-primary/60 hover:bg-primary/12"
+                    @click="openQuickUseDrawer()"
+                  >
+                    <div class="flex min-w-0 items-center gap-2.5">
+                      <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+                        <Zap class="h-4 w-4" />
+                      </span>
+                      <div class="min-w-0">
+                        <p class="truncate text-xs font-bold text-foreground">{{ t('needtoken.memberConsole.quick.quickUse') }}</p>
+                        <p class="truncate text-[11px] text-muted-foreground">{{ t('needtoken.memberConsole.quick.quickUseHint') }}</p>
+                      </div>
+                    </div>
+                    <ChevronRight class="h-4 w-4 shrink-0 text-primary" />
+                  </button>
                   <div class="grid grid-cols-2 gap-2">
                     <Button v-if="showGatewayFeatures" size="sm" class="h-9 justify-start px-3 text-xs" @click="navigateToSection('keys')">
                       <KeyRound class="mr-1.5 h-3.5 w-3.5 shrink-0" />
@@ -836,7 +853,12 @@
           </template>
 
           <!-- 2. API 密钥管理 -->
-          <GatewayKeysPanel v-else-if="activeSection === 'keys' && showGatewayFeatures" @changed="refreshGatewayData" />
+          <GatewayKeysPanel
+            v-else-if="activeSection === 'keys' && showGatewayFeatures"
+            ref="gatewayKeysPanelRef"
+            @changed="refreshGatewayData"
+            @open-quick-use="openQuickUseDrawer"
+          />
 
           <!-- 3. 模型与计费（模型目录 + 分组实时价格 + 调用分析） -->
           <GatewayModelsPanel v-else-if="activeSection === 'models' && showGatewayFeatures" />
@@ -888,11 +910,18 @@
         </div>
       </main>
     </div>
+
+    <!-- 快捷使用 70% × 100% 抽屉（自动注入会员专属密钥与模型配置） -->
+    <MemberQuickUseDrawer
+      v-if="showGatewayFeatures"
+      ref="quickUseDrawerRef"
+      @create-key="handleQuickUseCreateKey"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import {
@@ -923,6 +952,7 @@ import {
   UserPlus,
   Wallet,
   X,
+  Zap,
 } from 'lucide-vue-next'
 import { affiliateAPI, type AffiliateDashboardData } from '../../api'
 import { useAppStore } from '../../stores/app'
@@ -945,6 +975,7 @@ import GatewayModelsPanel from './components/member/GatewayModelsPanel.vue'
 import GatewayPlansPanel from './components/member/GatewayPlansPanel.vue'
 import GatewayPlaygroundPanel from './components/member/GatewayPlaygroundPanel.vue'
 import GatewayUsagePanel from './components/member/GatewayUsagePanel.vue'
+import MemberQuickUseDrawer from './components/member/MemberQuickUseDrawer.vue'
 import MemberWalletPanel from './components/member/MemberWalletPanel.vue'
 import ResellerWorkspacePanel from './components/member/ResellerWorkspacePanel.vue'
 import { API_BASE_URL, NEEDTOKEN_BRAND_NAME } from './config'
@@ -956,11 +987,17 @@ import {
   formatSubscriptionExpiry,
 } from './lib/apiAccountLinkPolicy'
 import {
+  formatConsoleGroupLabel,
   normalizeNeedtokenMemberSection,
   sumSubscriptionRemainingQuota,
   type NeedtokenMemberSection,
 } from './lib/gatewayConsoleHelpers'
-import { getGatewayUsage, listGatewayTokens, type GatewayUsageResponse } from './lib/gatewayConsoleApi'
+import {
+  getGatewayUsage,
+  listGatewayTokens,
+  type GatewayGroupMetaItem,
+  type GatewayUsageResponse,
+} from './lib/gatewayConsoleApi'
 
 const props = withDefaults(defineProps<{ section?: PersonalSection }>(), {
   section: 'overview',
@@ -1064,6 +1101,18 @@ const onProfileFocusOut = (event: FocusEvent) => {
 }
 
 const memberWalletPanelRef = ref<InstanceType<typeof MemberWalletPanel> | null>(null)
+const gatewayKeysPanelRef = ref<InstanceType<typeof GatewayKeysPanel> | null>(null)
+const quickUseDrawerRef = ref<InstanceType<typeof MemberQuickUseDrawer> | null>(null)
+const openQuickUseDrawer = (tokenId?: number) => {
+  quickUseDrawerRef.value?.openDrawer(tokenId)
+}
+const handleQuickUseCreateKey = async () => {
+  navigateToSection('keys')
+  await nextTick()
+  setTimeout(() => {
+    gatewayKeysPanelRef.value?.openCreateModal()
+  }, 120)
+}
 const pendingWalletModal = ref<'redeem' | 'recharge' | null>(props.section === 'giftCard' ? 'redeem' : null)
 watch(
   () => props.section,
@@ -1225,8 +1274,14 @@ const openAssetsSubTab = (tab: 'giftCard' | 'wallet') => {
 const gatewayLoading = ref(false)
 const activeKeyCount = ref<number | null>(null)
 const overviewUsage = ref<GatewayUsageResponse | null>(null)
+const overviewGroupMeta = ref<Record<string, GatewayGroupMetaItem>>({})
+const overviewUsableGroups = ref<Record<string, string>>({})
+const overviewGroupRatio = ref<Record<string, number>>({})
 const affiliateLoading = ref(false)
 const affiliateDashboard = ref<AffiliateDashboardData | null>(null)
+
+const formatOverviewGroup = (code: string) =>
+  formatConsoleGroupLabel(code, overviewGroupMeta.value, overviewUsableGroups.value, overviewGroupRatio.value)
 
 const overviewBarPercent = (quota: number) => {
   const daily = overviewUsage.value?.daily || []
@@ -1314,6 +1369,9 @@ const refreshGatewayData = async () => {
     if (tokenRes) {
       const items = Array.isArray(tokenRes.items) ? tokenRes.items : []
       activeKeyCount.value = items.filter(tok => tok.status === 1).length
+      overviewGroupMeta.value = tokenRes.group_meta || {}
+      overviewUsableGroups.value = tokenRes.usable_groups || {}
+      overviewGroupRatio.value = tokenRes.group_ratio || {}
     } else {
       activeKeyCount.value = null
     }

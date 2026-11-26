@@ -134,6 +134,15 @@
 
         <!-- Tab 1 筛选 -->
         <form v-if="logTab === 'common'" class="flex flex-wrap items-center gap-2" @submit.prevent="searchLogs">
+          <NeedtokenSelect
+            v-if="groupFilterOptions.length > 1"
+            v-model="filterGroup"
+            :options="groupFilterOptions"
+            :label="t('needtoken.memberConsole.usage.allGroups')"
+            compact
+            align="start"
+            class="min-w-[165px]"
+          />
           <input
             v-model="filterModel"
             type="text"
@@ -163,15 +172,13 @@
             :placeholder="t('needtoken.memberConsole.usage.taskIdPlaceholder')"
             class="h-8 w-44 rounded-lg border bg-background px-2.5 text-xs text-foreground outline-none focus:border-primary"
           />
-          <select
+          <NeedtokenSelect
             v-model="taskStatusFilter"
-            class="h-8 rounded-lg border bg-background px-2.5 text-xs text-foreground outline-none focus:border-primary"
-          >
-            <option value="">{{ t('needtoken.memberConsole.usage.allStatuses') }}</option>
-            <option value="SUCCESS">SUCCESS</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="FAILURE">FAILURE</option>
-          </select>
+            :options="taskStatusOptions"
+            :label="t('needtoken.memberConsole.usage.colStatus')"
+            compact
+            class="min-w-[130px]"
+          />
           <Button type="submit" variant="outline" size="sm" :disabled="tasksLoading">
             <Search class="mr-1 h-3.5 w-3.5" />
             {{ t('needtoken.memberConsole.usage.filterAction') }}
@@ -227,7 +234,7 @@
                     <span class="font-mono font-semibold text-foreground">{{ row.model_name || '-' }}</span>
                     <span v-if="row.is_stream" class="rounded bg-primary/10 px-1 py-0.5 text-[10px] font-semibold text-primary">SSE</span>
                   </div>
-                  <span v-if="row.group" class="text-[10.5px] text-muted-foreground">{{ row.group }}</span>
+                  <span v-if="row.group" class="text-[10.5px] text-muted-foreground">{{ formatGroup(row.group) }}</span>
                 </td>
                 <td class="px-4 py-2.5 text-muted-foreground">{{ row.token_name || '-' }}</td>
                 <td class="whitespace-nowrap px-4 py-2.5 font-mono text-muted-foreground">
@@ -379,18 +386,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { FileText, Image as ImageIcon, ListTodo, RefreshCw, Search } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import NeedtokenSelect from '../NeedtokenSelect.vue'
 import { formatApiQuotaUsd } from '../../lib/apiAccountLinkPolicy'
 import {
+  buildSelectableGroupOptions,
+  formatConsoleGroupLabel,
+} from '../../lib/gatewayConsoleHelpers'
+import {
+  getGatewayModels,
   getGatewayUsage,
   listGatewayDrawings,
   listGatewayLogs,
   listGatewayTasks,
   type GatewayDrawingItem,
+  type GatewayGroupMetaItem,
   type GatewayLogItem,
   type GatewayTaskItem,
   type GatewayUsageDailyItem,
@@ -414,11 +428,17 @@ const usage = ref<GatewayUsageResponse>({
   models: [],
 })
 
+const usableGroups = ref<Record<string, string>>({})
+const groupRatio = ref<Record<string, number>>({})
+const groupMeta = ref<Record<string, GatewayGroupMetaItem>>({})
+const defaultGroup = ref('default')
+
 const logs = ref<GatewayLogItem[]>([])
 const logsTotal = ref(0)
 const page = ref(1)
 const pageSize = 20
 const logsLoading = ref(false)
+const filterGroup = ref('')
 const filterModel = ref('')
 const filterToken = ref('')
 const errorMsg = ref('')
@@ -441,6 +461,43 @@ const dayOptions = computed(() => [
   { days: 7, label: t('needtoken.memberConsole.usage.range7d') },
   { days: 30, label: t('needtoken.memberConsole.usage.range30d') },
 ])
+
+const groupFilterOptions = computed(() => {
+  const opts = buildSelectableGroupOptions({
+    usableGroups: usableGroups.value,
+    groupMeta: groupMeta.value,
+    groupRatio: groupRatio.value,
+    defaultGroup: defaultGroup.value,
+  })
+  return [
+    { value: '', label: t('needtoken.memberConsole.usage.allGroups') },
+    ...opts.map(g => ({ value: g.code, label: g.label })),
+  ]
+})
+
+const taskStatusOptions = computed(() => [
+  { value: '', label: t('needtoken.memberConsole.usage.allStatuses') },
+  { value: 'SUCCESS', label: 'SUCCESS' },
+  { value: 'IN_PROGRESS', label: 'IN_PROGRESS' },
+  { value: 'FAILURE', label: 'FAILURE' },
+])
+
+const formatGroup = (code: string) =>
+  formatConsoleGroupLabel(code, groupMeta.value, usableGroups.value, groupRatio.value)
+
+watch(filterGroup, () => {
+  if (logTab.value === 'common') {
+    page.value = 1
+    void loadLogs()
+  }
+})
+
+watch(taskStatusFilter, () => {
+  if (logTab.value === 'task') {
+    taskPage.value = 1
+    void loadTasks()
+  }
+})
 
 const topModels = computed(() => (usage.value.models || []).slice(0, 6))
 const totalPages = computed(() => Math.max(1, Math.ceil(logsTotal.value / pageSize)))
@@ -496,6 +553,18 @@ const formatLogTime = (ts: number) => {
   }
 }
 
+const loadGroupMetadata = async () => {
+  try {
+    const res = await getGatewayModels()
+    usableGroups.value = res.usable_groups || {}
+    groupRatio.value = res.group_ratio || {}
+    groupMeta.value = res.group_meta || {}
+    defaultGroup.value = res.default_group || 'default'
+  } catch {
+    // non-blocking metadata enrichment
+  }
+}
+
 const loadUsage = async () => {
   try {
     usage.value = await getGatewayUsage(selectedDays.value)
@@ -512,6 +581,8 @@ const loadLogs = async () => {
     const res = await listGatewayLogs({
       p: page.value,
       page_size: pageSize,
+      type: 2,
+      group: filterGroup.value || undefined,
       model_name: filterModel.value.trim() || undefined,
       token_name: filterToken.value.trim() || undefined,
       start_timestamp: startTs,
@@ -597,7 +668,7 @@ const goPage = (nextPage: number) => {
 }
 
 const reloadAll = () => {
-  void Promise.all([loadUsage(), loadLogs()])
+  void Promise.all([loadUsage(), loadLogs(), loadGroupMetadata()])
 }
 
 onMounted(() => {

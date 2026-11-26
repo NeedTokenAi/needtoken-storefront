@@ -36,37 +36,36 @@
 
       <div v-else class="mt-4 grid grid-cols-1 gap-3 border-t pt-4 md:grid-cols-2">
         <div>
-          <label class="mb-1 block text-xs font-semibold text-foreground">
+          <label class="mb-1.5 block text-xs font-semibold text-foreground">
             {{ t('needtoken.memberConsole.playground.selectKey') }}
           </label>
-          <select
+          <NeedtokenSelect
             v-model="selectedTokenKey"
-            class="h-9 w-full rounded-xl border bg-background px-3 text-xs font-medium text-foreground outline-none focus:border-primary"
-            :disabled="streaming"
-          >
-            <option v-for="tok in activeTokens" :key="tok.id" :value="tok.key">
-              {{ tok.name || `Key #${tok.id}` }} ({{ tok.group || 'default' }} · {{ tok.masked_key }})
-            </option>
-          </select>
+            :options="tokenSelectOptions"
+            :label="t('needtoken.memberConsole.playground.selectKey')"
+            :disabled="streaming || tokenSelectOptions.length === 0"
+            align="start"
+            class="w-full"
+          />
         </div>
 
         <div>
-          <label class="mb-1 block text-xs font-semibold text-foreground">
-            {{ t('needtoken.memberConsole.playground.selectModel') }}
-          </label>
-          <div class="flex gap-2">
-            <input
-              v-model.trim="selectedModel"
-              list="needtoken-playground-models"
-              type="text"
-              :placeholder="t('needtoken.memberConsole.playground.modelPlaceholder')"
-              class="h-9 flex-1 rounded-xl border bg-background px-3 font-mono text-xs text-foreground outline-none focus:border-primary"
-              :disabled="streaming"
-            />
-            <datalist id="needtoken-playground-models">
-              <option v-for="m in modelNames" :key="m" :value="m" />
-            </datalist>
+          <div class="mb-1.5 flex items-center justify-between gap-2">
+            <label class="text-xs font-semibold text-foreground">
+              {{ t('needtoken.memberConsole.playground.selectModel') }}
+            </label>
+            <span v-if="availableModelsForToken.length" class="text-[11px] text-muted-foreground">
+              {{ t('needtoken.memberConsole.playground.supportedModelsCount', { n: availableModelsForToken.length }) }}
+            </span>
           </div>
+          <NeedtokenModelCombobox
+            v-model="selectedModel"
+            :models="availableModelsForToken"
+            :label="t('needtoken.memberConsole.playground.selectModel')"
+            :placeholder="t('needtoken.memberConsole.playground.modelPlaceholder')"
+            :search-placeholder="t('needtoken.memberConsole.playground.searchModelPlaceholder')"
+            :disabled="streaming"
+          />
         </div>
       </div>
 
@@ -160,7 +159,7 @@
             :placeholder="t('needtoken.memberConsole.playground.inputPlaceholder')"
             class="min-h-[44px] flex-1 resize-none rounded-xl border bg-background px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary"
             :disabled="streaming || !selectedTokenKey"
-            @keydown.enter.exact.prevent="sendPrompt"
+            @keydown.enter.exact="handlePromptKeydown"
           />
           <div class="flex shrink-0 items-center gap-2">
             <Button v-if="streaming" type="button" variant="destructive" size="sm" class="h-10 px-4" @click="stopStreaming">
@@ -179,15 +178,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Check, Copy, FlaskConical, KeyRound, Send, SlidersHorizontal, Square, Trash2 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import NeedtokenSelect from '../NeedtokenSelect.vue'
+import NeedtokenModelCombobox from './NeedtokenModelCombobox.vue'
 import { API_BASE_URL, DEFAULT_MODELS } from '../../config'
+import {
+  formatTokenGroupsSummary,
+  resolveTokenAvailableModels,
+} from '../../lib/gatewayConsoleHelpers'
 import {
   getGatewayModels,
   listGatewayTokens,
+  type GatewayGroupMetaItem,
+  type GatewayModelPricingItem,
   type GatewayTokenItem,
 } from '../../lib/gatewayConsoleApi'
 
@@ -208,7 +215,13 @@ const router = useRouter()
 
 const initLoading = ref(false)
 const tokens = ref<GatewayTokenItem[]>([])
-const modelNames = ref<string[]>([...DEFAULT_MODELS])
+const pricingModels = ref<GatewayModelPricingItem[]>([])
+const usableGroups = ref<Record<string, string>>({})
+const groupRatio = ref<Record<string, number>>({})
+const groupMeta = ref<Record<string, GatewayGroupMetaItem>>({})
+const defaultGroup = ref('default')
+const userAutoGroups = ref<string[]>([])
+
 const selectedTokenKey = ref('')
 const selectedModel = ref(String(route.query.model || '').trim() || DEFAULT_MODELS[0] || 'gpt-4o-mini')
 const systemPrompt = ref('')
@@ -225,6 +238,50 @@ let abortController: AbortController | null = null
 let copyTimer: ReturnType<typeof setTimeout> | undefined
 
 const activeTokens = computed(() => tokens.value.filter(tok => tok.status === 1 && tok.key))
+
+const selectedToken = computed(() =>
+  activeTokens.value.find(tok => tok.key === selectedTokenKey.value) || null,
+)
+
+const tokenSelectOptions = computed(() =>
+  activeTokens.value.map((tok) => {
+    const grpSummary = formatTokenGroupsSummary(
+      tok,
+      defaultGroup.value,
+      groupMeta.value,
+      usableGroups.value,
+      groupRatio.value,
+    )
+    return {
+      value: tok.key,
+      label: `${tok.name || `Key #${tok.id}`} (${grpSummary} · ${tok.masked_key})`,
+    }
+  }),
+)
+
+const availableModelsForToken = computed(() =>
+  resolveTokenAvailableModels({
+    token: selectedToken.value,
+    defaultGroup: defaultGroup.value,
+    userAutoGroups: userAutoGroups.value,
+    groupMeta: groupMeta.value,
+    pricingModels: pricingModels.value,
+    fallbackModels: [...DEFAULT_MODELS],
+  }),
+)
+
+watch([selectedTokenKey, availableModelsForToken], () => {
+  const list = availableModelsForToken.value
+  if (!list.length) return
+  if (!selectedModel.value || !list.includes(selectedModel.value)) {
+    const queryModel = String(route.query.model || '').trim()
+    if (queryModel && list.includes(queryModel)) {
+      selectedModel.value = queryModel
+    } else {
+      selectedModel.value = list[0]!
+    }
+  }
+})
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -253,6 +310,12 @@ const stopStreaming = () => {
   abortController?.abort()
   abortController = null
   streaming.value = false
+}
+
+const handlePromptKeydown = (event: KeyboardEvent) => {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  void sendPrompt()
 }
 
 const sendPrompt = async () => {
@@ -368,20 +431,26 @@ onMounted(async () => {
       listGatewayTokens().catch(() => null),
       getGatewayModels().catch(() => null),
     ])
-    if (tokRes?.items) {
-      tokens.value = tokRes.items
-      const firstEnabled = tokRes.items.find(tok => tok.status === 1 && tok.key)
+    if (modRes) {
+      pricingModels.value = Array.isArray(modRes.models) ? modRes.models : []
+      usableGroups.value = { ...(modRes.usable_groups || {}) }
+      groupRatio.value = { ...(modRes.group_ratio || {}) }
+      groupMeta.value = { ...(modRes.group_meta || {}) }
+      defaultGroup.value = modRes.default_group || defaultGroup.value
+      userAutoGroups.value = Array.isArray(modRes.auto_groups) ? modRes.auto_groups : []
+    }
+    if (tokRes) {
+      tokens.value = Array.isArray(tokRes.items) ? tokRes.items : []
+      usableGroups.value = { ...usableGroups.value, ...(tokRes.usable_groups || {}) }
+      groupRatio.value = { ...groupRatio.value, ...(tokRes.group_ratio || {}) }
+      groupMeta.value = { ...groupMeta.value, ...(tokRes.group_meta || {}) }
+      defaultGroup.value = tokRes.default_group || defaultGroup.value
+      if (Array.isArray(tokRes.auto_groups) && tokRes.auto_groups.length) {
+        userAutoGroups.value = tokRes.auto_groups
+      }
+      const firstEnabled = tokens.value.find(tok => tok.status === 1 && tok.key)
       if (firstEnabled) {
         selectedTokenKey.value = firstEnabled.key
-      }
-    }
-    if (modRes?.models?.length) {
-      const names = modRes.models.map(m => m.model_name).filter(Boolean)
-      if (names.length) {
-        modelNames.value = names
-        if (!route.query.model && !names.includes(selectedModel.value)) {
-          selectedModel.value = names[0]!
-        }
       }
     }
   } finally {

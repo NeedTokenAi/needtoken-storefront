@@ -30,12 +30,25 @@ export interface GatewayTokenItem {
   auto_groups?: string[] | null
 }
 
+export interface GatewayGroupMetaItem {
+  code: string
+  description?: string
+  channel_names?: string[]
+  display_name?: string
+  ratio: number
+  enabled_channel_count: number
+  models?: string[]
+}
+
 export interface GatewayTokensResponse {
   items: GatewayTokenItem[]
   total: number
   usable_groups: Record<string, string>
+  group_ratio?: Record<string, number>
+  group_meta?: Record<string, GatewayGroupMetaItem>
   default_group: string
   default_auto_group: boolean
+  auto_groups?: string[]
   quota_per_unit: number
   active_subscriptions?: Array<{
     id: number
@@ -137,6 +150,7 @@ export async function listGatewayLogs(params: {
   page_size?: number
   model_name?: string
   token_name?: string
+  group?: string
   type?: number
   start_timestamp?: number
   end_timestamp?: number
@@ -169,6 +183,7 @@ export interface GatewayModelsResponse {
   vendors: GatewayVendorItem[]
   usable_groups: Record<string, string>
   group_ratio: Record<string, number>
+  group_meta?: Record<string, GatewayGroupMetaItem>
   default_group: string
   supported_endpoint?: Record<string, { path?: string; method?: string }>
   auto_groups?: string[]
@@ -239,7 +254,52 @@ export interface GatewaySubscriptionsResponse {
   all_subscriptions: GatewaySubscriptionItem[]
   user_group: string
   user_quota: number
+  usable_groups?: Record<string, string>
+  group_ratio?: Record<string, number>
+  group_meta?: Record<string, GatewayGroupMetaItem>
   quota_per_unit: number
+}
+
+export interface QuickToolCategory {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  sort_order: number
+  enabled: boolean
+}
+
+export interface QuickToolItem {
+  id: string
+  category_id: string
+  name: string
+  slug: string
+  logo_url?: string
+  icon_key?: string
+  summary?: string
+  tags?: string[]
+  default_model_hint?: string
+  import_type?: 'deeplink' | 'command' | 'none'
+  import_label?: string
+  import_template?: string
+  config_filename?: string
+  config_template?: string
+  manual_guide?: string
+  ai_prompt_template?: string
+  docs_url?: string
+  sort_order: number
+  enabled: boolean
+}
+
+export interface QuickToolsResponse {
+  gateway_base_url: string
+  categories: QuickToolCategory[]
+  tools: QuickToolItem[]
+}
+
+export async function getGatewayQuickTools(): Promise<QuickToolsResponse> {
+  const res = await userApi.get('/me/gateway/quick-tools', { silentBusinessError: true })
+  return (res?.data?.data || { gateway_base_url: 'https://api.needtoken.ai', categories: [], tools: [] }) as QuickToolsResponse
 }
 
 export async function getGatewayUsage(days = 7): Promise<GatewayUsageResponse> {

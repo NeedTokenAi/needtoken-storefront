@@ -35,6 +35,7 @@ func RegisterMemberReadRoutes(routes gin.IRoutes, h *Handler) {
 	routes.GET("/me/gateway/tasks", h.gatewayListTasks)
 	routes.GET("/me/gateway/drawings", h.gatewayListDrawings)
 	routes.GET("/me/gateway/subscriptions", h.gatewaySubscriptions)
+	routes.GET("/me/gateway/quick-tools", h.gatewayQuickTools)
 }
 
 func RegisterMemberWriteRoutes(routes gin.IRoutes, h *Handler) {
@@ -381,6 +382,15 @@ func (h *Handler) gatewaySubscriptions(c *gin.Context) {
 		return
 	}
 	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/subscriptions", nil, nil)
+	h.respondGatewayData(c, data, err)
+}
+
+func (h *Handler) gatewayQuickTools(c *gin.Context) {
+	userID, ok := h.gatewayConsoleUser(c)
+	if !ok {
+		return
+	}
+	data, err := h.service.GatewayConsole(c.Request.Context(), userID, http.MethodGet, "/quick-tools", nil, nil)
 	h.respondGatewayData(c, data, err)
 }
 

@@ -36,7 +36,9 @@
         </div>
         <div class="rounded-xl border bg-muted/20 p-4">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.subscriptions.defaultGroup') }}</p>
-          <p class="mt-1 font-mono text-xl font-black text-foreground">{{ userGroup || 'default' }}</p>
+          <p class="mt-1 truncate text-base font-black text-foreground" :title="defaultGroupDisplay">
+            {{ defaultGroupDisplay }}
+          </p>
           <p class="mt-1 text-[11px] text-muted-foreground">
             {{ t('needtoken.memberConsole.subscriptions.historyCount', { count: allSubs.length }) }}
           </p>
@@ -82,9 +84,9 @@
                 <span
                   v-for="grp in splitGroups(sub.allowed_groups)"
                   :key="grp"
-                  class="rounded-md border bg-background px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-muted-foreground"
+                  class="rounded-md border bg-background px-1.5 py-0.5 text-[10.5px] font-medium text-muted-foreground"
                 >
-                  {{ grp }}
+                  {{ formatGroup(grp) }}
                 </span>
               </div>
             </div>
@@ -124,15 +126,13 @@
     <div class="rounded-2xl border bg-card shadow-sm">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5">
         <h3 class="text-sm font-bold text-foreground">{{ t('needtoken.memberConsole.subscriptions.historyTitle') }}</h3>
-        <select
+        <NeedtokenSelect
           v-model="statusFilter"
-          class="h-8 rounded-lg border bg-background px-2.5 text-xs text-foreground outline-none focus:border-primary"
-        >
-          <option value="all">{{ t('needtoken.memberConsole.subscriptions.filterAll') }}</option>
-          <option value="active">{{ t('needtoken.memberConsole.subscriptions.statusActive') }}</option>
-          <option value="depleted">{{ t('needtoken.memberConsole.subscriptions.statusDepleted') }}</option>
-          <option value="expired">{{ t('needtoken.memberConsole.subscriptions.statusExpired') }}</option>
-        </select>
+          :options="statusFilterOptions"
+          :label="t('needtoken.memberConsole.subscriptions.colStatus')"
+          compact
+          class="min-w-[130px]"
+        />
       </div>
 
       <div v-if="!filteredHistory.length" class="px-6 py-10 text-center text-xs text-muted-foreground">
@@ -164,8 +164,17 @@
               <td class="px-4 py-3 font-mono text-[11px] text-muted-foreground">
                 {{ formatUnix(sub.start_time) }} → {{ expiryText(sub.end_time) }}
               </td>
-              <td class="px-5 py-3 font-mono text-[11px] text-muted-foreground">
-                {{ sub.allowed_groups || '—' }}
+              <td class="px-5 py-3 text-[11px] text-muted-foreground">
+                <div v-if="splitGroups(sub.allowed_groups).length" class="flex flex-wrap gap-1">
+                  <span
+                    v-for="grp in splitGroups(sub.allowed_groups)"
+                    :key="grp"
+                    class="rounded-md border bg-muted/40 px-1.5 py-0.5 text-[10.5px]"
+                  >
+                    {{ formatGroup(grp) }}
+                  </span>
+                </div>
+                <span v-else>—</span>
               </td>
             </tr>
           </tbody>
@@ -181,15 +190,21 @@ import { useI18n } from 'vue-i18n'
 import { RefreshCw, Sparkles } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import NeedtokenSelect from '../NeedtokenSelect.vue'
 import {
   computeSubscriptionRemainingQuota,
   computeSubscriptionUsagePercent,
   formatApiQuotaUsd,
   formatSubscriptionExpiry,
 } from '../../lib/apiAccountLinkPolicy'
-import { sumSubscriptionRemainingQuota } from '../../lib/gatewayConsoleHelpers'
+import {
+  buildSelectableGroupOptions,
+  formatConsoleGroupLabel,
+  sumSubscriptionRemainingQuota,
+} from '../../lib/gatewayConsoleHelpers'
 import {
   getGatewaySubscriptions,
+  type GatewayGroupMetaItem,
   type GatewaySubscriptionItem,
 } from '../../lib/gatewayConsoleApi'
 
@@ -201,9 +216,33 @@ const activeSubs = ref<GatewaySubscriptionItem[]>([])
 const allSubs = ref<GatewaySubscriptionItem[]>([])
 const userGroup = ref('default')
 const userQuota = ref(0)
-const statusFilter = ref<'all' | 'active' | 'depleted' | 'expired'>('all')
+const usableGroups = ref<Record<string, string>>({})
+const groupRatio = ref<Record<string, number>>({})
+const groupMeta = ref<Record<string, GatewayGroupMetaItem>>({})
+const statusFilter = ref('all')
+
+const statusFilterOptions = computed(() => [
+  { value: 'all', label: t('needtoken.memberConsole.subscriptions.filterAll') },
+  { value: 'active', label: t('needtoken.memberConsole.subscriptions.statusActive') },
+  { value: 'depleted', label: t('needtoken.memberConsole.subscriptions.statusDepleted') },
+  { value: 'expired', label: t('needtoken.memberConsole.subscriptions.statusExpired') },
+])
 
 const activeRemainingQuota = computed(() => sumSubscriptionRemainingQuota(activeSubs.value))
+
+const formatGroup = (code: string) =>
+  formatConsoleGroupLabel(code, groupMeta.value, usableGroups.value, groupRatio.value)
+
+const defaultGroupDisplay = computed(() => {
+  const selectable = buildSelectableGroupOptions({
+    usableGroups: usableGroups.value,
+    groupMeta: groupMeta.value,
+    groupRatio: groupRatio.value,
+    defaultGroup: userGroup.value,
+  })
+  const preferred = selectable.find(g => g.code === userGroup.value) || selectable[0]
+  return preferred ? preferred.label : formatGroup(userGroup.value || 'default')
+})
 
 const filteredHistory = computed(() => {
   if (statusFilter.value === 'all') return allSubs.value
@@ -248,6 +287,9 @@ const loadSubscriptions = async () => {
     allSubs.value = Array.isArray(res.all_subscriptions) ? res.all_subscriptions : []
     userGroup.value = res.user_group || 'default'
     userQuota.value = res.user_quota || 0
+    usableGroups.value = res.usable_groups || {}
+    groupRatio.value = res.group_ratio || {}
+    groupMeta.value = res.group_meta || {}
   } catch (err: any) {
     errorMsg.value = err?.response?.data?.msg || t('needtoken.memberConsole.loadFailed')
   } finally {
