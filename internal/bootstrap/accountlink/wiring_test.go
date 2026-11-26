@@ -11,10 +11,15 @@ import (
 	usercontract "github.com/dujiao-next/internal/modules/identity/user/contract"
 	userdomain "github.com/dujiao-next/internal/modules/identity/user/domain"
 	"github.com/dujiao-next/internal/modules/order/application/accountlink"
+	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
+	settingscontract "github.com/dujiao-next/internal/modules/settings/contract"
 	siteconnectionapp "github.com/dujiao-next/internal/modules/siteconnection/application"
 	siteconnectioncontract "github.com/dujiao-next/internal/modules/siteconnection/contract"
 	siteconnectiondomain "github.com/dujiao-next/internal/modules/siteconnection/domain"
+	"github.com/dujiao-next/internal/shared/jsonmap"
+	"github.com/dujiao-next/internal/shared/money"
 	"github.com/dujiao-next/internal/telegramidentity"
+	"github.com/shopspring/decimal"
 )
 
 type stubConnRepo struct {
@@ -104,5 +109,51 @@ func TestLookupMemberRejectsPlaceholderAndUnverifiedEmails(t *testing.T) {
 	verified, err := reader.LookupMember(context.Background(), 3)
 	if err != nil || !verified.EmailVerified || verified.Email != "real@example.com" || !verified.Active {
 		t.Fatalf("verified real email should be accepted: member=%+v err=%v", verified, err)
+	}
+}
+
+type stubSettingStore struct {
+	settingscontract.Store
+	values map[string]jsonmap.JSON
+}
+
+func (s *stubSettingStore) GetByKey(key string) (jsonmap.JSON, bool, error) {
+	v, ok := s.values[key]
+	return v, ok, nil
+}
+
+func TestUnifiedBalanceDirectionalRoundingAndTruncation(t *testing.T) {
+	adapter := &UnifiedBalanceAdapter{
+		c: &container.Container{
+			SettingService: settingsapp.NewService(&stubSettingStore{
+				values: map[string]jsonmap.JSON{
+					constants.SettingKeySiteConfig: {
+						"needtoken_pricing": map[string]interface{}{
+							"usd_cny_rate": "6.67",
+						},
+					},
+				},
+			}),
+		},
+	}
+
+	// $100.00 - $0.00072 API call = $99.99928 = 49,999,640 quota; * 6.67 = 666.9951976 -> truncated to 666.99 CNY
+	cnyAfter := adapter.quotaToCurrencyAmount(49_999_640, "CNY")
+	if got := cnyAfter.Decimal.StringFixed(2); got != "666.99" {
+		t.Fatalf("expected truncated 666.99 CNY after $0.00072 call, got %s", got)
+	}
+
+	// Credit floors fractional quota, Debit ceils fractional quota (100.00 CNY / 6.67 * 500,000 = 7,496,251.874...)
+	amt := money.FromDecimal(decimal.RequireFromString("100.00"))
+	creditQ, err := adapter.currencyAmountToCreditQuota(amt, "CNY")
+	if err != nil || creditQ != 7_496_251 {
+		t.Fatalf("expected credit floor 7496251, got %d err=%v", creditQ, err)
+	}
+	debitQ, err := adapter.currencyAmountToDebitQuota(amt, "CNY")
+	if err != nil || debitQ != 7_496_252 {
+		t.Fatalf("expected debit ceil 7496252, got %d err=%v", debitQ, err)
+	}
+	if debitQ < creditQ {
+		t.Fatalf("debit quota %d must never be less than credit quota %d", debitQ, creditQ)
 	}
 }

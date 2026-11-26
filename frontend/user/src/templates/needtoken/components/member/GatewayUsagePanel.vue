@@ -24,15 +24,21 @@
       <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div class="rounded-xl border bg-muted/20 p-4">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.usage.totalSpend') }}</p>
-          <p class="mt-1 font-mono text-xl font-black text-primary">{{ formatApiQuotaUsd(usage.total_quota) }}</p>
+          <p class="mt-1 font-mono text-xl font-black text-primary" :title="formatApiQuotaUsdExact(usage.total_quota)">
+            {{ formatApiQuotaUsd(usage.total_quota, { compact: true, locale }) }}
+          </p>
         </div>
         <div class="rounded-xl border bg-muted/20 p-4">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.usage.totalRequests') }}</p>
-          <p class="mt-1 font-mono text-xl font-black text-foreground">{{ formatNumber(usage.total_requests) }}</p>
+          <p class="mt-1 font-mono text-xl font-black text-foreground" :title="formatExactInteger(usage.total_requests)">
+            {{ formatLargeCount(usage.total_requests, locale) }}
+          </p>
         </div>
         <div class="rounded-xl border bg-muted/20 p-4">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.usage.totalTokens') }}</p>
-          <p class="mt-1 font-mono text-xl font-black text-foreground">{{ formatCompactNumber(usage.total_tokens) }}</p>
+          <p class="mt-1 font-mono text-xl font-black text-foreground" :title="formatExactInteger(usage.total_tokens)">
+            {{ formatLargeCount(usage.total_tokens, locale) }}
+          </p>
         </div>
       </div>
 
@@ -392,7 +398,12 @@ import { FileText, Image as ImageIcon, ListTodo, RefreshCw, Search } from 'lucid
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import NeedtokenSelect from '../NeedtokenSelect.vue'
-import { formatApiQuotaUsd } from '../../lib/apiAccountLinkPolicy'
+import {
+  formatApiQuotaUsd,
+  formatApiQuotaUsdExact,
+  formatExactInteger,
+  formatLargeCount,
+} from '../../lib/apiAccountLinkPolicy'
 import {
   buildSelectableGroupOptions,
   formatConsoleGroupLabel,
@@ -525,17 +536,7 @@ const taskStatusVariant = (status?: string) => {
   return 'secondary'
 }
 
-const formatNumber = (n?: number) => {
-  const num = typeof n === 'number' && Number.isFinite(n) ? n : 0
-  return new Intl.NumberFormat(locale.value || 'zh-CN').format(num)
-}
-
-const formatCompactNumber = (n?: number) => {
-  const num = typeof n === 'number' && Number.isFinite(n) ? n : 0
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`
-  return String(num)
-}
+const formatNumber = (n?: number) => formatExactInteger(n, locale.value || 'en-US')
 
 const formatLogTime = (ts: number) => {
   if (!ts) return '-'
