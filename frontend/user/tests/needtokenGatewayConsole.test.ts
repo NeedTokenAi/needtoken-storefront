@@ -4,14 +4,21 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  buildSelectableGroupOptions,
+  classifyConsoleModelVendor,
+  collectModelsForConsoleGroups,
   computeCombinedApiQuota,
+  formatConsoleGroupLabel,
+  formatTokenGroupsSummary,
   isNeedtokenMemberConsolePath,
   mapLegacyResellerPath,
   matchesWalletRecordCategory,
   normalizeNeedtokenMemberSection,
   rawQuotaToUsdNumber,
+  renderQuickToolTemplate,
   resolveNeedtokenRouteTransitionKey,
   resolveResellerViewFromPath,
+  resolveTokenAvailableModels,
   sumSubscriptionRemainingQuota,
   usdToRawQuota,
 } from '../src/templates/needtoken/lib/gatewayConsoleHelpers.ts'
@@ -150,5 +157,113 @@ test('member console locales keep Wallet Balance, Plan Quota, and My Wallet labe
     assert.ok(mc.assets.helpWalletRule)
     assert.ok(mc.assets.recordsTitle)
     assert.ok(mc.assets.filterGiftCard)
+    assert.ok(mc.quick.quickUse)
+    assert.ok(mc.quickUse.title)
+    assert.ok(mc.quickUse.copyAiPrompt)
+    assert.ok(mc.keys.modelStrategyFollowTitle)
+    assert.ok(mc.keys.modelStrategyLockTitle)
   }
+})
+
+test('console group helpers format channel-code-ratio labels and hide empty ghost groups', () => {
+  const groupMeta = {
+    SSVIP: {
+      code: 'SSVIP',
+      display_name: 'needtoken-pool',
+      description: '自用 ChatGPT',
+      ratio: 1,
+      enabled_channel_count: 1,
+      models: ['gpt-5.4', 'gpt-6.2-sol'],
+    },
+    claude_pro: {
+      code: 'claude_pro',
+      display_name: 'Anthropic Pool',
+      ratio: 1.5,
+      enabled_channel_count: 2,
+      models: ['claude-sonnet-4-6'],
+    },
+    default: {
+      code: 'default',
+      description: 'Default group',
+      ratio: 1,
+      enabled_channel_count: 0,
+      models: [],
+    },
+  }
+  const usableGroups = { SSVIP: '自用 ChatGPT', claude_pro: 'Claude', default: 'Default group' }
+
+  assert.equal(formatConsoleGroupLabel('SSVIP', groupMeta, usableGroups), 'needtoken-pool - SSVIP - ×1.00')
+  assert.equal(formatConsoleGroupLabel('claude_pro', groupMeta, usableGroups), 'Anthropic Pool - claude_pro - ×1.50')
+  assert.equal(formatConsoleGroupLabel('default', groupMeta, usableGroups), 'default - ×1.00')
+
+  assert.equal(
+    formatTokenGroupsSummary({ group: 'auto', auto_groups: ['SSVIP', 'claude_pro'] }, 'default', groupMeta, usableGroups),
+    'needtoken-pool - SSVIP - ×1.00 / Anthropic Pool - claude_pro - ×1.50',
+  )
+
+  const selectable = buildSelectableGroupOptions({
+    usableGroups,
+    groupMeta,
+    defaultGroup: 'default',
+  })
+  assert.deepEqual(selectable.map(o => o.code), ['claude_pro', 'SSVIP'])
+
+  const editingWithLegacy = buildSelectableGroupOptions({
+    usableGroups,
+    groupMeta,
+    defaultGroup: 'default',
+    includeCodes: ['default'],
+  })
+  assert.equal(editingWithLegacy.some(o => o.code === 'default' && !o.hasActiveChannels), true)
+})
+
+test('dynamic model aggregation and token model resolution respect follow vs lock policies', () => {
+  const groupMeta = {
+    SSVIP: { code: 'SSVIP', enabled_channel_count: 1, models: ['gpt-5.4', 'gpt-6.2-sol'] },
+    claude_pro: { code: 'claude_pro', enabled_channel_count: 1, models: ['claude-sonnet-4-6'] },
+  }
+
+  const combined = collectModelsForConsoleGroups(['SSVIP', 'claude_pro'], groupMeta, [])
+  assert.deepEqual(combined.map(c => c.model), ['claude-sonnet-4-6', 'gpt-5.4', 'gpt-6.2-sol'])
+  assert.equal(classifyConsoleModelVendor('gpt-6.2-sol'), 'openai')
+  assert.equal(classifyConsoleModelVendor('claude-sonnet-4-6'), 'claude')
+  assert.equal(classifyConsoleModelVendor('gemini-2.5-pro'), 'gemini')
+
+  const followModels = resolveTokenAvailableModels({
+    token: { group: 'auto', auto_groups: ['SSVIP', 'claude_pro'], model_limits_enabled: false, model_limits: '' },
+    groupMeta,
+  })
+  assert.deepEqual(followModels, ['claude-sonnet-4-6', 'gpt-5.4', 'gpt-6.2-sol'])
+
+  const lockedModels = resolveTokenAvailableModels({
+    token: { group: 'SSVIP', model_limits_enabled: true, model_limits: 'gpt-6.2-sol' },
+    groupMeta,
+  })
+  assert.deepEqual(lockedModels, ['gpt-6.2-sol'])
+})
+
+test('renderQuickToolTemplate injects member credentials and supports URL encoding', () => {
+  const vars = {
+    apiKey: 'sk-test+abc/123',
+    baseUrl: 'https://api.needtoken.ai',
+    baseUrlV1: 'https://api.needtoken.ai/v1',
+    model: 'gpt-6.2-sol',
+    tokenName: 'My Key',
+    group: 'needtoken-pool - SSVIP - ×1.00',
+  }
+
+  assert.equal(
+    renderQuickToolTemplate('base_url="{{BASE_URL_V1}}" key="{{API_KEY}}" model="{{MODEL}}"', vars),
+    'base_url="https://api.needtoken.ai/v1" key="sk-test+abc/123" model="gpt-6.2-sol"',
+  )
+
+  const deepLink = renderQuickToolTemplate(
+    'ccswitch://v1/import?endpoint={{BASE_URL}}&apiKey={{API_KEY}}&model={{MODEL}}',
+    vars,
+    true,
+  )
+  assert.equal(
+    deepLink,
+    'ccswitch://v1/import?endpoint=https%3A%2F%2Fapi.needtoken.ai&apiKey=sk-test%2Babc%2F123&model=gpt-6.2-sol',
+  )
 })
