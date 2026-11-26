@@ -120,6 +120,17 @@ export function isNeedtokenMemberConsolePath(rawPath?: string | null): boolean {
   return clean === '/me' || clean.startsWith('/me/')
 }
 
+export type WalletRecordCategoryFilter = 'all' | 'recharge' | 'gift_card' | 'spend'
+
+export function matchesWalletRecordCategory(type?: string | null, filter: WalletRecordCategoryFilter = 'all'): boolean {
+  if (filter === 'all') return true
+  const norm = String(type || '').trim().toLowerCase()
+  if (filter === 'gift_card') return norm === 'gift_card_redeem'
+  if (filter === 'recharge') return norm === 'recharge' || norm === 'admin_adjust' || norm === 'order_underpaid_credit'
+  if (filter === 'spend') return norm === 'order_pay' || norm === 'order_refund' || norm === 'admin_refund'
+  return true
+}
+
 export function resolveNeedtokenRouteTransitionKey(rawPath?: string | null): string {
   const clean = String(rawPath || '').trim()
   if (isNeedtokenMemberConsolePath(clean)) {

@@ -216,3 +216,24 @@ func TestCustomerLinkBridgeSignsRequestsMapsErrorsAndBlocksRedirects(t *testing.
 		t.Fatalf("redirect leaked request to upstream: seen=%d", seen)
 	}
 }
+
+func TestCustomerLinkConsoleErrorMappingForUniversalGiftCards(t *testing.T) {
+	cases := []struct {
+		code      string
+		status    int
+		wantError error
+	}{
+		{"already_redeemed", http.StatusConflict, ErrUniversalGiftCardRedeemed},
+		{"card_in_progress", http.StatusConflict, ErrUniversalGiftCardInProgress},
+		{"card_disabled", http.StatusConflict, ErrUniversalGiftCardDisabled},
+		{"card_expired", http.StatusGone, ErrUniversalGiftCardExpired},
+		{"not_found", http.StatusNotFound, ErrUniversalGiftCardNotFound},
+	}
+	for _, tc := range cases {
+		body, _ := json.Marshal(map[string]any{"ok": false, "error_code": tc.code})
+		got := mapCustomerLinkError(tc.status, body)
+		if !errors.Is(got, tc.wantError) {
+			t.Fatalf("error_code=%s status=%d: want %v, got %v", tc.code, tc.status, tc.wantError, got)
+		}
+	}
+}

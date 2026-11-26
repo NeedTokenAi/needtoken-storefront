@@ -405,6 +405,16 @@ func mapCustomerLinkError(statusCode int, body []byte) error {
 	switch payload.ErrorCode {
 	case "not_linked":
 		return ErrCustomerLinkNotLinked
+	case "not_found":
+		return ErrUniversalGiftCardNotFound
+	case "already_redeemed":
+		return ErrUniversalGiftCardRedeemed
+	case "card_in_progress":
+		return ErrUniversalGiftCardInProgress
+	case "card_disabled":
+		return ErrUniversalGiftCardDisabled
+	case "card_expired":
+		return ErrUniversalGiftCardExpired
 	case "invalid_request":
 		return ErrCustomerLinkInvalid
 	case "link_challenge_expired", "link_challenge_not_found":
