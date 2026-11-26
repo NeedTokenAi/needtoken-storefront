@@ -4,6 +4,9 @@ import {
   computeSubscriptionRemainingQuota,
   computeSubscriptionUsagePercent,
   formatApiQuotaUsd,
+  formatApiQuotaUsdExact,
+  formatExactInteger,
+  formatLargeCount,
   formatSubscriptionExpiry,
   isSafeAuthorizeUrl,
   parseAccountLinkFragment,
@@ -80,6 +83,17 @@ test('API quota and subscription summary formatters handle raw quota units and t
   assert.equal(formatApiQuotaUsd(125_000), '$0.25')
   assert.equal(formatApiQuotaUsd(1_000), '$0.002')
   assert.equal(formatApiQuotaUsd(-100), '$0.00')
+  assert.equal(formatApiQuotaUsd(49_999_640, { truncateBalance: true }), '$99.99')
+  assert.equal(formatApiQuotaUsdExact(500_000_000), '$1,000.00')
+
+  // Large USD & token counters across 万/亿/万亿 and K/M/B/T
+  assert.equal(formatApiQuotaUsd(62_500_000_000, { compact: true, locale: 'zh-CN' }), '$12.50万')
+  assert.equal(formatApiQuotaUsd(64_000_000_000_000, { compact: true, locale: 'zh-CN' }), '$1.28亿')
+  assert.equal(formatApiQuotaUsd(64_000_000_000_000, { compact: true, locale: 'en-US' }), '$128.00M')
+  assert.equal(formatLargeCount(4_726, 'zh-CN'), '4,726')
+  assert.equal(formatLargeCount(25_600_000_000, 'zh-CN'), '256.00亿')
+  assert.equal(formatLargeCount(25_600_000_000, 'en-US'), '25.60B')
+  assert.equal(formatExactInteger(25_600_000_000), '25,600,000,000')
 
   assert.equal(computeSubscriptionRemainingQuota(10_000_000, 2_500_000), 7_500_000)
   assert.equal(computeSubscriptionRemainingQuota(1_000_000, 1_500_000), 0)

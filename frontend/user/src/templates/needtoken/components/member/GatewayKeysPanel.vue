@@ -173,12 +173,12 @@
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
               <span>
                 {{ t('needtoken.memberConsole.keys.usedLabel') }}:
-                <strong class="font-mono text-foreground">{{ formatApiQuotaUsd(tok.used_quota) }}</strong>
+                <strong class="font-mono text-foreground" :title="formatApiQuotaUsdExact(tok.used_quota)">{{ formatApiQuotaUsd(tok.used_quota, { compact: true }) }}</strong>
               </span>
               <span>
                 {{ t('needtoken.memberConsole.keys.quotaLabel') }}:
-                <strong class="font-mono text-foreground">
-                  {{ tok.unlimited_quota ? t('needtoken.memberConsole.keys.unlimited') : formatApiQuotaUsd(tok.remain_quota) }}
+                <strong class="font-mono text-foreground" :title="tok.unlimited_quota ? '' : formatApiQuotaUsdExact(tok.remain_quota)">
+                  {{ tok.unlimited_quota ? t('needtoken.memberConsole.keys.unlimited') : formatApiQuotaUsd(tok.remain_quota, { compact: true }) }}
                 </strong>
               </span>
               <span>
@@ -533,7 +533,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import NeedtokenSelect from '../NeedtokenSelect.vue'
 import { API_BASE_URL } from '../../config'
-import { formatApiQuotaUsd } from '../../lib/apiAccountLinkPolicy'
+import { formatApiQuotaUsd, formatApiQuotaUsdExact } from '../../lib/apiAccountLinkPolicy'
 import {
   buildSelectableGroupOptions,
   classifyConsoleModelVendor,

@@ -93,13 +93,67 @@ export function isSafeAuthorizeUrl(raw?: string | null): boolean {
 /** new-api raw quota units per $1.00 USD (QuotaPerUnit = 500,000). */
 export const API_QUOTA_PER_USD = 500_000
 
-export function formatApiQuotaUsd(rawQuota?: number | null): string {
+export interface FormatQuotaUsdOptions {
+  compact?: boolean
+  locale?: string
+  /** When true, truncates fractional cents down (floor) so micro charges never round back up visually. */
+  truncateBalance?: boolean
+}
+
+function isZhLocale(locale?: string): boolean {
+  const norm = String(locale || 'zh-CN').trim().toLowerCase()
+  return norm === '' || norm.startsWith('zh')
+}
+
+export function formatApiQuotaUsdExact(rawQuota?: number | null): string {
+  const value = typeof rawQuota === 'number' && Number.isFinite(rawQuota) ? rawQuota : 0
+  const usd = Math.max(0, value) / API_QUOTA_PER_USD
+  if (usd > 0 && usd < 0.01) {
+    return `$${usd.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}`
+  }
+  return `$${usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+export function formatApiQuotaUsd(rawQuota?: number | null, opts?: FormatQuotaUsdOptions): string {
   const value = typeof rawQuota === 'number' && Number.isFinite(rawQuota) ? rawQuota : 0
   const usd = Math.max(0, value) / API_QUOTA_PER_USD
   if (usd > 0 && usd < 0.01) {
     return `$${usd.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}`
   }
-  return `$${usd.toFixed(2)}`
+  const roundedUsd = opts?.truncateBalance ? Math.floor((usd + 1e-12) * 100) / 100 : usd
+  if (opts?.compact && roundedUsd >= 10_000) {
+    if (isZhLocale(opts.locale)) {
+      if (roundedUsd >= 1e12) return `$${(roundedUsd / 1e12).toFixed(2)}万亿`
+      if (roundedUsd >= 1e8) return `$${(roundedUsd / 1e8).toFixed(2)}亿`
+      return `$${(roundedUsd / 1e4).toFixed(2)}万`
+    }
+    if (roundedUsd >= 1e12) return `$${(roundedUsd / 1e12).toFixed(2)}T`
+    if (roundedUsd >= 1e9) return `$${(roundedUsd / 1e9).toFixed(2)}B`
+    if (roundedUsd >= 1e6) return `$${(roundedUsd / 1e6).toFixed(2)}M`
+    return `$${(roundedUsd / 1e3).toFixed(2)}K`
+  }
+  return `$${roundedUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+export function formatExactInteger(n?: number | null, locale = 'en-US'): string {
+  const num = typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0
+  return new Intl.NumberFormat(locale || 'en-US').format(num)
+}
+
+export function formatLargeCount(n?: number | null, locale = 'zh-CN'): string {
+  const num = typeof n === 'number' && Number.isFinite(n) ? Math.max(0, n) : 0
+  if (num < 10_000) {
+    return formatExactInteger(num, 'en-US')
+  }
+  if (isZhLocale(locale)) {
+    if (num >= 1e12) return `${(num / 1e12).toFixed(2)}万亿`
+    if (num >= 1e8) return `${(num / 1e8).toFixed(2)}亿`
+    return `${(num / 1e4).toFixed(2)}万`
+  }
+  if (num >= 1e12) return `${(num / 1e12).toFixed(2)}T`
+  if (num >= 1e9) return `${(num / 1e9).toFixed(2)}B`
+  if (num >= 1e6) return `${(num / 1e6).toFixed(2)}M`
+  return `${(num / 1e3).toFixed(1)}K`
 }
 
 export function computeSubscriptionRemainingQuota(total?: number | null, used?: number | null): number {

@@ -464,7 +464,7 @@
                   {{
                     showGatewayFeatures && apiSummary
                       ? t('needtoken.memberConsole.overview.unifiedBalanceApiHint', {
-                        usd: formatApiQuotaUsd(apiSummary.quota ?? 0),
+                        usd: formatApiQuotaUsd(apiSummary.quota ?? 0, { truncateBalance: true }),
                       })
                       : t('needtoken.memberConsole.overview.storeWalletHint')
                   }}
@@ -564,11 +564,14 @@
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h2 class="text-sm font-bold text-foreground sm:text-base">{{ t('needtoken.memberConsole.overview.trendTitle') }}</h2>
-                        <p class="mt-0.5 text-xs text-muted-foreground">
+                        <p
+                          class="mt-0.5 text-xs text-muted-foreground"
+                          :title="`${formatApiQuotaUsdExact(overviewUsage?.total_quota ?? 0)} / ${formatExactInteger(overviewUsage?.total_requests ?? 0)}`"
+                        >
                           {{
                             t('needtoken.memberConsole.overview.trendSubtitle', {
-                              spend: formatApiQuotaUsd(overviewUsage?.total_quota ?? 0),
-                              requests: formatInteger(overviewUsage?.total_requests ?? 0),
+                              spend: formatApiQuotaUsd(overviewUsage?.total_quota ?? 0, { compact: true, locale }),
+                              requests: formatLargeCount(overviewUsage?.total_requests ?? 0, locale),
                             })
                           }}
                         </p>
@@ -881,7 +884,7 @@
             ref="memberWalletPanelRef"
             :show-gateway-features="showGatewayFeatures"
             :store-wallet-display="storeWalletDisplay"
-            :api-quota-display="apiSummary ? formatApiQuotaUsd(apiSummary.quota ?? 0) : ''"
+            :api-quota-display="apiSummary ? formatApiQuotaUsd(apiSummary.quota ?? 0, { truncateBalance: true }) : ''"
             :has-api-summary="!!apiSummary"
             :gateway-loading="gatewayLoading"
             :plan-quota-display="formatApiQuotaUsd(subscriptionRemainingQuota)"
@@ -984,6 +987,9 @@ import {
   computeSubscriptionRemainingQuota,
   computeSubscriptionUsagePercent,
   formatApiQuotaUsd,
+  formatApiQuotaUsdExact,
+  formatExactInteger,
+  formatLargeCount,
   formatSubscriptionExpiry,
 } from './lib/apiAccountLinkPolicy'
 import {

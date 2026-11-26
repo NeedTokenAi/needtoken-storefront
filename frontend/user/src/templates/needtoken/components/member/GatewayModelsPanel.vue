@@ -197,15 +197,21 @@
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div class="rounded-2xl border bg-card p-5 shadow-sm">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.usage.totalSpend') }}</p>
-          <p class="mt-1.5 font-mono text-2xl font-black text-primary">{{ formatApiQuotaUsd(usage.total_quota) }}</p>
+          <p class="mt-1.5 font-mono text-2xl font-black text-primary" :title="formatApiQuotaUsdExact(usage.total_quota)">
+            {{ formatApiQuotaUsd(usage.total_quota, { compact: true, locale }) }}
+          </p>
         </div>
         <div class="rounded-2xl border bg-card p-5 shadow-sm">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.usage.totalRequests') }}</p>
-          <p class="mt-1.5 font-mono text-2xl font-black text-foreground">{{ formatNumber(usage.total_requests) }}</p>
+          <p class="mt-1.5 font-mono text-2xl font-black text-foreground" :title="formatExactInteger(usage.total_requests)">
+            {{ formatLargeCount(usage.total_requests, locale) }}
+          </p>
         </div>
         <div class="rounded-2xl border bg-card p-5 shadow-sm">
           <p class="text-xs text-muted-foreground">{{ t('needtoken.memberConsole.usage.totalTokens') }}</p>
-          <p class="mt-1.5 font-mono text-2xl font-black text-foreground">{{ formatCompactNumber(usage.total_tokens) }}</p>
+          <p class="mt-1.5 font-mono text-2xl font-black text-foreground" :title="formatExactInteger(usage.total_tokens)">
+            {{ formatLargeCount(usage.total_tokens, locale) }}
+          </p>
         </div>
       </div>
 
@@ -231,8 +237,12 @@
               <tr v-for="item in usage.models" :key="item.model_name" class="hover:bg-muted/20">
                 <td class="px-5 py-3 font-mono font-semibold text-foreground">{{ item.model_name }}</td>
                 <td class="px-4 py-3 text-right font-mono">{{ formatNumber(item.requests) }}</td>
-                <td class="px-4 py-3 text-right font-mono text-muted-foreground">{{ formatCompactNumber(item.token_used) }}</td>
-                <td class="px-4 py-3 text-right font-mono font-bold text-primary">{{ formatApiQuotaUsd(item.quota) }}</td>
+                <td class="px-4 py-3 text-right font-mono text-muted-foreground" :title="formatExactInteger(item.token_used)">
+                  {{ formatLargeCount(item.token_used, locale) }}
+                </td>
+                <td class="px-4 py-3 text-right font-mono font-bold text-primary" :title="formatApiQuotaUsdExact(item.quota)">
+                  {{ formatApiQuotaUsd(item.quota, { compact: true, locale }) }}
+                </td>
                 <td class="px-5 py-3">
                   <div class="flex items-center gap-2">
                     <div class="h-2 flex-1 overflow-hidden rounded-full bg-muted">
@@ -258,7 +268,12 @@ import { BarChart3, Box, Check, Copy, FlaskConical, RefreshCw, Search } from 'lu
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import NeedtokenSelect from '../NeedtokenSelect.vue'
-import { formatApiQuotaUsd } from '../../lib/apiAccountLinkPolicy'
+import {
+  formatApiQuotaUsd,
+  formatApiQuotaUsdExact,
+  formatExactInteger,
+  formatLargeCount,
+} from '../../lib/apiAccountLinkPolicy'
 import {
   buildSelectableGroupOptions,
   formatConsoleGroupLabel,
@@ -272,7 +287,7 @@ import {
   type GatewayVendorItem,
 } from '../../lib/gatewayConsoleApi'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 
 const activeTab = ref<'catalog' | 'analytics'>('catalog')
@@ -415,13 +430,7 @@ const formatUnitUsd = (val: number) => {
   return val.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')
 }
 
-const formatNumber = (n: number) => (Number.isFinite(n) ? n.toLocaleString('en-US') : '0')
-const formatCompactNumber = (n: number) => {
-  if (!Number.isFinite(n) || n <= 0) return '0'
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
-  return String(Math.round(n))
-}
+const formatNumber = (n: number) => formatExactInteger(n)
 
 const sharePercent = (quota: number) => {
   if (!usage.value.total_quota || usage.value.total_quota <= 0) return 0

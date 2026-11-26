@@ -440,25 +440,44 @@ func (a *UnifiedBalanceAdapter) quotaToCurrencyAmount(quota int64, currency stri
 	if !ok {
 		rate = decimal.NewFromInt(1)
 	}
-	return money.FromDecimal(usd.Mul(rate).Round(2))
+	// Truncate down to cents so tiny API charges (e.g. $0.00072 -> $99.99928 -> 666.995 CNY)
+	// never round back up to 667.00 CNY and mask deductions or overstate cash value.
+	return money.FromDecimal(usd.Mul(rate).Truncate(2))
 }
 
-func (a *UnifiedBalanceAdapter) currencyAmountToQuota(amount money.Amount, currency string) (int64, error) {
+func (a *UnifiedBalanceAdapter) currencyAmountToQuotaDecimal(amount money.Amount, currency string) (decimal.Decimal, error) {
 	dec := amount.Decimal.Round(2)
 	if dec.LessThanOrEqual(decimal.Zero) {
-		return 0, nil
+		return decimal.Zero, nil
 	}
 	rate, ok := ResolveUSDExchangeRate(a.c, currency)
 	if !ok || rate.LessThanOrEqual(decimal.Zero) {
 		if strings.EqualFold(strings.TrimSpace(currency), "USD") {
 			rate = decimal.NewFromInt(1)
 		} else {
-			return 0, errors.New("needtoken_pricing.usd_cny_rate is required for non-USD unified balance conversion")
+			return decimal.Zero, errors.New("needtoken_pricing.usd_cny_rate is required for non-USD unified balance conversion")
 		}
 	}
 	usd := dec.Div(rate)
-	quotaDec := usd.Mul(decimal.NewFromInt(needTokenQuotaPerUSD)).Round(0)
-	return quotaDec.IntPart(), nil
+	return usd.Mul(decimal.NewFromInt(needTokenQuotaPerUSD)), nil
+}
+
+// currencyAmountToCreditQuota floors fractional quota when crediting so conversions never over-issue API quota.
+func (a *UnifiedBalanceAdapter) currencyAmountToCreditQuota(amount money.Amount, currency string) (int64, error) {
+	quotaDec, err := a.currencyAmountToQuotaDecimal(amount, currency)
+	if err != nil || quotaDec.LessThanOrEqual(decimal.Zero) {
+		return 0, err
+	}
+	return quotaDec.Floor().IntPart(), nil
+}
+
+// currencyAmountToDebitQuota ceils fractional quota when debiting so deductions never under-charge.
+func (a *UnifiedBalanceAdapter) currencyAmountToDebitQuota(amount money.Amount, currency string) (int64, error) {
+	quotaDec, err := a.currencyAmountToQuotaDecimal(amount, currency)
+	if err != nil || quotaDec.LessThanOrEqual(decimal.Zero) {
+		return 0, err
+	}
+	return quotaDec.Ceil().IntPart(), nil
 }
 
 func (a *UnifiedBalanceAdapter) FetchBalance(ctx context.Context, userID uint, siteCurrency string) (money.Amount, bool, error) {
@@ -494,7 +513,7 @@ func (a *UnifiedBalanceAdapter) Credit(ctx context.Context, userID uint, amount 
 	if curr == "" {
 		curr = a.SiteCurrency()
 	}
-	quota, err := a.currencyAmountToQuota(amount, curr)
+	quota, err := a.currencyAmountToCreditQuota(amount, curr)
 	if err != nil || quota <= 0 {
 		return money.Amount{}, err
 	}
@@ -525,7 +544,7 @@ func (a *UnifiedBalanceAdapter) Debit(ctx context.Context, userID uint, maxAmoun
 	if curr == "" {
 		curr = a.SiteCurrency()
 	}
-	maxQuota, err := a.currencyAmountToQuota(maxAmount, curr)
+	maxQuota, err := a.currencyAmountToDebitQuota(maxAmount, curr)
 	if err != nil || maxQuota <= 0 {
 		return money.FromDecimal(decimal.Zero), money.FromDecimal(decimal.Zero), false, err
 	}
