@@ -3,15 +3,16 @@
     <button
       :id="id"
       type="button"
-      class="nt-theme-select__trigger w-full"
+      class="nt-theme-select__trigger inline-flex w-full items-center justify-between"
+      :data-state="open ? 'open' : 'closed'"
       :aria-label="label"
       :aria-expanded="open"
       :aria-controls="listId"
       :disabled="disabled"
       @click="toggleOpen"
     >
-      <span class="nt-model-combobox__value font-mono">
-        {{ modelValue || placeholder || label }}
+      <span class="nt-model-combobox__value" :class="modelValue ? 'font-mono' : 'text-muted-foreground'">
+        {{ displayLabel }}
       </span>
       <ChevronDown class="h-3.5 w-3.5 shrink-0 transition-transform duration-150" :class="open ? 'rotate-180' : ''" />
     </button>
@@ -58,6 +59,17 @@
       </div>
 
       <div class="nt-model-combobox__list">
+        <button
+          v-if="autoOptionLabel && !query.trim()"
+          type="button"
+          class="nt-model-combobox__option"
+          :class="{ 'is-selected': !modelValue }"
+          @click="selectAuto"
+        >
+          <span class="truncate">{{ autoOptionLabel }}</span>
+          <Check v-if="!modelValue" class="h-3.5 w-3.5 shrink-0 text-primary" />
+        </button>
+
         <button
           v-if="allowCustom && canUseCustomQuery"
           type="button"
@@ -106,6 +118,7 @@ const props = withDefaults(defineProps<{
   placeholder?: string
   searchPlaceholder?: string
   emptyText?: string
+  autoOptionLabel?: string
   disabled?: boolean
   allowCustom?: boolean
   compact?: boolean
@@ -117,6 +130,12 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const { t } = useI18n()
+
+const displayLabel = computed(() => {
+  if (props.modelValue) return props.modelValue
+  if (props.autoOptionLabel) return props.autoOptionLabel
+  return props.placeholder || props.label
+})
 
 const rootEl = ref<HTMLElement | null>(null)
 const searchInputEl = ref<HTMLInputElement | null>(null)
@@ -205,6 +224,11 @@ const toggleOpen = () => {
   else void openPanel()
 }
 
+const selectAuto = () => {
+  emit('update:modelValue', '')
+  closePanel()
+}
+
 const selectModel = (value: string) => {
   const clean = value.trim()
   if (!clean) return
@@ -253,8 +277,9 @@ onUnmounted(() => {
   width: 100%;
 }
 .nt-model-combobox--compact .nt-theme-select__trigger {
+  height: 34px;
   min-height: 34px;
-  padding: 6px 10px;
+  padding: 0 10px;
   font-size: 11.5px;
 }
 .nt-model-combobox__value {
@@ -286,19 +311,29 @@ onUnmounted(() => {
   border-radius: 9px;
   background: var(--nt-surface-input);
   padding: 0 9px;
-  height: 34px;
+  height: 36px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 .nt-model-combobox__search:focus-within {
   border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 16%, transparent);
 }
 .nt-model-combobox__input {
   min-width: 0;
   flex: 1;
+  height: 100%;
   background: transparent;
   border: 0;
   outline: none;
+  box-shadow: none;
   font-size: 12px;
   color: var(--ui-text-primary);
+}
+.nt-model-combobox__input:focus,
+.nt-model-combobox__input:focus-visible {
+  outline: none;
+  border-color: transparent;
+  box-shadow: none;
 }
 .nt-model-combobox__vendors {
   display: flex;

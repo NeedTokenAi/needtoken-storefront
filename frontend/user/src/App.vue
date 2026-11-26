@@ -2,7 +2,7 @@
   <!-- html keeps the scrollbar gutter; body locks must not reserve it twice. -->
   <ConfigProvider :scroll-body="{ padding: 0, margin: 0 }">
   <div id="app" class="min-h-screen bg-background text-foreground flex flex-col">
-    <NeedtokenStartup v-if="startupPhase !== 'ready'" :branded="startupBranded" :failed="startupPhase === 'error'" :slow="startupSlow" @retry="retryPage" />
+    <NeedtokenStartup v-if="startupPhase !== 'ready'" :branded="startupBranded" :mode="startupConsoleMode ? 'console' : 'storefront'" :failed="startupPhase === 'error'" :slow="startupSlow" @retry="retryPage" />
     <template v-else>
       <!-- vault 模板：自带顶栏/页脚的外壳包裹页面（控制台仍走下方分支） -->
       <VaultLayout v-if="activeTemplate === 'vault' && !isResellerConsole">
@@ -21,7 +21,8 @@
         <div v-if="routeLoadFailed" class="nt-route-error" role="alert"><span>{{ t('needtoken.startup.routeFailed') }}</span><button type="button" @click="retryPage">{{ t('needtoken.startup.retry') }}</button></div>
         <ErrorBoundary>
           <RouterView v-slot="{ Component }">
-            <div v-if="!Component" :class="{ 'nt-home-route-placeholder': route.path === '/' }">
+            <NeedtokenStartup v-if="!Component && isNeedtokenMemberConsolePath(route.path)" :branded="startupBranded" mode="console" />
+            <div v-else-if="!Component" :class="{ 'nt-home-route-placeholder': route.path === '/' }">
               <NeedtokenSkeleton :kind="route.path === '/' ? 'prices' : 'page'" :count="route.path === '/' ? 4 : 3" />
             </div>
             <Transition name="nt-page" mode="out-in">
@@ -96,13 +97,15 @@ const NeedtokenLayout = defineAsyncComponent({
   loadingComponent: {
     setup() {
       const store = useAppStore()
-      return () => h(NeedtokenStartup, { branded: !store.isResellerTenant })
+      const mode = typeof window !== 'undefined' && isNeedtokenMemberConsolePath(window.location.pathname) ? 'console' : 'storefront'
+      return () => h(NeedtokenStartup, { branded: !store.isResellerTenant, mode })
     },
   },
   errorComponent: {
     setup() {
       const store = useAppStore()
-      return () => h(NeedtokenStartup, { branded: !store.isResellerTenant, failed: true, onRetry: () => window.location.reload() })
+      const mode = typeof window !== 'undefined' && isNeedtokenMemberConsolePath(window.location.pathname) ? 'console' : 'storefront'
+      return () => h(NeedtokenStartup, { branded: !store.isResellerTenant, mode, failed: true, onRetry: () => window.location.reload() })
     },
   },
   delay: 0,
@@ -132,6 +135,9 @@ try { verifiedMainHint = localStorage.getItem('dj-storefront-boot-main') === '1'
 const startupBranded = computed(() => appStore.config
   ? isNeedtoken.value && !appStore.isResellerTenant
   : shouldBrandNeedtokenStartup(getActiveTemplate(), verifiedMainHint, window.location.hostname))
+const startupConsoleMode = computed(() =>
+  isNeedtokenMemberConsolePath(route.path)
+  || (typeof window !== 'undefined' && isNeedtokenMemberConsolePath(window.location.pathname)))
 const slowTimer = window.setTimeout(() => { if (startupPhase.value === 'pending') startupSlow.value = true }, 8000)
 watch(startupPhase, phase => { if (phase !== 'pending') window.clearTimeout(slowTimer) })
 watch(() => appStore.config, config => {

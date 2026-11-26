@@ -160,12 +160,15 @@ test('member console locales keep Wallet Balance, Plan Quota, and My Wallet labe
     assert.ok(mc.quick.quickUse)
     assert.ok(mc.quickUse.title)
     assert.ok(mc.quickUse.copyAiPrompt)
+    assert.ok(mc.quickUse.autoAllModelsLabel)
+    assert.ok(mc.quickUse.deeplinkNotInstalledHint)
+    assert.equal(mc.keys.quickConnect, undefined)
     assert.ok(mc.keys.modelStrategyFollowTitle)
     assert.ok(mc.keys.modelStrategyLockTitle)
   }
 })
 
-test('console group helpers format channel-code-ratio labels and hide empty ghost groups', () => {
+test('console group helpers format code-channel-ratio labels and hide empty ghost groups', () => {
   const groupMeta = {
     SSVIP: {
       code: 'SSVIP',
@@ -192,13 +195,13 @@ test('console group helpers format channel-code-ratio labels and hide empty ghos
   }
   const usableGroups = { SSVIP: '自用 ChatGPT', claude_pro: 'Claude', default: 'Default group' }
 
-  assert.equal(formatConsoleGroupLabel('SSVIP', groupMeta, usableGroups), 'needtoken-pool - SSVIP - ×1.00')
-  assert.equal(formatConsoleGroupLabel('claude_pro', groupMeta, usableGroups), 'Anthropic Pool - claude_pro - ×1.50')
+  assert.equal(formatConsoleGroupLabel('SSVIP', groupMeta, usableGroups), 'SSVIP - needtoken-pool - ×1.00')
+  assert.equal(formatConsoleGroupLabel('claude_pro', groupMeta, usableGroups), 'claude_pro - Anthropic Pool - ×1.50')
   assert.equal(formatConsoleGroupLabel('default', groupMeta, usableGroups), 'default - ×1.00')
 
   assert.equal(
     formatTokenGroupsSummary({ group: 'auto', auto_groups: ['SSVIP', 'claude_pro'] }, 'default', groupMeta, usableGroups),
-    'needtoken-pool - SSVIP - ×1.00 / Anthropic Pool - claude_pro - ×1.50',
+    'SSVIP - needtoken-pool - ×1.00 / claude_pro - Anthropic Pool - ×1.50',
   )
 
   const selectable = buildSelectableGroupOptions({
@@ -242,28 +245,37 @@ test('dynamic model aggregation and token model resolution respect follow vs loc
   assert.deepEqual(lockedModels, ['gpt-6.2-sol'])
 })
 
-test('renderQuickToolTemplate injects member credentials and supports URL encoding', () => {
+test('renderQuickToolTemplate injects member credentials, dynamic model lists, and supports URL encoding', () => {
   const vars = {
     apiKey: 'sk-test+abc/123',
     baseUrl: 'https://api.needtoken.ai',
     baseUrlV1: 'https://api.needtoken.ai/v1',
     model: 'gpt-6.2-sol',
+    allModels: ['gpt-5.4', 'gpt-6.2-sol'],
     tokenName: 'My Key',
-    group: 'needtoken-pool - SSVIP - ×1.00',
+    group: 'SSVIP - needtoken-pool - ×1.00',
   }
 
   assert.equal(
-    renderQuickToolTemplate('base_url="{{BASE_URL_V1}}" key="{{API_KEY}}" model="{{MODEL}}"', vars),
-    'base_url="https://api.needtoken.ai/v1" key="sk-test+abc/123" model="gpt-6.2-sol"',
+    renderQuickToolTemplate('endpoint="{{MODELS_ENDPOINT}}" models={{ALL_MODELS_JSON}} key="{{API_KEY}}"', vars),
+    'endpoint="https://api.needtoken.ai/v1/models" models=["gpt-5.4","gpt-6.2-sol"] key="sk-test+abc/123"',
   )
 
+  const openCodeMap = renderQuickToolTemplate('{"models": {{ALL_MODELS_MAP_JSON}}}', vars)
+  assert.deepEqual(JSON.parse(openCodeMap), {
+    models: {
+      'gpt-5.4': { name: 'gpt-5.4' },
+      'gpt-6.2-sol': { name: 'gpt-6.2-sol' },
+    },
+  })
+
   const deepLink = renderQuickToolTemplate(
-    'ccswitch://v1/import?endpoint={{BASE_URL}}&apiKey={{API_KEY}}&model={{MODEL}}',
+    'ccswitch://v1/import?endpoint={{BASE_URL}}&apiKey={{API_KEY}}',
     vars,
     true,
   )
   assert.equal(
     deepLink,
-    'ccswitch://v1/import?endpoint=https%3A%2F%2Fapi.needtoken.ai&apiKey=sk-test%2Babc%2F123&model=gpt-6.2-sol',
+    'ccswitch://v1/import?endpoint=https%3A%2F%2Fapi.needtoken.ai&apiKey=sk-test%2Babc%2F123',
   )
 })

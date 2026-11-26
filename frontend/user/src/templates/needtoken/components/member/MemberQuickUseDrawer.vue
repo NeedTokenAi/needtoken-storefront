@@ -34,7 +34,7 @@
         </button>
       </div>
 
-      <!-- 会员专属上下文配置条（密钥 + 模型 + 真实密钥开关） -->
+      <!-- 会员专属上下文配置条（密钥 + 动态模型策略 + 真实密钥开关） -->
       <div class="shrink-0 space-y-3 border-b border-border bg-muted/25 px-6 py-3.5">
         <div
           v-if="!loading && activeTokens.length === 0"
@@ -47,20 +47,21 @@
           </Button>
         </div>
 
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-12">
+        <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-12">
           <!-- 会员自己的 API Key（就地渲染，不依赖 body Portal） -->
           <div ref="keyMenuRootEl" class="relative md:col-span-5">
-            <label class="mb-1 block text-[11px] font-semibold text-muted-foreground">
+            <label class="mb-1.5 block text-[11px] font-semibold text-muted-foreground">
               {{ t('needtoken.memberConsole.quickUse.selectKey') }}
             </label>
             <button
               type="button"
-              class="nt-theme-select__trigger w-full"
+              class="nt-theme-select__trigger inline-flex w-full items-center justify-between"
+              :data-state="keyMenuOpen ? 'open' : 'closed'"
               :aria-expanded="keyMenuOpen"
               :disabled="activeTokens.length === 0"
               @click="keyMenuOpen = !keyMenuOpen"
             >
-              <span class="truncate text-left text-xs font-medium">
+              <span class="min-w-0 flex-1 truncate text-left text-xs font-medium">
                 {{ selectedTokenLabel }}
               </span>
               <ChevronDown class="h-3.5 w-3.5 shrink-0 transition-transform" :class="keyMenuOpen ? 'rotate-180' : ''" />
@@ -88,25 +89,25 @@
             </div>
           </div>
 
-          <!-- 联动所选密钥的可用模型 -->
+          <!-- 模型模式：默认自动同步网关全部最新模型，可选指定默认模型 -->
           <div class="md:col-span-5">
-            <label class="mb-1 block text-[11px] font-semibold text-muted-foreground">
-              {{ t('needtoken.memberConsole.quickUse.selectModel') }}
+            <label class="mb-1.5 block text-[11px] font-semibold text-muted-foreground">
+              {{ t('needtoken.memberConsole.quickUse.modelModeLabel') }}
             </label>
             <NeedtokenModelCombobox
               v-model="selectedModel"
               :models="availableModels"
-              :label="t('needtoken.memberConsole.quickUse.selectModel')"
-              :placeholder="t('needtoken.memberConsole.playground.modelPlaceholder')"
+              :label="t('needtoken.memberConsole.quickUse.modelModeLabel')"
+              :auto-option-label="t('needtoken.memberConsole.quickUse.autoAllModelsLabel', { n: availableModels.length })"
               :search-placeholder="t('needtoken.memberConsole.playground.searchModelPlaceholder')"
             />
           </div>
 
-          <!-- 明文 Key / 占位符切换 -->
-          <div class="flex flex-col justify-end md:col-span-2">
+          <!-- 明文 Key / 占位符切换（与下拉框严密齐平 40px） -->
+          <div class="md:col-span-2">
             <button
               type="button"
-              class="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors"
+              class="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-[11px] border px-3 text-xs font-semibold transition-colors"
               :class="includeRealKey && activeTokens.length > 0
                 ? 'border-primary/40 bg-primary/10 text-primary'
                 : 'border-border bg-background text-muted-foreground hover:text-foreground'"
@@ -177,21 +178,35 @@
             </div>
           </div>
 
-          <div class="flex items-center gap-3 rounded-2xl border bg-muted/20 p-4">
-            <div class="nt-quick-tool-logo h-12 w-12 shrink-0" :style="logoBadgeStyle(activeGuideTool)">
-              <img
-                v-if="activeGuideTool.logo_url && !brokenLogos.has(activeGuideTool.id)"
-                :src="activeGuideTool.logo_url"
-                :alt="activeGuideTool.name"
-                class="h-8 w-8 object-contain"
-                @error="markLogoBroken(activeGuideTool.id)"
-              />
-              <span v-else class="text-sm font-black tracking-tight">{{ logoGlyph(activeGuideTool) }}</span>
-            </div>
+          <div class="flex items-center gap-3.5 rounded-2xl border bg-muted/20 p-4">
+            <QuickToolLogo
+              :name="activeGuideTool.name"
+              :slug="activeGuideTool.slug"
+              :icon-key="activeGuideTool.icon_key"
+              :logo-url="activeGuideTool.logo_url"
+            />
             <div class="min-w-0">
               <h2 class="text-base font-bold text-foreground">{{ activeGuideTool.name }}</h2>
               <p v-if="activeGuideTool.summary" class="mt-0.5 text-xs text-muted-foreground">{{ activeGuideTool.summary }}</p>
             </div>
+          </div>
+
+          <!-- AI 一句话自动配置（放首位方便立即使用） -->
+          <div v-if="activeGuideTool.ai_prompt_template" class="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-primary">{{ t('needtoken.memberConsole.quickUse.copyAiPrompt') }}</span>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md border border-primary/35 bg-background px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                @click="copyAiPrompt(activeGuideTool)"
+              >
+                <Check v-if="copiedTag === `ai:${activeGuideTool.id}`" class="h-3.5 w-3.5" />
+                <Copy v-else class="h-3.5 w-3.5" />
+                <span>{{ copiedTag === `ai:${activeGuideTool.id}` ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
+              </button>
+            </div>
+            <p class="text-[11px] text-muted-foreground">{{ t('needtoken.memberConsole.quickUse.aiPromptHint') }}</p>
+            <pre class="whitespace-pre-wrap break-words rounded-lg border bg-background p-3 font-sans text-xs leading-relaxed text-foreground">{{ renderToolText(activeGuideTool, activeGuideTool.ai_prompt_template) }}</pre>
           </div>
 
           <!-- 配置文件预览 -->
@@ -220,24 +235,6 @@
           <div v-if="activeGuideTool.manual_guide" class="space-y-2">
             <span class="block text-xs font-bold text-foreground">{{ t('needtoken.memberConsole.quickUse.guideTitle') }}</span>
             <pre class="whitespace-pre-wrap break-words rounded-xl border bg-background p-4 font-sans text-xs leading-relaxed text-foreground">{{ renderToolText(activeGuideTool, activeGuideTool.manual_guide) }}</pre>
-          </div>
-
-          <!-- AI 一句话自动配置预览 -->
-          <div v-if="activeGuideTool.ai_prompt_template" class="space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-4">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-bold text-primary">{{ t('needtoken.memberConsole.quickUse.copyAiPrompt') }}</span>
-              <button
-                type="button"
-                class="inline-flex items-center gap-1 rounded-md border border-primary/35 bg-background px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
-                @click="copyAiPrompt(activeGuideTool)"
-              >
-                <Check v-if="copiedTag === `ai:${activeGuideTool.id}`" class="h-3.5 w-3.5" />
-                <Copy v-else class="h-3.5 w-3.5" />
-                <span>{{ copiedTag === `ai:${activeGuideTool.id}` ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
-              </button>
-            </div>
-            <p class="text-[11px] text-muted-foreground">{{ t('needtoken.memberConsole.quickUse.aiPromptHint') }}</p>
-            <pre class="whitespace-pre-wrap break-words rounded-lg border bg-background p-3 font-sans text-xs leading-relaxed text-foreground">{{ renderToolText(activeGuideTool, activeGuideTool.ai_prompt_template) }}</pre>
           </div>
         </div>
 
@@ -299,16 +296,12 @@
             >
               <!-- Logo + 标题与摘要 -->
               <div class="flex items-start gap-3.5">
-                <div class="nt-quick-tool-logo h-12 w-12 shrink-0" :style="logoBadgeStyle(tool)">
-                  <img
-                    v-if="tool.logo_url && !brokenLogos.has(tool.id)"
-                    :src="tool.logo_url"
-                    :alt="tool.name"
-                    class="h-8 w-8 object-contain"
-                    @error="markLogoBroken(tool.id)"
-                  />
-                  <span v-else class="text-sm font-black tracking-tight">{{ logoGlyph(tool) }}</span>
-                </div>
+                <QuickToolLogo
+                  :name="tool.name"
+                  :slug="tool.slug"
+                  :icon-key="tool.icon_key"
+                  :logo-url="tool.logo_url"
+                />
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-1.5">
                     <h3 class="truncate text-sm font-bold text-foreground">{{ tool.name }}</h3>
@@ -334,48 +327,123 @@
                 </div>
               </div>
 
-              <!-- Logo 下方操作按钮组 -->
-              <div class="flex flex-wrap items-center gap-2 border-t border-border/70 pt-3">
-                <!-- 主按钮 1：一键导入（深链或终端命令） -->
-                <Button
-                  v-if="tool.import_type && tool.import_type !== 'none' && tool.import_template"
-                  size="sm"
-                  class="h-8 flex-1 text-xs"
-                  @click="runImportAction(tool)"
-                >
-                  <Check v-if="copiedTag === `imp:${tool.id}`" class="mr-1.5 h-3.5 w-3.5" />
-                  <Terminal v-else-if="tool.import_type === 'command'" class="mr-1.5 h-3.5 w-3.5" />
-                  <ArrowUpRight v-else class="mr-1.5 h-3.5 w-3.5" />
-                  <span class="truncate">
-                    {{
-                      copiedTag === `imp:${tool.id}`
-                        ? (tool.import_type === 'deeplink'
-                          ? t('needtoken.memberConsole.quickUse.importTriggered')
-                          : t('needtoken.common.copied'))
-                        : (tool.import_label || (tool.import_type === 'command'
-                          ? t('needtoken.memberConsole.quickUse.copyCommand')
-                          : t('needtoken.memberConsole.quickUse.oneClickImport')))
-                    }}
-                  </span>
-                </Button>
+              <!-- 深链未唤起提示条（例如未安装 CC Switch） -->
+              <div
+                v-if="deeplinkMissedToolId === tool.id"
+                class="rounded-xl border border-amber-500/35 bg-amber-500/10 p-3 text-[11.5px] leading-relaxed text-amber-900 dark:text-amber-200"
+                role="status"
+              >
+                <div class="flex items-start gap-2">
+                  <AlertCircle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div class="min-w-0 flex-1 space-y-1.5">
+                    <p>{{ t('needtoken.memberConsole.quickUse.deeplinkNotInstalledHint', { name: tool.name }) }}</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <button
+                        v-if="tool.ai_prompt_template"
+                        type="button"
+                        class="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:opacity-90"
+                        @click="copyAiPrompt(tool)"
+                      >
+                        <Sparkles class="h-3 w-3" />
+                        <span>{{ t('needtoken.memberConsole.quickUse.useAiPromptInstead') }}</span>
+                      </button>
+                      <a
+                        v-if="tool.docs_url && /^https?:\/\//i.test(tool.docs_url)"
+                        :href="tool.docs_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center gap-1 font-semibold underline"
+                      >
+                        <span>{{ t('needtoken.memberConsole.quickUse.downloadClient') }}</span>
+                        <ExternalLink class="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                <!-- 主按钮 2：下载配置 -->
-                <Button
-                  v-if="tool.config_template"
-                  :variant="tool.import_type && tool.import_type !== 'none' && tool.import_template ? 'outline' : 'default'"
-                  size="sm"
-                  class="h-8 flex-1 text-xs"
-                  @click="downloadConfig(tool)"
-                >
-                  <Check v-if="copiedTag === `dl:${tool.id}`" class="mr-1.5 h-3.5 w-3.5 text-primary" />
-                  <Download v-else class="mr-1.5 h-3.5 w-3.5" />
-                  <span class="truncate">
-                    {{ copiedTag === `dl:${tool.id}` ? t('needtoken.memberConsole.quickUse.downloaded') : t('needtoken.memberConsole.quickUse.downloadConfig') }}
-                  </span>
-                </Button>
+              <!-- Logo 下方操作按钮组（AI 配置优先；深链工具提供一键导入 + 未安装探测） -->
+              <div class="flex flex-col gap-2 border-t border-border/70 pt-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <!-- 场景 A：原生深链工具（如 CC Switch）：复制给 AI 配置（第一推荐） + 一键导入 -->
+                  <template v-if="isDeeplinkTool(tool)">
+                    <Button
+                      v-if="tool.ai_prompt_template"
+                      size="sm"
+                      class="h-8 flex-1 text-xs"
+                      @click="copyAiPrompt(tool)"
+                    >
+                      <Check v-if="copiedTag === `ai:${tool.id}`" class="mr-1.5 h-3.5 w-3.5" />
+                      <Sparkles v-else class="mr-1.5 h-3.5 w-3.5" />
+                      <span class="truncate">
+                        {{ copiedTag === `ai:${tool.id}` ? t('needtoken.common.copied') : t('needtoken.memberConsole.quickUse.copyAiPrompt') }}
+                      </span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      class="h-8 flex-1 text-xs"
+                      :disabled="launchingToolId === tool.id"
+                      @click="runDeeplinkImport(tool)"
+                    >
+                      <Check v-if="copiedTag === `imp:${tool.id}`" class="mr-1.5 h-3.5 w-3.5 text-primary" />
+                      <ArrowUpRight v-else class="mr-1.5 h-3.5 w-3.5" />
+                      <span class="truncate">
+                        {{
+                          launchingToolId === tool.id
+                            ? t('needtoken.memberConsole.quickUse.launchingClient')
+                            : (copiedTag === `imp:${tool.id}`
+                              ? t('needtoken.memberConsole.quickUse.importTriggered')
+                              : (tool.import_label || t('needtoken.memberConsole.quickUse.oneClickImport')))
+                        }}
+                      </span>
+                    </Button>
+                  </template>
 
-                <!-- 次级快捷操作：手动教程 / 复制给 AI 配置的一句话 -->
-                <div class="flex w-full flex-wrap items-center gap-1.5">
+                  <!-- 场景 B：普通 CLI / IDE / 对话客户端：第一主按钮为「复制给 AI 配置」 -->
+                  <template v-else>
+                    <Button
+                      v-if="tool.ai_prompt_template"
+                      size="sm"
+                      class="h-8 flex-1 text-xs"
+                      @click="copyAiPrompt(tool)"
+                    >
+                      <Check v-if="copiedTag === `ai:${tool.id}`" class="mr-1.5 h-3.5 w-3.5" />
+                      <Sparkles v-else class="mr-1.5 h-3.5 w-3.5" />
+                      <span class="truncate">
+                        {{ copiedTag === `ai:${tool.id}` ? t('needtoken.common.copied') : t('needtoken.memberConsole.quickUse.copyAiPrompt') }}
+                      </span>
+                    </Button>
+                    <Button
+                      v-if="tool.config_template"
+                      :variant="tool.ai_prompt_template ? 'outline' : 'default'"
+                      size="sm"
+                      class="h-8 flex-1 text-xs"
+                      @click="downloadConfig(tool)"
+                    >
+                      <Check v-if="copiedTag === `dl:${tool.id}`" class="mr-1.5 h-3.5 w-3.5 text-primary" />
+                      <Download v-else class="mr-1.5 h-3.5 w-3.5" />
+                      <span class="truncate">
+                        {{ copiedTag === `dl:${tool.id}` ? t('needtoken.memberConsole.quickUse.downloaded') : t('needtoken.memberConsole.quickUse.downloadConfig') }}
+                      </span>
+                    </Button>
+                  </template>
+                </div>
+
+                <!-- 次级按钮栏：深链工具补「下载配置」，全部工具提供「手动配置教程」 -->
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <button
+                    v-if="isDeeplinkTool(tool) && tool.config_template"
+                    type="button"
+                    class="inline-flex h-7 flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-muted/30 px-2.5 text-[11px] font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                    @click="downloadConfig(tool)"
+                  >
+                    <Check v-if="copiedTag === `dl:${tool.id}`" class="h-3 w-3 shrink-0 text-primary" />
+                    <Download v-else class="h-3 w-3 shrink-0" />
+                    <span class="truncate">
+                      {{ copiedTag === `dl:${tool.id}` ? t('needtoken.memberConsole.quickUse.downloaded') : t('needtoken.memberConsole.quickUse.downloadConfig') }}
+                    </span>
+                  </button>
                   <button
                     v-if="tool.manual_guide || tool.config_template"
                     type="button"
@@ -384,18 +452,6 @@
                   >
                     <BookOpen class="h-3 w-3 shrink-0" />
                     <span class="truncate">{{ t('needtoken.memberConsole.quickUse.manualGuide') }}</span>
-                  </button>
-                  <button
-                    v-if="tool.ai_prompt_template"
-                    type="button"
-                    class="inline-flex h-7 flex-1 items-center justify-center gap-1 rounded-lg border border-primary/25 bg-primary/5 px-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/12"
-                    @click="copyAiPrompt(tool)"
-                  >
-                    <Check v-if="copiedTag === `ai:${tool.id}`" class="h-3 w-3 shrink-0" />
-                    <Sparkles v-else class="h-3 w-3 shrink-0" />
-                    <span class="truncate">
-                      {{ copiedTag === `ai:${tool.id}` ? t('needtoken.common.copied') : t('needtoken.memberConsole.quickUse.copyAiPrompt') }}
-                    </span>
                   </button>
                 </div>
               </div>
@@ -411,6 +467,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowUpRight,
   BookOpen,
@@ -424,12 +481,12 @@ import {
   KeyRound,
   Search,
   Sparkles,
-  Terminal,
   X,
   Zap,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import NeedtokenModelCombobox from './NeedtokenModelCombobox.vue'
+import QuickToolLogo from './QuickToolLogo.vue'
 import { API_BASE_URL, DEFAULT_MODELS } from '../../config'
 import {
   formatTokenGroupsSummary,
@@ -462,7 +519,8 @@ const searchQuery = ref('')
 const activeCategoryId = ref('all')
 const activeGuideTool = ref<QuickToolItem | null>(null)
 const copiedTag = ref('')
-const brokenLogos = ref<Set<string>>(new Set())
+const launchingToolId = ref('')
+const deeplinkMissedToolId = ref('')
 
 const gatewayBaseUrl = ref(API_BASE_URL.replace(/\/v1\/?$/, ''))
 const categories = ref<QuickToolCategory[]>([])
@@ -477,154 +535,160 @@ const defaultGroup = ref('default')
 const userAutoGroups = ref<string[]>([])
 
 const selectedTokenId = ref<number | null>(null)
-const selectedModel = ref<string>(DEFAULT_MODELS[0] || 'gpt-5.4')
+// 空字符串表示「自动跟随网关全部模型（动态同步 /v1/models）」，不写死单一模型
+const selectedModel = ref<string>('')
 
 const FALLBACK_CATEGORIES: QuickToolCategory[] = [
-  { id: 'cat-cli', name: 'CLI 编程工具', slug: 'cli', sort_order: 10, enabled: true },
-  { id: 'cat-ide', name: 'IDE 与插件', slug: 'ide', sort_order: 20, enabled: true },
-  { id: 'cat-router', name: '聚合与路由切换', slug: 'router', sort_order: 30, enabled: true },
-  { id: 'cat-chat', name: '对话客户端', slug: 'chat', sort_order: 40, enabled: true },
+  { id: 'cat_coding_cli', name: '编程 CLI 工具', slug: 'coding-cli', sort_order: 10, enabled: true },
+  { id: 'cat_switch_proxy', name: '切换与配置管理', slug: 'switch-proxy', sort_order: 20, enabled: true },
+  { id: 'cat_ide_plugins', name: 'IDE 与编辑器插件', slug: 'ide-plugins', sort_order: 30, enabled: true },
+  { id: 'cat_chat_clients', name: 'AI 聊天客户端', slug: 'chat-clients', sort_order: 40, enabled: true },
 ]
 
 const FALLBACK_TOOLS: QuickToolItem[] = [
   {
-    id: 'tool-codex',
-    category_id: 'cat-cli',
+    id: 'tool_codex_cli',
+    category_id: 'cat_coding_cli',
     name: 'Codex CLI',
     slug: 'codex',
     icon_key: 'codex',
-    summary: 'OpenAI 官方终端编程助手，使用 Responses 协议直连 Need 网关。',
+    summary: 'OpenAI 官方终端编程助手，动态接入全部授权模型（含新同步版本）',
     tags: ['codex', 'openai', 'cli', '编程工具'],
-    default_model_hint: 'gpt-5.4',
-    import_type: 'command',
-    import_label: '复制配置命令',
-    import_template: 'export OPENAI_BASE_URL="{{BASE_URL_V1}}"\nexport OPENAI_API_KEY="{{API_KEY}}"',
+    import_type: 'none',
     config_filename: 'config.toml',
-    config_template: 'model_provider = "needtoken"\nmodel = "{{MODEL}}"\n\n[model_providers.needtoken]\nname = "NeedToken"\nbase_url = "{{BASE_URL_V1}}"\nwire_api = "responses"\nenv_key = "NEEDTOKEN_API_KEY"\n',
-    manual_guide: '1. 将配置文件保存至 ~/.codex/config.toml\n2. 写入环境变量 NEEDTOKEN_API_KEY="{{API_KEY}}"\n3. 终端执行 codex 即可开始使用。',
-    ai_prompt_template: '请帮我配置本地 Codex CLI（~/.codex/config.toml 与环境变量 NEEDTOKEN_API_KEY），使用 NeedToken 网关：Base URL 为 {{BASE_URL_V1}}，wire_api 为 responses，默认模型 {{MODEL}}，API Key 为 {{API_KEY}}。配置完成后请帮我验证连通性。',
+    config_template: '# 保存为 ~/.codex/config.toml，并在 shell 配置文件持久化设置 NEEDTOKEN_API_KEY={{API_KEY}}\n# 不写死单一模型，后台同步新模型（如 GPT-6.2）后自动可用\nmodel_provider = "needtoken"\n\n[model_providers.needtoken]\nname = "NeedToken"\nbase_url = "{{BASE_URL_V1}}"\nwire_api = "responses"\nenv_key = "NEEDTOKEN_API_KEY"\n',
+    manual_guide: '1. 将下载的 config.toml 保存至 ~/.codex/config.toml。\n2. 在 ~/.zshrc 或 ~/.bashrc 永久写入 export NEEDTOKEN_API_KEY="{{API_KEY}}" 并 source。\n3. 启动 codex 后可随时通过 /model 或 {{MODELS_ENDPOINT}} 切换全部最新模型。',
+    ai_prompt_template: '请帮我配置本机 OpenAI Codex CLI 接入 NeedToken 网关：更新 ~/.codex/config.toml 设置 model_provider="needtoken"、base_url="{{BASE_URL_V1}}"、wire_api="responses"、env_key="NEEDTOKEN_API_KEY"（不写死单一旧模型），并在 shell 配置文件持久化写入 export NEEDTOKEN_API_KEY="{{API_KEY}}"，完成后请求 GET {{MODELS_ENDPOINT}} 校验可用模型列表。',
     docs_url: 'https://github.com/openai/codex',
     sort_order: 10,
     enabled: true,
   },
   {
-    id: 'tool-claude-code',
-    category_id: 'cat-cli',
+    id: 'tool_claude_code',
+    category_id: 'cat_coding_cli',
     name: 'Claude Code',
     slug: 'claude-code',
     icon_key: 'claude',
-    summary: 'Anthropic 官方终端编程 Agent，支持一键写入环境变量与 settings.json。',
+    summary: 'Anthropic 官方终端编码 Agent，自动同步网关最新模型列表',
     tags: ['claude', 'anthropic', 'cli', '编程工具'],
-    default_model_hint: 'claude-sonnet-4-6',
-    import_type: 'command',
-    import_label: '复制配置命令',
-    import_template: 'export ANTHROPIC_BASE_URL="{{BASE_URL}}"\nexport ANTHROPIC_AUTH_TOKEN="{{API_KEY}}"\nexport ANTHROPIC_MODEL="{{MODEL}}"',
-    config_filename: 'claude-code-settings.json',
-    config_template: '{\n  "env": {\n    "ANTHROPIC_BASE_URL": "{{BASE_URL}}",\n    "ANTHROPIC_AUTH_TOKEN": "{{API_KEY}}",\n    "ANTHROPIC_MODEL": "{{MODEL}}"\n  }\n}\n',
-    manual_guide: '1. 下载配置并合并至 ~/.claude/settings.json\n2. 重启终端并运行 claude 即可生效。',
-    ai_prompt_template: '请帮我配置 Claude Code（~/.claude/settings.json），将 ANTHROPIC_BASE_URL 设为 {{BASE_URL}}，ANTHROPIC_AUTH_TOKEN 设为 {{API_KEY}}，ANTHROPIC_MODEL 设为 {{MODEL}}。',
+    import_type: 'none',
+    config_filename: 'claude-settings.json',
+    config_template: '{\n  "env": {\n    "ANTHROPIC_BASE_URL": "{{BASE_URL}}",\n    "ANTHROPIC_AUTH_TOKEN": "{{API_KEY}}"\n  }\n}\n',
+    manual_guide: '1. 将配置合并到 ~/.claude/settings.json（未写死单一模型）。\n2. 重启终端并运行 claude，在会话中用 /model 随时切换最新模型。',
+    ai_prompt_template: '请帮我配置本机 Claude Code（~/.claude/settings.json），合并设置 env.ANTHROPIC_BASE_URL="{{BASE_URL}}" 与 env.ANTHROPIC_AUTH_TOKEN="{{API_KEY}}"，不要写死单一模型以便自动跟随网关新增模型，并请求 GET {{MODELS_ENDPOINT}} 核对可用模型。',
     docs_url: 'https://docs.anthropic.com/en/docs/claude-code/overview',
     sort_order: 20,
     enabled: true,
   },
   {
-    id: 'tool-gemini-cli',
-    category_id: 'cat-cli',
+    id: 'tool_gemini_cli',
+    category_id: 'cat_coding_cli',
     name: 'Gemini CLI',
-    slug: 'gemini-cli',
+    slug: 'gemini',
     icon_key: 'gemini',
-    summary: 'Google Gemini 终端编程工具，通过自定义 Base URL 无缝接入 Need 网关。',
+    summary: 'Google Gemini 终端 AI 助手，动态跟随网关全量可用模型',
     tags: ['gemini', 'google', 'cli', '编程工具'],
-    default_model_hint: 'gemini-2.5-pro',
-    import_type: 'command',
-    import_label: '复制配置命令',
-    import_template: 'export GOOGLE_GEMINI_BASE_URL="{{BASE_URL}}"\nexport GEMINI_API_KEY="{{API_KEY}}"\nexport GEMINI_MODEL="{{MODEL}}"',
-    config_filename: 'gemini-cli.env',
-    config_template: 'GOOGLE_GEMINI_BASE_URL={{BASE_URL}}\nGEMINI_API_KEY={{API_KEY}}\nGEMINI_MODEL={{MODEL}}\n',
-    manual_guide: '1. 将上述变量追加至 ~/.zshrc 或 ~/.bashrc\n2. 执行 source 后运行 gemini。',
-    ai_prompt_template: '请帮我在当前环境配置 Gemini CLI，设置 GOOGLE_GEMINI_BASE_URL={{BASE_URL}}、GEMINI_API_KEY={{API_KEY}}、GEMINI_MODEL={{MODEL}}。',
+    import_type: 'none',
+    config_filename: 'gemini.env',
+    config_template: 'GOOGLE_GEMINI_BASE_URL={{BASE_URL}}\nGEMINI_API_KEY={{API_KEY}}\n',
+    manual_guide: '1. 将配置写入 ~/.gemini/.env（未锁定单一模型）。\n2. 运行 gemini 即可按需使用全部最新模型。',
+    ai_prompt_template: '请帮我配置本机 Gemini CLI（~/.gemini/.env），设置 GOOGLE_GEMINI_BASE_URL={{BASE_URL}} 与 GEMINI_API_KEY={{API_KEY}}，不写死单一模型，并通过 GET {{MODELS_ENDPOINT}} 核对可用模型列表。',
     docs_url: 'https://github.com/google-gemini/gemini-cli',
     sort_order: 30,
     enabled: true,
   },
   {
-    id: 'tool-opencode',
-    category_id: 'cat-cli',
+    id: 'tool_opencode',
+    category_id: 'cat_coding_cli',
     name: 'OpenCode',
     slug: 'opencode',
     icon_key: 'opencode',
-    summary: '开源多模型终端编码助手，支持导入 opencode.json 自定义 NeedToken Provider。',
+    summary: '开源多模型终端编程代理，自动注入当前密钥全量可用模型',
     tags: ['opencode', 'cli', '编程工具'],
-    default_model_hint: 'claude-sonnet-4-6',
     import_type: 'none',
     config_filename: 'opencode.json',
-    config_template: '{\n  "$schema": "https://opencode.ai/config.json",\n  "model": "needtoken/{{MODEL}}",\n  "providers": {\n    "needtoken": {\n      "name": "NeedToken",\n      "package": "@opencode/ai/providers/openai-compatible",\n      "settings": {\n        "baseURL": "{{BASE_URL_V1}}",\n        "apiKey": "{{API_KEY}}"\n      },\n      "models": {\n        "{{MODEL}}": { "name": "{{MODEL}}" }\n      }\n    }\n  }\n}\n',
-    manual_guide: '1. 下载 opencode.json 放入项目根目录或 ~/.config/opencode/\n2. 运行 opencode 即可调用 {{MODEL}}。',
-    ai_prompt_template: '请帮我生成并写入 OpenCode 配置文件 opencode.json，使用 NeedToken OpenAI-Compatible Provider，baseURL={{BASE_URL_V1}}，apiKey={{API_KEY}}，默认模型 {{MODEL}}。',
+    config_template: '{\n  "$schema": "https://opencode.ai/config.json",\n  "provider": {\n    "needtoken": {\n      "npm": "@ai-sdk/openai-compatible",\n      "name": "NeedToken",\n      "options": {\n        "baseURL": "{{BASE_URL_V1}}",\n        "apiKey": "{{API_KEY}}"\n      },\n      "models": {{ALL_MODELS_MAP_JSON}}\n    }\n  }\n}\n',
+    manual_guide: '1. 下载 opencode.json 放入 ~/.config/opencode/opencode.json，已包含你当前密钥的全部模型。\n2. 后台新增模型后重新下载或让 AI 从 {{MODELS_ENDPOINT}} 刷新 models 字段即可。',
+    ai_prompt_template: '请帮我配置并动态同步本机 OpenCode（~/.config/opencode/opencode.json）：先请求 GET {{MODELS_ENDPOINT}}（Bearer {{API_KEY}}）获取全部最新模型，将 NeedToken（baseURL={{BASE_URL_V1}}、apiKey={{API_KEY}}）及全量模型写入 provider.needtoken.models。',
     docs_url: 'https://opencode.ai/docs/providers/',
     sort_order: 40,
     enabled: true,
   },
   {
-    id: 'tool-cc-switch',
-    category_id: 'cat-router',
+    id: 'tool_cc_switch',
+    category_id: 'cat_switch_proxy',
     name: 'CC Switch',
     slug: 'cc-switch',
     icon_key: 'ccswitch',
-    summary: '桌面端一键切换 Claude / Codex / Gemini 供应商配置，支持深度链接直接导入。',
-    tags: ['cc switch', 'ccswitch', 'router', '编程工具'],
-    default_model_hint: 'claude-sonnet-4-6',
+    summary: 'Claude Code / Codex / Gemini 桌面配置切换器，支持协议深链一键导入',
+    tags: ['cc switch', 'cc-switch', 'claude', 'codex'],
     import_type: 'deeplink',
     import_label: '一键导入 CC Switch',
-    import_template: 'ccswitch://v1/import?resource=provider&app=claude&name=NeedToken&endpoint={{BASE_URL}}&apiKey={{API_KEY}}&model={{MODEL}}',
+    import_template: 'ccswitch://v1/import?resource=provider&app=claude&name=NeedToken&endpoint={{BASE_URL}}&apiKey={{API_KEY}}',
     config_filename: 'cc-switch-needtoken.json',
-    config_template: '{\n  "name": "NeedToken",\n  "endpoint": "{{BASE_URL}}",\n  "apiKey": "{{API_KEY}}",\n  "model": "{{MODEL}}"\n}\n',
-    manual_guide: '1. 安装 CC Switch 后点击「一键导入」直接唤起应用\n2. 如未唤起，可下载 JSON 在应用内手动新增供应商。',
-    ai_prompt_template: '请在 CC Switch 中新增 NeedToken 供应商配置：Endpoint={{BASE_URL}}，API Key={{API_KEY}}，默认模型={{MODEL}}。',
-    docs_url: 'https://ccswitch.io/',
-    sort_order: 50,
+    config_template: '{\n  "name": "NeedToken ({{GROUP}})",\n  "endpoint": "{{BASE_URL}}",\n  "openaiBaseUrl": "{{BASE_URL_V1}}",\n  "modelsEndpoint": "{{MODELS_ENDPOINT}}",\n  "apiKey": "{{API_KEY}}"\n}\n',
+    manual_guide: '1. 已安装 CC Switch 时点击「一键导入」直接唤起应用。\n2. 未安装时建议优先使用「复制给 AI 配置」或先下载安装 CC Switch。',
+    ai_prompt_template: '请帮我在本机配置 NeedToken 网关（如已安装 CC Switch 则新增 Provider，否则直接帮我配置本机 CLI 工具）：Anthropic 地址 {{BASE_URL}}，OpenAI 地址 {{BASE_URL_V1}}，API Key {{API_KEY}}，通过 GET {{MODELS_ENDPOINT}} 自动同步全部可用模型。',
+    docs_url: 'https://github.com/farion1231/cc-switch/releases/latest',
+    sort_order: 10,
     enabled: true,
   },
   {
-    id: 'tool-cursor',
-    category_id: 'cat-ide',
-    name: 'Cursor / Cline',
+    id: 'tool_cursor',
+    category_id: 'cat_ide_plugins',
+    name: 'Cursor',
     slug: 'cursor',
     icon_key: 'cursor',
-    summary: '在 Cursor、Cline 或 Roo Code 中覆盖 OpenAI Base URL，一键解锁全系模型。',
-    tags: ['cursor', 'cline', 'ide', '编程工具'],
-    default_model_hint: 'claude-sonnet-4-6',
+    summary: 'AI 原生代码编辑器，通过自定义 OpenAI Base URL 动态拉取全部模型',
+    tags: ['cursor', 'ide', '编程工具'],
     import_type: 'none',
-    config_filename: 'cursor-needtoken.txt',
-    config_template: 'Provider: OpenAI Compatible\nBase URL: {{BASE_URL_V1}}\nAPI Key: {{API_KEY}}\nModel: {{MODEL}}\n',
-    manual_guide: '1. 打开 Cursor Settings → Models → 勾选 Override OpenAI Base URL\n2. 填入 {{BASE_URL_V1}} 与您的 API Key\n3. 添加模型 {{MODEL}} 即可使用。',
-    ai_prompt_template: '请指导或帮我将当前 IDE 插件（Cline / Roo Code / Continue）的 OpenAI Compatible Provider 配置为 Base URL={{BASE_URL_V1}}、API Key={{API_KEY}}、Model={{MODEL}}。',
+    config_filename: 'cursor-needtoken.json',
+    config_template: '{\n  "openai_api_key": "{{API_KEY}}",\n  "override_openai_base_url": "{{BASE_URL_V1}}",\n  "models_endpoint": "{{MODELS_ENDPOINT}}",\n  "available_models": {{ALL_MODELS_JSON}}\n}\n',
+    manual_guide: '1. 打开 Cursor Settings → Models，填入 API Key 与 Override OpenAI Base URL {{BASE_URL_V1}}。\n2. 验证后按 {{MODELS_ENDPOINT}} 返回的最新模型列表启用所需模型。',
+    ai_prompt_template: '请帮我配置 Cursor 接入 NeedToken 网关：Override OpenAI Base URL={{BASE_URL_V1}}，API Key={{API_KEY}}，并请求 GET {{MODELS_ENDPOINT}} 获取全部最新模型列表。',
     docs_url: 'https://docs.cursor.com/',
-    sort_order: 60,
+    sort_order: 10,
     enabled: true,
   },
   {
-    id: 'tool-t3-chat',
-    category_id: 'cat-chat',
+    id: 'tool_cline',
+    category_id: 'cat_ide_plugins',
+    name: 'Cline / Roo Code',
+    slug: 'cline',
+    icon_key: 'cline',
+    summary: 'VS Code 自主编码插件，通过 OpenAI Compatible 动态同步网关全部模型',
+    tags: ['cline', 'roo code', 'vscode', 'ide'],
+    import_type: 'none',
+    config_filename: 'cline-needtoken-profile.json',
+    config_template: '{\n  "apiProvider": "openai",\n  "openAiBaseUrl": "{{BASE_URL_V1}}",\n  "openAiApiKey": "{{API_KEY}}",\n  "modelsEndpoint": "{{MODELS_ENDPOINT}}",\n  "availableModels": {{ALL_MODELS_JSON}}\n}\n',
+    manual_guide: '1. 在 VS Code 打开 Cline / Roo Code 设置，选择 OpenAI Compatible。\n2. 填入 Base URL {{BASE_URL_V1}} 与 API Key，点击刷新模型列表即可同步全部最新模型。',
+    ai_prompt_template: '请帮我配置 VS Code 的 Cline / Roo Code 使用 NeedToken 网关（OpenAI Compatible）：Base URL={{BASE_URL_V1}}，API Key={{API_KEY}}，通过 GET {{MODELS_ENDPOINT}} 动态加载全部最新模型。',
+    docs_url: 'https://docs.cline.bot/',
+    sort_order: 20,
+    enabled: true,
+  },
+  {
+    id: 'tool_t3_chat',
+    category_id: 'cat_chat_clients',
     name: 'T3 Chat / Cherry Studio',
     slug: 't3',
     icon_key: 't3',
-    summary: '多模型高速对话客户端，支持 OpenAI Compatible 自定义接口快速导入。',
-    tags: ['t3', 'cherry studio', 'chat', '对话'],
-    default_model_hint: 'gpt-5.4',
+    summary: '高速 AI 聊天与多模型对比客户端，支持自动拉取网关最新模型列表',
+    tags: ['t3', 'cherry studio', 'chat'],
     import_type: 'none',
-    config_filename: 'needtoken-openai-compatible.json',
-    config_template: '{\n  "provider": "NeedToken",\n  "base_url": "{{BASE_URL_V1}}",\n  "api_key": "{{API_KEY}}",\n  "default_model": "{{MODEL}}"\n}\n',
-    manual_guide: '1. 打开客户端设置 → 自定义 OpenAI 接口\n2. 填写接口地址 {{BASE_URL_V1}} 与密钥 {{API_KEY}}\n3. 获取模型列表后即可直接对话。',
-    ai_prompt_template: '请帮我用 OpenAI Compatible 方式配置对话客户端：接口地址 {{BASE_URL_V1}}，API Key {{API_KEY}}，默认模型 {{MODEL}}。',
+    config_filename: 't3-needtoken-provider.json',
+    config_template: '{\n  "providerName": "NeedToken",\n  "apiType": "openai-compatible",\n  "baseURL": "{{BASE_URL_V1}}",\n  "modelsEndpoint": "{{MODELS_ENDPOINT}}",\n  "apiKey": "{{API_KEY}}",\n  "availableModels": {{ALL_MODELS_JSON}}\n}\n',
+    manual_guide: '1. 在客户端新增 OpenAI 兼容服务商 NeedToken，填入 {{BASE_URL_V1}} 与 API Key。\n2. 点击「获取/刷新模型列表」即可自动同步全部后台最新模型。',
+    ai_prompt_template: '请帮我配置当前 AI 对话客户端接入 NeedToken（OpenAI Compatible）：Base URL={{BASE_URL_V1}}，API Key={{API_KEY}}，并从 GET {{MODELS_ENDPOINT}} 自动拉取全部最新可用模型。',
     docs_url: 'https://docs.cherry-ai.com/',
-    sort_order: 70,
+    sort_order: 10,
     enabled: true,
   },
 ]
 
 const effectiveBaseUrl = computed(() => (gatewayBaseUrl.value || API_BASE_URL).replace(/\/+$/, '').replace(/\/v1$/, ''))
 const effectiveBaseUrlV1 = computed(() => `${effectiveBaseUrl.value}/v1`)
+const effectiveModelsEndpoint = computed(() => `${effectiveBaseUrlV1.value}/models`)
 
 const activeTokens = computed(() => tokens.value.filter(tok => tok.status === 1 && tok.key))
 const selectedToken = computed(() => activeTokens.value.find(tok => tok.id === selectedTokenId.value) || activeTokens.value[0] || null)
@@ -650,10 +714,8 @@ const availableModels = computed(() =>
 )
 
 watch([selectedTokenId, availableModels], () => {
-  const list = availableModels.value
-  if (!list.length) return
-  if (!selectedModel.value || !list.includes(selectedModel.value)) {
-    selectedModel.value = list[0]!
+  if (selectedModel.value && availableModels.value.length && !availableModels.value.includes(selectedModel.value)) {
+    selectedModel.value = ''
   }
 })
 
@@ -694,9 +756,12 @@ const filteredTools = computed(() => {
   })
 })
 
+const isDeeplinkTool = (tool: QuickToolItem) =>
+  tool.import_type === 'deeplink' && Boolean(String(tool.import_template || '').trim())
+
 const resolveModelForTool = (tool: QuickToolItem): string => {
-  const hint = String(tool.default_model_hint || '').trim()
   if (selectedModel.value) return selectedModel.value
+  const hint = String(tool.default_model_hint || '').trim()
   if (hint && availableModels.value.includes(hint)) return hint
   return availableModels.value[0] || hint || 'gpt-5.4'
 }
@@ -708,7 +773,9 @@ const buildRenderVars = (tool: QuickToolItem) => {
     apiKey,
     baseUrl: effectiveBaseUrl.value,
     baseUrlV1: effectiveBaseUrlV1.value,
+    modelsEndpoint: effectiveModelsEndpoint.value,
     model: resolveModelForTool(tool),
+    allModels: availableModels.value,
     tokenName: tok?.name || 'NeedToken',
     group: tok ? formatTokenGroups(tok) : defaultGroup.value,
   }
@@ -717,38 +784,9 @@ const buildRenderVars = (tool: QuickToolItem) => {
 const renderToolText = (tool: QuickToolItem, template?: string, encodeForUrl = false) =>
   renderQuickToolTemplate(template || '', buildRenderVars(tool), encodeForUrl)
 
-const logoGlyph = (tool: QuickToolItem): string => {
-  const key = (tool.icon_key || tool.slug || tool.name || '').toLowerCase()
-  if (key.includes('codex') || key.includes('openai')) return 'CX'
-  if (key.includes('claude')) return 'CC'
-  if (key.includes('gemini')) return 'GM'
-  if (key.includes('opencode')) return 'OC'
-  if (key.includes('ccswitch') || key.includes('cc-switch')) return 'SW'
-  if (key.includes('cursor')) return 'CR'
-  if (key.includes('cline') || key.includes('roo')) return 'CL'
-  if (key.includes('t3') || key.includes('cherry')) return 'T3'
-  return (tool.name || 'AI').slice(0, 2).toUpperCase()
-}
-
-const logoBadgeStyle = (tool: QuickToolItem): Record<string, string> => {
-  const key = (tool.icon_key || tool.slug || '').toLowerCase()
-  if (key.includes('codex') || key.includes('openai')) return { background: 'rgba(16, 163, 127, 0.14)', color: '#0d9473' }
-  if (key.includes('claude')) return { background: 'rgba(194, 93, 63, 0.14)', color: '#c25d3f' }
-  if (key.includes('gemini')) return { background: 'rgba(59, 126, 240, 0.14)', color: '#3b7ef0' }
-  if (key.includes('opencode')) return { background: 'rgba(124, 77, 147, 0.14)', color: '#7c4d93' }
-  if (key.includes('ccswitch') || key.includes('cc-switch')) return { background: 'rgba(13, 148, 115, 0.16)', color: '#0a7a5e' }
-  if (key.includes('cursor')) return { background: 'rgba(71, 91, 116, 0.16)', color: '#475b74' }
-  if (key.includes('t3') || key.includes('cherry')) return { background: 'rgba(180, 118, 18, 0.14)', color: '#9a6510' }
-  return { background: 'var(--ui-accent-soft)', color: 'var(--ui-accent)' }
-}
-
-const markLogoBroken = (toolId: string) => {
-  const next = new Set(brokenLogos.value)
-  next.add(toolId)
-  brokenLogos.value = next
-}
-
 let feedbackTimer: ReturnType<typeof setTimeout> | undefined
+let deeplinkCleanup: (() => void) | null = null
+
 const setFeedback = (tag: string) => {
   if (feedbackTimer) clearTimeout(feedbackTimer)
   copiedTag.value = tag
@@ -764,18 +802,51 @@ const copyText = async (text: string, tag: string) => {
   }
 }
 
-const runImportAction = async (tool: QuickToolItem) => {
+const clearDeeplinkProbe = () => {
+  deeplinkCleanup?.()
+  deeplinkCleanup = null
+  launchingToolId.value = ''
+}
+
+const runDeeplinkImport = (tool: QuickToolItem) => {
   if (!tool.import_template) return
-  if (tool.import_type === 'deeplink') {
-    const uri = renderToolText(tool, tool.import_template, true)
-    if (uri && !/^javascript:/i.test(uri)) {
-      window.location.href = uri
-      setFeedback(`imp:${tool.id}`)
-    }
-    return
+  clearDeeplinkProbe()
+  deeplinkMissedToolId.value = ''
+
+  const uri = renderToolText(tool, tool.import_template, true)
+  if (!uri || /^javascript:/i.test(uri)) return
+
+  launchingToolId.value = tool.id
+  let appFocusedAway = false
+
+  const onAppDetected = () => {
+    appFocusedAway = true
+    clearDeeplinkProbe()
+    deeplinkMissedToolId.value = ''
+    setFeedback(`imp:${tool.id}`)
   }
-  const cmd = renderToolText(tool, tool.import_template, false)
-  await copyText(cmd, `imp:${tool.id}`)
+
+  const onVisibilityChange = () => {
+    if (document.hidden) onAppDetected()
+  }
+
+  window.addEventListener('blur', onAppDetected)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
+  const probeTimer = window.setTimeout(() => {
+    clearDeeplinkProbe()
+    if (!appFocusedAway && !document.hidden) {
+      deeplinkMissedToolId.value = tool.id
+    }
+  }, 1500)
+
+  deeplinkCleanup = () => {
+    window.clearTimeout(probeTimer)
+    window.removeEventListener('blur', onAppDetected)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+  }
+
+  window.location.href = uri
 }
 
 const downloadConfig = (tool: QuickToolItem) => {
@@ -796,6 +867,7 @@ const downloadConfig = (tool: QuickToolItem) => {
 
 const copyAiPrompt = async (tool: QuickToolItem) => {
   if (!tool.ai_prompt_template) return
+  deeplinkMissedToolId.value = ''
   const prompt = renderToolText(tool, tool.ai_prompt_template, false)
   await copyText(prompt, `ai:${tool.id}`)
 }
@@ -855,6 +927,8 @@ const loadAll = async (preferredTokenId?: number) => {
 const openDrawer = (preferredTokenId?: number) => {
   activeGuideTool.value = null
   keyMenuOpen.value = false
+  deeplinkMissedToolId.value = ''
+  clearDeeplinkProbe()
   if (preferredTokenId) {
     selectedTokenId.value = preferredTokenId
   }
@@ -867,6 +941,7 @@ const openDrawer = (preferredTokenId?: number) => {
 
 const closeDrawer = () => {
   keyMenuOpen.value = false
+  clearDeeplinkProbe()
   const el = dialogRef.value
   if (el?.open) {
     el.close()
@@ -904,6 +979,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (feedbackTimer) clearTimeout(feedbackTimer)
+  clearDeeplinkProbe()
   document.removeEventListener('mousedown', onDocMouseDown)
 })
 
@@ -946,11 +1022,5 @@ defineExpose({ openDrawer, closeDrawer })
 }
 .nt-quick-drawer__dropdown-item.is-selected {
   background: var(--nt-accent-subtle);
-}
-.nt-quick-tool-logo {
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  border: 1px solid var(--ui-border);
 }
 </style>
