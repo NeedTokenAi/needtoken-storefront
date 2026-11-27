@@ -116,8 +116,30 @@
         </div>
       </section>
 
-      <!-- 成功 -->
-      <section v-if="recharge.status === 'success'" class="mb-[18px] flex items-center gap-3 rounded-xl border border-l-4 border-l-[color:var(--teal-strong)] bg-card p-[22px]">
+      <!-- 余额同步与成功 -->
+      <section v-if="isBalanceSyncPending" class="mb-[18px] flex flex-col gap-3 rounded-xl border border-l-4 bg-card p-[22px] md:flex-row md:items-center md:justify-between" :class="balanceSyncState === 'sync_error' ? 'border-l-amber-500' : 'border-l-blue-500'">
+        <div class="flex items-start gap-3">
+          <AlertCircle class="mt-0.5 h-[22px] w-[22px] flex-none" :class="balanceSyncState === 'sync_error' ? 'text-amber-500' : 'text-blue-500'" />
+          <div class="space-y-1">
+            <p class="font-bold text-foreground">
+              {{ balanceSyncState === 'sync_error' ? t('rechargeOrder.balanceSyncErrorTitle') : t('rechargeOrder.balanceSyncingTitle') }}
+            </p>
+            <p class="text-xs text-muted-foreground">
+              {{ balanceSyncState === 'sync_error' ? t('rechargeOrder.balanceSyncErrorDesc') : t('rechargeOrder.balanceSyncingDesc') }}
+            </p>
+            <p v-if="balanceSync?.last_error" class="text-xs text-amber-600 dark:text-amber-400 break-all">
+              {{ balanceSync.last_error }}
+            </p>
+            <p v-if="balanceSync?.updated_at" class="text-xs text-muted-foreground">
+              {{ t('rechargeOrder.balanceSyncUpdatedAt') }}：{{ formatDate(balanceSync.updated_at) }}
+            </p>
+          </div>
+        </div>
+        <Button type="button" variant="outline" size="sm" class="rounded-full self-start md:self-auto" :disabled="loading" @click="loadDetail">
+          {{ t('rechargeOrder.refreshBalanceSync') }}
+        </Button>
+      </section>
+      <section v-else-if="isBalanceCredited" class="mb-[18px] flex items-center gap-3 rounded-xl border border-l-4 border-l-[color:var(--teal-strong)] bg-card p-[22px]">
         <CheckCircle2 class="h-[26px] w-[26px] flex-none text-[color:var(--teal-strong)]" />
         <p class="font-bold text-foreground">{{ t('personalCenter.wallet.rechargeSuccess') }}</p>
       </section>
@@ -135,7 +157,7 @@ import { useRechargeOrderDetail } from '../../composables/useRechargeOrderDetail
 const { t } = useI18n()
 
 const {
-  loading, checkingPayment, recharge, payment, walletAddressCopied, qrImageUrl,
+  loading, checkingPayment, recharge, payment, balanceSync, balanceSyncState, isBalanceSyncPending, isBalanceCredited, walletAddressCopied, qrImageUrl,
   isPending, payLink, showTelegramPayHint, qrUsingPayLinkFallback, showQRCode,
   cryptoWalletAddress, cryptoPaymentDetails, hasCryptoPaymentDetails, customerFeeApplied,
   rechargeStatusText, rechargeStatusVariant, formatMoney, formatDate,

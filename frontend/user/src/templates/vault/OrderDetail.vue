@@ -54,12 +54,14 @@
         :fulfillment-downloading="fulfillmentDownloading"
         @download="handleDownloadFulfillment"
       />
+      <OrderAfterSalesPanel class="mt-4" :order="order" />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import SubscriptionAuthorizationPanel from "../../components/SubscriptionAuthorizationPanel.vue"
+import OrderAfterSalesPanel from "../../components/OrderAfterSalesPanel.vue"
 import { useI18n } from 'vue-i18n'
 import { AlertCircle } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'

@@ -5,7 +5,14 @@ import QRCode from 'qrcode'
 import { walletAPI } from '../api/wallet'
 import { useTelegramMiniAppStore } from '../stores/telegramMiniApp'
 import { copyText } from '../utils/clipboard'
-import { isCustomerSurchargePayment, resolvePaymentLinkNavigationTarget, resolvePaymentPresentationMode, shouldAutoOpenPaymentLink } from '../utils/paymentResumePolicy'
+import {
+  isCustomerSurchargePayment,
+  resolvePaymentLinkNavigationTarget,
+  resolvePaymentPresentationMode,
+  resolveRechargeBalanceSyncState,
+  shouldAutoOpenPaymentLink,
+  shouldContinueRechargePolling,
+} from '../utils/paymentResumePolicy'
 import type { BadgeTone } from '../utils/status'
 
 /**
@@ -20,6 +27,7 @@ export function useRechargeOrderDetail() {
   const checkingPayment = ref(false)
   const recharge = ref<any>(null)
   const payment = ref<any>(null)
+  const balanceSync = ref<any>(null)
   const pollTimer = ref<number | null>(null)
   const walletAddressCopied = ref(false)
   const walletAddressCopiedTimer = ref<number | null>(null)
@@ -32,6 +40,9 @@ export function useRechargeOrderDetail() {
     const status = String(recharge.value?.status || '').toLowerCase()
     return status === 'pending' || status === 'initiated'
   })
+  const balanceSyncState = computed(() => resolveRechargeBalanceSyncState(recharge.value, balanceSync.value))
+  const isBalanceSyncPending = computed(() => balanceSyncState.value === 'syncing' || balanceSyncState.value === 'sync_error')
+  const isBalanceCredited = computed(() => balanceSyncState.value === 'credited')
 
   const payLink = computed(() => String(payment.value?.pay_url || '').trim())
   const interactionMode = computed(() => String(payment.value?.interaction_mode || '').trim().toLowerCase())
@@ -135,6 +146,7 @@ export function useRechargeOrderDetail() {
 
   const syncPayload = (payload: any) => {
     recharge.value = payload?.recharge || recharge.value
+    balanceSync.value = payload?.balance_sync ?? null
     const paymentData = payload?.payment || (payload?.payment_id != null ? {
       id: payload.payment_id,
       provider_type: payload.provider_type,
@@ -172,11 +184,10 @@ export function useRechargeOrderDetail() {
       const payload = response.data.data || {}
       syncPayload(payload)
 
-      const status = String(recharge.value?.status || '').toLowerCase()
-      if (['success', 'failed', 'expired', 'partially_refunded', 'refunded'].includes(status)) {
-        stopPolling()
-      } else {
+      if (shouldContinueRechargePolling(recharge.value, balanceSync.value)) {
         startPolling()
+      } else {
+        stopPolling()
       }
     } catch (err: any) {
       if (!silent) {
@@ -286,10 +297,10 @@ export function useRechargeOrderDetail() {
 
   onMounted(async () => {
     await loadDetail()
-    if (isPending.value) {
+    if (shouldContinueRechargePolling(recharge.value, balanceSync.value)) {
       startPolling()
       // 自动跳转类支付使用当前标签页，避免异步加载后被浏览器拦截为弹窗。
-      if (shouldAutoOpenPaymentLink(payment.value)) {
+      if (isPending.value && shouldAutoOpenPaymentLink(payment.value)) {
         openPayLinkInCompatibleWindow(true)
       }
     }
@@ -308,6 +319,10 @@ export function useRechargeOrderDetail() {
     checkingPayment,
     recharge,
     payment,
+    balanceSync,
+    balanceSyncState,
+    isBalanceSyncPending,
+    isBalanceCredited,
     walletAddressCopied,
     qrImageUrl,
     isPending,

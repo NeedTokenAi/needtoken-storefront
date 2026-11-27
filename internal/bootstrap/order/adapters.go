@@ -288,9 +288,10 @@ type orderAdminWalletRefundAdapter struct {
 
 func (a orderAdminWalletRefundAdapter) AdminRefundToWallet(input ordertransport.AdminRefundToWalletInput) (*orderdomain.Order, *walletdomain.Transaction, *orderdomain.OrderRefundRecord, error) {
 	order, txn, record, err := a.refunds.AdminRefundToWallet(orderrefund.AdminRefundToWalletInput{
-		OrderID: input.OrderID,
-		Amount:  input.Amount,
-		Remark:  input.Remark,
+		OperationID: input.OperationID,
+		OrderID:     input.OrderID,
+		Amount:      input.Amount,
+		Remark:      input.Remark,
 	})
 	return order, txn, record, mapOrderTransportError(err)
 }
@@ -525,6 +526,7 @@ func mapOrderTransportError(err error) error {
 	}{
 		{orderinvoice.ErrInvalid, ordertransport.ErrInvoiceRequestInvalid},
 		{orderrefund.ErrRefundOperationConflict, ordertransport.ErrRefundOperationConflict},
+		{orderrefund.ErrRefundOperationInvalid, ordertransport.ErrRefundOperationInvalid},
 		{orderapp.ErrOrderNotFound, ordertransport.ErrOrderNotFound},
 		{orderapp.ErrOrderStatusInvalid, ordertransport.ErrOrderStatusInvalid},
 		{orderapp.ErrOrderFetchFailed, ordertransport.ErrOrderFetchFailed},

@@ -1,19 +1,26 @@
 package integrationtest
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	userdomain "github.com/dujiao-next/internal/modules/identity/user/domain"
+	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 
 	"github.com/dujiao-next/internal/constants"
 	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
 	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	walletgormstore "github.com/dujiao-next/internal/modules/wallet/infrastructure/gormstore"
+	wallethttp "github.com/dujiao-next/internal/modules/wallet/transport/http"
 	"github.com/dujiao-next/internal/shared/money"
 
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -62,6 +69,8 @@ func setupWalletRepositoryTest(t *testing.T) (*walletgormstore.Store, *gorm.DB) 
 		&walletdomain.Account{},
 		&walletdomain.Transaction{},
 		&walletdomain.RechargeOrder{},
+		&walletdomain.UnifiedOp{},
+		&paymentdomain.Payment{},
 	); err != nil {
 		t.Fatalf("auto migrate failed: %v", err)
 	}
@@ -282,5 +291,156 @@ func TestWalletStoreExcludesSoftDeletedRecords(t *testing.T) {
 	}
 	if foundRecharge != nil {
 		t.Fatalf("soft-deleted recharge leaked: %+v", foundRecharge)
+	}
+}
+
+type rechargeSyncUnifiedStub struct {
+	creditErr error
+	balance   money.Amount
+}
+
+func (s *rechargeSyncUnifiedStub) Enabled() bool        { return true }
+func (s *rechargeSyncUnifiedStub) SiteCurrency() string { return "CNY" }
+func (s *rechargeSyncUnifiedStub) FetchBalance(_ context.Context, _ uint, _ string) (money.Amount, bool, error) {
+	return s.balance, true, nil
+}
+func (s *rechargeSyncUnifiedStub) Credit(_ context.Context, _ uint, amount money.Amount, _, _, _ string) (money.Amount, error) {
+	if s.creditErr != nil {
+		return money.Amount{}, s.creditErr
+	}
+	s.balance = money.FromDecimal(s.balance.Decimal.Add(amount.Decimal))
+	return s.balance, nil
+}
+func (s *rechargeSyncUnifiedStub) Debit(_ context.Context, _ uint, _ money.Amount, _ string, _ bool, _, _ string) (money.Amount, money.Amount, bool, error) {
+	return money.Amount{}, money.Amount{}, false, nil
+}
+func (s *rechargeSyncUnifiedStub) Redeem(_ context.Context, _ uint, _, _ string) (*walletcontract.UnifiedBalanceRedeemResult, error) {
+	return nil, nil
+}
+
+type rechargeSyncPaymentReader struct {
+	payment *paymentdomain.Payment
+}
+
+func (p *rechargeSyncPaymentReader) GetAvailableWalletRechargeChannels(_ money.Amount, _ *userdomain.User) ([]map[string]interface{}, error) {
+	return nil, nil
+}
+func (p *rechargeSyncPaymentReader) CreateWalletRechargePayment(_ wallethttp.CreateRechargePaymentInput) (*wallethttp.CreateRechargePaymentResult, error) {
+	return nil, nil
+}
+func (p *rechargeSyncPaymentReader) GetPayment(_ uint) (*paymentdomain.Payment, error) {
+	return p.payment, nil
+}
+func (p *rechargeSyncPaymentReader) CapturePayment(_ wallethttp.CapturePaymentInput) (*paymentdomain.Payment, error) {
+	return p.payment, nil
+}
+
+type rechargeSyncUserReader struct{}
+
+func (u *rechargeSyncUserReader) GetByID(id uint) (*userdomain.User, error) {
+	return &userdomain.User{ID: id}, nil
+}
+
+type rechargeSyncWalletWrapper struct {
+	*walletapp.Service
+}
+
+func (w *rechargeSyncWalletWrapper) ListTransactions(userID uint, page, pageSize int) ([]walletdomain.Transaction, int64, error) {
+	return w.Service.ListTransactions(walletcontract.TransactionListFilter{
+		UserID:   userID,
+		Page:     page,
+		PageSize: pageSize,
+	})
+}
+
+func TestUserGetRechargeExposesUnifiedBalanceSyncState(t *testing.T) {
+	repo, db := setupWalletRepositoryTest(t)
+	now := time.Now().UTC()
+	user := userdomain.User{
+		Email: "sync_recharge@example.com", DisplayName: "Sync", PasswordHash: "h",
+		Status: constants.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	payment := paymentdomain.Payment{
+		ID: 551, ChannelID: 1, ProviderType: constants.PaymentProviderOfficial,
+		ChannelType: constants.PaymentChannelTypeAlipay, InteractionMode: constants.PaymentInteractionQR,
+		Amount: money.FromDecimal(decimal.NewFromInt(20)), Currency: "CNY", Status: constants.PaymentStatusSuccess,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&payment).Error; err != nil {
+		t.Fatal(err)
+	}
+	recharge := walletdomain.RechargeOrder{
+		ID: 881, RechargeNo: "RCH-SYNC-881", UserID: user.ID, PaymentID: payment.ID,
+		ChannelID: 1, ProviderType: constants.PaymentProviderOfficial, ChannelType: constants.PaymentChannelTypeAlipay,
+		InteractionMode: constants.PaymentInteractionQR,
+		Amount:          money.FromDecimal(decimal.NewFromInt(20)), PayableAmount: money.FromDecimal(decimal.NewFromInt(20)),
+		FeeRate: money.FromDecimal(decimal.Zero), FeeAmount: money.FromDecimal(decimal.Zero),
+		Currency: "CNY", Status: constants.WalletRechargeStatusSuccess, PaidAt: &now, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&recharge).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	bridge := &rechargeSyncUnifiedStub{creditErr: fmt.Errorf("gateway 503")}
+	svc := walletapp.NewService(walletapp.Options{Repository: repo, Transactions: repo, Unified: bridge})
+
+	opID := fmt.Sprintf("recharge:%d:success", recharge.ID)
+	var op *walletdomain.UnifiedOp
+	if err := repo.WithinTransaction(func(tx walletcontract.Transaction) error {
+		var enqErr error
+		op, enqErr = svc.EnqueueUnifiedCreditInTx(tx, user.ID, &recharge.ID, recharge.Amount, "CNY", opID, "recharge")
+		return enqErr
+	}); err != nil {
+		t.Fatal(err)
+	}
+	svc.FlushUnifiedCreditOp(op)
+
+	// R11 check: unresolved unified ops list includes the errored credit_pending op.
+	unresolved, err := svc.ListUnresolvedUnifiedOps(20)
+	if err != nil || len(unresolved) != 1 || unresolved[0].OpID != opID {
+		t.Fatalf("expected 1 unresolved unified op %q, got %+v err=%v", opID, unresolved, err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	handler := wallethttp.NewUserHandler(&rechargeSyncWalletWrapper{Service: svc}, &rechargeSyncPaymentReader{payment: &payment}, &rechargeSyncUserReader{})
+	callDetail := func() map[string]any {
+		rec := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(rec)
+		ctx.Set("user_id", user.ID)
+		ctx.Params = gin.Params{{Key: "recharge_no", Value: recharge.RechargeNo}}
+		ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/user/wallet/recharges/"+recharge.RechargeNo, nil)
+		handler.GetRecharge(ctx)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("unexpected HTTP %d: %s", rec.Code, rec.Body.String())
+		}
+		var out map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out["data"].(map[string]any)
+	}
+
+	data1 := callDetail()
+	bs1, ok := data1["balance_sync"].(map[string]any)
+	if !ok || bs1["status"] != "sync_error" || bs1["last_error"] != "gateway 503" {
+		t.Fatalf("expected balance_sync sync_error with last_error, got %+v", data1["balance_sync"])
+	}
+
+	// Recover after gateway resumes and clear backoff to simulate immediate retry.
+	bridge.creditErr = nil
+	if err := db.Model(&walletdomain.UnifiedOp{}).Where("op_id = ?", opID).Update("next_retry_at", nil).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.RecoverUnifiedOps(); err != nil {
+		t.Fatal(err)
+	}
+
+	data2 := callDetail()
+	bs2, ok := data2["balance_sync"].(map[string]any)
+	if !ok || bs2["status"] != "credited" {
+		t.Fatalf("expected balance_sync credited after recovery, got %+v", data2["balance_sync"])
 	}
 }

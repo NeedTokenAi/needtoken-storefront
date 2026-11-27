@@ -339,8 +339,9 @@ func (s *Service) ReserveAndDebitStrictForAdminOp(userID uint, amount money.Amou
 	return op, nil
 }
 
-// RecoverUnifiedOps retries pending unified credits/rollbacks and compensates
-// orphaned debited ops left behind by process crashes.
+// RecoverUnifiedOps retries pending unified credits/rollbacks, queries uncertain
+// pending debits against the authoritative gateway ledger, and converges
+// confirmed debits against the target order state.
 func (s *Service) RecoverUnifiedOps() error {
 	if s == nil || !s.HasUnifiedBalance() || s.repository == nil {
 		return nil
@@ -352,14 +353,151 @@ func (s *Service) RecoverUnifiedOps() error {
 	}
 	for i := range rows {
 		op := rows[i]
-		if op.Status == walletdomain.UnifiedOpStatusDebited {
-			// Process crashed after NewAPI debit and before committing order/wallet tx.
-			s.CompensateUnifiedDebit(&op, "异常中断扣款自动退回")
-			continue
+		switch op.Status {
+		case walletdomain.UnifiedOpStatusPending:
+			s.reconcilePendingUnifiedOp(&op)
+		case walletdomain.UnifiedOpStatusDebited:
+			s.reconcileDebitedUnifiedOp(&op)
+		default:
+			_ = s.deliverUnifiedCreditOrRollback(&op)
 		}
-		_ = s.deliverUnifiedCreditOrRollback(&op)
 	}
 	return nil
+}
+
+func (s *Service) reconcilePendingUnifiedOp(op *walletdomain.UnifiedOp) {
+	if s == nil || op == nil || !s.HasUnifiedBalance() {
+		return
+	}
+	querier, ok := s.unified.(walletcontract.UnifiedBalanceOpQuerier)
+	if !ok || querier == nil {
+		return
+	}
+	kind := "wallet_debit"
+	if op.Direction == walletdomain.UnifiedOpDirectionCredit {
+		kind = "wallet_credit"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	status, err := querier.QueryOp(ctx, op.UserID, op.OpID, kind, op.Currency)
+	if err != nil || status == nil {
+		// Authoritative outcome still unknown: keep pending with backoff, never fabricate a new op_id.
+		now := time.Now()
+		op.Attempts++
+		if err != nil {
+			op.LastError = truncateUnifiedOpError(err.Error())
+		} else {
+			op.LastError = "empty authoritative op lookup response"
+		}
+		next := now.Add(unifiedOpRetryBackoff(op.Attempts))
+		op.NextRetryAt = &next
+		op.UpdatedAt = now
+		_ = s.saveUnifiedOp(op)
+		return
+	}
+
+	now := time.Now()
+	switch {
+	case !status.Found || status.Status == "not_found":
+		s.transitionPendingOpStatus(op, walletdomain.UnifiedOpStatusCancelled, op.Amount, now)
+		return
+	case status.Status == "rolled_back":
+		s.transitionPendingOpStatus(op, walletdomain.UnifiedOpStatusRolledBack, op.Amount, now)
+		return
+	case status.Status == "credited" && op.Direction == walletdomain.UnifiedOpDirectionCredit:
+		s.transitionPendingOpStatus(op, walletdomain.UnifiedOpStatusCredited, op.Amount, now)
+		s.updateLocalMirrorBalance(op.UserID, status.Balance)
+		return
+	case status.Status == "debited" && op.Direction == walletdomain.UnifiedOpDirectionDebit:
+		debitedRounded := money.FromDecimal(status.Amount.Decimal.Round(2))
+		nextStatus := walletdomain.UnifiedOpStatusDebited
+		if debitedRounded.Decimal.LessThanOrEqual(decimal.Zero) {
+			nextStatus = walletdomain.UnifiedOpStatusApplied
+			debitedRounded = money.FromDecimal(decimal.Zero)
+		}
+		if updated := s.transitionPendingOpStatus(op, nextStatus, debitedRounded, now); !updated || nextStatus != walletdomain.UnifiedOpStatusDebited {
+			return
+		}
+		s.reconcileDebitedUnifiedOp(op)
+	default:
+		op.Attempts++
+		op.LastError = truncateUnifiedOpError("unexpected authoritative status: " + status.Status)
+		next := now.Add(unifiedOpRetryBackoff(op.Attempts))
+		op.NextRetryAt = &next
+		op.UpdatedAt = now
+		_ = s.saveUnifiedOp(op)
+	}
+}
+
+func (s *Service) transitionPendingOpStatus(op *walletdomain.UnifiedOp, nextStatus string, amount money.Amount, now time.Time) bool {
+	if op == nil {
+		return false
+	}
+	if s.transactions == nil {
+		op.Status = nextStatus
+		op.Amount = amount
+		op.LastError = ""
+		op.NextRetryAt = nil
+		op.UpdatedAt = now
+		return true
+	}
+	changed := false
+	err := s.transactions.WithinTransaction(func(tx walletcontract.Transaction) error {
+		current, err := tx.Wallets().GetUnifiedOpByOpID(op.OpID)
+		if err != nil || current == nil {
+			return err
+		}
+		if current.Status != walletdomain.UnifiedOpStatusPending {
+			*op = *current
+			return nil
+		}
+		current.Status = nextStatus
+		current.Amount = amount
+		current.LastError = ""
+		current.NextRetryAt = nil
+		current.UpdatedAt = now
+		if err := tx.Wallets().UpdateUnifiedOp(current); err != nil {
+			return err
+		}
+		*op = *current
+		changed = true
+		return nil
+	})
+	if err != nil {
+		logger.Warnw("unified_wallet_pending_transition_failed", "op_id", op.OpID, "target_status", nextStatus, "error", err)
+		return false
+	}
+	return changed
+}
+
+func (s *Service) reconcileDebitedUnifiedOp(op *walletdomain.UnifiedOp) {
+	if s == nil || op == nil || !s.HasUnifiedBalance() {
+		return
+	}
+	if op.Direction == walletdomain.UnifiedOpDirectionDebit && op.OrderID != nil && *op.OrderID > 0 && s.debitReconciler != nil {
+		applied, shouldRollback, err := s.debitReconciler.ReconcileUnifiedDebitOrder(op)
+		if applied {
+			return
+		}
+		if err != nil {
+			now := time.Now()
+			op.Attempts++
+			op.LastError = truncateUnifiedOpError(err.Error())
+			next := now.Add(unifiedOpRetryBackoff(op.Attempts))
+			op.NextRetryAt = &next
+			op.UpdatedAt = now
+			_ = s.saveUnifiedOp(op)
+			logger.Warnw("unified_wallet_debit_order_reconcile_failed", "op_id", op.OpID, "order_id", *op.OrderID, "error", err)
+			return
+		}
+		if !shouldRollback {
+			return
+		}
+		s.CompensateUnifiedDebit(op, "订单状态不可核销，退回统一余额")
+		return
+	}
+	// Process crashed after NewAPI debit and before committing order/wallet tx.
+	s.CompensateUnifiedDebit(op, "异常中断扣款自动退回")
 }
 
 func (s *Service) deliverUnifiedCreditOrRollback(op *walletdomain.UnifiedOp) error {
@@ -445,4 +583,20 @@ func truncateUnifiedOpError(msg string) string {
 		return msg
 	}
 	return msg[:480]
+}
+
+// GetUnifiedOpByOpID returns the persisted cross-system wallet operation by op_id.
+func (s *Service) GetUnifiedOpByOpID(opID string) (*walletdomain.UnifiedOp, error) {
+	if s == nil || s.repository == nil || strings.TrimSpace(opID) == "" {
+		return nil, nil
+	}
+	return s.repository.GetUnifiedOpByOpID(opID)
+}
+
+// ListUnresolvedUnifiedOps returns pending/debited/credit_pending/rollback_pending operations for reconciliation.
+func (s *Service) ListUnresolvedUnifiedOps(limit int) ([]walletdomain.UnifiedOp, error) {
+	if s == nil || s.repository == nil || !s.HasUnifiedBalance() {
+		return nil, nil
+	}
+	return s.repository.ListUnresolvedUnifiedOps(limit)
 }

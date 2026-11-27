@@ -287,7 +287,7 @@ func (s *Service) AdminManualRefund(input AdminManualRefundInput) (*orderdomain.
 	if existing, err := s.orderStore.GetRefundRecordByOperationID(operation.ID); err != nil {
 		return nil, nil, err
 	} else if existing != nil {
-		if existing.OperationDigest != operation.Digest {
+		if existing.Type != constants.OrderRefundTypeManual || existing.OrderID != input.OrderID || existing.OperationDigest != operation.Digest {
 			return nil, nil, ErrRefundOperationConflict
 		}
 		order, err := s.orderStore.GetByID(input.OrderID)
@@ -329,7 +329,7 @@ func (s *Service) AdminManualRefund(input AdminManualRefundInput) (*orderdomain.
 		if existing, err := orders.GetRefundRecordByOperationID(operation.ID); err != nil {
 			return err
 		} else if existing != nil {
-			if existing.OperationDigest != operation.Digest {
+			if existing.Type != constants.OrderRefundTypeManual || existing.OrderID != input.OrderID || existing.OperationDigest != operation.Digest {
 				return ErrRefundOperationConflict
 			}
 			createdRecord = existing
@@ -430,7 +430,7 @@ func (s *Service) AdminManualRefund(input AdminManualRefundInput) (*orderdomain.
 		return nil
 	}); err != nil {
 		if existing, lookupErr := s.orderStore.GetRefundRecordByOperationID(operation.ID); lookupErr == nil && existing != nil {
-			if existing.OperationDigest != operation.Digest {
+			if existing.Type != constants.OrderRefundTypeManual || existing.OrderID != input.OrderID || existing.OperationDigest != operation.Digest {
 				return nil, nil, ErrRefundOperationConflict
 			}
 			order, loadErr := s.orderStore.GetByID(input.OrderID)

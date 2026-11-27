@@ -41,15 +41,51 @@ export function extractPlatformCredential(input: string): string | null {
 
 export type SubscriptionProgressStepState = 'done' | 'active' | 'pending'
 
+export type FulfillmentProgressStage =
+  | 'awaiting_authorization'
+  | 'queued'
+  | 'executing'
+  | 'credential_expired'
+  | 'payment_unknown'
+  | 'manual_review'
+  | 'completed'
+  | 'canceled'
+  | 'refunded'
+  | string
+
+export interface FulfillmentProgress {
+  stage: FulfillmentProgressStage
+  authorization_submitted: boolean
+  next_action: string
+  updated_at?: string
+  terminal: boolean
+}
+
 export interface SubscriptionProgressStep {
   key: 'paid' | 'authorize' | 'checkout' | 'verified'
   state: SubscriptionProgressStepState
 }
 
-export function deriveSubscriptionProgressSteps(orderStatus: string | undefined, submitted: boolean): SubscriptionProgressStep[] {
+const TERMINAL_ORDER_STATUSES = new Set(['delivered', 'completed', 'canceled', 'refunded', 'expired'])
+
+export function shouldPollFulfillmentOrder(
+  orderStatus: string | undefined,
+  progress?: FulfillmentProgress | null,
+): boolean {
+  if (progress?.terminal) return false
+  const st = String(orderStatus || '').trim().toLowerCase()
+  if (st && TERMINAL_ORDER_STATUSES.has(st)) return false
+  return true
+}
+
+export function deriveSubscriptionProgressSteps(
+  orderStatus: string | undefined,
+  submitted: boolean,
+  progress?: FulfillmentProgress | null,
+): SubscriptionProgressStep[] {
+  const stage = String(progress?.stage || '').trim().toLowerCase()
   const status = String(orderStatus || '').trim().toLowerCase()
-  const finished = status === 'delivered' || status === 'completed'
-  if (finished) {
+  if (stage === 'completed' || status === 'delivered' || status === 'completed') {
     return [
       { key: 'paid', state: 'done' },
       { key: 'authorize', state: 'done' },
@@ -57,7 +93,15 @@ export function deriveSubscriptionProgressSteps(orderStatus: string | undefined,
       { key: 'verified', state: 'done' },
     ]
   }
-  if (submitted) {
+  if (stage === 'executing' || stage === 'payment_unknown' || stage === 'manual_review') {
+    return [
+      { key: 'paid', state: 'done' },
+      { key: 'authorize', state: 'done' },
+      { key: 'checkout', state: 'active' },
+      { key: 'verified', state: 'pending' },
+    ]
+  }
+  if (stage === 'queued' || (submitted && stage !== 'credential_expired')) {
     return [
       { key: 'paid', state: 'done' },
       { key: 'authorize', state: 'done' },

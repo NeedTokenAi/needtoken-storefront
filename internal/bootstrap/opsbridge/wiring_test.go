@@ -2,6 +2,7 @@ package opsbridge
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,13 +25,19 @@ import (
 	mappinggormstore "github.com/dujiao-next/internal/modules/catalog/mapping/infrastructure/gormstore"
 	productdomain "github.com/dujiao-next/internal/modules/catalog/product/domain"
 	productgormstore "github.com/dujiao-next/internal/modules/catalog/product/store/gormstore"
+	fulfillmentdomain "github.com/dujiao-next/internal/modules/fulfillment/domain"
+	userdomain "github.com/dujiao-next/internal/modules/identity/user/domain"
+	usergormstore "github.com/dujiao-next/internal/modules/identity/user/infrastructure/gormstore"
 	memberleveldomain "github.com/dujiao-next/internal/modules/memberlevel/domain"
 	memberlevelgormstore "github.com/dujiao-next/internal/modules/memberlevel/infrastructure/gormstore"
 	opscontract "github.com/dujiao-next/internal/modules/opsbridge/contract"
+	orderrefund "github.com/dujiao-next/internal/modules/order/application/refund"
 	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 	ordergormstore "github.com/dujiao-next/internal/modules/order/infrastructure/gormstore"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	paymentgormstore "github.com/dujiao-next/internal/modules/payment/infrastructure/gormstore"
+	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
+	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
 	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	walletgormstore "github.com/dujiao-next/internal/modules/wallet/infrastructure/gormstore"
 	"github.com/dujiao-next/internal/shared/jsonmap"
@@ -605,5 +612,108 @@ func TestUpstreamStoreAdapterImportOrSyncSingleSKUStockOnly(t *testing.T) {
 	}
 	if resUnmapped.SyncedCount != 0 || resUnmapped.ImportedCount != 0 || resUnmapped.SkippedCount != 1 || resUnmapped.SkippedReason != "target_sku_not_mapped" || len(fakeSvc.batchImported) != 0 {
 		t.Fatalf("sync_stock_only must not import unmapped products: res=%+v imported=%v", resUnmapped, fakeSvc.batchImported)
+	}
+}
+
+type failingUnifiedWalletRefundStub struct {
+	creditErr error
+	balance   money.Amount
+}
+
+func (s *failingUnifiedWalletRefundStub) Enabled() bool        { return true }
+func (s *failingUnifiedWalletRefundStub) SiteCurrency() string { return "CNY" }
+func (s *failingUnifiedWalletRefundStub) FetchBalance(_ context.Context, _ uint, _ string) (money.Amount, bool, error) {
+	return s.balance, true, nil
+}
+func (s *failingUnifiedWalletRefundStub) Credit(_ context.Context, _ uint, amount money.Amount, _, _, _ string) (money.Amount, error) {
+	if s.creditErr != nil {
+		return money.Amount{}, s.creditErr
+	}
+	s.balance = money.FromDecimal(s.balance.Decimal.Add(amount.Decimal))
+	return s.balance, nil
+}
+func (s *failingUnifiedWalletRefundStub) Debit(_ context.Context, _ uint, _ money.Amount, _ string, _ bool, _, _ string) (money.Amount, money.Amount, bool, error) {
+	return money.Amount{}, money.Amount{}, false, nil
+}
+func (s *failingUnifiedWalletRefundStub) Redeem(_ context.Context, _ uint, _, _ string) (*walletcontract.UnifiedBalanceRedeemResult, error) {
+	return nil, nil
+}
+
+func TestOrderRefundBridgeReflectsUnifiedBalanceSyncStateAndPendingOps(t *testing.T) {
+	_, db := setupOpsBridgeTestRouter(t)
+	if err := db.AutoMigrate(
+		&userdomain.User{},
+		&fulfillmentdomain.Fulfillment{},
+		&orderdomain.OrderRefundRecord{},
+		&walletdomain.Account{},
+		&walletdomain.Transaction{},
+		&walletdomain.UnifiedOp{},
+		&paymentdomain.Payment{},
+	); err != nil {
+		t.Fatalf("migrate refund test tables: %v", err)
+	}
+
+	now := time.Now().UTC()
+	userRepo := usergormstore.New(db)
+	user := userdomain.User{
+		Email: "ops_refund_sync@example.com", DisplayName: "Ops", PasswordHash: "h",
+		Status: constants.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	orderStore := ordergormstore.New(db, "test-guest-secret-at-least-32-bytes")
+	order := orderdomain.Order{
+		OrderNo:          "ORD-BRIDGE-SYNC-1",
+		UserID:           user.ID,
+		Status:           constants.OrderStatusPaid,
+		Currency:         "CNY",
+		OriginalAmount:   money.FromDecimal(decimal.NewFromInt(30)),
+		DiscountAmount:   money.FromDecimal(decimal.Zero),
+		TotalAmount:      money.FromDecimal(decimal.NewFromInt(30)),
+		OnlinePaidAmount: money.FromDecimal(decimal.NewFromInt(30)),
+		PaidAt:           &now,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if err := db.Create(&order).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	walletRepo := walletgormstore.New(db)
+	unifiedStub := &failingUnifiedWalletRefundStub{creditErr: fmt.Errorf("new-api unavailable")}
+	walletSvc := walletapp.NewService(walletapp.Options{
+		Repository:   walletRepo,
+		Transactions: walletRepo,
+		Unified:      unifiedStub,
+	})
+	refundSvc := orderrefund.New(orderStore, userRepo, nil, nil, walletSvc, nil)
+	adapter := &orderRefundStoreAdapter{
+		orders:  orderStore,
+		refunds: refundSvc,
+		wallets: walletSvc,
+	}
+
+	res, err := adapter.RefundOrder(order.OrderNo, opscontract.RefundOrderInput{
+		OperationID: "ops_refund_bridge_sync_op_1",
+		Mode:        "wallet",
+		Amount:      "10.00",
+		Remark:      "partial refund test",
+	})
+	if err != nil {
+		t.Fatalf("RefundOrder failed: %v", err)
+	}
+	if res.SettlementStatus != "balance_sync_failed" {
+		t.Fatalf("settlement_status must not be settled while credit_pending errored, got %q", res.SettlementStatus)
+	}
+	if res.BalanceSyncStatus != "sync_error" || res.BalanceSyncError != "new-api unavailable" {
+		t.Fatalf("expected balance_sync sync_error with error details, got %+v", res)
+	}
+
+	// R11 check: unifiedOpReaderAdapter exposes pending/errored unified ops on storefront snapshot.
+	reader := &unifiedOpReaderAdapter{wallets: walletSvc}
+	pendingOps, err := reader.ListPendingUnifiedOpsForOps(50)
+	if err != nil || len(pendingOps) != 1 || pendingOps[0].OpID != res.BalanceSyncOpID || pendingOps[0].LastError != "new-api unavailable" {
+		t.Fatalf("expected pending unified ops from adapter, got %+v err=%v", pendingOps, err)
 	}
 }

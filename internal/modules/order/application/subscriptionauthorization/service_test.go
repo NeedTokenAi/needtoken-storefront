@@ -317,3 +317,46 @@ func TestConcurrentOpensUseOneImmutableAuthorization(t *testing.T) {
 		}
 	}
 }
+
+func TestEligibilityPreservesServerFulfillmentProgressAcrossRefreshAndTerminalStates(t *testing.T) {
+	s, d, b, _, _, _, subject := fixture(t, false)
+	ctx := context.Background()
+
+	// 1. After authorization submitted -> backend returns queued, Eligibility returns Eligible=false + progress so refresh never regresses
+	b.remote.FulfillmentProgress = &FulfillmentProgress{
+		Stage: "queued", AuthorizationSubmitted: true, NextAction: "wait", UpdatedAt: "2026-11-27T12:00:00Z",
+	}
+	v, err := s.Eligibility(ctx, subject)
+	if err != nil || v.Eligible || v.FulfillmentProgress == nil || v.FulfillmentProgress.Stage != "queued" || !v.FulfillmentProgress.AuthorizationSubmitted {
+		t.Fatalf("expected queued non-eligible state with persistent progress, got %+v err=%v", v, err)
+	}
+
+	// 2. Credential expired allows resubmission cleanly
+	b.remote.FulfillmentProgress = &FulfillmentProgress{
+		Stage: "credential_expired", AuthorizationSubmitted: false, NextAction: "resubmit_authorization", UpdatedAt: "2026-11-27T12:35:00Z",
+	}
+	vExp, err := s.Eligibility(ctx, subject)
+	if err != nil || !vExp.Eligible || vExp.FulfillmentProgress == nil || vExp.FulfillmentProgress.Stage != "credential_expired" {
+		t.Fatalf("expected credential_expired to permit resubmission, got %+v err=%v", vExp, err)
+	}
+
+	// 3. Payment unknown keeps Eligible=false & non-terminal
+	b.remote.FulfillmentProgress = &FulfillmentProgress{
+		Stage: "payment_unknown", AuthorizationSubmitted: true, NextAction: "wait", Terminal: false,
+	}
+	vUnk, err := s.Eligibility(ctx, subject)
+	if err != nil || vUnk.Eligible || vUnk.FulfillmentProgress == nil || vUnk.FulfillmentProgress.Stage != "payment_unknown" || vUnk.FulfillmentProgress.Terminal {
+		t.Fatalf("expected payment_unknown preserved without faking success, got %+v err=%v", vUnk, err)
+	}
+
+	// 4. Delivered order (Paid=false in authorization snapshot) STILL returns completed progress without hiding panel!
+	d.snapshot.Paid = false
+	d.snapshot.OrderStatus = "delivered"
+	b.remote.FulfillmentProgress = &FulfillmentProgress{
+		Stage: "completed", AuthorizationSubmitted: true, NextAction: "none", Terminal: true, UpdatedAt: "2026-11-27T13:00:00Z",
+	}
+	vDone, err := s.Eligibility(ctx, subject)
+	if err != nil || vDone.Eligible || vDone.FulfillmentProgress == nil || vDone.FulfillmentProgress.Stage != "completed" || !vDone.FulfillmentProgress.Terminal {
+		t.Fatalf("expected delivered order to expose completed terminal progress, got %+v err=%v", vDone, err)
+	}
+}

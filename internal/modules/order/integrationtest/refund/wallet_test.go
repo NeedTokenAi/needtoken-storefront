@@ -3,6 +3,7 @@ package refund_test
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -689,5 +690,128 @@ func TestWalletServiceAdminRefundToWalletChildCountsAgainstParent(t *testing.T) 
 	}
 	if _, _, _, err := svc.AdminRefundToWallet(AdminRefundToWalletInput{OrderID: parent.ID, Amount: forty}); !errors.Is(err, walletcontract.ErrRefundExceeded) {
 		t.Fatalf("parent refund after full child refund must be rejected, got %v", err)
+	}
+}
+
+func TestWalletServiceAdminRefundToWalletOperationIdempotencyAndConflict(t *testing.T) {
+	svc, db := setupOrderRefundWalletTest(t)
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("db.DB failed: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	createTestUser(t, db, 301)
+	orderA := createTestOrder(t, db, 301, "DJREFUNDIDEMP-A", decimal.NewFromInt(100))
+	orderB := createTestOrder(t, db, 301, "DJREFUNDIDEMP-B", decimal.NewFromInt(100))
+	paidAt := time.Now()
+	for _, id := range []uint{orderA.ID, orderB.ID} {
+		if err := db.Model(&orderdomain.Order{}).Where("id = ?", id).Updates(map[string]interface{}{
+			"status":  constants.OrderStatusPaid,
+			"paid_at": paidAt,
+		}).Error; err != nil {
+			t.Fatalf("update order failed: %v", err)
+		}
+	}
+
+	ten := money.FromDecimal(decimal.NewFromInt(10))
+	opID := "ops_refund_stable_10_a"
+
+	// 1. 同一 operation_id 顺序重试（含并发）：只产生 1 笔退款记录和 1 次余额入账。
+	var wg sync.WaitGroup
+	errs := make([]error, 4)
+	for i := range 4 {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			_, _, _, errs[idx] = svc.AdminRefundToWallet(AdminRefundToWalletInput{
+				OperationID: opID,
+				OrderID:     orderA.ID,
+				Amount:      ten,
+				Remark:      "部分退款",
+			})
+		}(i)
+	}
+	wg.Wait()
+	for i, e := range errs {
+		if e != nil {
+			t.Fatalf("concurrent/retry wallet refund[%d] failed: %v", i, e)
+		}
+	}
+
+	// 再次顺序重试仍幂等成功且余额不叠加
+	updated, txnReplay, recReplay, err := svc.AdminRefundToWallet(AdminRefundToWalletInput{
+		OperationID: opID,
+		OrderID:     orderA.ID,
+		Amount:      ten,
+		Remark:      "部分退款",
+	})
+	if err != nil {
+		t.Fatalf("replay wallet refund failed: %v", err)
+	}
+	if !updated.RefundedAmount.Decimal.Equal(decimal.NewFromInt(10)) || txnReplay == nil || recReplay == nil {
+		t.Fatalf("expected refunded_amount=10 with non-nil txn/rec, got %s txn=%v rec=%v", updated.RefundedAmount.String(), txnReplay, recReplay)
+	}
+
+	var acc walletdomain.Account
+	if err := db.Where("user_id = ?", 301).First(&acc).Error; err != nil {
+		t.Fatalf("query wallet account failed: %v", err)
+	}
+	if !acc.Balance.Decimal.Equal(decimal.NewFromInt(10)) {
+		t.Fatalf("wallet balance = %s, want 10.00 (no double credit)", acc.Balance.StringFixed(2))
+	}
+	var recCount int64
+	if err := db.Model(&orderdomain.OrderRefundRecord{}).Where("order_id = ?", orderA.ID).Count(&recCount).Error; err != nil || recCount != 1 {
+		t.Fatalf("refund record count = %d (err=%v), want 1", recCount, err)
+	}
+
+	// 2. 同 operation_id 不同金额、不同订单、或跨手动退款模式必须冲突拒绝。
+	if _, _, _, err := svc.AdminRefundToWallet(AdminRefundToWalletInput{
+		OperationID: opID,
+		OrderID:     orderA.ID,
+		Amount:      money.FromDecimal(decimal.NewFromInt(20)),
+		Remark:      "部分退款",
+	}); !errors.Is(err, ErrRefundOperationConflict) {
+		t.Fatalf("same opID different amount must conflict, got %v", err)
+	}
+	if _, _, _, err := svc.AdminRefundToWallet(AdminRefundToWalletInput{
+		OperationID: opID,
+		OrderID:     orderB.ID,
+		Amount:      ten,
+		Remark:      "部分退款",
+	}); !errors.Is(err, ErrRefundOperationConflict) {
+		t.Fatalf("same opID different order must conflict, got %v", err)
+	}
+	if _, _, err := svc.AdminManualRefund(AdminManualRefundInput{
+		OperationID: opID,
+		OrderID:     orderA.ID,
+		Amount:      ten,
+		Remark:      "部分退款",
+	}); !errors.Is(err, ErrRefundOperationConflict) {
+		t.Fatalf("same opID across wallet vs manual mode must conflict, got %v", err)
+	}
+
+	// 3. 另一笔合法部分退款（不同 operation_id）可正常累计至 20.00，超出总额时仍被拒绝。
+	if updated2, _, _, err := svc.AdminRefundToWallet(AdminRefundToWalletInput{
+		OperationID: "ops_refund_stable_10_b",
+		OrderID:     orderA.ID,
+		Amount:      ten,
+		Remark:      "第二次部分退款",
+	}); err != nil {
+		t.Fatalf("second distinct partial refund failed: %v", err)
+	} else if !updated2.RefundedAmount.Decimal.Equal(decimal.NewFromInt(20)) {
+		t.Fatalf("refunded_amount after second partial = %s, want 20.00", updated2.RefundedAmount.String())
+	}
+	if err := db.Where("user_id = ?", 301).First(&acc).Error; err != nil || !acc.Balance.Decimal.Equal(decimal.NewFromInt(20)) {
+		t.Fatalf("wallet balance after second partial = %s (err=%v), want 20.00", acc.Balance.StringFixed(2), err)
+	}
+	if _, _, _, err := svc.AdminRefundToWallet(AdminRefundToWalletInput{
+		OperationID: "ops_refund_stable_over",
+		OrderID:     orderA.ID,
+		Amount:      money.FromDecimal(decimal.NewFromInt(90)),
+		Remark:      "超额退款",
+	}); !errors.Is(err, walletcontract.ErrRefundExceeded) {
+		t.Fatalf("over-limit refund must fail with ErrRefundExceeded, got %v", err)
 	}
 }

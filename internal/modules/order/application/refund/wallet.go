@@ -1,12 +1,16 @@
 package refund
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/shared/money"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	orderapp "github.com/dujiao-next/internal/modules/order/application"
@@ -20,9 +24,47 @@ import (
 // AdminRefundToWalletInput describes an order refund whose settlement target
 // is the registered user's wallet.
 type AdminRefundToWalletInput struct {
-	OrderID uint
-	Amount  money.Amount
-	Remark  string
+	OperationID string
+	OrderID     uint
+	Amount      money.Amount
+	Remark      string
+}
+
+func buildWalletRefundDigestAndRef(operationID string, orderID uint, amount decimal.Decimal, remark string) (string, string) {
+	raw, _ := json.Marshal(struct {
+		Type           string
+		OrderID        uint
+		Amount, Remark string
+	}{constants.OrderRefundTypeWallet, orderID, amount.StringFixed(2), remark})
+	digestSum := sha256.Sum256(raw)
+	opSum := sha256.Sum256([]byte(operationID))
+	reference := fmt.Sprintf("order:%d:wrefund:%s", orderID, hex.EncodeToString(opSum[:12]))
+	return hex.EncodeToString(digestSum[:]), reference
+}
+
+func (s *Service) resolveExistingWalletRefund(
+	existing *orderdomain.OrderRefundRecord,
+	orderID uint,
+	digest string,
+	reference string,
+) (*orderdomain.Order, *walletdomain.Transaction, *orderdomain.OrderRefundRecord, error) {
+	if existing.Type != constants.OrderRefundTypeWallet || existing.OrderID != orderID || existing.OperationDigest != digest {
+		return nil, nil, nil, ErrRefundOperationConflict
+	}
+	order, err := s.orderStore.GetByID(orderID)
+	if err != nil {
+		return nil, nil, nil, ErrOrderFetchFailed
+	}
+	var txn *walletdomain.Transaction
+	_ = s.orderStore.WithinTransaction(func(tx ordercontract.Transaction) error {
+		loaded, loadErr := tx.Wallets().Wallets().GetTransactionByReference(reference)
+		if loadErr != nil {
+			return loadErr
+		}
+		txn = loaded
+		return nil
+	})
+	return order, txn, existing, nil
 }
 
 // AdminRefundToWallet executes the order refund workflow and delegates only
@@ -38,7 +80,7 @@ func (s *Service) AdminRefundToWallet(
 	if amount.LessThanOrEqual(decimal.Zero) {
 		return nil, nil, nil, walletcontract.ErrInvalidAmount
 	}
-	if s == nil || s.wallets == nil {
+	if s == nil || s.wallets == nil || s.orderStore == nil {
 		return nil, nil, nil, walletcontract.ErrAccountNotFound
 	}
 
@@ -47,7 +89,21 @@ func (s *Service) AdminRefundToWallet(
 	if walletRemark == "" {
 		walletRemark = "管理员退款到余额"
 	}
-	reference := fmt.Sprintf("order:%d:admin_refund:%d", input.OrderID, time.Now().UnixNano())
+	operationID := strings.TrimSpace(input.OperationID)
+	if operationID == "" {
+		operationID = uuid.NewString()
+	}
+	if len(operationID) > 128 {
+		return nil, nil, nil, ErrRefundOperationInvalid
+	}
+	opDigest, reference := buildWalletRefundDigestAndRef(operationID, input.OrderID, amount, remark)
+
+	if existing, err := s.orderStore.GetRefundRecordByOperationID(operationID); err != nil {
+		return nil, nil, nil, err
+	} else if existing != nil {
+		return s.resolveExistingWalletRefund(existing, input.OrderID, opDigest, reference)
+	}
+
 	var (
 		transactionResult  *walletdomain.Transaction
 		refundRecordResult *orderdomain.OrderRefundRecord
@@ -71,6 +127,18 @@ func (s *Service) AdminRefundToWallet(
 		}
 		if locked == nil {
 			return ErrOrderNotFound
+		}
+		if existing, lookupErr := orderRepository.GetRefundRecordByOperationID(operationID); lookupErr != nil {
+			return lookupErr
+		} else if existing != nil {
+			if existing.Type != constants.OrderRefundTypeWallet || existing.OrderID != input.OrderID || existing.OperationDigest != opDigest {
+				return ErrRefundOperationConflict
+			}
+			refundRecordResult = existing
+			if existingTxn, txnErr := tx.Wallets().Wallets().GetTransactionByReference(reference); txnErr == nil {
+				transactionResult = existingTxn
+			}
+			return nil
 		}
 		order := *locked
 		if order.UserID == 0 {
@@ -152,7 +220,10 @@ func (s *Service) AdminRefundToWallet(
 		if currency == "" {
 			currency = "CNY"
 		}
+		opIDCopy := operationID
 		record := &orderdomain.OrderRefundRecord{
+			OperationID:              &opIDCopy,
+			OperationDigest:          opDigest,
 			UserID:                   order.UserID,
 			GuestEmail:               order.GuestEmail,
 			OrderID:                  order.ID,
@@ -197,6 +268,9 @@ func (s *Service) AdminRefundToWallet(
 		return nil
 	})
 	if err != nil {
+		if existing, lookupErr := s.orderStore.GetRefundRecordByOperationID(operationID); lookupErr == nil && existing != nil {
+			return s.resolveExistingWalletRefund(existing, input.OrderID, opDigest, reference)
+		}
 		return nil, nil, nil, err
 	}
 	if unifiedCreditOp != nil && s.wallets != nil {

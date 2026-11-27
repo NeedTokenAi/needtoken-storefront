@@ -3,8 +3,10 @@ package wallethttp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
+	"github.com/dujiao-next/internal/constants"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 
@@ -208,6 +210,12 @@ func (h *UserHandler) Recharge(c *gin.Context) {
 	response.Success(c, walletpresenter.NewWalletRechargePaymentPayload(result.Recharge, result.Payment, account))
 }
 
+type unifiedBalanceSyncReader interface {
+	HasUnifiedBalance() bool
+	GetUnifiedOpByOpID(opID string) (*walletdomain.UnifiedOp, error)
+}
+
+// GetRecharge 查询充值单详情
 func (h *UserHandler) GetRecharge(c *gin.Context) {
 	uid, ok := ginutil.GetUserID(c)
 	if !ok {
@@ -237,7 +245,39 @@ func (h *UserHandler) GetRecharge(c *gin.Context) {
 		ginutil.RespondError(c, response.CodeInternal, "error.user_fetch_failed", err)
 		return
 	}
-	response.Success(c, walletpresenter.NewWalletRechargePaymentPayload(recharge, payment, account))
+	payload := walletpresenter.NewWalletRechargePaymentPayload(recharge, payment, account)
+	if syncReader, ok := h.wallets.(unifiedBalanceSyncReader); ok && syncReader.HasUnifiedBalance() &&
+		recharge.Status == constants.WalletRechargeStatusSuccess {
+		opID := fmt.Sprintf("recharge:%d:success", recharge.ID)
+		if op, opErr := syncReader.GetUnifiedOpByOpID(opID); opErr == nil && op != nil {
+			updatedAt := op.UpdatedAt
+			syncResp := &walletpresenter.WalletBalanceSyncResp{
+				OperationID: op.OpID,
+				LastError:   op.LastError,
+				Attempts:    op.Attempts,
+				UpdatedAt:   &updatedAt,
+			}
+			switch op.Status {
+			case walletdomain.UnifiedOpStatusCredited:
+				syncResp.Status = "credited"
+			case walletdomain.UnifiedOpStatusCreditPending:
+				if strings.TrimSpace(op.LastError) != "" {
+					syncResp.Status = "sync_error"
+				} else {
+					syncResp.Status = "syncing"
+				}
+			default:
+				syncResp.Status = op.Status
+			}
+			payload.BalanceSync = syncResp
+		} else if opErr == nil {
+			payload.BalanceSync = &walletpresenter.WalletBalanceSyncResp{
+				OperationID: opID,
+				Status:      "credited",
+			}
+		}
+	}
+	response.Success(c, payload)
 }
 
 func (h *UserHandler) ListRecharges(c *gin.Context) {

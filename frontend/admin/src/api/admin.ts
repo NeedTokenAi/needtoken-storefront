@@ -221,6 +221,7 @@ export interface AdminAdjustWalletPayload {
 }
 
 export interface AdminRefundToWalletPayload {
+  operation_id: string
   amount: string
   remark?: string
 }

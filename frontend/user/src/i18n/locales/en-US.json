@@ -21,7 +21,31 @@
     "submitted": "Authorization submitted; awaiting target account verification. The subscription has not yet been confirmed",
     "failed": "Completion was not confirmed. Check this order and its authorization before retrying",
     "invalidCredential": "Enter a valid short-lived token or session JSON containing accessToken",
-    "expired": "This authorization expired. Verify again"
+    "expired": "This authorization expired. Verify again",
+    "updatedAt": "Updated {time}",
+    "stages": {
+      "awaiting_authorization": "Awaiting Authorization",
+      "queued": "Queued for Fulfillment",
+      "executing": "Fulfillment In Progress",
+      "credential_expired": "Credential Expired",
+      "payment_unknown": "Payment Confirmation Pending",
+      "manual_review": "Manual Review Required",
+      "completed": "Completed",
+      "canceled": "Canceled",
+      "refunded": "Refunded"
+    },
+    "actions": {
+      "submit_authorization": "Submit a short-lived account credential to start fulfillment",
+      "resubmit_authorization": "Your previous short-lived token expired. Submit a fresh one",
+      "wait": "Fulfillment is in progress and updates automatically",
+      "contact_support": "Manual review is required. Open an order support ticket below",
+      "none": ""
+    },
+    "stageNotices": {
+      "credential_expired": "The previous short-lived authorization token expired. Please submit a new token.",
+      "payment_unknown": "Payment outcome is awaiting authoritative verification. Do not treat this order as completed yet.",
+      "manual_review": "This order requires manual verification. You can submit details in the after-sales section below."
+    }
   },
   "assetVaultClaim": {
     "title": "Encrypted Vault · One-Time Secure Claim",
@@ -1754,7 +1778,13 @@
     "amountTitle": "Amount Breakdown",
     "timeTitle": "Timeline",
     "remarkLabel": "Remark",
-    "paymentTitle": "Payment Info"
+    "paymentTitle": "Payment Info",
+    "balanceSyncingTitle": "Payment received, syncing wallet balance",
+    "balanceSyncingDesc": "Your payment is confirmed and your balance is being credited automatically. This page refreshes automatically.",
+    "balanceSyncErrorTitle": "Payment received, retrying balance sync",
+    "balanceSyncErrorDesc": "The authoritative balance service has not confirmed credit yet. Automatic retries are running; please refresh shortly.",
+    "balanceSyncUpdatedAt": "Last sync update",
+    "refreshBalanceSync": "Refresh sync status"
   },
   "orderDetail": {
     "title": "Order Detail",
@@ -4553,6 +4583,42 @@
         "siteLogoLabel": "Site Logo",
         "copyLogoUrl": "Copy Logo URL"
       }
+    }
+  },
+  "orderAfterSales": {
+    "title": "After-Sales & Support Tickets",
+    "subtitle": "Submit an order-scoped ticket for fulfillment review or disputes. Progress updates sync here.",
+    "refresh": "Refresh",
+    "openForm": "Open After-Sales Ticket",
+    "cancelForm": "Close Form",
+    "categoryLabel": "Category",
+    "summaryLabel": "Description",
+    "summaryPlaceholder": "Briefly describe the issue (missing fulfillment, amount mismatch, or manual review)",
+    "submitButton": "Submit Ticket",
+    "submitting": "Submitting...",
+    "createSuccess": "After-sales ticket submitted. Support will review it shortly.",
+    "supplementSuccess": "Additional note recorded on your ticket.",
+    "submitFailed": "Submission failed. Please try again later.",
+    "loading": "Loading after-sales tickets...",
+    "unavailableHint": "After-sales service is temporarily unavailable. Refresh shortly.",
+    "empty": "No after-sales tickets have been opened for this order yet.",
+    "resolutionLabel": "Support Resolution",
+    "supplementsTitle": "Customer Follow-ups",
+    "customerAuthor": "Customer Note",
+    "supplementPlaceholder": "Add more context or payment reference details...",
+    "supplementButton": "Send Note",
+    "categories": {
+      "fulfillment_failed": "Missing Fulfillment / Delivery Issue",
+      "amount_mismatch": "Amount Mismatch",
+      "refund_dispute": "Refund Dispute",
+      "customer_inquiry": "Order Inquiry",
+      "other": "Other"
+    },
+    "statuses": {
+      "open": "Open",
+      "in_progress": "In Progress",
+      "resolved": "Resolved",
+      "closed": "Closed"
     }
   }
 }

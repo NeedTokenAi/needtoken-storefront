@@ -100,25 +100,35 @@ func NewWalletRechargeRespList(orders []walletdomain.RechargeOrder) []WalletRech
 	return result
 }
 
+// WalletBalanceSyncResp 权威余额异步入账状态
+type WalletBalanceSyncResp struct {
+	OperationID string     `json:"operation_id,omitempty"`
+	Status      string     `json:"status"`
+	LastError   string     `json:"last_error,omitempty"`
+	Attempts    int        `json:"attempts,omitempty"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
+}
+
 // WalletRechargePaymentPayload 钱包充值支付响应载荷
 type WalletRechargePaymentPayload struct {
-	Recharge        *WalletRechargeResp `json:"recharge,omitempty"`
-	RechargeNo      string              `json:"recharge_no,omitempty"`
-	RechargeStatus  string              `json:"recharge_status,omitempty"`
-	Account         *WalletAccountResp  `json:"account,omitempty"`
-	PaymentID       *uint               `json:"payment_id,omitempty"`
-	ProviderType    string              `json:"provider_type,omitempty"`
-	ChannelType     string              `json:"channel_type,omitempty"`
-	InteractionMode string              `json:"interaction_mode,omitempty"`
-	PayURL          string              `json:"pay_url,omitempty"`
-	QRCode          string              `json:"qr_code,omitempty"`
-	WalletAddress   string              `json:"wallet_address,omitempty"`
-	ChainAmount     string              `json:"chain_amount,omitempty"`
-	Chain           string              `json:"chain,omitempty"`
-	TokenID         string              `json:"token_id,omitempty"`
-	ExpiresAt       *time.Time          `json:"expires_at,omitempty"`
-	Status          string              `json:"status,omitempty"`
-	FeePolicy       string              `json:"fee_policy,omitempty"`
+	Recharge        *WalletRechargeResp    `json:"recharge,omitempty"`
+	RechargeNo      string                 `json:"recharge_no,omitempty"`
+	RechargeStatus  string                 `json:"recharge_status,omitempty"`
+	Account         *WalletAccountResp     `json:"account,omitempty"`
+	PaymentID       *uint                  `json:"payment_id,omitempty"`
+	ProviderType    string                 `json:"provider_type,omitempty"`
+	ChannelType     string                 `json:"channel_type,omitempty"`
+	InteractionMode string                 `json:"interaction_mode,omitempty"`
+	PayURL          string                 `json:"pay_url,omitempty"`
+	QRCode          string                 `json:"qr_code,omitempty"`
+	WalletAddress   string                 `json:"wallet_address,omitempty"`
+	ChainAmount     string                 `json:"chain_amount,omitempty"`
+	Chain           string                 `json:"chain,omitempty"`
+	TokenID         string                 `json:"token_id,omitempty"`
+	ExpiresAt       *time.Time             `json:"expires_at,omitempty"`
+	Status          string                 `json:"status,omitempty"`
+	FeePolicy       string                 `json:"fee_policy,omitempty"`
+	BalanceSync     *WalletBalanceSyncResp `json:"balance_sync,omitempty"`
 }
 
 // NewWalletRechargePaymentPayload 构造钱包充值支付响应

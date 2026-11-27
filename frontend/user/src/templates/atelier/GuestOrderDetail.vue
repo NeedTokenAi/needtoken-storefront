@@ -101,12 +101,14 @@
           @copy-fulfillment="handleCopyFulfillment"
           @download-fulfillment="handleDownloadFulfillment"
         />
+        <OrderAfterSalesPanel :order="order" :guest-auth="auth" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import OrderAfterSalesPanel from '../../components/OrderAfterSalesPanel.vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronLeft } from 'lucide-vue-next'
 import { Alert, AlertDescription } from '@/components/ui/alert'

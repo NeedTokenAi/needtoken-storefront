@@ -58,12 +58,25 @@ is_high_risk_path() {
       frontend/user/src/templates/vault/layout/VaultLayout.vue | \
       frontend/user/src/components/AssetVaultClaimPanel.vue | \
       frontend/user/src/components/SubscriptionAuthorizationPanel.vue | \
+      frontend/user/src/components/OrderAfterSalesPanel.vue | \
+      frontend/user/src/components/GatewayPlaygroundPanel.vue | \
       frontend/user/src/utils/subscriptionAuthorization.ts | \
+      frontend/user/src/utils/playgroundRequest.ts | \
+      frontend/user/src/composables/useOrderDetail.ts | \
+      frontend/user/src/composables/useGuestOrderDetail.ts | \
       frontend/user/src/views/OrderDetail.vue | frontend/user/src/views/GuestOrderDetail.vue | \
+      frontend/user/src/templates/vault/OrderDetail.vue | frontend/user/src/templates/vault/GuestOrderDetail.vue | \
+      frontend/user/src/templates/atelier/OrderDetail.vue | frontend/user/src/templates/atelier/GuestOrderDetail.vue | \
       frontend/user/src/views/PersonalCenter.vue | frontend/user/src/views/personal/GiftCardPanel.vue | \
       frontend/user/src/views/personal/WalletPanel.vue | \
+      frontend/user/src/views/RechargeOrderDetail.vue | \
+      frontend/user/src/templates/vault/RechargeOrderDetail.vue | \
+      frontend/user/src/templates/atelier/RechargeOrderDetail.vue | \
+      frontend/user/src/composables/useRechargeOrderDetail.ts | \
+      frontend/user/src/utils/paymentResumePolicy.ts | \
       frontend/user/src/utils/theme.ts | frontend/user/src/utils/themeState.ts | \
       frontend/user/src/utils/chunkRecovery.ts | frontend/admin/src/utils/chunkRecovery.ts | \
+      frontend/admin/src/api/admin.ts | frontend/admin/src/views/admin/components/OrderDetailDialog.vue | \
       frontend/user/src/components/captcha/TurnstileCaptcha.vue | \
       frontend/admin/src/components/captcha/TurnstileCaptcha.vue | \
       frontend/admin/src/views/Login.vue | \

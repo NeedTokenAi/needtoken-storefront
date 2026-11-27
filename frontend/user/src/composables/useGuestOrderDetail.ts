@@ -5,6 +5,7 @@ import { guestOrderAPI } from '../api'
 import { debounceAsync } from '../utils/debounce'
 import { clearGuestOrderAuth, loadGuestOrderAuth, saveGuestOrderAuth } from '../utils/guestOrderAuth'
 import { resolveGuestOrderDetailViewState } from '../utils/guestOrderDetailState'
+import { shouldPollFulfillmentOrder } from '../utils/subscriptionAuthorization'
 import { useOrderDisplayHelpers } from './useOrderDisplayHelpers'
 
 /**
@@ -58,12 +59,32 @@ export function useGuestOrderDetail() {
     showAuthForm: showAuthForm.value,
   }))
 
-  const loadOrder = async () => {
-    loading.value = true
+  let pollTimer: ReturnType<typeof setTimeout> | undefined
+  let disposed = false
+
+  const clearPollTimer = () => {
+    if (pollTimer) {
+      clearTimeout(pollTimer)
+      pollTimer = undefined
+    }
+  }
+
+  const schedulePollIfPending = () => {
+    clearPollTimer()
+    if (disposed || !order.value || !hasAuth.value || authError.value !== '') return
+    if (!shouldPollFulfillmentOrder(order.value.status)) return
+    pollTimer = setTimeout(() => {
+      void loadOrder(true)
+    }, 8000)
+  }
+
+  const loadOrder = async (silent = false) => {
+    if (!silent) loading.value = true
     try {
       if (!hasAuth.value) {
         order.value = null
         authError.value = t('guestOrderDetail.authRequired')
+        clearPollTimer()
         return
       }
       const response = await guestOrderAPI.detail(String(route.params.order_no || '').trim(), {
@@ -72,11 +93,15 @@ export function useGuestOrderDetail() {
       })
       order.value = response.data.data
       authError.value = ''
+      schedulePollIfPending()
     } catch (error) {
-      order.value = null
-      authError.value = t('guestOrderDetail.authInvalid')
+      if (!silent) {
+        order.value = null
+        authError.value = t('guestOrderDetail.authInvalid')
+      }
+      clearPollTimer()
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 
@@ -101,6 +126,7 @@ export function useGuestOrderDetail() {
   }
 
   const clearAuth = () => {
+    clearPollTimer()
     clearGuestOrderAuth()
     auth.value = { email: '', order_password: '' }
     order.value = null
@@ -117,6 +143,8 @@ export function useGuestOrderDetail() {
   })
 
   onUnmounted(() => {
+    disposed = true
+    clearPollTimer()
     debouncedLoadOrder.cancel()
   })
 

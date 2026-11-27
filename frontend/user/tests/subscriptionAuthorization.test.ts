@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { deriveSubscriptionProgressSteps, extractPlatformCredential, validateSubscriptionSession } from '../src/utils/subscriptionAuthorization.ts'
+import {
+  deriveSubscriptionProgressSteps,
+  extractPlatformCredential,
+  shouldPollFulfillmentOrder,
+  validateSubscriptionSession,
+} from '../src/utils/subscriptionAuthorization.ts'
 
 test('subscription session rejects expired, redirected or malformed credential endpoints', () => {
   const now = Date.parse('2026-11-15T08:00:00Z')
@@ -35,4 +40,41 @@ test('deriveSubscriptionProgressSteps tracks paid, authorized, and delivered lif
     deriveSubscriptionProgressSteps('delivered', false).map(s => `${s.key}:${s.state}`),
     ['paid:done', 'authorize:done', 'checkout:done', 'verified:done'],
   )
+})
+
+test('R16: server-side fulfillment progress prevents refresh regression and stops polling on terminal states', () => {
+  // After page refresh, in-memory `submitted` is false, but server progress `queued` keeps step 3 active
+  assert.deepEqual(
+    deriveSubscriptionProgressSteps('processing', false, {
+      stage: 'queued',
+      authorization_submitted: true,
+      next_action: 'wait',
+      terminal: false,
+    }).map(s => `${s.key}:${s.state}`),
+    ['paid:done', 'authorize:done', 'checkout:active', 'verified:pending'],
+  )
+  // Expired credential returns user to authorization step even if local memory wasn't reset
+  assert.deepEqual(
+    deriveSubscriptionProgressSteps('processing', true, {
+      stage: 'credential_expired',
+      authorization_submitted: false,
+      next_action: 'resubmit_authorization',
+      terminal: false,
+    }).map(s => `${s.key}:${s.state}`),
+    ['paid:done', 'authorize:active', 'checkout:pending', 'verified:pending'],
+  )
+  // payment_unknown must never appear as verified/completed
+  const unkSteps = deriveSubscriptionProgressSteps('processing', false, {
+    stage: 'payment_unknown',
+    authorization_submitted: true,
+    next_action: 'wait',
+    terminal: false,
+  })
+  assert.equal(unkSteps.find(s => s.key === 'verified')?.state, 'pending')
+
+  assert.equal(shouldPollFulfillmentOrder('processing', { stage: 'executing', authorization_submitted: true, next_action: 'wait', terminal: false }), true)
+  assert.equal(shouldPollFulfillmentOrder('processing', { stage: 'payment_unknown', authorization_submitted: true, next_action: 'wait', terminal: false }), true)
+  assert.equal(shouldPollFulfillmentOrder('delivered', null), false)
+  assert.equal(shouldPollFulfillmentOrder('canceled', null), false)
+  assert.equal(shouldPollFulfillmentOrder('processing', { stage: 'completed', authorization_submitted: true, next_action: 'none', terminal: true }), false)
 })

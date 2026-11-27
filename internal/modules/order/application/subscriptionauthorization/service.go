@@ -15,6 +15,7 @@ import (
 	"math/big"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	ordercontract "github.com/dujiao-next/internal/modules/order/contract"
@@ -29,13 +30,13 @@ type Subject struct {
 }
 
 type OrderSnapshot struct {
-	ID                                                uint
-	OrderNo, TenantRef, BuyerRef, GuestEmail          string
-	Paid                                              bool
-	Leaf                                              bool
-	ConnectionID, UpstreamOrderID                     uint
-	UpstreamOrderNo, SnapshotHash, PaymentEnvironment string
-	Contract                                          json.RawMessage
+	ID                                                    uint
+	OrderNo, OrderStatus, TenantRef, BuyerRef, GuestEmail string
+	Paid                                                  bool
+	Leaf                                                  bool
+	ConnectionID, UpstreamOrderID                         uint
+	UpstreamOrderNo, SnapshotHash, PaymentEnvironment     string
+	Contract                                              json.RawMessage
 }
 
 type Directory interface {
@@ -46,14 +47,23 @@ type Mailer interface {
 	Send(context.Context, string, string, string) error
 }
 
+type FulfillmentProgress struct {
+	Stage                  string `json:"stage"`
+	AuthorizationSubmitted bool   `json:"authorization_submitted"`
+	NextAction             string `json:"next_action"`
+	UpdatedAt              string `json:"updated_at,omitempty"`
+	Terminal               bool   `json:"terminal"`
+}
+
 type Context struct {
-	OrderID      uint   `json:"order_id"`
-	OrderNo      string `json:"order_no"`
-	SnapshotHash string `json:"snapshot_hash"`
-	Platform     string `json:"authorization_platform"`
-	Route        string `json:"route"`
-	Plan         string `json:"plan"`
-	Period       string `json:"period"`
+	OrderID             uint                 `json:"order_id"`
+	OrderNo             string               `json:"order_no"`
+	SnapshotHash        string               `json:"snapshot_hash"`
+	Platform            string               `json:"authorization_platform"`
+	Route               string               `json:"route"`
+	Plan                string               `json:"plan"`
+	Period              string               `json:"period"`
+	FulfillmentProgress *FulfillmentProgress `json:"fulfillment_progress,omitempty"`
 }
 
 // Assertion deliberately matches the existing Glue inspection-only contract.
@@ -118,13 +128,14 @@ type Terms struct {
 	Currency      string `json:"currency"`
 }
 type Eligibility struct {
-	Eligible           bool   `json:"eligible"`
-	Reason             string `json:"reason"`
-	Platform           string `json:"platform,omitempty"`
-	Route              string `json:"route,omitempty"`
-	Plan               string `json:"plan,omitempty"`
-	Period             string `json:"period,omitempty"`
-	GuestProofRequired bool   `json:"guest_proof_required"`
+	Eligible            bool                 `json:"eligible"`
+	Reason              string               `json:"reason"`
+	Platform            string               `json:"platform,omitempty"`
+	Route               string               `json:"route,omitempty"`
+	Plan                string               `json:"plan,omitempty"`
+	Period              string               `json:"period,omitempty"`
+	GuestProofRequired  bool                 `json:"guest_proof_required"`
+	FulfillmentProgress *FulfillmentProgress `json:"fulfillment_progress,omitempty"`
 }
 type SessionRequest struct {
 	OperationID          string `json:"operation_id"`
@@ -213,6 +224,31 @@ func (s *Service) load(ctx context.Context, subject Subject) (OrderSnapshot, Con
 	return local, remote, terms, nil
 }
 
+func isResubmittableStage(progress *FulfillmentProgress) bool {
+	if progress == nil {
+		return true
+	}
+	switch progress.Stage {
+	case "", "awaiting_authorization", "credential_expired":
+		return !progress.AuthorizationSubmitted
+	default:
+		return false
+	}
+}
+
+func fallbackProgressFromOrderStatus(status string) *FulfillmentProgress {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "delivered", "completed":
+		return &FulfillmentProgress{Stage: "completed", AuthorizationSubmitted: true, NextAction: "none", Terminal: true}
+	case "canceled":
+		return &FulfillmentProgress{Stage: "canceled", AuthorizationSubmitted: false, NextAction: "none", Terminal: true}
+	case "refunded", "partially_refunded":
+		return &FulfillmentProgress{Stage: "refunded", AuthorizationSubmitted: false, NextAction: "none", Terminal: true}
+	default:
+		return nil
+	}
+}
+
 func (s *Service) Eligibility(ctx context.Context, subject Subject) (Eligibility, error) {
 	local, remote, terms, err := s.load(ctx, subject)
 	if err == ordercontract.ErrAuthorizationNotFound {
@@ -220,12 +256,44 @@ func (s *Service) Eligibility(ctx context.Context, subject Subject) (Eligibility
 	}
 	v := Eligibility{Reason: "unavailable", GuestProofRequired: subject.UserID == 0}
 	if err != nil {
+		if s.directory != nil {
+			if snap, rErr := s.directory.Resolve(ctx, subject); rErr == nil && snap.Leaf && snap.OrderNo != "" {
+				var progress *FulfillmentProgress
+				if s.cfg.Enabled && s.bridge != nil && snap.ConnectionID > 0 && snap.UpstreamOrderID > 0 {
+					if rem, cErr := s.bridge.Context(ctx, snap.ConnectionID, snap.UpstreamOrderID); cErr == nil && rem.FulfillmentProgress != nil {
+						progress = rem.FulfillmentProgress
+					}
+				}
+				if progress == nil {
+					progress = fallbackProgressFromOrderStatus(snap.OrderStatus)
+				}
+				if progress != nil {
+					v.FulfillmentProgress = progress
+					v.Reason = progress.Stage
+				}
+			}
+		}
 		return v, nil
 	}
 	if local.OrderNo == "" || remote.OrderNo == "" {
 		return v, nil
 	}
-	return Eligibility{Eligible: true, Reason: "ready", Platform: terms.Platform, Route: terms.Route, Plan: terms.Plan, Period: terms.Period, GuestProofRequired: subject.UserID == 0}, nil
+	progress := remote.FulfillmentProgress
+	eligible := isResubmittableStage(progress)
+	reason := "ready"
+	if !eligible && progress != nil && progress.Stage != "" {
+		reason = progress.Stage
+	}
+	return Eligibility{
+		Eligible:            eligible,
+		Reason:              reason,
+		Platform:            terms.Platform,
+		Route:               terms.Route,
+		Plan:                terms.Plan,
+		Period:              terms.Period,
+		GuestProofRequired:  subject.UserID == 0,
+		FulfillmentProgress: progress,
+	}, nil
 }
 
 func contextDigest(local OrderSnapshot, remote Context, terms Terms) string {

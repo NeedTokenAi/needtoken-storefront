@@ -60,11 +60,28 @@ func (s *Store) ListPendingUnifiedOps(now time.Time, orphanBefore time.Time, lim
 	}
 	var rows []walletdomain.UnifiedOp
 	err := s.db.Where(
-		"((status IN ? AND (next_retry_at IS NULL OR next_retry_at <= ?)) OR (status = ? AND updated_at <= ?))",
+		"((status IN ? AND (next_retry_at IS NULL OR next_retry_at <= ?)) OR (status = ? AND updated_at <= ?) OR (status = ? AND ((next_retry_at IS NOT NULL AND next_retry_at <= ?) OR updated_at <= ?)))",
 		[]string{walletdomain.UnifiedOpStatusCreditPending, walletdomain.UnifiedOpStatusRollbackPending},
 		now,
 		walletdomain.UnifiedOpStatusDebited,
 		orphanBefore,
+		walletdomain.UnifiedOpStatusPending,
+		now,
+		orphanBefore,
 	).Order("id ASC").Limit(limit).Find(&rows).Error
+	return rows, err
+}
+
+func (s *Store) ListUnresolvedUnifiedOps(limit int) ([]walletdomain.UnifiedOp, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	var rows []walletdomain.UnifiedOp
+	err := s.db.Where("status IN ?", []string{
+		walletdomain.UnifiedOpStatusPending,
+		walletdomain.UnifiedOpStatusDebited,
+		walletdomain.UnifiedOpStatusCreditPending,
+		walletdomain.UnifiedOpStatusRollbackPending,
+	}).Order("updated_at ASC").Limit(limit).Find(&rows).Error
 	return rows, err
 }
