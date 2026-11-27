@@ -211,8 +211,15 @@ func TestServiceEnsureSingleflightSecurityAndAPISummary(t *testing.T) {
 	identity.member.EmailVerified = false
 	bridge.autoRes = AutoLinkResult{Linked: false, Status: "email_unverified"}
 	res, err = svc.Ensure(context.Background(), 9)
-	if err != nil || res.Linked || bridge.gotAuto.Email != "" || bridge.gotAuto.EmailVerified {
+	if err != nil || res.Linked || bridge.gotAuto.Email != "" || bridge.gotAuto.EmailVerified || bridge.gotAuto.AllowWithoutEmail {
 		t.Fatalf("unverified member must not forward email: res=%+v gotAuto=%+v err=%v", res, bridge.gotAuto, err)
+	}
+
+	// Explicit AllowWithoutEmail forwards empty email with AllowWithoutEmail=true.
+	bridge.autoRes = AutoLinkResult{Linked: true, Status: "auto_provisioned", NativeUserID: 88}
+	res, err = svc.EnsureWithOptions(context.Background(), 9, EnsureOptions{AllowWithoutEmail: true})
+	if err != nil || !res.Linked || res.NativeUserID != 88 || bridge.gotAuto.Email != "" || bridge.gotAuto.EmailVerified || !bridge.gotAuto.AllowWithoutEmail {
+		t.Fatalf("explicit allow_without_email EnsureWithOptions failed: res=%+v gotAuto=%+v err=%v", res, bridge.gotAuto, err)
 	}
 
 	// Disabled member is forbidden.

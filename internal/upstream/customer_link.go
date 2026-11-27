@@ -69,6 +69,7 @@ type CustomerAutoLinkInput struct {
 	MerchantCustomerID string `json:"merchant_customer_id,omitempty"`
 	Email              string `json:"email"`
 	EmailVerified      bool   `json:"email_verified"`
+	AllowWithoutEmail  bool   `json:"allow_without_email,omitempty"`
 	DisplayName        string `json:"display_name,omitempty"`
 	Username           string `json:"username,omitempty"`
 }
@@ -206,6 +207,7 @@ func (a *DujiaoNextAdapter) AutoLink(ctx context.Context, req CustomerAutoLinkIn
 		MerchantCustomerID: strings.TrimSpace(req.MerchantCustomerID),
 		Email:              strings.TrimSpace(req.Email),
 		EmailVerified:      req.EmailVerified,
+		AllowWithoutEmail:  req.AllowWithoutEmail,
 		DisplayName:        strings.TrimSpace(req.DisplayName),
 		Username:           strings.TrimSpace(req.Username),
 	}

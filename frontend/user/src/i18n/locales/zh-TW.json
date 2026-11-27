@@ -3286,6 +3286,17 @@
       "smallAmount": "低於 {price}",
       "fxMissing": "本站尚未公布 USD/CNY 匯率，暫以 USD 顯示。比較金額也請填寫 USD。"
     },
+    "tgEmailPrompt": {
+      "title": "是否綁定信箱？",
+      "desc": "可現在綁定信箱，或跳過並直接開通 API 帳號。",
+      "bindAction": "綁定信箱",
+      "skipAction": "暫不綁定，直接使用",
+      "provisioning": "正在開通帳號…",
+      "bindTitle": "綁定信箱",
+      "confirmBind": "確認綁定",
+      "binding": "綁定中…",
+      "provisionFailed": "暫時無法自動開通 API 帳號，請稍後重試。"
+    },
     "emailAuth": {
       "title": "登入或建立帳號",
       "subtitle": "一個信箱，繼續使用你的 AI 服務。",

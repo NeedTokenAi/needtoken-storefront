@@ -3286,6 +3286,17 @@
       "smallAmount": "Less than {price}",
       "fxMissing": "No USD/CNY exchange rate has been published by this site. Results and comparison inputs therefore use USD."
     },
+    "tgEmailPrompt": {
+      "title": "Bind an email?",
+      "desc": "Bind your email now, or skip to activate your API account right away.",
+      "bindAction": "Bind email",
+      "skipAction": "Skip for now",
+      "provisioning": "Activating account…",
+      "bindTitle": "Bind email",
+      "confirmBind": "Confirm",
+      "binding": "Binding…",
+      "provisionFailed": "Unable to activate API account right now. Please try again later."
+    },
     "emailAuth": {
       "title": "Sign in or create an account",
       "subtitle": "One email to continue with your AI services.",

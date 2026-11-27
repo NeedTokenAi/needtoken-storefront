@@ -3286,6 +3286,17 @@
       "smallAmount": "低于 {price}",
       "fxMissing": "本站尚未公布 USD/CNY 汇率，暂以 USD 展示。比较金额也请填写 USD。"
     },
+    "tgEmailPrompt": {
+      "title": "是否绑定邮箱？",
+      "desc": "可现在绑定邮箱，或跳过并直接开通 API 账号。",
+      "bindAction": "绑定邮箱",
+      "skipAction": "暂不绑定，直接使用",
+      "provisioning": "正在开通账号…",
+      "bindTitle": "绑定邮箱",
+      "confirmBind": "确认绑定",
+      "binding": "绑定中…",
+      "provisionFailed": "暂时无法自动开通 API 账号，请稍后重试。"
+    },
     "emailAuth": {
       "title": "登录或创建账号",
       "subtitle": "一个邮箱，继续使用你的 AI 服务。",

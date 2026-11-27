@@ -218,6 +218,8 @@
       <NeedtokenFooter :brand-name="brandName" :reseller-logo="resellerLogo" :support="support" />
       <SupportWidget :support="support" :raised="raiseSupport" />
     </template>
+
+    <TelegramEmailBindPrompt v-if="!isAuthFocusedRoute && !appStore.isResellerTenant" />
   </div>
 </template>
 
@@ -253,6 +255,7 @@ import NavAnimatedIcon, { type NavIconName } from '../components/NavAnimatedIcon
 import NeedtokenFooter from '../components/NeedtokenFooter.vue'
 import GhostFibersBackground from '../components/GhostFibersBackground.vue'
 import SupportWidget from '../components/SupportWidget.vue'
+import TelegramEmailBindPrompt from '../components/TelegramEmailBindPrompt.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import { useNeedtokenEffects } from '../composables/useNeedtokenEffects'
 import { useApiAccountLink } from '../composables/useApiAccountLink'

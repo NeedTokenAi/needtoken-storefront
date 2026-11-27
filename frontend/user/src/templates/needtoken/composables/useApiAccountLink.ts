@@ -130,16 +130,18 @@ export async function fetchApiAccountSummary(force = false): Promise<ApiAccountS
   return summaryInflight
 }
 
-export async function ensureApiAccountLink(options?: { force?: boolean }): Promise<ApiAccountEnsureResult | null> {
+export async function ensureApiAccountLink(options?: { force?: boolean; allowWithoutEmail?: boolean }): Promise<ApiAccountEnsureResult | null> {
   const force = Boolean(options?.force)
-  if (!force && sharedEnsureAttempted.value) {
+  const allowWithoutEmail = Boolean(options?.allowWithoutEmail)
+  if (!force && !allowWithoutEmail && sharedEnsureAttempted.value) {
     return sharedEnsureResult.value
   }
-  if (ensureInflight) {
+  if (!allowWithoutEmail && ensureInflight) {
     return ensureInflight
   }
-  ensureInflight = userApi
-    .post('/me/api-account-link/ensure', {}, { silentBusinessError: true })
+  const body = allowWithoutEmail ? { allow_without_email: true } : {}
+  const request = userApi
+    .post('/me/api-account-link/ensure', body, { silentBusinessError: true })
     .then(res => {
       const data = (res?.data?.data || null) as ApiAccountEnsureResult | null
       sharedEnsureAttempted.value = true
@@ -161,9 +163,12 @@ export async function ensureApiAccountLink(options?: { force?: boolean }): Promi
       sharedEnsureAttempted.value = true
       return null
     })
-    .finally(() => {
-      ensureInflight = null
-    })
+  if (allowWithoutEmail) {
+    return request
+  }
+  ensureInflight = request.finally(() => {
+    ensureInflight = null
+  })
   return ensureInflight
 }
 
