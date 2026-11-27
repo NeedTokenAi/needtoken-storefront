@@ -78,7 +78,12 @@ type AutoLinkInput struct {
 	MerchantCustomerID string
 	Email              string
 	EmailVerified      bool
+	AllowWithoutEmail  bool
 	DisplayName        string
+}
+
+type EnsureOptions struct {
+	AllowWithoutEmail bool
 }
 
 type AutoLinkResult struct {
@@ -155,18 +160,23 @@ type ensureFlight struct {
 	err  error
 }
 
+type ensureFlightKey struct {
+	userID            uint
+	allowWithoutEmail bool
+}
+
 type Service struct {
 	bridge         Bridge
 	identity       IdentityReader
 	sessionRevoker SessionRevoker
 	ensureMu       sync.Mutex
-	ensureInflight map[uint]*ensureFlight
+	ensureInflight map[ensureFlightKey]*ensureFlight
 }
 
 func New(bridge Bridge) *Service {
 	return &Service{
 		bridge:         bridge,
-		ensureInflight: make(map[uint]*ensureFlight),
+		ensureInflight: make(map[ensureFlightKey]*ensureFlight),
 	}
 }
 
@@ -339,6 +349,10 @@ func (s *Service) ConsoleSSO(ctx context.Context, userID uint, targetPath, nextP
 // to prevent re-entrant race conditions, and pre-existing console accounts never
 // leak remote identities (native_user_id is stripped when existing_requires_link).
 func (s *Service) Ensure(ctx context.Context, userID uint) (AutoLinkResult, error) {
+	return s.EnsureWithOptions(ctx, userID, EnsureOptions{})
+}
+
+func (s *Service) EnsureWithOptions(ctx context.Context, userID uint, opts EnsureOptions) (AutoLinkResult, error) {
 	ref, err := merchantCustomerID(userID)
 	if err != nil {
 		return AutoLinkResult{}, err
@@ -347,11 +361,12 @@ func (s *Service) Ensure(ctx context.Context, userID uint) (AutoLinkResult, erro
 		return AutoLinkResult{Linked: false, Status: "disabled"}, nil
 	}
 
+	key := ensureFlightKey{userID: userID, allowWithoutEmail: opts.AllowWithoutEmail}
 	s.ensureMu.Lock()
 	if s.ensureInflight == nil {
-		s.ensureInflight = make(map[uint]*ensureFlight)
+		s.ensureInflight = make(map[ensureFlightKey]*ensureFlight)
 	}
-	if flight, running := s.ensureInflight[userID]; running {
+	if flight, running := s.ensureInflight[key]; running {
 		s.ensureMu.Unlock()
 		select {
 		case <-flight.done:
@@ -361,22 +376,22 @@ func (s *Service) Ensure(ctx context.Context, userID uint) (AutoLinkResult, erro
 		}
 	}
 	flight := &ensureFlight{done: make(chan struct{})}
-	s.ensureInflight[userID] = flight
+	s.ensureInflight[key] = flight
 	s.ensureMu.Unlock()
 
-	res, callErr := s.runEnsure(ctx, userID, ref)
+	res, callErr := s.runEnsure(ctx, userID, ref, opts)
 
 	s.ensureMu.Lock()
 	flight.res = res
 	flight.err = callErr
-	delete(s.ensureInflight, userID)
+	delete(s.ensureInflight, key)
 	close(flight.done)
 	s.ensureMu.Unlock()
 
 	return res, callErr
 }
 
-func (s *Service) runEnsure(ctx context.Context, userID uint, ref string) (AutoLinkResult, error) {
+func (s *Service) runEnsure(ctx context.Context, userID uint, ref string, opts EnsureOptions) (AutoLinkResult, error) {
 	member, err := s.identity.LookupMember(ctx, userID)
 	if err != nil {
 		return AutoLinkResult{}, ErrUnavailable
@@ -396,6 +411,7 @@ func (s *Service) runEnsure(ctx context.Context, userID uint, ref string) (AutoL
 		MerchantCustomerID: ref,
 		Email:              email,
 		EmailVerified:      emailVerified,
+		AllowWithoutEmail:  opts.AllowWithoutEmail && !emailVerified,
 		DisplayName:        strings.TrimSpace(member.DisplayName),
 	})
 	if err != nil {

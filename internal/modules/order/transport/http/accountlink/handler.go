@@ -152,11 +152,15 @@ func (h *Handler) ensure(c *gin.Context) {
 		h.fail(c, accountlink.ErrForbidden)
 		return
 	}
-	var empty struct{}
-	if !h.decodeJSON(c, &empty, true) {
+	var input struct {
+		AllowWithoutEmail bool `json:"allow_without_email"`
+	}
+	if !h.decodeJSON(c, &input, true) {
 		return
 	}
-	result, err := h.service.Ensure(c.Request.Context(), userID)
+	result, err := h.service.EnsureWithOptions(c.Request.Context(), userID, accountlink.EnsureOptions{
+		AllowWithoutEmail: input.AllowWithoutEmail,
+	})
 	if err != nil {
 		h.fail(c, err)
 		return

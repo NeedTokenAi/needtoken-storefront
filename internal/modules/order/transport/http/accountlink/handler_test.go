@@ -229,6 +229,15 @@ func TestAccountLinkMemberHTTPFlowAndSecurityHeaders(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/me/api-account-link/ensure", bytes.NewBufferString(`{"allow_without_email":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || bridge.gotAuto.Email != "verified-user@example.com" || bridge.gotAuto.AllowWithoutEmail {
+		// Verified member already has emailVerified=true, so AllowWithoutEmail stays false.
+		t.Fatalf("verified member ensure unexpected: status=%d auto=%+v body=%s", w.Code, bridge.gotAuto, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/me/api-account-link/ensure", bytes.NewBufferString(`{"email":"spoof@example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)

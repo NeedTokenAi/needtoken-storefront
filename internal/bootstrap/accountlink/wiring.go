@@ -246,6 +246,7 @@ func (b upstreamBridge) AutoLink(ctx context.Context, input accountlink.AutoLink
 		MerchantCustomerID: input.MerchantCustomerID,
 		Email:              input.Email,
 		EmailVerified:      input.EmailVerified,
+		AllowWithoutEmail:  input.AllowWithoutEmail,
 		DisplayName:        input.DisplayName,
 	})
 	if err != nil {
