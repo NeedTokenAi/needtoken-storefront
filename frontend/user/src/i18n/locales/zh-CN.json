@@ -3291,7 +3291,7 @@
       "submitRegister": "创建账号并登录",
       "deviceSecurityHint": "受信任设备 30 天免二次验证",
       "orWithEmail": "或使用邮箱",
-      "telegramShort": "Telegram 登录"
+      "telegramShort": "使用 Telegram 账号登录"
     },
     "homeLibrary": {
       "eyebrow": "产品库",

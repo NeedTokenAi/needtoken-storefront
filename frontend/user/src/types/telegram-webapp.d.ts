@@ -44,10 +44,24 @@ export interface TelegramWebApp {
   BackButton?: TelegramWebAppBackButton
 }
 
+export interface TelegramLoginWidgetAuthOptions {
+  bot_id: string | number
+  request_access?: boolean | 'write'
+  lang?: string
+}
+
+export interface TelegramLoginWidgetAPI {
+  auth: (
+    options: TelegramLoginWidgetAuthOptions,
+    callback: (user?: Record<string, unknown> | false) => void,
+  ) => void
+}
+
 declare global {
   interface Window {
     Telegram?: {
       WebApp?: TelegramWebApp
+      Login?: TelegramLoginWidgetAPI
     }
   }
 }

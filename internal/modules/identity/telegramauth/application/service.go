@@ -113,6 +113,7 @@ func (s *Service) PublicConfig() map[string]interface{} {
 	if s == nil {
 		return map[string]interface{}{
 			"enabled":      false,
+			"bot_id":       "",
 			"bot_username": "",
 			"mini_app_url": "",
 			"mode":         "",
@@ -123,8 +124,13 @@ func (s *Service) PublicConfig() map[string]interface{} {
 		Enabled: cfg.Enabled, BotUsername: cfg.BotUsername, BotToken: cfg.BotToken,
 		ClientSecret: cfg.ClientSecret, OIDCRedirectURI: cfg.OIDCRedirectURI,
 	})
+	botID := ""
+	if cfg.Enabled {
+		botID = settingssecurity.TelegramBotIDFromToken(cfg.BotToken)
+	}
 	return map[string]interface{}{
 		"enabled":      cfg.Enabled,
+		"bot_id":       botID,
 		"bot_username": strings.TrimSpace(cfg.BotUsername),
 		"mini_app_url": strings.TrimSpace(cfg.MiniAppURL),
 		"mode":         string(mode),

@@ -36,6 +36,7 @@ is_high_risk_path() {
       internal/modules/identity/userauth/transport/http/user_login_handler.go | \
       internal/modules/identity/userauth/transport/http/user_2fa_handler.go | \
       internal/modules/identity/userauth/transport/http/routes.go | \
+      internal/modules/identity/telegramauth/application/service.go | \
       internal/modules/captcha/application/service.go | \
       internal/web/handler.go | \
       internal/modules/identity/user/contract/* | \
@@ -66,7 +67,8 @@ is_high_risk_path() {
       frontend/user/src/components/captcha/TurnstileCaptcha.vue | \
       frontend/admin/src/components/captcha/TurnstileCaptcha.vue | \
       frontend/admin/src/views/Login.vue | \
-      frontend/user/src/composables/useLogin.ts | frontend/user/src/composables/useRegister.ts)
+      frontend/user/src/composables/useLogin.ts | frontend/user/src/composables/useRegister.ts | \
+      frontend/user/src/types/telegram-webapp.d.ts)
       return 0
       ;;
     *)
