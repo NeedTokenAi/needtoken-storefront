@@ -132,6 +132,7 @@ func TestTelegramAuthServicePublicConfigIncludesMiniAppURL(t *testing.T) {
 	svc := NewService(config.TelegramAuthConfig{
 		Enabled:     true,
 		BotUsername: "demo_bot",
+		BotToken:    "123456789:secret-token-value",
 		MiniAppURL:  " https://example.com/mini-app ",
 	})
 
@@ -139,11 +140,26 @@ func TestTelegramAuthServicePublicConfigIncludesMiniAppURL(t *testing.T) {
 	if publicConfig["enabled"] != true {
 		t.Fatalf("expected enabled true, got %v", publicConfig["enabled"])
 	}
+	if publicConfig["bot_id"] != "123456789" {
+		t.Fatalf("expected bot_id 123456789, got %v", publicConfig["bot_id"])
+	}
 	if publicConfig["bot_username"] != "demo_bot" {
 		t.Fatalf("expected bot_username demo_bot, got %v", publicConfig["bot_username"])
 	}
 	if publicConfig["mini_app_url"] != "https://example.com/mini-app" {
 		t.Fatalf("expected mini_app_url https://example.com/mini-app, got %v", publicConfig["mini_app_url"])
+	}
+	if _, exists := publicConfig["bot_token"]; exists {
+		t.Fatalf("public config must never expose bot_token")
+	}
+
+	disabled := NewService(config.TelegramAuthConfig{
+		Enabled:     false,
+		BotUsername: "demo_bot",
+		BotToken:    "123456789:secret-token-value",
+	})
+	if got := disabled.PublicConfig()["bot_id"]; got != "" {
+		t.Fatalf("disabled config must return empty bot_id, got %v", got)
 	}
 }
 

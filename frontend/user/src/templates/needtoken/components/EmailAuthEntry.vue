@@ -51,11 +51,19 @@
           <div
             v-if="login.showThirdPartyLogin"
             class="social-actions"
-            :class="isDualSocialRow ? 'social-actions--dual' : 'social-actions--stack'"
           >
-            <div v-if="login.showTelegramWidget" class="telegram-widget-slot">
-              <div ref="telegramWidgetRef" class="telegram-widget"></div>
-            </div>
+            <button
+              v-if="login.showTelegramWidgetCustomButton"
+              type="button"
+              class="social-tg-btn"
+              :disabled="login.userAuthStore.loading"
+              @click="login.startTelegramWidgetLogin"
+            >
+              <svg class="social-tg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm4.636 6.824-1.584 7.463c-.12.53-.432.662-.875.412l-2.418-1.782-1.167 1.123c-.129.13-.237.237-.486.237l.174-2.463 4.483-4.05c.195-.174-.042-.27-.302-.096l-5.541 3.49-2.386-.747c-.519-.162-.528-.519.108-.768l9.323-3.593c.432-.162.81.096.675.774Z" />
+              </svg>
+              <span>{{ t('needtoken.emailAuth.telegramShort') }}</span>
+            </button>
             <button
               v-else-if="login.showTelegramOidc"
               type="button"
@@ -68,6 +76,9 @@
               </svg>
               <span>{{ t('needtoken.emailAuth.telegramShort') }}</span>
             </button>
+            <div v-else-if="login.showTelegramWidget" class="telegram-widget-slot">
+              <div ref="telegramWidgetRef" class="telegram-widget"></div>
+            </div>
             <p v-else-if="login.showMiniAppLoginHint" class="field-hint social-miniapp-hint">
               {{ t(login.attemptingMiniAppLogin ? 'auth.login.telegramMiniAppLoggingIn' : 'auth.login.telegramMiniAppHint') }}
             </p>
@@ -452,7 +463,6 @@ const showSocialSection = computed(() =>
   (stage.value === 'login' || stage.value === 'register_email' || stage.value === 'register_direct')
   && (login.showThirdPartyLogin || login.showTelegramMiniAppEntry),
 )
-const isDualSocialRow = computed(() => login.showGoogleLogin && login.showTelegramOidc)
 
 watch(stage, async () => {
   await nextTick()
@@ -468,7 +478,7 @@ void loginTurnstileRef
 
 <style scoped>
 .email-entry{min-height:calc(100dvh - 52px);display:grid;place-items:center;padding:10px 16px 14px;background:transparent;color:var(--ui-text-primary)}
-.entry-shell{width:100%;max-width:456px}
+.entry-shell{width:100%;max-width:448px}
 .entry-card{padding:18px 24px;border:1px solid var(--nt-card-border);border-radius:18px;background:var(--ui-bg-elevated);box-shadow:var(--nt-popover-shadow)}
 .mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border-radius:10px;background:var(--ui-bg-soft);border:1px solid var(--ui-border)}
 .mode-tabs button{min-height:32px;border-radius:7px;font-size:13px;font-weight:650;color:var(--ui-text-secondary);transition:background-color .16s,color .16s,box-shadow .16s}
@@ -478,16 +488,16 @@ header{margin:10px 0 12px}
 h1{font-size:19px;font-weight:730;line-height:1.25;letter-spacing:-.03em;text-wrap:balance}
 header p{margin-top:3px;color:var(--ui-text-secondary);font-size:12.5px;line-height:1.4;text-wrap:pretty}
 .social-area{margin-bottom:2px}
-.social-actions--dual{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}
-.social-actions--stack{display:flex;flex-direction:column;gap:8px;align-items:stretch}
-.social-tg-btn{width:100%;min-height:40px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;border:1px solid var(--ui-border-strong);background:var(--ui-bg-soft);color:var(--ui-text-primary);font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;transition:transform .16s,border-color .16s,background-color .16s}
-.social-tg-btn:hover:not(:disabled){border-color:var(--nt-accent-border-strong);background:var(--nt-surface-hover);transform:translateY(-1px)}
-.social-tg-icon{width:16px;height:16px;color:#229ed9;flex-shrink:0}
+.social-actions{display:flex;flex-direction:column;gap:8px;width:100%;max-width:400px;margin-inline:auto;align-items:stretch}
+.social-tg-btn{position:relative;box-sizing:border-box;width:100%;height:40px;padding:0 12px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1px solid #dadce0;background:#ffffff;color:#3c4043;font-family:"Google Sans",arial,sans-serif;font-size:14px;font-weight:500;line-height:1;letter-spacing:.25px;white-space:nowrap;transition:background-color .218s,border-color .218s}
+.social-tg-btn:hover:not(:disabled){background:#f8faff;border-color:#d2e3fc}
+.social-tg-btn:active:not(:disabled){background:#ecf3fe}
+.social-tg-icon{position:absolute;left:12px;width:18px;height:18px;color:#229ed9;flex-shrink:0}
 .telegram-widget-slot{display:flex;justify-content:center;align-items:center;min-height:40px}
 .telegram-widget{display:flex;justify-content:center;align-items:center}
 .social-google{min-width:0;width:100%;display:flex;align-items:center}
 .social-google :deep(> div),
-.social-google :deep(> div > div){min-height:40px}
+.social-google :deep(> div > div){min-height:40px;height:40px}
 .social-miniapp-hint{text-align:center}
 .social-miniapp-link{display:block;margin:8px auto 0;font-size:12px;font-weight:500;color:var(--ui-text-muted);text-decoration:underline;text-underline-offset:3px;padding:2px 6px}
 .social-miniapp-link:hover{color:var(--ui-accent)}
@@ -533,12 +543,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--ui-accent);outline-
 @media(pointer:coarse){
   .entry-card input:not([type=checkbox]){min-height:44px;font-size:16px}
   .password-field button{height:44px}
-  .entry-primary,.social-tg-btn,.mode-tabs button{min-height:44px}
-  .social-google :deep(> div),
-  .social-google :deep(> div > div){min-height:44px}
-}
-@media(max-width:420px){
-  .social-actions--dual{grid-template-columns:1fr;gap:8px}
+  .entry-primary,.mode-tabs button{min-height:44px}
 }
 @media(max-width:480px){
   .email-entry{padding:10px 12px 16px}

@@ -26,6 +26,74 @@ import TurnstileCaptcha from '../components/captcha/TurnstileCaptcha.vue'
 import { useFormValidation } from './useFormValidation'
 import { resolveFallbackSiteName } from '../utils/storefrontStartup'
 
+const TELEGRAM_WIDGET_SCRIPT_URL = 'https://telegram.org/js/telegram-widget.js?22'
+const TELEGRAM_WIDGET_SDK_SCRIPT_ID = 'telegram-login-sdk'
+const TELEGRAM_WIDGET_SDK_TIMEOUT_MS = 10000
+let telegramLoginSDKPromise: Promise<void> | null = null
+
+const loadTelegramLoginSDK = (): Promise<void> => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.reject(new Error('Telegram Login SDK requires a browser'))
+  }
+  if (window.Telegram?.Login?.auth) return Promise.resolve()
+  if (telegramLoginSDKPromise) return telegramLoginSDKPromise
+
+  let script = document.getElementById(TELEGRAM_WIDGET_SDK_SCRIPT_ID) as HTMLScriptElement | null
+  let shouldAppend = false
+  if (!script) {
+    script = document.createElement('script')
+    script.id = TELEGRAM_WIDGET_SDK_SCRIPT_ID
+    script.src = TELEGRAM_WIDGET_SCRIPT_URL
+    script.async = true
+    shouldAppend = true
+  }
+
+  telegramLoginSDKPromise = new Promise<void>((resolve, reject) => {
+    let settled = false
+    const settle = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      script?.removeEventListener('load', onLoad)
+      script?.removeEventListener('error', onError)
+      fn()
+    }
+    const onLoad = () => {
+      if (window.Telegram?.Login?.auth) {
+        settle(resolve)
+        return
+      }
+      settle(() => {
+        telegramLoginSDKPromise = null
+        script?.remove()
+        reject(new Error('Telegram Login SDK is unavailable'))
+      })
+    }
+    const onError = () => {
+      settle(() => {
+        telegramLoginSDKPromise = null
+        script?.remove()
+        reject(new Error('Failed to load Telegram Login SDK'))
+      })
+    }
+    const timer = window.setTimeout(() => {
+      settle(() => {
+        telegramLoginSDKPromise = null
+        script?.remove()
+        reject(new Error('Telegram Login SDK load timed out'))
+      })
+    }, TELEGRAM_WIDGET_SDK_TIMEOUT_MS)
+
+    script?.addEventListener('load', onLoad)
+    script?.addEventListener('error', onError)
+  })
+
+  if (shouldAppend) {
+    document.head.appendChild(script)
+  }
+  return telegramLoginSDKPromise
+}
+
 /**
  * 用户登录页共享逻辑（classic + vault 双模板共用）。
  * 完整保留原 views/auth/Login.vue 的行为，仅抽离为 composable。
@@ -85,6 +153,7 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
   const loginCaptchaEnabled = computed(() => !!captchaConfig.value?.scenes?.login && captchaProvider.value !== 'none')
   const turnstileSiteKey = computed(() => String(captchaConfig.value?.turnstile?.site_key || ''))
   const telegramConfig = computed(() => appStore.config?.telegram_auth || null)
+  const telegramBotID = computed(() => String(telegramConfig.value?.bot_id || '').trim())
   const telegramBotUsername = computed(() => String(telegramConfig.value?.bot_username || '').trim())
   const telegramMiniAppURL = computed(() => String(telegramConfig.value?.mini_app_url || '').trim())
   const telegramEnabled = computed(() => !!telegramConfig.value?.enabled && telegramBotUsername.value !== '')
@@ -111,6 +180,7 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
   const isTelegramMiniApp = computed(() => (telegramMiniAppStore.isMiniApp && telegramMiniAppStore.isReady) || isTelegramUrlEnv)
   const miniAppInitData = computed(() => String(telegramMiniAppStore.initData || '').trim())
   const showTelegramWidget = computed(() => isWidgetMode.value && telegramEnabled.value && !isTelegramMiniApp.value)
+  const showTelegramWidgetCustomButton = computed(() => showTelegramWidget.value && telegramBotID.value !== '')
   const showTelegramOidc = computed(() => telegramLoginMode.value === 'oidc' && telegramEnabled.value && !isTelegramMiniApp.value)
   const showMiniAppLoginHint = computed(() => isTelegramMiniApp.value)
   const showGoogleLogin = computed(() => canShowGoogleIdentityButton(
@@ -515,7 +585,45 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     }
   }
 
+  const startTelegramWidgetLogin = async () => {
+    if (userAuthStore.loading || telegramBotID.value === '') return
+    error.value = ''
+
+    const invokeAuth = () => {
+      const auth = window.Telegram?.Login?.auth
+      if (!auth) return false
+      auth(
+        {
+          bot_id: telegramBotID.value,
+          request_access: 'write',
+        },
+        (user) => {
+          if (user) {
+            void handleTelegramAuth(user)
+          }
+        },
+      )
+      return true
+    }
+
+    // 优先同步触发弹窗，避免浏览器拦截异步打开的新窗口
+    if (invokeAuth()) return
+    try {
+      await loadTelegramLoginSDK()
+      if (!invokeAuth()) {
+        error.value = t('auth.login.telegramWidgetLoadFailed')
+      }
+    } catch {
+      error.value = t('auth.login.telegramWidgetLoadFailed')
+    }
+  }
+
   const renderTelegramWidget = () => {
+    if (showTelegramWidgetCustomButton.value) {
+      clearTelegramWidget()
+      void loadTelegramLoginSDK().catch(() => undefined)
+      return
+    }
     if (telegramLoginMode.value === 'oidc') {
       clearTelegramWidget()
       return
@@ -527,7 +635,7 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     clearTelegramWidget()
     const script = document.createElement('script')
     script.async = true
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
+    script.src = TELEGRAM_WIDGET_SCRIPT_URL
     script.setAttribute('data-telegram-login', telegramBotUsername.value)
     script.setAttribute('data-size', 'large')
     script.setAttribute('data-userpic', 'false')
@@ -569,7 +677,7 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     await tryTelegramMiniAppLogin()
   })
 
-  watch([showTelegramWidget, telegramBotUsername], () => {
+  watch([showTelegramWidget, showTelegramWidgetCustomButton, telegramBotID, telegramBotUsername], () => {
     renderTelegramWidget()
   })
 
@@ -632,6 +740,8 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
     continueAfterLogin,
     // telegram
     showTelegramWidget,
+    showTelegramWidgetCustomButton,
+    startTelegramWidgetLogin,
     telegramWidgetRef,
     showTelegramOidc,
     startTelegramOidc,

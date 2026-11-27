@@ -3291,7 +3291,7 @@
       "submitRegister": "Create account & sign in",
       "deviceSecurityHint": "Trusted devices stay verified for 30 days",
       "orWithEmail": "Or continue with email",
-      "telegramShort": "Telegram"
+      "telegramShort": "Sign in with Telegram"
     },
     "homeLibrary": {
       "eyebrow": "Product library",

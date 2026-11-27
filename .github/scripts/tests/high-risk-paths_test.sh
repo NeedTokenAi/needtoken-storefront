@@ -73,6 +73,7 @@ high_risk_cases=(
   "frontend/user/src/utils/themeState.ts"
   "internal/web/handler.go"
   "internal/modules/captcha/application/service.go"
+  "internal/modules/identity/telegramauth/application/service.go"
   "internal/modules/identity/userauth/transport/http/user_login_handler.go"
   "frontend/user/src/components/captcha/TurnstileCaptcha.vue"
   "frontend/admin/src/components/captcha/TurnstileCaptcha.vue"
@@ -88,6 +89,7 @@ high_risk_cases=(
   "frontend/user/src/style.css"
   "frontend/user/src/components/ui/select/SelectContent.vue"
   "frontend/user/src/composables/useCheckout.ts"
+  "frontend/user/src/types/telegram-webapp.d.ts"
   "frontend/user/src/views/personal/WalletPanel.vue"
 )
 
