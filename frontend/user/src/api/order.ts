@@ -54,6 +54,11 @@ export const userOrderAPI = {
     openSubscriptionAuthorization: (orderNo: string, data: any) => userApi.post(`/orders/${encodeURIComponent(orderNo)}/subscription-authorization/session`, data, { silentBusinessError: true }),
     assetClaimStatus: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/asset-claim`, { silentBusinessError: true }),
     revealAssetClaim: (orderNo: string) => userApi.post(`/orders/${encodeURIComponent(orderNo)}/asset-claim/reveal`, {}, { silentBusinessError: true }),
+    afterSalesList: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/after-sales`, { silentBusinessError: true }),
+    afterSalesCreate: (orderNo: string, data: { category: string; summary: string; idempotency_key?: string }) =>
+        userApi.post(`/orders/${encodeURIComponent(orderNo)}/after-sales`, data, { silentBusinessError: true }),
+    afterSalesSupplement: (orderNo: string, ticketID: string, data: { message: string }) =>
+        userApi.post(`/orders/${encodeURIComponent(orderNo)}/after-sales/${encodeURIComponent(ticketID)}/supplement`, data, { silentBusinessError: true }),
     downloadFulfillment: (orderNo: string) => userApi.get(`/orders/${encodeURIComponent(orderNo)}/fulfillment/download`, { blob: true }),
 }
 
@@ -77,6 +82,18 @@ export const guestOrderAPI = {
     revealAssetClaim: (orderNo: string, auth: GuestAuthInput) => {
         const request = withGuestAuth(auth, { silentBusinessError: true })
         return userApi.post(`/guest/orders/${encodeURIComponent(orderNo)}/asset-claim/reveal`, {}, request.options)
+    },
+    afterSalesList: (orderNo: string, auth: GuestAuthInput) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.get(`/guest/orders/${encodeURIComponent(orderNo)}/after-sales`, request.options)
+    },
+    afterSalesCreate: (orderNo: string, auth: GuestAuthInput, data: { category: string; summary: string; idempotency_key?: string }) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.post(`/guest/orders/${encodeURIComponent(orderNo)}/after-sales`, data, request.options)
+    },
+    afterSalesSupplement: (orderNo: string, auth: GuestAuthInput, ticketID: string, data: { message: string }) => {
+        const request = withGuestAuth(auth, { silentBusinessError: true })
+        return userApi.post(`/guest/orders/${encodeURIComponent(orderNo)}/after-sales/${encodeURIComponent(ticketID)}/supplement`, data, request.options)
     },
     preview: (data: any) => userApi.post('/guest/orders/preview', data),
     create: (data: any) => userApi.post('/guest/orders', data),

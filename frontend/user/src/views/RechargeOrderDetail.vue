@@ -140,8 +140,31 @@
           </div>
         </div>
 
+        <!-- 余额同步与入账提示 -->
+        <div v-if="isBalanceSyncPending" class="theme-float rounded-[22px] bg-card p-5 md:p-6 border-l-4" :class="balanceSyncState === 'sync_error' ? 'border-amber-500' : 'border-blue-500'">
+          <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div class="space-y-1">
+              <p class="text-sm font-semibold text-foreground">
+                {{ balanceSyncState === 'sync_error' ? t('rechargeOrder.balanceSyncErrorTitle') : t('rechargeOrder.balanceSyncingTitle') }}
+              </p>
+              <p class="text-xs text-muted-foreground">
+                {{ balanceSyncState === 'sync_error' ? t('rechargeOrder.balanceSyncErrorDesc') : t('rechargeOrder.balanceSyncingDesc') }}
+              </p>
+              <p v-if="balanceSync?.last_error" class="text-xs text-amber-600 dark:text-amber-400 break-all">
+                {{ balanceSync.last_error }}
+              </p>
+              <p v-if="balanceSync?.updated_at" class="text-xs text-muted-foreground">
+                {{ t('rechargeOrder.balanceSyncUpdatedAt') }}：{{ formatDate(balanceSync.updated_at) }}
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" :disabled="loading" @click="loadDetail">
+              {{ t('rechargeOrder.refreshBalanceSync') }}
+            </Button>
+          </div>
+        </div>
+
         <!-- 支付成功提示 -->
-        <div v-if="recharge.status === 'success'" class="theme-float rounded-[22px] bg-card p-5 md:p-6 border-l-4 border-green-500">
+        <div v-else-if="isBalanceCredited" class="theme-float rounded-[22px] bg-card p-5 md:p-6 border-l-4 border-green-500">
           <p class="text-sm font-semibold text-foreground">{{ t('personalCenter.wallet.rechargeSuccess') }}</p>
         </div>
       </div>
@@ -160,7 +183,7 @@ import { useRechargeOrderDetail } from '../composables/useRechargeOrderDetail'
 const { t } = useI18n()
 
 const {
-  loading, checkingPayment, recharge, payment, walletAddressCopied, qrImageUrl,
+  loading, checkingPayment, recharge, payment, balanceSync, balanceSyncState, isBalanceSyncPending, isBalanceCredited, walletAddressCopied, qrImageUrl,
   isPending, payLink, showTelegramPayHint, qrUsingPayLinkFallback, showQRCode,
   cryptoWalletAddress, cryptoPaymentDetails, hasCryptoPaymentDetails, customerFeeApplied,
   rechargeStatusText, rechargeStatusVariant, formatMoney, formatDate,

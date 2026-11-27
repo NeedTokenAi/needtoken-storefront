@@ -409,6 +409,7 @@
             </div>
           </div>
         </div>
+        <OrderAfterSalesPanel :order="order" :guest-auth="auth" />
       </div>
     </div>
   </div>
@@ -417,6 +418,7 @@
 <script setup lang="ts">
 import SubscriptionAuthorizationPanel from "../components/SubscriptionAuthorizationPanel.vue"
 import AssetVaultClaimPanel from "../components/AssetVaultClaimPanel.vue"
+import OrderAfterSalesPanel from "../components/OrderAfterSalesPanel.vue"
 import { Copy, Check, Download, Info, Image as ImageIcon } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { computed } from 'vue'

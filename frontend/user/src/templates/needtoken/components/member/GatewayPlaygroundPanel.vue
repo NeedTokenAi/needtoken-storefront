@@ -291,6 +291,10 @@ import {
   resolveTokenAvailableModels,
 } from '../../lib/gatewayConsoleHelpers'
 import {
+  buildPlaygroundChatRequest,
+  buildPlaygroundCurlSnippet,
+} from '../../../../utils/playgroundRequest'
+import {
   getGatewayModels,
   listGatewayTokens,
   type GatewayGroupMetaItem,
@@ -425,17 +429,19 @@ const copyReply = async (content: string, idx: number) => {
 const copyCurlSnippet = async () => {
   if (!selectedTokenKey.value || !selectedModel.value) return
   if (curlTimer) clearTimeout(curlTimer)
-  const payload = {
+  const payload = buildPlaygroundChatRequest({
     model: selectedModel.value,
-    messages: [{ role: 'user', content: promptInput.value.trim() || 'Hello' }],
-    stream: true,
-  }
-  const snippet = [
-    `curl -N ${API_BASE_URL}/chat/completions \\`,
-    `  -H "Content-Type: application/json" \\`,
-    `  -H "Authorization: Bearer ${selectedTokenKey.value}" \\`,
-    `  -d '${JSON.stringify(payload)}'`,
-  ].join('\n')
+    systemPrompt: systemPrompt.value,
+    historyMessages: messages.value,
+    userPrompt: promptInput.value,
+    temperature: temperature.value,
+    maxTokens: maxTokens.value,
+  })
+  const snippet = buildPlaygroundCurlSnippet({
+    apiBaseURL: API_BASE_URL,
+    apiKey: selectedTokenKey.value,
+    payload,
+  })
   try {
     await navigator.clipboard.writeText(snippet)
     curlCopied.value = true
@@ -473,12 +479,14 @@ const sendPrompt = async () => {
   if (!text || streaming.value || !selectedTokenKey.value || !selectedModel.value) return
   errorMsg.value = ''
 
-  const history = messages.value.map(m => ({ role: m.role, content: m.content }))
-  const reqMessages: Array<{ role: string; content: string }> = []
-  if (systemPrompt.value.trim()) {
-    reqMessages.push({ role: 'system', content: systemPrompt.value.trim() })
-  }
-  reqMessages.push(...history, { role: 'user', content: text })
+  const reqBody = buildPlaygroundChatRequest({
+    model: selectedModel.value,
+    systemPrompt: systemPrompt.value,
+    historyMessages: messages.value,
+    userPrompt: text,
+    temperature: temperature.value,
+    maxTokens: maxTokens.value,
+  })
 
   messages.value.push({ role: 'user', content: text })
   const assistantMsg: ChatBubble = { role: 'assistant', content: '', model: selectedModel.value }
@@ -490,17 +498,6 @@ const sendPrompt = async () => {
   abortController = new AbortController()
   const startedAt = performance.now()
   let firstChunkSeen = false
-
-  const reqBody: Record<string, unknown> = {
-    model: selectedModel.value,
-    messages: reqMessages,
-    temperature: temperature.value,
-    stream: true,
-    stream_options: { include_usage: true },
-  }
-  if (typeof maxTokens.value === 'number' && Number.isFinite(maxTokens.value) && maxTokens.value > 0) {
-    reqBody.max_tokens = Math.round(maxTokens.value)
-  }
 
   try {
     const resp = await fetch(`${API_BASE_URL}/chat/completions`, {

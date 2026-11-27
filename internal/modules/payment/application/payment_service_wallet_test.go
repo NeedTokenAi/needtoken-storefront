@@ -1881,15 +1881,18 @@ func TestManualConfirmWalletRechargeValidatesPaymentAndRecordsProviderRef(t *tes
 }
 
 type fakeUnifiedBalanceBridge struct {
-	mu            sync.Mutex
-	balance       map[uint]decimal.Decimal
-	debits        map[string]decimal.Decimal
-	credits       map[string]decimal.Decimal
-	creditFailCnt int
-	debitStarted  chan string
-	debitRelease  chan struct{}
-	debitOps      []string
-	creditOps     []string
+	mu               sync.Mutex
+	balance          map[uint]decimal.Decimal
+	debits           map[string]decimal.Decimal
+	credits          map[string]decimal.Decimal
+	creditFailCnt    int
+	debitDropRespCnt int
+	queryFailCnt     int
+	queryCalls       int
+	debitStarted     chan string
+	debitRelease     chan struct{}
+	debitOps         []string
+	creditOps        []string
 }
 
 func newFakeUnifiedBalanceBridge(initial map[uint]string) *fakeUnifiedBalanceBridge {
@@ -1963,7 +1966,51 @@ func (f *fakeUnifiedBalanceBridge) Debit(_ context.Context, userID uint, maxAmou
 	}
 	f.debits[opID] = deduct
 	f.balance[userID] = avail.Sub(deduct).Round(2)
+	if f.debitDropRespCnt > 0 {
+		// Simulate gateway committed debit but HTTP response was lost in transit.
+		f.debitDropRespCnt--
+		return money.Amount{}, money.Amount{}, false, errors.New("simulated network timeout after debit")
+	}
 	return money.FromDecimal(deduct), money.FromDecimal(f.balance[userID]), false, nil
+}
+
+func (f *fakeUnifiedBalanceBridge) QueryOp(_ context.Context, userID uint, opID, kind, _ string) (*walletcontract.UnifiedOpAuthorityStatus, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queryCalls++
+	if f.queryFailCnt > 0 {
+		f.queryFailCnt--
+		return nil, errors.New("simulated transient query error")
+	}
+	if _, rolledBack := f.credits[opID+":rollback"]; rolledBack {
+		return &walletcontract.UnifiedOpAuthorityStatus{
+			Found:   true,
+			Status:  "rolled_back",
+			Amount:  money.FromDecimal(f.debits[opID]),
+			Balance: money.FromDecimal(f.balance[userID]),
+		}, nil
+	}
+	if amt, ok := f.debits[opID]; ok && (kind == "" || kind == "wallet_debit") {
+		return &walletcontract.UnifiedOpAuthorityStatus{
+			Found:   true,
+			Status:  "debited",
+			Amount:  money.FromDecimal(amt),
+			Balance: money.FromDecimal(f.balance[userID]),
+		}, nil
+	}
+	if amt, ok := f.credits[opID]; ok && (kind == "" || kind == "wallet_credit") {
+		return &walletcontract.UnifiedOpAuthorityStatus{
+			Found:   true,
+			Status:  "credited",
+			Amount:  money.FromDecimal(amt),
+			Balance: money.FromDecimal(f.balance[userID]),
+		}, nil
+	}
+	return &walletcontract.UnifiedOpAuthorityStatus{
+		Found:   false,
+		Status:  "not_found",
+		Balance: money.FromDecimal(f.balance[userID]),
+	}, nil
 }
 
 func (f *fakeUnifiedBalanceBridge) Redeem(_ context.Context, _ uint, _, _ string) (*walletcontract.UnifiedBalanceRedeemResult, error) {
@@ -2233,5 +2280,140 @@ func TestUnifiedBalanceOutboxUnderpaidRefundAndAdminAdjust(t *testing.T) {
 	}
 	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("15.00")) {
 		t.Fatalf("balance after recharge refund = %s, want 15.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+}
+
+func TestUnifiedBalancePendingRecoveryAndOrderConvergence(t *testing.T) {
+	svc, db := setupPaymentServiceWalletTest(t)
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	user := &userdomain.User{Email: "unified-r04@example.com", PasswordHash: "hash", Status: constants.UserStatusActive}
+	if err := db.Create(user).Error; err != nil {
+		t.Fatal(err)
+	}
+	bridge := newFakeUnifiedBalanceBridge(map[uint]string{user.ID: "100.00"})
+	svc.walletSvc.SetUnifiedBalanceBridge(bridge)
+
+	createOrder := func(no, total string, expiresAt *time.Time) *orderdomain.Order {
+		t.Helper()
+		o := &orderdomain.Order{
+			OrderNo: no, UserID: user.ID, Status: constants.OrderStatusPendingPayment, Currency: "CNY",
+			OriginalAmount:   money.FromDecimal(decimal.RequireFromString(total)),
+			TotalAmount:      money.FromDecimal(decimal.RequireFromString(total)),
+			OnlinePaidAmount: money.FromDecimal(decimal.RequireFromString(total)),
+			WalletPaidAmount: money.FromDecimal(decimal.Zero),
+			ExpiresAt:        expiresAt,
+		}
+		if err := db.Create(o).Error; err != nil {
+			t.Fatal(err)
+		}
+		return o
+	}
+
+	// 1. NewAPI 已扣款但响应丢失导致 op 停留在 pending；查询失败时不误结算也不改 op_id，恢复后完成活跃订单支付。
+	future := time.Now().Add(10 * time.Minute)
+	orderActive := createOrder("DJR04ACTIVE", "30.00", &future)
+	bridge.debitDropRespCnt = 1
+	bridge.queryFailCnt = 1
+	if _, err := svc.CreatePayment(CreatePaymentInput{OrderID: orderActive.ID, ChannelID: 0, UseBalance: true}); err == nil {
+		t.Fatalf("expected error when debit response dropped")
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("70.00")) {
+		t.Fatalf("balance after dropped debit response = %s, want 70.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+	var opActive walletdomain.UnifiedOp
+	if err := db.Where("order_id = ?", orderActive.ID).First(&opActive).Error; err != nil || opActive.Status != walletdomain.UnifiedOpStatusPending {
+		t.Fatalf("expected pending unified op after dropped response, got %+v err=%v", opActive, err)
+	}
+	origOpID := opActive.OpID
+
+	// 首次恢复：QueryOp 瞬时失败，必须保持 pending 且不生成替代 op_id。
+	if err := svc.walletSvc.RecoverUnifiedOps(); err != nil {
+		t.Fatalf("RecoverUnifiedOps failed: %v", err)
+	}
+	if err := db.Where("order_id = ?", orderActive.ID).First(&opActive).Error; err != nil {
+		t.Fatal(err)
+	}
+	if opActive.Status != walletdomain.UnifiedOpStatusPending || opActive.OpID != origOpID || opActive.Attempts < 2 {
+		t.Fatalf("expected pending op unchanged after transient query failure, got %+v", opActive)
+	}
+
+	// 拨回 next_retry_at 并二次恢复：QueryOp 查出 debited -> 订单未过期且全额覆盖 -> 自动完成支付并置为 applied。
+	past := time.Now().Add(-time.Minute)
+	if err := db.Model(&opActive).Update("next_retry_at", &past).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.walletSvc.RecoverUnifiedOps(); err != nil {
+		t.Fatalf("RecoverUnifiedOps second run failed: %v", err)
+	}
+	if err := db.Where("order_id = ?", orderActive.ID).First(&opActive).Error; err != nil || opActive.Status != walletdomain.UnifiedOpStatusApplied {
+		t.Fatalf("expected applied op after convergence, got %+v err=%v", opActive, err)
+	}
+	var reloadedOrder orderdomain.Order
+	if err := db.First(&reloadedOrder, orderActive.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if reloadedOrder.Status != constants.OrderStatusPaid || !reloadedOrder.WalletPaidAmount.Decimal.Equal(decimal.RequireFromString("30.00")) {
+		t.Fatalf("expected active order paid=30.00, got status=%s wallet_paid=%s", reloadedOrder.Status, reloadedOrder.WalletPaidAmount.String())
+	}
+
+	// 2. 响应丢失 + 订单随后过期：恢复扫描查明已扣款但订单已过期 -> 自动幂等冲正退回 NewAPI。
+	bridge.debitDropRespCnt = 1
+	orderExpired := createOrder("DJR04EXPIRED", "20.00", &future)
+	if _, err := svc.CreatePayment(CreatePaymentInput{OrderID: orderExpired.ID, ChannelID: 0, UseBalance: true}); err == nil {
+		t.Fatalf("expected error on dropped response")
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("50.00")) {
+		t.Fatalf("balance after second dropped debit = %s, want 50.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+	expiredAt := time.Now().Add(-time.Minute)
+	if err := db.Model(&orderdomain.Order{}).Where("id = ?", orderExpired.ID).Update("expires_at", &expiredAt).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.walletSvc.RecoverUnifiedOps(); err != nil {
+		t.Fatalf("RecoverUnifiedOps for expired order failed: %v", err)
+	}
+	if err := svc.walletSvc.RecoverUnifiedOps(); err != nil {
+		t.Fatalf("idempotent RecoverUnifiedOps failed: %v", err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("70.00")) {
+		t.Fatalf("balance after expired order rollback = %s, want 70.00", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+	var opExpired walletdomain.UnifiedOp
+	if err := db.Where("order_id = ?", orderExpired.ID).First(&opExpired).Error; err != nil || opExpired.Status != walletdomain.UnifiedOpStatusRolledBack {
+		t.Fatalf("expected rolled_back op for expired order, got %+v err=%v", opExpired, err)
+	}
+
+	// 3. 进程崩溃遗留孤儿 pending 且 NewAPI 未曾扣款（not_found）：超时后扫描关闭为 cancelled，不冲正也不重复扣款。
+	staleTime := time.Now().Add(-10 * time.Minute)
+	orderMissing := createOrder("DJR04MISSING", "15.00", &future)
+	oid := orderMissing.ID
+	if err := db.Create(&walletdomain.UnifiedOp{
+		OpID:      "order:r04missing:debit:crash",
+		Direction: walletdomain.UnifiedOpDirectionDebit,
+		Status:    walletdomain.UnifiedOpStatusPending,
+		UserID:    user.ID,
+		OrderID:   &oid,
+		Amount:    money.FromDecimal(decimal.RequireFromString("15.00")),
+		Currency:  "CNY",
+		CreatedAt: staleTime,
+		UpdatedAt: staleTime,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.walletSvc.RecoverUnifiedOps(); err != nil {
+		t.Fatalf("RecoverUnifiedOps for not_found pending failed: %v", err)
+	}
+	var opMissing walletdomain.UnifiedOp
+	if err := db.Where("order_id = ?", orderMissing.ID).First(&opMissing).Error; err != nil || opMissing.Status != walletdomain.UnifiedOpStatusCancelled {
+		t.Fatalf("expected cancelled status for not_found pending, got %+v err=%v", opMissing, err)
+	}
+	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("70.00")) {
+		t.Fatalf("balance must stay 70.00 when not_found closed, got %s", bridge.balanceOf(user.ID).StringFixed(2))
 	}
 }

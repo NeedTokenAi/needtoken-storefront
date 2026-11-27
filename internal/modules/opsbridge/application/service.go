@@ -53,6 +53,7 @@ type Service struct {
 	users           opscontract.UserStore
 	ugcClaims       opscontract.UniversalGiftCardClaimStore
 	radarStore      opscontract.RadarSubscriptionStore
+	unifiedOps      opscontract.UnifiedOpReader
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {
@@ -106,6 +107,11 @@ func (s *Service) WithUpstream(upstream opscontract.UpstreamStore) *Service {
 
 func (s *Service) WithOrderRefunds(refunds opscontract.OrderRefundStore) *Service {
 	s.refunds = refunds
+	return s
+}
+
+func (s *Service) WithUnifiedOps(reader opscontract.UnifiedOpReader) *Service {
+	s.unifiedOps = reader
 	return s
 }
 
@@ -454,6 +460,11 @@ func (s *Service) OrdersFiltered(filter opscontract.OrdersFilter) (*opscontract.
 			return nil, err
 		}
 		result.Orders = append(result.Orders, mapped)
+	}
+	if page == 1 && s.unifiedOps != nil {
+		if pendingOps, uErr := s.unifiedOps.ListPendingUnifiedOpsForOps(100); uErr == nil && len(pendingOps) > 0 {
+			result.PendingUnifiedOps = pendingOps
+		}
 	}
 
 	return result, nil

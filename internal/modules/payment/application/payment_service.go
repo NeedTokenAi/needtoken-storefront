@@ -140,7 +140,7 @@ type PaymentServiceOptions struct {
 
 // NewPaymentService 创建支付服务
 func NewPaymentService(opts PaymentServiceOptions) *PaymentService {
-	return &PaymentService{
+	svc := &PaymentService{
 		Guard:                   reservationguard.New(opts.OrderStore, opts.ProductSKURepo, opts.CheckoutReservations),
 		planCheckouts:           plancheckout.New(opts.OrderStore, opts.ProductRepo, opts.ProductSKURepo, opts.PlanEligibility),
 		orderRepo:               opts.OrderStore,
@@ -161,6 +161,10 @@ func NewPaymentService(opts PaymentServiceOptions) *PaymentService {
 		paymentProviderRegistry: opts.PaymentProviderRegistry,
 		resellerAccounting:      opts.ResellerAccounting,
 	}
+	if opts.WalletService != nil {
+		opts.WalletService.SetUnifiedDebitOrderReconciler(svc)
+	}
+	return svc
 }
 
 // ListPayments 管理端支付列表。

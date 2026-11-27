@@ -9,7 +9,9 @@ import {
   resolvePaymentLinkNavigationTarget,
   resolvePaymentPresentationMode,
   resolvePaymentResultTitleKey,
+  resolveRechargeBalanceSyncState,
   shouldAutoOpenPaymentLink,
+  shouldContinueRechargePolling,
 } from '../src/utils/paymentResumePolicy.ts'
 
 test('manual payment method changes do not auto resume the latest payment', () => {
@@ -86,4 +88,47 @@ test('redirect-style payments auto open unless a customer fee needs confirmation
 test('automatic cashier navigation uses the current tab to avoid popup blocking', () => {
   assert.equal(resolvePaymentLinkNavigationTarget(true), 'current-tab')
   assert.equal(resolvePaymentLinkNavigationTarget(false), 'new-window')
+})
+
+test('recharge balance sync keeps polling while syncing or errored and stops once credited', () => {
+  assert.equal(resolveRechargeBalanceSyncState({ status: 'pending' }, null), 'none')
+  assert.equal(shouldContinueRechargePolling({ status: 'pending' }, null), true)
+  assert.equal(shouldContinueRechargePolling({ status: 'initiated' }, null), true)
+  assert.equal(shouldContinueRechargePolling({ status: 'failed' }, null), false)
+
+  assert.equal(
+    resolveRechargeBalanceSyncState({ status: 'success' }, { status: 'syncing', attempts: 1 }),
+    'syncing',
+  )
+  assert.equal(
+    shouldContinueRechargePolling({ status: 'success' }, { status: 'syncing' }),
+    true,
+  )
+
+  assert.equal(
+    resolveRechargeBalanceSyncState(
+      { status: 'success' },
+      { status: 'sync_error', last_error: 'upstream timeout' },
+    ),
+    'sync_error',
+  )
+  assert.equal(
+    shouldContinueRechargePolling(
+      { status: 'success' },
+      { status: 'sync_error', last_error: 'upstream timeout' },
+    ),
+    true,
+  )
+
+  assert.equal(
+    resolveRechargeBalanceSyncState({ status: 'success' }, { status: 'credited' }),
+    'credited',
+  )
+  assert.equal(
+    shouldContinueRechargePolling({ status: 'success' }, { status: 'credited' }),
+    false,
+  )
+  // Legacy non-unified wallet without balance_sync keeps existing behavior
+  assert.equal(resolveRechargeBalanceSyncState({ status: 'success' }, null), 'credited')
+  assert.equal(shouldContinueRechargePolling({ status: 'success' }, null), false)
 })

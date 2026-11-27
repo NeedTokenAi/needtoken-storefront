@@ -152,14 +152,29 @@ type OrdersFilter struct {
 	CreatedFrom     *time.Time
 	CreatedTo       *time.Time
 }
+type PendingUnifiedOp struct {
+	OpID      string    `json:"op_id"`
+	UserID    uint      `json:"user_id"`
+	Kind      string    `json:"kind"`
+	Status    string    `json:"status"`
+	Amount    string    `json:"amount"`
+	Currency  string    `json:"currency"`
+	Attempts  int       `json:"attempts"`
+	LastError string    `json:"last_error,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+type UnifiedOpReader interface {
+	ListPendingUnifiedOpsForOps(limit int) ([]PendingUnifiedOp, error)
+}
 type OrdersResult struct {
-	Source      string    `json:"source"`
-	CollectedAt time.Time `json:"collected_at"`
-	Freshness   string    `json:"freshness"`
-	Orders      []Order   `json:"orders"`
-	Total       int64     `json:"total"`
-	Page        int       `json:"page"`
-	PageSize    int       `json:"page_size"`
+	Source            string             `json:"source"`
+	CollectedAt       time.Time          `json:"collected_at"`
+	Freshness         string             `json:"freshness"`
+	Orders            []Order            `json:"orders"`
+	Total             int64              `json:"total"`
+	Page              int                `json:"page"`
+	PageSize          int                `json:"page_size"`
+	PendingUnifiedOps []PendingUnifiedOp `json:"pending_unified_ops,omitempty"`
 }
 type Overview struct {
 	Source         string           `json:"source"`
@@ -690,18 +705,22 @@ type RefundOrderInput struct {
 }
 
 type RefundOrderResult struct {
-	Source           string    `json:"source"`
-	CollectedAt      time.Time `json:"collected_at"`
-	OrderID          uint      `json:"order_id"`
-	OrderNo          string    `json:"order_no"`
-	Status           string    `json:"status"`
-	TotalAmount      string    `json:"total_amount"`
-	RefundedAmount   string    `json:"refunded_amount"`
-	Currency         string    `json:"currency"`
-	RefundRecordID   uint      `json:"refund_record_id"`
-	RefundType       string    `json:"refund_type"`
-	SettlementStatus string    `json:"settlement_status"`
-	OperationID      string    `json:"operation_id"`
+	Source               string     `json:"source"`
+	CollectedAt          time.Time  `json:"collected_at"`
+	OrderID              uint       `json:"order_id"`
+	OrderNo              string     `json:"order_no"`
+	Status               string     `json:"status"`
+	TotalAmount          string     `json:"total_amount"`
+	RefundedAmount       string     `json:"refunded_amount"`
+	Currency             string     `json:"currency"`
+	RefundRecordID       uint       `json:"refund_record_id"`
+	RefundType           string     `json:"refund_type"`
+	SettlementStatus     string     `json:"settlement_status"`
+	OperationID          string     `json:"operation_id"`
+	BalanceSyncStatus    string     `json:"balance_sync_status,omitempty"`
+	BalanceSyncOpID      string     `json:"balance_sync_op_id,omitempty"`
+	BalanceSyncError     string     `json:"balance_sync_error,omitempty"`
+	BalanceSyncUpdatedAt *time.Time `json:"balance_sync_updated_at,omitempty"`
 }
 
 type OrderRefundStore interface {

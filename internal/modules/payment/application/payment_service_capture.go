@@ -12,10 +12,13 @@ import (
 	"github.com/dujiao-next/internal/shared/jsonmap"
 
 	orderapp "github.com/dujiao-next/internal/modules/order/application"
+	orderdomain "github.com/dujiao-next/internal/modules/order/domain"
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
 	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
+	"github.com/dujiao-next/internal/shared/money"
+	"github.com/shopspring/decimal"
 )
 
 // CapturePaymentInput 捕获支付输入。
@@ -285,4 +288,139 @@ func (s *PaymentService) GetWalletRechargeRefundFeeSnapshot(id uint) (walletcont
 		return walletcontract.RechargeRefundFeeSnapshot{PaymentAmount: payment.Amount, PaymentFee: payment.FeeAmount}, nil
 	}
 	return walletcontract.RechargeRefundFeeSnapshot{}, nil
+}
+
+// ReconcileUnifiedDebitOrder converges a NewAPI-confirmed debit operation against
+// the target storefront order during background recovery.
+func (s *PaymentService) ReconcileUnifiedDebitOrder(op *walletdomain.UnifiedOp) (bool, bool, error) {
+	if s == nil || op == nil || op.OrderID == nil || *op.OrderID == 0 || s.paymentRepo == nil || s.walletSvc == nil {
+		return false, false, nil
+	}
+	orderID := *op.OrderID
+	debitedAmount := op.Amount.Decimal.Round(2)
+	if debitedAmount.LessThanOrEqual(decimal.Zero) {
+		return false, false, nil
+	}
+
+	planEvidence, planErr := s.planCheckouts.Ensure(orderID)
+	guardErr := s.Guard.Ensure(context.Background(), orderID)
+
+	var applied bool
+	var shouldRollback bool
+	var paidOrder *orderdomain.Order
+	var paidPayment *paymentdomain.Payment
+
+	txErr := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
+		currentOp, err := tx.Wallets().Wallets().GetUnifiedOpByOpID(op.OpID)
+		if err != nil {
+			return err
+		}
+		if currentOp == nil {
+			return nil
+		}
+		switch currentOp.Status {
+		case walletdomain.UnifiedOpStatusApplied:
+			applied = true
+			return nil
+		case walletdomain.UnifiedOpStatusRollbackPending, walletdomain.UnifiedOpStatusRolledBack, walletdomain.UnifiedOpStatusCancelled:
+			return nil
+		}
+		if currentOp.Status != walletdomain.UnifiedOpStatusDebited {
+			return nil
+		}
+
+		preloaded, err := tx.Orders().GetByIDForUpdateWithChildren(orderID)
+		if err != nil {
+			return err
+		}
+		if preloaded == nil {
+			shouldRollback = true
+			return nil
+		}
+		lockedOrder := *preloaded
+		now := time.Now()
+		if lockedOrder.ParentID != nil ||
+			lockedOrder.Status != constants.OrderStatusPendingPayment ||
+			(lockedOrder.ExpiresAt != nil && !lockedOrder.ExpiresAt.After(now)) ||
+			lockedOrder.WalletPaidAmount.Decimal.GreaterThan(decimal.Zero) {
+			shouldRollback = true
+			return nil
+		}
+
+		totalAmount := normalizeOrderAmount(lockedOrder.TotalAmount.Decimal)
+		if debitedAmount.LessThan(totalAmount) {
+			shouldRollback = true
+			return nil
+		}
+		if planErr != nil || guardErr != nil {
+			shouldRollback = true
+			return nil
+		}
+		if err := planEvidence.CheckLocked(&lockedOrder); err != nil {
+			shouldRollback = true
+			return nil
+		}
+		if err := s.Guard.Check(tx, &lockedOrder, now); err != nil {
+			shouldRollback = true
+			return nil
+		}
+
+		if _, err := orderapp.ApplyWalletBalance(s.walletSvc, tx, &lockedOrder, true, currentOp.Amount); err != nil {
+			return err
+		}
+		if err := s.walletSvc.MarkUnifiedDebitAppliedInTx(tx.Wallets(), currentOp.OpID); err != nil {
+			return err
+		}
+
+		walletPaidAmount := normalizeOrderAmount(lockedOrder.WalletPaidAmount.Decimal)
+		createdPayment := &paymentdomain.Payment{
+			OrderID:         lockedOrder.ID,
+			ChannelID:       0,
+			ProviderType:    constants.PaymentProviderWallet,
+			ChannelType:     constants.PaymentChannelTypeBalance,
+			InteractionMode: constants.PaymentInteractionBalance,
+			Amount:          money.FromDecimal(walletPaidAmount),
+			FeeRate:         money.FromDecimal(decimal.Zero),
+			FixedFee:        money.FromDecimal(decimal.Zero),
+			FeeAmount:       money.FromDecimal(decimal.Zero),
+			FeePolicy:       constants.PaymentFeePolicyNone,
+			Currency:        lockedOrder.Currency,
+			Status:          constants.PaymentStatusSuccess,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+			PaidAt:          &now,
+		}
+		if err := tx.Payments().Create(createdPayment); err != nil {
+			return err
+		}
+		if _, err := tx.Payments().SupersedePendingByOrderID(lockedOrder.ID, createdPayment.ID, now); err != nil {
+			return err
+		}
+		if err := s.markOrderPaid(tx, &lockedOrder, now); err != nil {
+			return err
+		}
+		if s.resellerAccounting != nil {
+			if err := s.resellerAccounting.PostOrderProfit(tx.ResellerAccounting(), &lockedOrder, createdPayment); err != nil {
+				return err
+			}
+		}
+
+		applied = true
+		paidOrder = &lockedOrder
+		paidPayment = createdPayment
+		return nil
+	})
+	if txErr != nil {
+		return false, false, txErr
+	}
+	if applied && paidOrder != nil && paidPayment != nil {
+		log := paymentLogger("order_id", paidOrder.ID, "payment_id", paidPayment.ID, "op_id", op.OpID)
+		log.Infow("unified_wallet_recovery_order_paid",
+			"order_id", paidOrder.ID,
+			"payment_id", paidPayment.ID,
+			"wallet_paid_amount", paidOrder.WalletPaidAmount.String(),
+		)
+		s.enqueueOrderPaidAsync(paidOrder, paidPayment, log)
+	}
+	return applied, shouldRollback, nil
 }

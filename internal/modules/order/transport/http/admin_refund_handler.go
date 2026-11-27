@@ -18,6 +18,7 @@ import (
 var (
 	ErrOrderFetchFailed           = errors.New("order fetch failed")
 	ErrRefundOperationConflict    = errors.New("refund operation content conflict")
+	ErrRefundOperationInvalid     = errors.New("refund operation ID invalid")
 	ErrOrderRefundExpired         = errors.New("order refund expired")
 	ErrWalletInvalidAmount        = errors.New("wallet invalid amount")
 	ErrWalletRefundExceeded       = errors.New("wallet refund exceeded")
@@ -51,9 +52,10 @@ type AdminRefundItem struct {
 
 // AdminRefundToWalletInput 管理端退款到余额输入。
 type AdminRefundToWalletInput struct {
-	OrderID uint
-	Amount  money.Amount
-	Remark  string
+	OperationID string
+	OrderID     uint
+	Amount      money.Amount
+	Remark      string
 }
 
 // AdminManualRefundInput 管理端手动退款输入。
@@ -128,8 +130,9 @@ func NewAdminRefundHandler(
 
 // AdminRefundOrderToWalletRequest 管理端订单退款到余额请求
 type AdminRefundOrderToWalletRequest struct {
-	Amount string `json:"amount" binding:"required"`
-	Remark string `json:"remark"`
+	OperationID string `json:"operation_id" binding:"required,max=128"`
+	Amount      string `json:"amount" binding:"required"`
+	Remark      string `json:"remark"`
 }
 
 // AdminManualRefundOrderRequest 管理端手动退款请求（不处理钱包/支付渠道）
@@ -211,18 +214,27 @@ func (h *AdminRefundHandler) AdminRefundOrderToWallet(c *gin.Context) {
 		ginutil.RespondBindError(c, err)
 		return
 	}
+	if strings.TrimSpace(req.OperationID) == "" {
+		ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
+		return
+	}
 	amount, err := h.writes.ParseRefundAmount(req.Amount)
 	if err != nil {
 		ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", err)
 		return
 	}
 	order, txn, refundRecord, err := h.wallet.AdminRefundToWallet(AdminRefundToWalletInput{
-		OrderID: orderID,
-		Amount:  amount,
-		Remark:  req.Remark,
+		OperationID: strings.TrimSpace(req.OperationID),
+		OrderID:     orderID,
+		Amount:      amount,
+		Remark:      req.Remark,
 	})
 	if err != nil {
 		switch {
+		case errors.Is(err, ErrRefundOperationConflict):
+			response.ErrorWithHTTPStatus(c, http.StatusConflict, response.CodeBadRequest, i18n.T(i18n.ResolveLocale(c), "error.operation_conflict"))
+		case errors.Is(err, ErrRefundOperationInvalid):
+			ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 		case errors.Is(err, ErrOrderNotFound):
 			ginutil.RespondError(c, response.CodeNotFound, "error.order_not_found", nil)
 		case errors.Is(err, ErrOrderStatusInvalid):

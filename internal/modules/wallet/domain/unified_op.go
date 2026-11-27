@@ -13,6 +13,7 @@ const (
 	UnifiedOpStatusPending         = "pending"
 	UnifiedOpStatusDebited         = "debited"
 	UnifiedOpStatusApplied         = "applied"
+	UnifiedOpStatusCancelled       = "cancelled"
 	UnifiedOpStatusRollbackPending = "rollback_pending"
 	UnifiedOpStatusRolledBack      = "rolled_back"
 	UnifiedOpStatusCreditPending   = "credit_pending"

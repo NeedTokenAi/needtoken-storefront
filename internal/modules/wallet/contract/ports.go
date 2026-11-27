@@ -43,6 +43,7 @@ type Repository interface {
 	GetActiveOrderDebitUnifiedOpForUpdate(orderID uint) (*walletdomain.UnifiedOp, error)
 	UpdateUnifiedOp(op *walletdomain.UnifiedOp) error
 	ListPendingUnifiedOps(now time.Time, orphanBefore time.Time, limit int) ([]walletdomain.UnifiedOp, error)
+	ListUnresolvedUnifiedOps(limit int) ([]walletdomain.UnifiedOp, error)
 }
 
 // Transaction is the wallet-owned view of an already-open database
@@ -101,4 +102,26 @@ type UnifiedBalanceBridge interface {
 	Credit(ctx context.Context, userID uint, amount money.Amount, currency, operationID, remark string) (money.Amount, error)
 	Debit(ctx context.Context, userID uint, maxAmount money.Amount, currency string, allowPartial bool, operationID, remark string) (debited money.Amount, balanceAfter money.Amount, replayed bool, err error)
 	Redeem(ctx context.Context, userID uint, code, siteCurrency string) (*UnifiedBalanceRedeemResult, error)
+}
+
+// UnifiedOpAuthorityStatus describes the authoritative NeedToken API state of
+// a cross-system wallet operation queried by operation_id.
+type UnifiedOpAuthorityStatus struct {
+	Found   bool
+	Status  string // "not_found", "debited", "rolled_back", "credited"
+	Amount  money.Amount
+	Balance money.Amount
+}
+
+// UnifiedBalanceOpQuerier is an optional extension of UnifiedBalanceBridge that
+// queries authoritative operation state from NeedToken API before recovering
+// uncertain pending operations.
+type UnifiedBalanceOpQuerier interface {
+	QueryOp(ctx context.Context, userID uint, operationID, kind, currency string) (*UnifiedOpAuthorityStatus, error)
+}
+
+// UnifiedDebitOrderReconciler reconciles a confirmed NewAPI debit against the
+// target storefront order during background recovery.
+type UnifiedDebitOrderReconciler interface {
+	ReconcileUnifiedDebitOrder(op *walletdomain.UnifiedOp) (applied bool, shouldRollback bool, err error)
 }

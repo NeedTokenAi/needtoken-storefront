@@ -25,11 +25,12 @@ type Options struct {
 }
 
 type Service struct {
-	repository   walletcontract.Repository
-	transactions walletcontract.UnitOfWork
-	refundConfig settingscontract.OrderRefundConfigReader
-	refundEmails walletcontract.RechargeRefundEmailQueue
-	unified      walletcontract.UnifiedBalanceBridge
+	repository      walletcontract.Repository
+	transactions    walletcontract.UnitOfWork
+	refundConfig    settingscontract.OrderRefundConfigReader
+	refundEmails    walletcontract.RechargeRefundEmailQueue
+	unified         walletcontract.UnifiedBalanceBridge
+	debitReconciler walletcontract.UnifiedDebitOrderReconciler
 }
 
 var _ walletcontract.UseCase = (*Service)(nil)
@@ -50,6 +51,14 @@ func (s *Service) SetUnifiedBalanceBridge(bridge walletcontract.UnifiedBalanceBr
 		return
 	}
 	s.unified = bridge
+}
+
+// SetUnifiedDebitOrderReconciler wires order reconciliation for recovered debits.
+func (s *Service) SetUnifiedDebitOrderReconciler(reconciler walletcontract.UnifiedDebitOrderReconciler) {
+	if s == nil {
+		return
+	}
+	s.debitReconciler = reconciler
 }
 
 // HasUnifiedBalance reports whether the authoritative NeedToken API balance bridge is active.

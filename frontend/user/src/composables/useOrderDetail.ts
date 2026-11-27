@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { userOrderAPI } from '../api'
 import { debounceAsync } from '../utils/debounce'
+import { shouldPollFulfillmentOrder } from '../utils/subscriptionAuthorization'
 import { useConfirmDialog } from './useConfirmDialog'
 import { toast } from './useToast'
 import { useOrderDisplayHelpers } from './useOrderDisplayHelpers'
@@ -39,15 +40,36 @@ export function useOrderDetail() {
     }
   }
 
-  const loadOrder = async () => {
-    loading.value = true
+  let pollTimer: ReturnType<typeof setTimeout> | undefined
+  let disposed = false
+
+  const clearPollTimer = () => {
+    if (pollTimer) {
+      clearTimeout(pollTimer)
+      pollTimer = undefined
+    }
+  }
+
+  const schedulePollIfPending = () => {
+    clearPollTimer()
+    if (disposed || !order.value) return
+    if (!shouldPollFulfillmentOrder(order.value.status)) return
+    pollTimer = setTimeout(() => {
+      void loadOrder(true)
+    }, 8000)
+  }
+
+  const loadOrder = async (silent = false) => {
+    if (!silent) loading.value = true
     try {
       const response = await userOrderAPI.detail(String(route.params.order_no || '').trim())
       order.value = response.data.data
+      schedulePollIfPending()
     } catch (error) {
-      order.value = null
+      if (!silent) order.value = null
+      clearPollTimer()
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 
@@ -80,6 +102,8 @@ export function useOrderDetail() {
   })
 
   onUnmounted(() => {
+    disposed = true
+    clearPollTimer()
     debouncedLoadOrder.cancel()
   })
 

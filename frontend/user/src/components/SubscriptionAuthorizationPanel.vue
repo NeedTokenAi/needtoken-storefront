@@ -5,13 +5,15 @@ import { userOrderAPI, guestOrderAPI } from '../api/order'
 import {
   deriveSubscriptionProgressSteps,
   extractPlatformCredential,
+  shouldPollFulfillmentOrder,
   validateSubscriptionSession,
+  type FulfillmentProgress,
   type SubscriptionSession,
 } from '../utils/subscriptionAuthorization'
 
 const props = defineProps<{ order: { order_no: string; status?: string; children?: any[] }; guestAuth?: { email: string; order_password: string } }>()
 const { t } = useI18n()
-const eligibility = ref<{ eligible: boolean; guest_proof_required: boolean; plan?: string } | null>(null)
+const eligibility = ref<{ eligible: boolean; guest_proof_required: boolean; plan?: string; fulfillment_progress?: FulfillmentProgress | null } | null>(null)
 const consent = ref(false)
 const nonRefundableConsent = ref(false)
 const credential = ref('')
@@ -22,30 +24,55 @@ const cooldown = ref(false)
 const busy = ref(false)
 const submitted = ref(false)
 const failure = ref('')
-const progressSteps = computed(() => deriveSubscriptionProgressSteps(props.order.status, submitted.value))
+const fulfillmentProgress = computed(() => eligibility.value?.fulfillment_progress ?? null)
+const effectiveSubmitted = computed(() => submitted.value || fulfillmentProgress.value?.authorization_submitted === true)
+const progressSteps = computed(() => deriveSubscriptionProgressSteps(props.order.status, effectiveSubmitted.value, fulfillmentProgress.value))
+const canSubmitForm = computed(() => {
+  if (!eligibility.value?.eligible || submitted.value) return false
+  const st = fulfillmentProgress.value?.stage
+  return !st || st === 'awaiting_authorization' || st === 'credential_expired'
+})
 let session: SubscriptionSession | null = null
 let expiry: ReturnType<typeof setTimeout> | undefined
 let resend: ReturnType<typeof setTimeout> | undefined
+let pollTimer: ReturnType<typeof setTimeout> | undefined
 let request: AbortController | null = null
 let generation = 0
+const clearPollTimer = () => {
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = undefined
+  }
+}
 const reset = () => {
   generation++
   request?.abort(); request = null
   if (expiry) clearTimeout(expiry)
   if (resend) clearTimeout(resend)
+  clearPollTimer()
   session = null; credential.value = ''; code.value = ''; operationID.value = ''
   challengeSent.value = false; cooldown.value = false; consent.value = false; nonRefundableConsent.value = false; submitted.value = false; failure.value = ''; busy.value = false
 }
-watch(() => [props.order.order_no, props.guestAuth?.email, props.guestAuth?.order_password], async () => {
-  reset(); eligibility.value = null
+const fetchEligibility = async (targetGen = generation) => {
   if (props.order.children?.length) return
-  const current = generation
   try {
     const result = props.guestAuth
       ? await guestOrderAPI.subscriptionAuthorization(props.order.order_no, props.guestAuth)
       : await userOrderAPI.subscriptionAuthorization(props.order.order_no)
-    if (current === generation) eligibility.value = result.data.data
+    if (targetGen !== generation) return
+    eligibility.value = result.data.data
+    clearPollTimer()
+    if (shouldPollFulfillmentOrder(props.order.status, eligibility.value?.fulfillment_progress)) {
+      pollTimer = setTimeout(() => {
+        if (targetGen === generation) void fetchEligibility(targetGen)
+      }, 5000)
+    }
   } catch { /* No customer action is offered while eligibility is unknown. */ }
+}
+watch(() => [props.order.order_no, props.guestAuth?.email, props.guestAuth?.order_password], async () => {
+  reset(); eligibility.value = null
+  if (props.order.children?.length) return
+  await fetchEligibility(generation)
 }, { immediate: true })
 
 const ensureOperation = () => {
@@ -97,7 +124,10 @@ const submit = async () => {
     const result = await response.json()
     if (!response.ok || result.ok !== true || result.accepted !== true || result.authorization_id !== session.authorization_id ||
         result.authorization?.credential_present !== true || result.authorization?.execution_scope !== 'inspection_only') throw new Error('submission_unverified')
-    if (current === generation) { submitted.value = true; session = null; code.value = ''; if (expiry) clearTimeout(expiry) }
+    if (current === generation) {
+      submitted.value = true; session = null; code.value = ''; if (expiry) clearTimeout(expiry)
+      void fetchEligibility(current)
+    }
   } catch { if (current === generation) failure.value = t('subscriptionAuthorization.failed') }
   finally { if (current === generation) { credential.value = ''; busy.value = false; request = null } }
 }
@@ -108,9 +138,20 @@ onBeforeUnmount(reset)
   <template v-if="order.children?.length">
     <SubscriptionAuthorizationPanel v-for="child in order.children" :key="child.order_no" :order="child" :guest-auth="guestAuth" />
   </template>
-  <section v-else-if="eligibility?.eligible" class="my-4 rounded-xl border bg-card p-5" :aria-label="t('subscriptionAuthorization.title')">
-    <h2 class="text-base font-semibold">{{ t('subscriptionAuthorization.title') }}</h2>
+  <section v-else-if="eligibility?.eligible || fulfillmentProgress" class="my-4 rounded-xl border bg-card p-5" :aria-label="t('subscriptionAuthorization.title')">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-base font-semibold">{{ t('subscriptionAuthorization.title') }}</h2>
+      <span v-if="fulfillmentProgress" class="rounded-full border px-2.5 py-0.5 text-xs font-medium">
+        {{ t(`subscriptionAuthorization.stages.${fulfillmentProgress.stage}`, fulfillmentProgress.stage) }}
+      </span>
+    </div>
     <p class="mt-2 text-sm text-muted-foreground">{{ t('subscriptionAuthorization.description', { order: order.order_no }) }}</p>
+    <p v-if="fulfillmentProgress" class="mt-1 text-xs text-muted-foreground">
+      {{ t(`subscriptionAuthorization.actions.${fulfillmentProgress.next_action}`, '') }}
+      <span v-if="fulfillmentProgress.updated_at" class="ml-2 font-mono">
+        {{ t('subscriptionAuthorization.updatedAt', { time: new Date(fulfillmentProgress.updated_at).toLocaleString() }) }}
+      </span>
+    </p>
     <ol class="mt-4 grid gap-2 sm:grid-cols-4" :aria-label="t('subscriptionAuthorization.progressTitle')">
       <li
         v-for="(step, idx) in progressSteps"
@@ -121,12 +162,14 @@ onBeforeUnmount(reset)
         <span class="mr-1 font-mono">{{ idx + 1 }}.</span>{{ t(`subscriptionAuthorization.steps.${step.key}`) }}
       </li>
     </ol>
-    <div class="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+    <div v-if="canSubmitForm" class="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3.5 py-2.5 text-xs text-amber-800 dark:text-amber-300">
       {{ t('subscriptionAuthorization.nonRefundableNotice') }}
     </div>
-    <p v-if="submitted" role="status" class="mt-4 text-sm">{{ t('subscriptionAuthorization.submitted') }}</p>
-    <form v-else class="mt-4 space-y-4" @submit.prevent="submit">
-      <div v-if="eligibility.guest_proof_required" class="flex flex-wrap items-end gap-3">
+    <p v-if="fulfillmentProgress?.stage === 'payment_unknown' || fulfillmentProgress?.stage === 'manual_review' || fulfillmentProgress?.stage === 'credential_expired'" role="status" class="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3.5 py-2.5 text-sm text-amber-800 dark:text-amber-300">
+      {{ t(`subscriptionAuthorization.stageNotices.${fulfillmentProgress.stage}`) }}
+    </p>
+    <form v-if="canSubmitForm" class="mt-4 space-y-4" @submit.prevent="submit">
+      <div v-if="eligibility?.guest_proof_required" class="flex flex-wrap items-end gap-3">
         <label class="text-sm">{{ t('subscriptionAuthorization.emailCode') }}
           <input v-model="code" class="mt-1 block h-10 rounded-md border bg-background px-3" inputmode="numeric" autocomplete="one-time-code" maxlength="6" :disabled="busy" />
         </label>
@@ -144,7 +187,8 @@ onBeforeUnmount(reset)
         <span>{{ t('subscriptionAuthorization.nonRefundableConsent') }}</span>
       </label>
       <p v-if="failure" role="alert" class="text-sm text-destructive">{{ failure }}</p>
-      <button type="submit" class="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" :disabled="busy || !consent || !nonRefundableConsent || !credential || (eligibility.guest_proof_required && (!challengeSent || code.length !== 6))">{{ t(busy ? 'subscriptionAuthorization.submitting' : 'subscriptionAuthorization.submit') }}</button>
+      <button type="submit" class="h-10 rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50" :disabled="busy || !consent || !nonRefundableConsent || !credential || (eligibility?.guest_proof_required && (!challengeSent || code.length !== 6))">{{ t(busy ? 'subscriptionAuthorization.submitting' : 'subscriptionAuthorization.submit') }}</button>
     </form>
+    <p v-else-if="effectiveSubmitted && fulfillmentProgress?.stage !== 'payment_unknown' && fulfillmentProgress?.stage !== 'manual_review'" role="status" class="mt-4 text-sm">{{ t('subscriptionAuthorization.submitted') }}</p>
   </section>
 </template>

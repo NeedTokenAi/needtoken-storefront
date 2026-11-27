@@ -539,14 +539,46 @@ const submitRefundToWallet = async () => {
 
   refundSubmitting.value = true
   try {
-    await adminAPI.refundOrderToWallet(Number(selectedOrder.value.id), {
+    const orderId = Number(selectedOrder.value.id)
+    const cleanRemark = refundForm.remark.trim()
+    const storageKey = `needtoken:wallet-refund:${orderId}`
+    const fingerprint = `${amount}|${cleanRemark}`
+    let operationID = ''
+    try {
+      const savedRaw = sessionStorage.getItem(storageKey)
+      if (savedRaw) {
+        const saved = JSON.parse(savedRaw) as { op_id?: string; fingerprint?: string }
+        if (saved?.op_id && saved.fingerprint === fingerprint) {
+          operationID = saved.op_id
+        }
+      }
+    } catch {
+      operationID = ''
+    }
+    if (!operationID) {
+      operationID = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? `wallet_refund_${crypto.randomUUID()}`
+        : `wallet_refund_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+    }
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify({ op_id: operationID, fingerprint }))
+    } catch {
+      // Ignore storage quota errors cleanly.
+    }
+    await adminAPI.refundOrderToWallet(orderId, {
+      operation_id: operationID,
       amount,
-      remark: refundForm.remark.trim() || undefined,
+      remark: cleanRemark || undefined,
     })
+    try {
+      sessionStorage.removeItem(storageKey)
+    } catch {
+      // Ignore storage errors cleanly.
+    }
     refundSuccess.value = t('admin.orders.refundSuccess')
     refundForm.amount = ''
     refundForm.remark = ''
-    await fetchOrderDetail(Number(selectedOrder.value.id))
+    await fetchOrderDetail(orderId)
     emit('refresh')
   } catch (err: any) {
     refundError.value = err?.message || t('admin.orders.refundFailed')

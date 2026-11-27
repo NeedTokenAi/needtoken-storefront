@@ -112,12 +112,14 @@
           @copy-fulfillment="handleCopyFulfillment"
           @download-fulfillment="handleDownloadFulfillment"
         />
+        <OrderAfterSalesPanel :order="order" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import OrderAfterSalesPanel from '../../components/OrderAfterSalesPanel.vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

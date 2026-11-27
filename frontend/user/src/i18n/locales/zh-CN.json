@@ -21,7 +21,31 @@
     "submitted": "授权已提交，等待目标账号核验；此状态不表示订阅已到账",
     "failed": "本次未确认完成，请检查原订单和授权状态后重试",
     "invalidCredential": "请填写有效的短期 Token 或包含 accessToken 的 Session JSON",
-    "expired": "本次授权已过期，请重新验证"
+    "expired": "本次授权已过期，请重新验证",
+    "updatedAt": "更新于 {time}",
+    "stages": {
+      "awaiting_authorization": "待提交授权",
+      "queued": "已提交 · 排队办理",
+      "executing": "代充执行中",
+      "credential_expired": "授权凭据已过期",
+      "payment_unknown": "付款待确认",
+      "manual_review": "需人工核查",
+      "completed": "已完成到账",
+      "canceled": "已取消",
+      "refunded": "已退款"
+    },
+    "actions": {
+      "submit_authorization": "请填写并提交短期账号授权以启动代充",
+      "resubmit_authorization": "原短期授权已过期，请重新提交新的短期 Token",
+      "wait": "系统正在核验处理中，状态将自动刷新",
+      "contact_support": "当前需要人工介入核查，请在下方提交订单售后单或联系客服",
+      "none": ""
+    },
+    "stageNotices": {
+      "credential_expired": "先前提交的短期授权凭据已过期，请获取最新短期 Token 后重新提交。",
+      "payment_unknown": "付款提交结果尚待原渠道权威确认，请等待系统核查，勿视为已到账或重复付款。",
+      "manual_review": "订单当前处于人工核查状态，可通过下方售后入口补充信息联系客服。"
+    }
   },
   "assetVaultClaim": {
     "title": "加密保险库 · 一次性安全领号",
@@ -1702,7 +1726,13 @@
     "amountTitle": "金额明细",
     "timeTitle": "时间信息",
     "remarkLabel": "备注",
-    "paymentTitle": "支付信息"
+    "paymentTitle": "支付信息",
+    "balanceSyncingTitle": "支付已确认，正在同步账户余额",
+    "balanceSyncingDesc": "您的付款已完成，系统正在自动入账，请稍候（页面将自动刷新）。",
+    "balanceSyncErrorTitle": "支付已确认，余额同步重试中",
+    "balanceSyncErrorDesc": "统一余额服务暂未确认入账，系统将继续自动重试，请稍后刷新查看。",
+    "balanceSyncUpdatedAt": "最近同步时间",
+    "refreshBalanceSync": "刷新同步状态"
   },
   "orderDetail": {
     "title": "订单详情",
@@ -4553,6 +4583,42 @@
         "siteLogoLabel": "站点 Logo",
         "copyLogoUrl": "复制图标 URL"
       }
+    }
+  },
+  "orderAfterSales": {
+    "title": "订单售后与工单",
+    "subtitle": "提交本订单的异常排查、补发或退款争议工单，处理进度将在此同步展示",
+    "refresh": "刷新工单",
+    "openForm": "发起售后工单",
+    "cancelForm": "收起表单",
+    "categoryLabel": "问题分类",
+    "summaryLabel": "问题描述",
+    "summaryPlaceholder": "请简要描述遇到的问题（如未到账、扣款金额不符或需人工核查）",
+    "submitButton": "提交售后工单",
+    "submitting": "提交中...",
+    "createSuccess": "售后工单已提交，客服团队将尽快核实处理。",
+    "supplementSuccess": "补充说明已记录，客服将结合最新信息跟进。",
+    "submitFailed": "提交失败，请稍后重试。",
+    "loading": "正在加载售后记录...",
+    "unavailableHint": "当前暂无法连接售后工单服务，请稍后刷新重试。",
+    "empty": "当前订单暂无售后工单记录。",
+    "resolutionLabel": "客服处理结论",
+    "supplementsTitle": "补充说明记录",
+    "customerAuthor": "客户补充",
+    "supplementPlaceholder": "补充更多核查信息或交易说明...",
+    "supplementButton": "提交补充",
+    "categories": {
+      "fulfillment_failed": "未到账 / 履约异常",
+      "amount_mismatch": "金额不符",
+      "refund_dispute": "退款争议",
+      "customer_inquiry": "订单咨询",
+      "other": "其他问题"
+    },
+    "statuses": {
+      "open": "待处理",
+      "in_progress": "核查处理中",
+      "resolved": "已解决",
+      "closed": "已关闭"
     }
   }
 }

@@ -21,7 +21,31 @@
     "submitted": "授權已提交，等待目標帳號查驗；此狀態不表示訂閱已到帳",
     "failed": "本次尚未確認完成，請檢查原訂單與授權狀態後重試",
     "invalidCredential": "請填寫有效的短期 Token 或包含 accessToken 的 Session JSON",
-    "expired": "本次授權已過期，請重新驗證"
+    "expired": "本次授權已過期，請重新驗證",
+    "updatedAt": "更新於 {time}",
+    "stages": {
+      "awaiting_authorization": "待提交授權",
+      "queued": "已提交 · 排隊辦理",
+      "executing": "代充執行中",
+      "credential_expired": "授權憑證已過期",
+      "payment_unknown": "付款待確認",
+      "manual_review": "需人工查核",
+      "completed": "已完成到帳",
+      "canceled": "已取消",
+      "refunded": "已退款"
+    },
+    "actions": {
+      "submit_authorization": "請填寫並提交短期帳號授權以啟動代充",
+      "resubmit_authorization": "原短期授權已過期，請重新提交新的短期 Token",
+      "wait": "系統正在查驗處理中，狀態將自動重新整理",
+      "contact_support": "目前需要人工介入查核，請在下方提交訂單售後單或聯繫客服",
+      "none": ""
+    },
+    "stageNotices": {
+      "credential_expired": "先前提交的短期授權憑證已過期，請取得最新短期 Token 後重新提交。",
+      "payment_unknown": "付款提交結果尚待原通路權威確認，請等待系統查核，勿視為已到帳或重複付款。",
+      "manual_review": "訂單目前處於人工查核狀態，可透過下方售後入口補充資訊聯繫客服。"
+    }
   },
   "assetVaultClaim": {
     "title": "加密保險庫 · 一次性安全領號",
@@ -1754,7 +1778,13 @@
     "amountTitle": "金額明細",
     "timeTitle": "時間資訊",
     "remarkLabel": "備註",
-    "paymentTitle": "支付資訊"
+    "paymentTitle": "支付資訊",
+    "balanceSyncingTitle": "支付已確認，正在同步帳戶餘額",
+    "balanceSyncingDesc": "您的付款已完成，系統正在自動入帳，請稍候（頁面將自動重新整理）。",
+    "balanceSyncErrorTitle": "支付已確認，餘額同步重試中",
+    "balanceSyncErrorDesc": "統一餘額服務暫未確認入帳，系統將繼續自動重試，請稍後重新整理查看。",
+    "balanceSyncUpdatedAt": "最近同步時間",
+    "refreshBalanceSync": "重新整理同步狀態"
   },
   "orderDetail": {
     "title": "訂單詳情",
@@ -4553,6 +4583,42 @@
         "siteLogoLabel": "站點 Logo",
         "copyLogoUrl": "複製圖示 URL"
       }
+    }
+  },
+  "orderAfterSales": {
+    "title": "訂單售後與工單",
+    "subtitle": "提交本訂單的異常排查、補發或退款爭議工單，處理進度將在此同步顯示",
+    "refresh": "重新整理工單",
+    "openForm": "發起售後工單",
+    "cancelForm": "收起表單",
+    "categoryLabel": "問題分類",
+    "summaryLabel": "問題描述",
+    "summaryPlaceholder": "請簡要描述遇到的問題（如未到帳、扣款金額不符或需人工核查）",
+    "submitButton": "提交售後工單",
+    "submitting": "提交中...",
+    "createSuccess": "售後工單已提交，客服團隊將盡快核實處理。",
+    "supplementSuccess": "補充說明已記錄，客服將結合最新資訊跟進。",
+    "submitFailed": "提交失敗，請稍後重試。",
+    "loading": "正在載入售後記錄...",
+    "unavailableHint": "目前暫無法連線售後工單服務，請稍後重新整理重試。",
+    "empty": "目前訂單尚無售後工單記錄。",
+    "resolutionLabel": "客服處理結論",
+    "supplementsTitle": "補充說明記錄",
+    "customerAuthor": "客戶補充",
+    "supplementPlaceholder": "補充更多核查資訊或交易說明...",
+    "supplementButton": "提交補充",
+    "categories": {
+      "fulfillment_failed": "未到帳 / 履約異常",
+      "amount_mismatch": "金額不符",
+      "refund_dispute": "退款爭議",
+      "customer_inquiry": "訂單諮詢",
+      "other": "其他問題"
+    },
+    "statuses": {
+      "open": "待處理",
+      "in_progress": "核查處理中",
+      "resolved": "已解決",
+      "closed": "已關閉"
     }
   }
 }

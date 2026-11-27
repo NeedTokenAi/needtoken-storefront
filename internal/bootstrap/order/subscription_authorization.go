@@ -54,7 +54,7 @@ func (a authorizationDirectory) Current(ctx context.Context, id uint) (subscript
 func (a authorizationDirectory) snapshot(_ context.Context, order *orderdomain.Order) (subscriptionauth.OrderSnapshot, error) {
 	// Existing payment rows do not freeze an authoritative gateway environment.
 	// Today's channel configuration cannot upgrade a historical payment to live.
-	local := subscriptionauth.OrderSnapshot{ID: order.ID, OrderNo: order.OrderNo, TenantRef: "main", GuestEmail: order.GuestEmail, Leaf: len(order.Children) == 0 && len(order.Items) == 1, PaymentEnvironment: "unknown"}
+	local := subscriptionauth.OrderSnapshot{ID: order.ID, OrderNo: order.OrderNo, OrderStatus: order.Status, TenantRef: "main", GuestEmail: order.GuestEmail, Leaf: len(order.Children) == 0 && len(order.Items) == 1, PaymentEnvironment: "unknown"}
 	if order.ResellerID != nil {
 		local.TenantRef = "reseller:" + strconv.FormatUint(uint64(*order.ResellerID), 10)
 	}

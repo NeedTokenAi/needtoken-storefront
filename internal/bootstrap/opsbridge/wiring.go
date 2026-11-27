@@ -34,7 +34,9 @@ import (
 	siteconnectionapp "github.com/dujiao-next/internal/modules/siteconnection/application"
 	siteconnectioncontract "github.com/dujiao-next/internal/modules/siteconnection/contract"
 	siteconnectiondomain "github.com/dujiao-next/internal/modules/siteconnection/domain"
+	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
+	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
 	"github.com/dujiao-next/internal/shared/jsonmap"
 	"github.com/dujiao-next/internal/shared/jsonslice"
 	"github.com/dujiao-next/internal/shared/money"
@@ -103,6 +105,7 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 		svc.WithOrderRefunds(&orderRefundStoreAdapter{
 			orders:  c.OrderStore,
 			refunds: c.OrderRefundService,
+			wallets: c.WalletService,
 		})
 	}
 	if c.UserStore != nil {
@@ -131,6 +134,9 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 			radar: c.RadarSubscriptionRepo,
 			users: c.UserStore,
 		})
+	}
+	if c.WalletService != nil {
+		svc.WithUnifiedOps(&unifiedOpReaderAdapter{wallets: c.WalletService})
 	}
 	return opstransport.New(svc)
 }
@@ -1043,6 +1049,7 @@ func (u *upstreamStoreAdapter) ImportOrSync(connectionID uint, input opscontract
 type orderRefundStoreAdapter struct {
 	orders  ordercontract.Store
 	refunds *orderrefund.Service
+	wallets *walletapp.Service
 }
 
 func findExactOrderByNo(rows []orderdomain.Order, orderNo string) *orderdomain.Order {
@@ -1108,53 +1115,19 @@ func (a *orderRefundStoreAdapter) RefundOrder(orderNo string, input opscontract.
 	}
 
 	if input.Mode == "wallet" {
-		opTag := "[ops_op:" + opID + "]"
-		existingList, listErr := a.orders.ListRefundRecordsByOrderIDs([]uint{target.ID})
-		if listErr != nil {
-			return nil, listErr
+		if opID == "" {
+			return nil, opscontract.ErrInvalidInput
 		}
-		for i := range existingList {
-			rec := existingList[i]
-			matchedOp := (rec.OperationID != nil && *rec.OperationID == opID) || strings.Contains(rec.Remark, opTag)
-			if !matchedOp {
-				continue
-			}
-			if rec.Type != constants.OrderRefundTypeWallet || !rec.Amount.Decimal.Round(2).Equal(amount.Decimal.Round(2)) {
-				return nil, opscontract.ErrConflict
-			}
-			reloaded, getErr := a.orders.GetByID(target.ID)
-			if getErr != nil {
-				return nil, getErr
-			}
-			if reloaded == nil {
-				reloaded = target
-			}
-			return &opscontract.RefundOrderResult{
-				Source:           "storefront",
-				CollectedAt:      time.Now().UTC(),
-				OrderID:          reloaded.ID,
-				OrderNo:          reloaded.OrderNo,
-				Status:           reloaded.Status,
-				TotalAmount:      reloaded.TotalAmount.String(),
-				RefundedAmount:   reloaded.RefundedAmount.String(),
-				Currency:         reloaded.Currency,
-				RefundRecordID:   rec.ID,
-				RefundType:       rec.Type,
-				SettlementStatus: "settled",
-				OperationID:      opID,
-			}, nil
-		}
-
-		walletRemark := remark + " " + opTag
 		updatedOrder, _, record, wErr := a.refunds.AdminRefundToWallet(orderrefund.AdminRefundToWalletInput{
-			OrderID: target.ID,
-			Amount:  amount,
-			Remark:  walletRemark,
+			OperationID: opID,
+			OrderID:     target.ID,
+			Amount:      amount,
+			Remark:      remark,
 		})
 		if wErr != nil {
 			return nil, mapRefundErr(wErr)
 		}
-		return &opscontract.RefundOrderResult{
+		res := &opscontract.RefundOrderResult{
 			Source:           "storefront",
 			CollectedAt:      time.Now().UTC(),
 			OrderID:          updatedOrder.ID,
@@ -1167,7 +1140,48 @@ func (a *orderRefundStoreAdapter) RefundOrder(orderNo string, input opscontract.
 			RefundType:       record.Type,
 			SettlementStatus: "settled",
 			OperationID:      opID,
-		}, nil
+		}
+		if a.wallets != nil && a.wallets.HasUnifiedBalance() {
+			unifiedOpID := fmt.Sprintf("order:%d:refund:%d", target.ID, record.ID)
+			op, opErr := a.wallets.GetUnifiedOpByOpID(unifiedOpID)
+			switch {
+			case opErr != nil:
+				res.SettlementStatus = "balance_sync_failed"
+				res.BalanceSyncStatus = "sync_error"
+				res.BalanceSyncOpID = unifiedOpID
+				res.BalanceSyncError = opErr.Error()
+			case op != nil && op.Status == walletdomain.UnifiedOpStatusCredited:
+				updatedAt := op.UpdatedAt
+				res.SettlementStatus = "settled"
+				res.BalanceSyncStatus = "credited"
+				res.BalanceSyncOpID = op.OpID
+				res.BalanceSyncUpdatedAt = &updatedAt
+			case op != nil && op.Status == walletdomain.UnifiedOpStatusCreditPending:
+				updatedAt := op.UpdatedAt
+				res.BalanceSyncOpID = op.OpID
+				res.BalanceSyncError = op.LastError
+				res.BalanceSyncUpdatedAt = &updatedAt
+				if strings.TrimSpace(op.LastError) != "" {
+					res.SettlementStatus = "balance_sync_failed"
+					res.BalanceSyncStatus = "sync_error"
+				} else {
+					res.SettlementStatus = "balance_syncing"
+					res.BalanceSyncStatus = "syncing"
+				}
+			case op != nil:
+				updatedAt := op.UpdatedAt
+				res.SettlementStatus = "balance_syncing"
+				res.BalanceSyncStatus = op.Status
+				res.BalanceSyncOpID = op.OpID
+				res.BalanceSyncError = op.LastError
+				res.BalanceSyncUpdatedAt = &updatedAt
+			default:
+				res.SettlementStatus = "settled"
+				res.BalanceSyncStatus = "credited"
+				res.BalanceSyncOpID = unifiedOpID
+			}
+		}
+		return res, nil
 	}
 
 	updatedOrder, record, mErr := a.refunds.AdminManualRefund(orderrefund.AdminManualRefundInput{
@@ -1261,4 +1275,33 @@ func (a *universalGiftCardClaimAdapter) LookupUniversalGiftCardClaim(claimID str
 		CreditDisplay: fmt.Sprintf("%s %s", txn.Amount.Decimal.StringFixed(2), strings.TrimSpace(txn.Currency)),
 		CreatedAt:     &createdAt,
 	}, nil
+}
+
+type unifiedOpReaderAdapter struct {
+	wallets *walletapp.Service
+}
+
+func (a *unifiedOpReaderAdapter) ListPendingUnifiedOpsForOps(limit int) ([]opscontract.PendingUnifiedOp, error) {
+	if a == nil || a.wallets == nil || !a.wallets.HasUnifiedBalance() {
+		return nil, nil
+	}
+	rows, err := a.wallets.ListUnresolvedUnifiedOps(limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]opscontract.PendingUnifiedOp, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, opscontract.PendingUnifiedOp{
+			OpID:      row.OpID,
+			UserID:    row.UserID,
+			Kind:      row.Direction,
+			Status:    row.Status,
+			Amount:    row.Amount.String(),
+			Currency:  row.Currency,
+			Attempts:  row.Attempts,
+			LastError: strings.TrimSpace(row.LastError),
+			UpdatedAt: row.UpdatedAt.UTC(),
+		})
+	}
+	return out, nil
 }

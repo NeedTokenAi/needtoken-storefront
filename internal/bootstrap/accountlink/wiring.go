@@ -577,6 +577,42 @@ func (a *UnifiedBalanceAdapter) Debit(ctx context.Context, userID uint, maxAmoun
 	return debited, balanceAfter, resp.Replayed, nil
 }
 
+func (a *UnifiedBalanceAdapter) QueryOp(ctx context.Context, userID uint, operationID, kind, currency string) (*walletcontract.UnifiedOpAuthorityStatus, error) {
+	if !a.Enabled() || userID == 0 || strings.TrimSpace(operationID) == "" {
+		return nil, walletcontract.ErrTransactionRequired
+	}
+	curr := strings.TrimSpace(currency)
+	if curr == "" {
+		curr = a.SiteCurrency()
+	}
+	q := url.Values{}
+	q.Set("operation_id", strings.TrimSpace(operationID))
+	if strings.TrimSpace(kind) != "" {
+		q.Set("kind", strings.TrimSpace(kind))
+	}
+	raw, err := a.svc.GatewayConsole(ctx, userID, "GET", "/wallet/ops", q, nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		OperationID  string `json:"operation_id"`
+		Kind         string `json:"kind"`
+		Found        bool   `json:"found"`
+		Status       string `json:"status"`
+		AppliedQuota int64  `json:"applied_quota"`
+		BalanceQuota int64  `json:"balance_quota"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, err
+	}
+	return &walletcontract.UnifiedOpAuthorityStatus{
+		Found:   resp.Found,
+		Status:  strings.TrimSpace(resp.Status),
+		Amount:  a.quotaToCurrencyAmount(resp.AppliedQuota, curr),
+		Balance: a.quotaToCurrencyAmount(resp.BalanceQuota, curr),
+	}, nil
+}
+
 func (a *UnifiedBalanceAdapter) Redeem(ctx context.Context, userID uint, code, siteCurrency string) (*walletcontract.UnifiedBalanceRedeemResult, error) {
 	if !a.Enabled() || userID == 0 {
 		return nil, accountlink.ErrUnavailable
@@ -643,5 +679,6 @@ func (a *UnifiedBalanceAdapter) SyncLocalCredit(userID uint, amount money.Amount
 
 var (
 	_ walletcontract.UnifiedBalanceBridge      = (*UnifiedBalanceAdapter)(nil)
+	_ walletcontract.UnifiedBalanceOpQuerier   = (*UnifiedBalanceAdapter)(nil)
 	_ giftcardcontract.UnifiedGiftCardRedeemer = (*UnifiedBalanceAdapter)(nil)
 )
