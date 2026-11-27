@@ -92,7 +92,7 @@ const submitPassword = async () => {
   }
   if (loginCaptchaEnabled.value && captchaProvider.value === 'turnstile') {
     const resolved = getCaptchaPayload()
-    if (!resolved?.turnstile_token && !(resolved?.captcha_id && resolved?.captcha_code)) {
+    if (!resolved?.turnstile_token) {
       error.value = t('admin.login.captchaRequired')
       return
     }

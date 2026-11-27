@@ -35,7 +35,6 @@ const clearTurnstileScriptCache = () => {
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { CaptchaPayload } from '../../api'
-import ImageCaptcha from './ImageCaptcha.vue'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -46,24 +45,22 @@ const props = withDefaults(defineProps<{
 }>(), {
   modelValue: '',
   disabled: false,
-  scriptTimeoutMs: 4500,
-  slowHintMs: 6500,
+  scriptTimeoutMs: 12000,
+  slowHintMs: 5000,
 })
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void
-  (event: 'fallback-change', payload: CaptchaPayload): void
 }>()
 
 const { t } = useI18n()
 
 const containerRef = ref<HTMLElement | null>(null)
-const fallbackImageRef = ref<InstanceType<typeof ImageCaptcha> | null>(null)
 const widgetID = ref<string>('')
 const currentToken = ref<string>(props.modelValue || '')
-const mode = ref<'loading' | 'turnstile' | 'fallback'>('loading')
-const showSlowSwitch = ref(false)
-const fallbackPayload = ref<CaptchaPayload>({})
+const mode = ref<'loading' | 'ready' | 'error'>('loading')
+const errorType = ref<'load' | 'expired' | ''>('')
+const showSlowReload = ref(false)
 
 let slowTimer: ReturnType<typeof setTimeout> | null = null
 let renderEpoch = 0
@@ -80,9 +77,7 @@ const syncToken = (token: string) => {
   emit('update:modelValue', token)
 }
 
-const switchToFallback = () => {
-  clearSlowTimer()
-  showSlowSwitch.value = false
+const removeWidget = () => {
   if (window.turnstile && widgetID.value) {
     try {
       window.turnstile.remove(widgetID.value)
@@ -91,8 +86,25 @@ const switchToFallback = () => {
     }
     widgetID.value = ''
   }
+}
+
+const scheduleSlowHint = (epoch: number) => {
+  clearSlowTimer()
+  showSlowReload.value = false
+  slowTimer = setTimeout(() => {
+    if (epoch === renderEpoch && !currentToken.value && mode.value !== 'error') {
+      showSlowReload.value = true
+    }
+  }, props.slowHintMs)
+}
+
+const enterErrorMode = (type: 'load' | 'expired') => {
+  clearSlowTimer()
+  showSlowReload.value = false
+  removeWidget()
   syncToken('')
-  mode.value = 'fallback'
+  errorType.value = type
+  mode.value = 'error'
 }
 
 const loadScript = async (timeoutMs: number) => {
@@ -139,40 +151,34 @@ const loadScript = async (timeoutMs: number) => {
 const renderWidget = async () => {
   const epoch = ++renderEpoch
   clearSlowTimer()
-  showSlowSwitch.value = false
-  fallbackPayload.value = {}
-  emit('fallback-change', {})
+  showSlowReload.value = false
+  errorType.value = ''
+  syncToken('')
 
   if (!props.siteKey) {
-    syncToken('')
-    mode.value = 'turnstile'
+    mode.value = 'error'
+    errorType.value = 'load'
     return
   }
 
   mode.value = 'loading'
+  scheduleSlowHint(epoch)
   try {
     await loadScript(props.scriptTimeoutMs)
   } catch {
     if (epoch !== renderEpoch) return
-    switchToFallback()
+    enterErrorMode('load')
     return
   }
 
   if (epoch !== renderEpoch) return
   if (!window.turnstile || !containerRef.value) {
-    switchToFallback()
+    enterErrorMode('load')
     return
   }
 
-  mode.value = 'turnstile'
-  if (widgetID.value) {
-    try {
-      window.turnstile.remove(widgetID.value)
-    } catch {
-      // ignore
-    }
-    widgetID.value = ''
-  }
+  mode.value = 'ready'
+  removeWidget()
 
   containerRef.value.innerHTML = ''
   const theme: 'light' | 'dark' = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
@@ -183,70 +189,63 @@ const renderWidget = async () => {
       size: 'flexible',
       callback: (token: string) => {
         clearSlowTimer()
-        showSlowSwitch.value = false
+        showSlowReload.value = false
+        errorType.value = ''
         syncToken(token || '')
       },
       'expired-callback': () => {
         syncToken('')
+        if (window.turnstile && widgetID.value) {
+          try {
+            window.turnstile.reset(widgetID.value)
+            scheduleSlowHint(epoch)
+            return
+          } catch {
+            // fall through to explicit reload state
+          }
+        }
+        enterErrorMode('expired')
       },
       'error-callback': () => {
-        switchToFallback()
+        if (epoch !== renderEpoch) return
+        enterErrorMode('load')
       },
     })
   } catch {
-    switchToFallback()
+    enterErrorMode('load')
     return
   }
-
-  slowTimer = setTimeout(() => {
-    if (epoch === renderEpoch && mode.value === 'turnstile' && !currentToken.value) {
-      showSlowSwitch.value = true
-    }
-  }, props.slowHintMs)
 }
 
 const retryTurnstile = () => {
+  clearSlowTimer()
+  removeWidget()
   clearTurnstileScriptCache()
   void renderWidget()
 }
 
 const reset = () => {
-  if (mode.value === 'fallback') {
-    fallbackPayload.value = {}
-    emit('fallback-change', {})
-    fallbackImageRef.value?.refresh()
+  if (mode.value === 'error') {
+    retryTurnstile()
     return
   }
   if (window.turnstile && widgetID.value) {
     try {
       window.turnstile.reset(widgetID.value)
+      scheduleSlowHint(renderEpoch)
     } catch {
-      // ignore
+      enterErrorMode('load')
+      return
     }
   }
   syncToken('')
 }
 
-const getPayload = (): CaptchaPayload => {
-  if (mode.value === 'fallback') {
-    return {
-      captcha_id: fallbackPayload.value.captcha_id || '',
-      captcha_code: fallbackPayload.value.captcha_code || '',
-    }
-  }
-  return {
-    turnstile_token: currentToken.value || '',
-  }
-}
+const getPayload = (): CaptchaPayload => ({
+  turnstile_token: currentToken.value || '',
+})
 
-const hasPayload = (): boolean => {
-  const payload = getPayload()
-  return Boolean(payload.turnstile_token || (payload.captcha_id && payload.captcha_code))
-}
-
-watch(fallbackPayload, (val) => {
-  emit('fallback-change', val)
-}, { deep: true })
+const hasPayload = (): boolean => Boolean(currentToken.value)
 
 watch(
   () => props.siteKey,
@@ -262,58 +261,58 @@ onMounted(() => {
 onBeforeUnmount(() => {
   renderEpoch++
   clearSlowTimer()
-  if (window.turnstile && widgetID.value) {
-    try {
-      window.turnstile.remove(widgetID.value)
-    } catch {
-      // ignore
-    }
-  }
+  removeWidget()
 })
 
 defineExpose({
   reset,
   getPayload,
   hasPayload,
-  switchToFallback,
   retryTurnstile,
 })
 </script>
 
 <template>
-  <div class="w-full space-y-2">
-    <template v-if="mode === 'fallback'">
-      <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>{{ t('auth.common.turnstileFallbackNotice') }}</span>
+  <div class="w-full space-y-1.5">
+    <div
+      v-if="mode === 'error'"
+      class="flex min-h-[65px] items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground"
+      role="alert"
+    >
+      <span>{{ t(errorType === 'expired' ? 'auth.common.turnstileExpired' : 'auth.common.turnstileLoadFailed') }}</span>
+      <button
+        type="button"
+        class="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="disabled"
+        @click="retryTurnstile"
+      >
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+        </svg>
+        <span>{{ t('auth.common.turnstileRetry') }}</span>
+      </button>
+    </div>
+    <template v-else>
+      <div class="relative w-full min-h-[65px]">
+        <div
+          v-if="mode === 'loading'"
+          class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border border-border/70 bg-muted/30 px-3 text-xs text-muted-foreground"
+          role="status"
+        >
+          {{ t('auth.common.turnstileLoading') }}
+        </div>
+        <div ref="containerRef" class="turnstile-widget-host w-full min-h-[65px]"></div>
+      </div>
+      <div v-if="showSlowReload && !currentToken" class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{{ t('auth.common.turnstileSlowHint') }}</span>
         <button
           type="button"
-          class="shrink-0 underline underline-offset-2 hover:text-foreground"
+          class="inline-flex shrink-0 items-center gap-1 font-medium text-foreground underline underline-offset-2 hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="disabled"
           @click="retryTurnstile"
         >
           {{ t('auth.common.turnstileRetry') }}
-        </button>
-      </div>
-      <ImageCaptcha
-        ref="fallbackImageRef"
-        v-model="fallbackPayload"
-        :disabled="disabled"
-      />
-    </template>
-    <template v-else>
-      <div v-if="mode === 'loading'" class="text-xs text-muted-foreground">
-        {{ t('auth.common.turnstileLoading') }}
-      </div>
-      <div ref="containerRef" class="turnstile-widget-host w-full min-h-[65px]"></div>
-      <div v-if="showSlowSwitch" class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>{{ t('auth.common.turnstileSlowHint') }}</span>
-        <button
-          type="button"
-          class="shrink-0 underline underline-offset-2 hover:text-foreground"
-          :disabled="disabled"
-          @click="switchToFallback"
-        >
-          {{ t('auth.common.turnstileUseImage') }}
         </button>
       </div>
     </template>

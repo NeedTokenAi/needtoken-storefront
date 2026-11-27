@@ -2,8 +2,6 @@
   <div class="email-entry theme-auth-page">
     <div class="entry-shell">
       <section class="entry-card" aria-labelledby="entry-title">
-        <router-link to="/" class="entry-brand"><BrandMark v-if="!isReseller" /><span>{{ brand }}</span></router-link>
-
         <div
           v-if="showModeTabs"
           class="mode-tabs"
@@ -32,7 +30,7 @@
         </header>
 
         <div v-if="stage === 'register_complete'" class="email-chip">
-          <Mail :size="16" />
+          <Mail :size="16" aria-hidden="true" />
           <span>{{ email }}</span>
           <button type="button" @click="backToRegisterEmail">{{ t('needtoken.emailAuth.change') }}</button>
         </div>
@@ -47,6 +45,59 @@
           >{{ t('needtoken.emailAuth.emailExistsSwitch') }}</button>
         </div>
         <p v-if="login.info" role="status" class="entry-info">{{ login.info }}</p>
+
+        <!-- 快捷第三方登录区（置于邮箱表单上方，使用 v-show 避免切换登录/注册 Tab 时重建官方组件） -->
+        <div v-show="showSocialSection" class="social-area">
+          <div
+            v-if="login.showThirdPartyLogin"
+            class="social-actions"
+            :class="isDualSocialRow ? 'social-actions--dual' : 'social-actions--stack'"
+          >
+            <div v-if="login.showTelegramWidget" class="telegram-widget-slot">
+              <div ref="telegramWidgetRef" class="telegram-widget"></div>
+            </div>
+            <button
+              v-else-if="login.showTelegramOidc"
+              type="button"
+              class="social-tg-btn"
+              :disabled="login.userAuthStore.loading"
+              @click="login.startTelegramOidc"
+            >
+              <svg class="social-tg-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm4.636 6.824-1.584 7.463c-.12.53-.432.662-.875.412l-2.418-1.782-1.167 1.123c-.129.13-.237.237-.486.237l.174-2.463 4.483-4.05c.195-.174-.042-.27-.302-.096l-5.541 3.49-2.386-.747c-.519-.162-.528-.519.108-.768l9.323-3.593c.432-.162.81.096.675.774Z" />
+              </svg>
+              <span>{{ t('needtoken.emailAuth.telegramShort') }}</span>
+            </button>
+            <p v-else-if="login.showMiniAppLoginHint" class="field-hint social-miniapp-hint">
+              {{ t(login.attemptingMiniAppLogin ? 'auth.login.telegramMiniAppLoggingIn' : 'auth.login.telegramMiniAppHint') }}
+            </p>
+
+            <div v-if="login.showGoogleLogin" class="social-google">
+              <GoogleIdentityButton
+                :client-id="login.googleClientID"
+                :locale="login.googleButtonLocale"
+                :ux-mode="login.googleIdentityUXMode"
+                :login-uri="login.googleRedirectLoginURI"
+                :prepare-redirect="login.prepareGoogleRedirectLogin"
+                :disabled="login.userAuthStore.loading"
+                :loading-label="t('auth.login.googleLoading')"
+                @credential="login.handleGoogleCredential"
+                @error="login.handleGoogleScriptError"
+              />
+            </div>
+          </div>
+
+          <button
+            v-if="login.showTelegramMiniAppEntry"
+            type="button"
+            class="social-miniapp-link"
+            @click="login.openTelegramMiniAppEntry"
+          >{{ t('auth.login.telegramMiniAppEntryAction') }}</button>
+
+          <div v-if="login.showThirdPartyLogin" class="social-divider">
+            <span>{{ t('needtoken.emailAuth.orWithEmail') }}</span>
+          </div>
+        </div>
 
         <!-- 1. 密码登录（默认主入口：受信任环境一次直接登录；环境变更时自动触发邮箱验证） -->
         <form v-if="stage === 'login'" @submit.prevent="submitLogin">
@@ -84,7 +135,7 @@
                 :aria-pressed="login.showPassword"
                 :aria-label="t(login.showPassword ? 'auth.common.hidePassword' : 'auth.common.showPassword')"
                 @click="login.showPassword = !login.showPassword"
-              ><EyeOff v-if="login.showPassword" :size="18" /><Eye v-else :size="18" /></button>
+              ><EyeOff v-if="login.showPassword" :size="17" aria-hidden="true" /><Eye v-else :size="17" aria-hidden="true" /></button>
             </div>
           </div>
 
@@ -111,7 +162,7 @@
           </div>
 
           <button class="entry-primary" type="submit" :disabled="login.userAuthStore.loading">
-            {{ login.userAuthStore.loading ? t('auth.login.submitting') : t('auth.login.submit') }}<ArrowRight :size="18" />
+            {{ login.userAuthStore.loading ? t('auth.login.submitting') : t('auth.login.submit') }}<ArrowRight :size="17" aria-hidden="true" />
           </button>
         </form>
 
@@ -138,7 +189,7 @@
           </div>
           <p class="field-hint">{{ t('auth.login.emailVerify.deviceTrustHint') }}</p>
           <button class="entry-primary" type="submit" :disabled="login.userAuthStore.loading">
-            {{ login.userAuthStore.loading ? t('auth.login.emailVerify.verifying') : t('auth.login.emailVerify.submit') }}<ArrowRight :size="18" />
+            {{ login.userAuthStore.loading ? t('auth.login.emailVerify.verifying') : t('auth.login.emailVerify.submit') }}<ArrowRight :size="17" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -226,7 +277,7 @@
             <TurnstileCaptcha v-else-if="provider === 'turnstile'" ref="sendTurnstileRef" v-model="sendTurnstileToken" :site-key="sendSiteKey" :disabled="busy" />
           </div>
           <button class="entry-primary" type="submit" :disabled="busy || countdown > 0 || !registration.registrationEnabled">
-            {{ busy ? t('needtoken.emailAuth.sending') : countdown > 0 ? t('auth.common.countdown', { seconds: countdown }) : t('needtoken.emailAuth.sendRegisterCode') }}<ArrowRight :size="18" />
+            {{ busy ? t('needtoken.emailAuth.sending') : countdown > 0 ? t('auth.common.countdown', { seconds: countdown }) : t('needtoken.emailAuth.sendRegisterCode') }}<ArrowRight :size="17" aria-hidden="true" />
           </button>
         </form>
 
@@ -270,7 +321,7 @@
                 :aria-pressed="registration.showPassword"
                 :aria-label="t(registration.showPassword ? 'auth.common.hidePassword' : 'auth.common.showPassword')"
                 @click="registration.showPassword = !registration.showPassword"
-              ><EyeOff v-if="registration.showPassword" :size="18" /><Eye v-else :size="18" /></button>
+              ><EyeOff v-if="registration.showPassword" :size="17" aria-hidden="true" /><Eye v-else :size="17" aria-hidden="true" /></button>
             </div>
             <p v-if="registration.formValidation.getError('password')" class="field-error">{{ registration.formValidation.getError('password') }}</p>
             <p v-else-if="registration.password" class="field-hint">{{ t(`formValidation.passwordStrength.${registration.passwordStrength}`) }}</p>
@@ -284,7 +335,7 @@
           <label class="check-label setup-choice">
             <input v-model="setupTwoFactor" type="checkbox" />
             <span>{{ t('needtoken.emailAuth.setupTwoFactor') }}<small>{{ t('needtoken.emailAuth.setupTwoFactorHint') }}</small></span>
-            <ShieldCheck :size="20" />
+            <ShieldCheck :size="19" aria-hidden="true" />
           </label>
           <label class="check-label agreement">
             <input v-model="registration.agreed" type="checkbox" required />
@@ -292,7 +343,7 @@
           </label>
 
           <button class="entry-primary" type="submit" :disabled="registration.userAuthStore.loading || !registration.agreed || !registration.registrationEnabled">
-            {{ registration.userAuthStore.loading ? t('auth.register.creating') : t('needtoken.emailAuth.submitRegister') }}<ArrowRight :size="18" />
+            {{ registration.userAuthStore.loading ? t('auth.register.creating') : t('needtoken.emailAuth.submitRegister') }}<ArrowRight :size="17" aria-hidden="true" />
           </button>
 
           <div v-if="sendCaptchaEnabled && countdown === 0" class="captcha-field">
@@ -340,7 +391,7 @@
                 :aria-pressed="registration.showPassword"
                 :aria-label="t(registration.showPassword ? 'auth.common.hidePassword' : 'auth.common.showPassword')"
                 @click="registration.showPassword = !registration.showPassword"
-              ><EyeOff v-if="registration.showPassword" :size="18" /><Eye v-else :size="18" /></button>
+              ><EyeOff v-if="registration.showPassword" :size="17" aria-hidden="true" /><Eye v-else :size="17" aria-hidden="true" /></button>
             </div>
           </div>
           <div v-if="registration.inviteOnlyEnabled" class="field-group">
@@ -354,40 +405,18 @@
           <label class="check-label setup-choice">
             <input v-model="setupTwoFactor" type="checkbox" />
             <span>{{ t('needtoken.emailAuth.setupTwoFactor') }}<small>{{ t('needtoken.emailAuth.setupTwoFactorHint') }}</small></span>
-            <ShieldCheck :size="20" />
+            <ShieldCheck :size="19" aria-hidden="true" />
           </label>
           <label class="check-label agreement">
             <input v-model="registration.agreed" type="checkbox" required />
             <span>{{ t('auth.register.agreementPrefix') }} <router-link to="/privacy" target="_blank" rel="noopener noreferrer">{{ t('footer.privacy') }}</router-link> {{ t('auth.register.agreementAnd') }} <router-link to="/terms" target="_blank" rel="noopener noreferrer">{{ t('footer.terms') }}</router-link></span>
           </label>
           <button class="entry-primary" type="submit" :disabled="registration.userAuthStore.loading || !registration.agreed || !registration.registrationEnabled">
-            {{ registration.userAuthStore.loading ? t('auth.register.creating') : t('needtoken.emailAuth.submitRegister') }}<ArrowRight :size="18" />
+            {{ registration.userAuthStore.loading ? t('auth.register.creating') : t('needtoken.emailAuth.submitRegister') }}<ArrowRight :size="17" aria-hidden="true" />
           </button>
         </form>
 
-        <div v-show="stage === 'login' || stage === 'register_email' || stage === 'register_direct'" class="social-area">
-          <template v-if="login.showThirdPartyLogin">
-            <div class="social-divider"><span>{{ t('auth.login.socialOr') }}</span></div>
-            <div v-if="login.showTelegramWidget"><div ref="telegramWidgetRef" class="telegram-widget"></div><p class="field-hint">{{ t('auth.login.telegramHint') }}</p></div>
-            <button v-else-if="login.showTelegramOidc" type="button" class="entry-secondary" @click="login.startTelegramOidc">{{ t('auth.login.telegramOidcButton') }}</button>
-            <p v-else-if="login.showMiniAppLoginHint" class="field-hint">{{ t(login.attemptingMiniAppLogin ? 'auth.login.telegramMiniAppLoggingIn' : 'auth.login.telegramMiniAppHint') }}</p>
-            <GoogleIdentityButton
-              v-if="login.showGoogleLogin"
-              :client-id="login.googleClientID"
-              :locale="login.googleButtonLocale"
-              :ux-mode="login.googleIdentityUXMode"
-              :login-uri="login.googleRedirectLoginURI"
-              :prepare-redirect="login.prepareGoogleRedirectLogin"
-              :disabled="login.userAuthStore.loading"
-              :loading-label="t('auth.login.googleLoading')"
-              @credential="login.handleGoogleCredential"
-              @error="login.handleGoogleScriptError"
-            />
-          </template>
-          <button v-if="login.showTelegramMiniAppEntry" type="button" class="entry-secondary" @click="login.openTelegramMiniAppEntry">{{ t('auth.login.telegramMiniAppEntryAction') }}</button>
-        </div>
-
-        <p class="entry-security"><LockKeyhole :size="13" />{{ t('needtoken.emailAuth.deviceSecurityHint') }}</p>
+        <p class="entry-security"><LockKeyhole :size="12" aria-hidden="true" />{{ t('needtoken.emailAuth.deviceSecurityHint') }}</p>
       </section>
     </div>
     <InviteCodeDialog @success="login.continueAfterLogin" />
@@ -402,7 +431,6 @@ import ImageCaptcha from '../../../components/captcha/ImageCaptcha.vue'
 import TurnstileCaptcha from '../../../components/captcha/TurnstileCaptcha.vue'
 import GoogleIdentityButton from '../../../components/auth/GoogleIdentityButton.vue'
 import InviteCodeDialog from '../../../components/InviteCodeDialog.vue'
-import BrandMark from './BrandMark.vue'
 import { useEmailEntry, type AuthEntryMode } from '../composables/useEmailEntry'
 
 const props = withDefaults(defineProps<{ initialMode?: AuthEntryMode }>(), {
@@ -411,17 +439,20 @@ const props = withDefaults(defineProps<{ initialMode?: AuthEntryMode }>(), {
 
 const { t } = useI18n()
 const {
-  app, mode, stage, email, message, emailExistsHint, busy, countdown, setupTwoFactor, login, registration,
+  mode, stage, email, message, emailExistsHint, busy, countdown, setupTwoFactor, login, registration,
   titleKey, subtitleText, sendCaptcha, sendTurnstileToken, sendImageRef, sendTurnstileRef, provider,
   sendCaptchaEnabled, sendSiteKey, switchMode, backToRegisterEmail, submitLogin, sendRegisterCode,
   submitRegister, cancelSecondaryStep, captchaStale, telegramWidgetRef, loginImageRef, loginTurnstileRef,
 } = useEmailEntry(props.initialMode)
 
-const isReseller = computed(() => app.isResellerTenant)
-const brand = computed(() => isReseller.value ? login.brandSiteName : 'NeedToken.AI')
 const showModeTabs = computed(() =>
   registration.registrationEnabled && stage.value !== 'totp' && stage.value !== 'login_email_verify',
 )
+const showSocialSection = computed(() =>
+  (stage.value === 'login' || stage.value === 'register_email' || stage.value === 'register_direct')
+  && (login.showThirdPartyLogin || login.showTelegramMiniAppEntry),
+)
+const isDualSocialRow = computed(() => login.showGoogleLogin && login.showTelegramOidc)
 
 watch(stage, async () => {
   await nextTick()
@@ -436,71 +467,84 @@ void loginTurnstileRef
 </script>
 
 <style scoped>
-.email-entry{min-height:calc(100dvh - 52px);display:grid;place-items:center;padding:14px 16px 20px;background:transparent;color:var(--ui-text-primary)}
-.entry-shell{width:100%;max-width:420px}
-.entry-card{padding:22px 26px;border:1px solid var(--nt-card-border);border-radius:20px;background:var(--ui-bg-elevated);box-shadow:var(--nt-popover-shadow)}
-.entry-brand{display:flex;align-items:center;gap:8px;width:fit-content;color:var(--ui-text-primary);font-size:16px;font-weight:750;line-height:1.2}
-.entry-brand :is(img,svg){width:26px;height:26px;flex-shrink:0}
-.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;margin-top:14px;border-radius:11px;background:var(--ui-bg-soft);border:1px solid var(--ui-border)}
-.mode-tabs button{min-height:34px;border-radius:8px;font-size:13px;font-weight:650;color:var(--ui-text-secondary);transition:background-color .16s,color .16s,box-shadow .16s}
+.email-entry{min-height:calc(100dvh - 52px);display:grid;place-items:center;padding:10px 16px 14px;background:transparent;color:var(--ui-text-primary)}
+.entry-shell{width:100%;max-width:456px}
+.entry-card{padding:18px 24px;border:1px solid var(--nt-card-border);border-radius:18px;background:var(--ui-bg-elevated);box-shadow:var(--nt-popover-shadow)}
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border-radius:10px;background:var(--ui-bg-soft);border:1px solid var(--ui-border)}
+.mode-tabs button{min-height:32px;border-radius:7px;font-size:13px;font-weight:650;color:var(--ui-text-secondary);transition:background-color .16s,color .16s,box-shadow .16s}
 .mode-tabs button:hover{color:var(--ui-text-primary)}
 .mode-tabs button.active{background:var(--ui-bg-elevated);color:var(--ui-text-primary);box-shadow:0 2px 8px rgba(0,0,0,.18)}
-header{margin:14px 0}
-h1{font-size:21px;font-weight:730;line-height:1.3;letter-spacing:-.03em}
-header p{margin-top:4px;color:var(--ui-text-secondary);font-size:12.5px;line-height:1.5}
-.entry-card form{display:flex;flex-direction:column;gap:11px}
-.field-group{display:flex;flex-direction:column;gap:5px}
-.field-group>label{font-size:12.5px;color:var(--ui-text-secondary);font-weight:600;line-height:1.35}
-.entry-card input:not([type=checkbox]){box-sizing:border-box;width:100%;height:42px;border:1px solid var(--ui-border-strong);border-radius:10px;padding:0 12px;color:var(--ui-text-primary);background:var(--nt-surface-input);outline:none;font-size:14px}
+header{margin:10px 0 12px}
+h1{font-size:19px;font-weight:730;line-height:1.25;letter-spacing:-.03em;text-wrap:balance}
+header p{margin-top:3px;color:var(--ui-text-secondary);font-size:12.5px;line-height:1.4;text-wrap:pretty}
+.social-area{margin-bottom:2px}
+.social-actions--dual{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}
+.social-actions--stack{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.social-tg-btn{width:100%;min-height:40px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;border:1px solid var(--ui-border-strong);background:var(--ui-bg-soft);color:var(--ui-text-primary);font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;transition:transform .16s,border-color .16s,background-color .16s}
+.social-tg-btn:hover:not(:disabled){border-color:var(--nt-accent-border-strong);background:var(--nt-surface-hover);transform:translateY(-1px)}
+.social-tg-icon{width:16px;height:16px;color:#229ed9;flex-shrink:0}
+.telegram-widget-slot{display:flex;justify-content:center;align-items:center;min-height:40px}
+.telegram-widget{display:flex;justify-content:center;align-items:center}
+.social-google{min-width:0;width:100%;display:flex;align-items:center}
+.social-google :deep(> div),
+.social-google :deep(> div > div){min-height:40px}
+.social-miniapp-hint{text-align:center}
+.social-miniapp-link{display:block;margin:8px auto 0;font-size:12px;font-weight:500;color:var(--ui-text-muted);text-decoration:underline;text-underline-offset:3px;padding:2px 6px}
+.social-miniapp-link:hover{color:var(--ui-accent)}
+.social-divider{border-top:1px solid var(--ui-border);text-align:center;margin:13px 0 8px}
+.social-divider span{position:relative;top:-10px;background:var(--ui-bg-elevated);padding:0 10px;font-size:11px;color:var(--ui-text-muted)}
+.entry-card form{display:flex;flex-direction:column;gap:9px}
+.field-group{display:flex;flex-direction:column;gap:4px}
+.field-group>label{font-size:12.5px;color:var(--ui-text-secondary);font-weight:600;line-height:1.3}
+.entry-card input:not([type=checkbox]){box-sizing:border-box;width:100%;height:40px;border:1px solid var(--ui-border-strong);border-radius:9px;padding:0 12px;color:var(--ui-text-primary);background:var(--nt-surface-input);outline:none;font-size:14px}
 .entry-card input:focus-visible{border-color:var(--ui-accent);box-shadow:0 0 0 3px var(--ui-focus-ring)}
 .entry-card input::placeholder{color:var(--ui-text-muted);font-size:13px}
 .entry-card input:autofill{box-shadow:0 0 0 100px var(--ui-bg-soft) inset;-webkit-text-fill-color:var(--ui-text-primary)}
-.entry-primary,.entry-secondary{width:100%;min-height:42px;display:flex;justify-content:center;align-items:center;gap:8px;border-radius:10px;font-size:14px;font-weight:700;transition:transform .18s,box-shadow .18s,background-color .18s,border-color .18s}
-.entry-primary{background:var(--nt-purchase-bg);color:var(--nt-purchase-fg);border:1px solid var(--nt-purchase-border);margin-top:4px;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 6px 18px var(--ui-accent-soft)}
-.entry-secondary{background:var(--ui-bg-soft);border:1px solid var(--ui-border-strong);color:var(--ui-text-primary);min-height:40px;margin-top:8px}
+.entry-primary{width:100%;min-height:40px;display:flex;justify-content:center;align-items:center;gap:8px;border-radius:9px;font-size:14px;font-weight:700;background:var(--nt-purchase-bg);color:var(--nt-purchase-fg);border:1px solid var(--nt-purchase-border);margin-top:2px;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 6px 18px var(--ui-accent-soft);transition:transform .18s,box-shadow .18s,background-color .18s,border-color .18s}
 .entry-primary:hover:not(:disabled){background:var(--nt-purchase-bg-hover);border-color:var(--nt-purchase-bg-hover);transform:translateY(-1px)}
-.entry-secondary:hover:not(:disabled){border-color:var(--nt-accent-border-strong);transform:translateY(-1px)}
 .entry-primary:active:not(:disabled){transform:translateY(1px)}
 button:disabled{opacity:.45;cursor:not-allowed}
 button:focus-visible,a:focus-visible{outline:2px solid var(--ui-accent);outline-offset:3px}
-.entry-text{color:var(--ui-accent);align-self:center;font-size:12px;padding:3px 6px;min-height:30px}
-.field-hint{font-size:12px;line-height:1.5;color:var(--ui-text-muted)}
+.entry-text{color:var(--ui-accent);align-self:center;font-size:12px;padding:2px 6px;min-height:28px}
+.field-hint{font-size:12px;line-height:1.45;color:var(--ui-text-muted)}
 .field-error{font-size:12px;color:var(--nt-danger-ink)}
-.email-chip{display:flex;align-items:center;gap:9px;border:1px solid var(--ui-border);background:var(--ui-bg-soft);padding:9px 11px;border-radius:10px;margin-bottom:12px;font-size:13px;min-width:0}
+.email-chip{display:flex;align-items:center;gap:9px;border:1px solid var(--ui-border);background:var(--ui-bg-soft);padding:8px 11px;border-radius:10px;margin-bottom:10px;font-size:13px;min-width:0}
 .email-chip>span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .email-chip>button{font-size:12px;color:var(--ui-accent);padding:3px;flex-shrink:0}
-.entry-error,.entry-info{font-size:12.5px;line-height:1.5;padding:10px 12px;border-radius:9px;margin-bottom:12px;overflow-wrap:anywhere}
+.entry-error,.entry-info{font-size:12.5px;line-height:1.45;padding:9px 11px;border-radius:9px;margin-bottom:10px;overflow-wrap:anywhere}
 .entry-error{color:var(--nt-danger-ink);background:var(--nt-danger-bg);border:1px solid var(--nt-danger-border)}
 .entry-inline-action{margin-top:6px;display:inline-flex;align-items:center;font-size:12px;font-weight:650;color:var(--ui-accent);text-decoration:underline;text-underline-offset:3px}
 .entry-info{color:var(--ui-accent);background:var(--ui-accent-soft)}
 .password-field{position:relative}
 .password-field input{padding-right:42px!important}
-.password-field button{position:absolute;right:8px;top:0;height:42px;padding:0 6px;color:var(--ui-text-muted)}
+.password-field button{position:absolute;right:8px;top:0;height:40px;padding:0 6px;color:var(--ui-text-muted)}
 .form-options{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--ui-text-muted);font-size:12px}
 .form-options a,.agreement a{color:var(--ui-accent)}
-.check-label{display:flex;gap:8px;align-items:center;font-size:12px!important;font-weight:400!important;line-height:1.5}
+.check-label{display:flex;gap:8px;align-items:center;font-size:12px!important;font-weight:400!important;line-height:1.45}
 .check-label input{accent-color:var(--ui-accent);width:15px;height:15px;flex-shrink:0}
-.setup-choice{padding:10px 12px;border:1px solid var(--nt-accent-border);background:var(--nt-accent-subtle);border-radius:10px;margin-top:2px}
+.setup-choice{padding:9px 11px;border:1px solid var(--nt-accent-border);background:var(--nt-accent-subtle);border-radius:9px;margin-top:2px}
 .setup-choice small{display:block;color:var(--ui-text-muted);font-size:11px;font-weight:400}
 .setup-choice svg{margin-left:auto;flex-shrink:0;color:var(--ui-accent)}
 .agreement{align-items:start}
-.agreement input{margin-top:3px}
+.agreement input{margin-top:2px}
 .code-input{text-align:center;letter-spacing:.4em;font-size:18px!important}
-.social-divider{border-top:1px solid var(--ui-border);text-align:center;margin:16px 0 12px}
-.social-divider span{position:relative;top:-10px;background:var(--ui-bg-elevated);padding:0 12px;font-size:11px;color:var(--ui-text-muted)}
-.telegram-widget{display:flex;justify-content:center}
-.entry-security{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;line-height:1.45;color:var(--ui-text-muted);margin-top:14px}
+.entry-security{display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;line-height:1.4;color:var(--ui-text-muted);margin-top:10px;text-align:center}
 .captcha-field{margin:2px 0;width:100%;display:flex;justify-content:center}
 @media(pointer:coarse){
-  .entry-card input:not([type=checkbox]){min-height:46px;font-size:16px}
-  .password-field button{height:46px}
-  .entry-primary,.entry-secondary{min-height:46px}
+  .entry-card input:not([type=checkbox]){min-height:44px;font-size:16px}
+  .password-field button{height:44px}
+  .entry-primary,.social-tg-btn,.mode-tabs button{min-height:44px}
+  .social-google :deep(> div),
+  .social-google :deep(> div > div){min-height:44px}
+}
+@media(max-width:420px){
+  .social-actions--dual{grid-template-columns:1fr;gap:8px}
 }
 @media(max-width:480px){
-  .email-entry{padding:12px 12px 18px}
-  .entry-card{padding:18px 16px;border-radius:18px}
-  .entry-card header{margin:12px 0}
-  h1{font-size:19px}
+  .email-entry{padding:10px 12px 16px}
+  .entry-card{padding:16px;border-radius:16px}
+  .entry-card header{margin:8px 0 10px}
+  h1{font-size:18px}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none!important;transform:none!important}}
 </style>

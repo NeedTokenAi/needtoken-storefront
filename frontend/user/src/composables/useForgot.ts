@@ -94,7 +94,7 @@ export function useForgot() {
     }
     if (sendCodeCaptchaEnabled.value && captchaProvider.value === 'turnstile') {
       const resolved = getCaptchaPayload()
-      if (!resolved?.turnstile_token && !(resolved?.captcha_id && resolved?.captcha_code)) {
+      if (!resolved?.turnstile_token) {
         error.value = t('auth.common.captchaRequired')
         return
       }

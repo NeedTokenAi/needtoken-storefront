@@ -65,6 +65,7 @@ is_high_risk_path() {
       frontend/user/src/utils/chunkRecovery.ts | frontend/admin/src/utils/chunkRecovery.ts | \
       frontend/user/src/components/captcha/TurnstileCaptcha.vue | \
       frontend/admin/src/components/captcha/TurnstileCaptcha.vue | \
+      frontend/admin/src/views/Login.vue | \
       frontend/user/src/composables/useLogin.ts | frontend/user/src/composables/useRegister.ts)
       return 0
       ;;
