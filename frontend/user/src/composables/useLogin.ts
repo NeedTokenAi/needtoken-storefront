@@ -176,7 +176,7 @@ export function useLogin(options: { onAuthenticated?: () => unknown } = {}) {
 
     if (loginCaptchaEnabled.value && captchaProvider.value === 'turnstile') {
       const resolved = getCaptchaPayload()
-      if (!resolved?.turnstile_token && !(resolved?.captcha_id && resolved?.captcha_code)) {
+      if (!resolved?.turnstile_token) {
         error.value = t('auth.common.captchaRequired')
         return
       }

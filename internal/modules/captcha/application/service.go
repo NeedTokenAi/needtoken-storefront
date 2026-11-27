@@ -77,14 +77,13 @@ func (s *Service) GetPublicSetting() (jsonmap.JSON, error) {
 	return settingssecurity.PublicCaptchaSetting(setting), nil
 }
 
-// GenerateImageChallenge 生成图片验证码。
-// 当提供方为 image，或提供方为 turnstile（供大陆等弱网环境加载失败/超时自动降级）时均允许签发。
+// GenerateImageChallenge 生成图片验证码
 func (s *Service) GenerateImageChallenge() (*contract.ImageChallenge, error) {
 	setting, err := s.getSetting()
 	if err != nil {
 		return nil, err
 	}
-	if setting.Provider != constants.CaptchaProviderImage && setting.Provider != constants.CaptchaProviderTurnstile {
+	if setting.Provider != constants.CaptchaProviderImage {
 		return nil, contract.ErrConfigInvalid
 	}
 
@@ -137,24 +136,13 @@ func (s *Service) Verify(scene string, payload contract.VerifyPayload, clientIP 
 		return nil
 	case constants.CaptchaProviderTurnstile:
 		token := strings.TrimSpace(payload.TurnstileToken)
-		if token != "" {
-			if s.turnstile == nil {
-				return contract.ErrVerifyFailed
-			}
-			return s.turnstile.Verify(setting.Turnstile, token, strings.TrimSpace(clientIP))
+		if token == "" {
+			return contract.ErrRequired
 		}
-		// 大陆/弱网环境 Turnstile 加载超时或失败时，前端自动降级到内置图片验证码；
-		// 服务端仍执行一次性图形验证码强校验，不降低防脚本底线。
-		captchaID := strings.TrimSpace(payload.CaptchaID)
-		captchaCode := strings.TrimSpace(payload.CaptchaCode)
-		if captchaID != "" && captchaCode != "" {
-			store := s.ensureImageStore(setting)
-			if !store.Verify(captchaID, captchaCode, true) {
-				return contract.ErrInvalid
-			}
-			return nil
+		if s.turnstile == nil {
+			return contract.ErrVerifyFailed
 		}
-		return contract.ErrRequired
+		return s.turnstile.Verify(setting.Turnstile, token, strings.TrimSpace(clientIP))
 	case constants.CaptchaProviderNone:
 		return contract.ErrConfigInvalid
 	default:

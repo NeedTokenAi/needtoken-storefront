@@ -75,7 +75,7 @@ func TestVerifySkipsDisabledScene(t *testing.T) {
 	}
 }
 
-func TestTurnstileAllowsFallbackToImageCaptcha(t *testing.T) {
+func TestTurnstileRejectsImageCaptchaFallback(t *testing.T) {
 	setting := settingssecurity.CaptchaSetting{
 		Provider: constants.CaptchaProviderTurnstile,
 		Scenes: settingssecurity.CaptchaSceneSetting{
@@ -97,47 +97,38 @@ func TestTurnstileAllowsFallbackToImageCaptcha(t *testing.T) {
 			TimeoutMS: 2000,
 		},
 	}
-	service := NewService(settingReaderStub{setting: setting}, config.CaptchaConfig{}, &turnstileStub{})
+	verifier := &turnstileStub{}
+	service := NewService(settingReaderStub{setting: setting}, config.CaptchaConfig{}, verifier)
 
-	// Turnstile 模式下允许签发降级图片验证码
-	challenge, err := service.GenerateImageChallenge()
-	if err != nil {
-		t.Fatalf("GenerateImageChallenge in turnstile mode failed: %v", err)
-	}
-	if challenge == nil || challenge.CaptchaID == "" || challenge.ImageBase64 == "" {
-		t.Fatalf("unexpected image challenge: %#v", challenge)
+	// Turnstile 模式下禁止签发图片验证码，防止绕过 Cloudflare 验证
+	if challenge, err := service.GenerateImageChallenge(); err != contract.ErrConfigInvalid {
+		t.Fatalf("GenerateImageChallenge in turnstile mode got (%#v, %v), want ErrConfigInvalid", challenge, err)
 	}
 
-	// 双空必须拒绝
+	// 空载荷必须拒绝
 	if err := service.Verify(constants.CaptchaSceneLogin, contract.VerifyPayload{}, "127.0.0.1"); err != contract.ErrRequired {
 		t.Fatalf("empty payload error got %v want ErrRequired", err)
 	}
 
-	// 写入确定性验证码答案验证降级成功与一次性防重放
+	// 即使图片验证码存储中存在有效答案，Turnstile 模式下提交图片验证码载荷也必须被拒绝
 	store := service.ensureImageStore(setting)
 	if err := store.Set("fallback-id", "Ab12C"); err != nil {
 		t.Fatalf("seed image store failed: %v", err)
 	}
 	if err := service.Verify(constants.CaptchaSceneLogin, contract.VerifyPayload{
 		CaptchaID:   "fallback-id",
-		CaptchaCode: "wrong",
-	}, "127.0.0.1"); err != contract.ErrInvalid {
-		t.Fatalf("wrong fallback code got %v want ErrInvalid", err)
+		CaptchaCode: "Ab12C",
+	}, "127.0.0.1"); err != contract.ErrRequired {
+		t.Fatalf("image captcha fallback in turnstile mode got %v want ErrRequired", err)
 	}
-	// 上一步 verify(clear=true) 已消耗旧 id，重新写入验证正确码通过且不可重放
-	if err := store.Set("fallback-id-2", "Xy98Z"); err != nil {
-		t.Fatalf("seed image store 2 failed: %v", err)
-	}
+
+	// 提交 Turnstile token 正常放行给 Turnstile verifier
 	if err := service.Verify(constants.CaptchaSceneLogin, contract.VerifyPayload{
-		CaptchaID:   "fallback-id-2",
-		CaptchaCode: "Xy98Z",
+		TurnstileToken: "valid-turnstile-token",
 	}, "127.0.0.1"); err != nil {
-		t.Fatalf("valid fallback image captcha failed: %v", err)
+		t.Fatalf("valid turnstile token failed: %v", err)
 	}
-	if err := service.Verify(constants.CaptchaSceneLogin, contract.VerifyPayload{
-		CaptchaID:   "fallback-id-2",
-		CaptchaCode: "Xy98Z",
-	}, "127.0.0.1"); err != contract.ErrInvalid {
-		t.Fatalf("replayed fallback image captcha got %v want ErrInvalid", err)
+	if verifier.token != "valid-turnstile-token" {
+		t.Fatalf("verifier token got %q want %q", verifier.token, "valid-turnstile-token")
 	}
 }

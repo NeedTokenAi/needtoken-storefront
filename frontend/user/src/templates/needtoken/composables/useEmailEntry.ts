@@ -124,7 +124,7 @@ export function useEmailEntry(initialMode: AuthEntryMode = 'login') {
       return Boolean(payload?.captcha_id && payload?.captcha_code)
     }
     if (provider.value === 'turnstile') {
-      return Boolean(payload?.turnstile_token || (payload?.captcha_id && payload?.captcha_code))
+      return Boolean(payload?.turnstile_token)
     }
     return true
   }
@@ -247,17 +247,11 @@ export function useEmailEntry(initialMode: AuthEntryMode = 'login') {
       const payload = resolveSendCaptchaPayload()
       if (provider.value === 'image' && payload) {
         registration.captchaPayload = payload
-      } else if (provider.value === 'turnstile' && payload) {
-        if (payload.turnstile_token) {
-          registration.turnstileToken = payload.turnstile_token
-        } else {
-          // 降级图片验证码场景：同步传递到 register API
-          registration.captchaPayload = payload
-        }
+      } else if (provider.value === 'turnstile' && payload?.turnstile_token) {
+        registration.turnstileToken = payload.turnstile_token
       }
     }
     if (!registration.emailVerificationEnabled && sendCaptchaEnabled.value && provider.value === 'turnstile') {
-      // 直接带降级/正常 payload 注册
       if (!registration.formValidation.validateAll({ email: normalizedEmail.value, password: registration.password })) return
       if (registration.inviteOnlyEnabled && !registration.inviteCode.trim()) {
         error.value = t('auth.register.errors.inviteCodeRequired')

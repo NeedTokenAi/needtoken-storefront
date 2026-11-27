@@ -76,6 +76,7 @@ high_risk_cases=(
   "internal/modules/identity/userauth/transport/http/user_login_handler.go"
   "frontend/user/src/components/captcha/TurnstileCaptcha.vue"
   "frontend/admin/src/components/captcha/TurnstileCaptcha.vue"
+  "frontend/admin/src/views/Login.vue"
   "frontend/user/src/utils/chunkRecovery.ts"
   "frontend/admin/src/utils/chunkRecovery.ts"
   "internal/modules/radarsubscription/application/service.go"
