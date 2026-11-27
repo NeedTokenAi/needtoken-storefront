@@ -23,52 +23,6 @@
       </div>
     </header>
 
-    <!-- 分组切换器（展示 usable_group 说明与 group_ratio 倍率，切换实时重算单价） -->
-    <section
-      v-if="pricing.groups.value.length > 0"
-      class="mt-6 rounded-2xl border border-border bg-card p-4"
-      :aria-label="t('needtoken.models.groupSwitcherLabel')"
-    >
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <span class="text-[12px] font-semibold text-foreground">{{ t('needtoken.models.groupSwitcherTitle') }}</span>
-        <span class="text-[12px] text-muted-foreground">{{ activeGroupHint }}</span>
-      </div>
-      <div class="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          class="inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors"
-          :class="selectedGroup === '' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background/60 text-muted-foreground hover:text-foreground'"
-          :aria-pressed="selectedGroup === ''"
-          @click="selectedGroup = ''"
-        >
-          <span>{{ t('needtoken.models.groupRecommended') }}</span>
-        </button>
-        <button
-          v-for="grp in pricing.groups.value"
-          :key="grp.name"
-          type="button"
-          class="inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors"
-          :class="selectedGroup === grp.name ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background/60 text-muted-foreground hover:text-foreground'"
-          :aria-pressed="selectedGroup === grp.name"
-          @click="selectedGroup = grp.name"
-        >
-          <span class="h-2 w-2 rounded-full" :class="groupDotClass(grp.name)" aria-hidden="true" />
-          <span class="nt-mono">{{ grp.name }}</span>
-          <span class="nt-mono opacity-75">×{{ grp.ratio }}</span>
-        </button>
-        <button
-          v-if="pricing.groups.value.length > 1"
-          type="button"
-          class="inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors"
-          :class="selectedGroup === '__all_offers__' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background/60 text-muted-foreground hover:text-foreground'"
-          :aria-pressed="selectedGroup === '__all_offers__'"
-          @click="selectedGroup = '__all_offers__'"
-        >
-          <span>{{ t('needtoken.models.groupExpandAll') }}</span>
-        </button>
-      </div>
-    </section>
-
     <!-- 厂商筛选胶囊栏 -->
     <nav
       v-if="vendorStats.length > 0"
@@ -109,7 +63,7 @@
         :aria-label="t('needtoken.models.search')"
       />
 
-      <div class="inline-flex rounded-lg border border-border bg-card p-1" role="group" :aria-label="t('needtoken.models.billingFilterLabel')">
+      <div v-if="hasPerCallModels" class="inline-flex rounded-lg border border-border bg-card p-1" role="group" :aria-label="t('needtoken.models.billingFilterLabel')">
         <button
           v-for="mode in billingModes"
           :key="mode.value"
@@ -149,7 +103,12 @@
 
       <!-- 按量实价 vs 套餐倍数切换 + 表格/卡片视图切换 -->
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <div class="inline-flex rounded-lg border border-border bg-card p-1" role="group" :aria-label="t('needtoken.apiServices.pricing.modeLabel')">
+        <div
+          v-if="planMultiplierOptions.length > 0"
+          class="inline-flex rounded-lg border border-border bg-card p-1"
+          role="group"
+          :aria-label="t('needtoken.apiServices.pricing.modeLabel')"
+        >
           <button
             type="button"
             class="rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors"
@@ -214,10 +173,7 @@
           <tr class="border-b border-border text-[12px] font-semibold text-muted-foreground">
             <th class="px-4 py-3.5">Model</th>
             <th class="px-3 py-3.5">Context</th>
-            <th class="px-3 py-3.5">{{ t('needtoken.apiServices.pricing.colOfficialInput') }}</th>
-            <th class="px-3 py-3.5">{{ t('needtoken.apiServices.pricing.colOfficialOutput') }}</th>
-            <th class="bg-emerald-500/8 px-3.5 py-3.5 font-bold text-foreground">{{ t('needtoken.apiServices.pricing.colNeedInput') }}</th>
-            <th class="bg-emerald-500/8 px-3.5 py-3.5 font-bold text-foreground">{{ t('needtoken.apiServices.pricing.colNeedOutput') }}</th>
+            <th class="bg-emerald-500/8 px-3.5 py-3.5 font-bold text-foreground">{{ t('needtoken.models.columns.priceCompare') }}</th>
             <th class="px-3 py-3.5">{{ t('needtoken.models.columns.supply') }}</th>
             <th class="px-3 py-3.5">Uptime (SLA)</th>
             <th class="px-3 py-3.5 text-right"></th>
@@ -242,39 +198,41 @@
             </td>
             <td class="nt-mono px-3 py-3.5 text-[12px] text-muted-foreground">{{ offer.contextLength || '—' }}</td>
             <template v-if="offer.unit === 'per_million_tokens'">
-              <td class="nt-mono px-3 py-3.5 text-muted-foreground whitespace-nowrap">
-                <div>{{ offer.officialInputPrice !== null ? formatUsd(offer.officialInputPrice) : '—' }}</div>
-                <div v-if="offer.officialCachePrice !== null" class="text-[11px] opacity-80">Cache {{ formatUsd(offer.officialCachePrice) }}</div>
-              </td>
-              <td class="nt-mono px-3 py-3.5 text-muted-foreground whitespace-nowrap">
-                {{ offer.officialOutputPrice !== null ? formatUsd(offer.officialOutputPrice) : '—' }}
-              </td>
               <td class="nt-mono bg-emerald-500/8 px-3.5 py-3.5 whitespace-nowrap">
-                <div class="flex items-center gap-1.5">
-                  <strong class="text-[14px] font-bold text-foreground">{{ formatUsd(displayPrice(offer.inputPrice)) }}</strong>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">NeedToken</span>
+                  <strong class="text-[13px] font-bold text-foreground">{{ formatUsd(displayPrice(offer.inputPrice)) }}</strong>
+                  <span class="text-muted-foreground">/</span>
+                  <strong class="text-[13px] font-bold text-foreground">{{ formatUsd(displayPrice(offer.outputPrice)) }}</strong>
                   <span v-if="displayDiscount(offer) !== null" class="rounded bg-foreground px-1.5 py-0.5 text-[10.5px] font-bold text-background">{{ displayDiscount(offer) }}% off</span>
                 </div>
-                <div v-if="offer.cachePrice !== null" class="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">Cache {{ formatUsd(displayPrice(offer.cachePrice)) }}</div>
-              </td>
-              <td class="nt-mono bg-emerald-500/8 px-3.5 py-3.5 whitespace-nowrap">
-                <div class="flex items-center gap-1.5">
-                  <strong class="text-[14px] font-bold text-foreground">{{ formatUsd(displayPrice(offer.outputPrice)) }}</strong>
-                  <span v-if="displayDiscount(offer) !== null" class="rounded bg-foreground px-1.5 py-0.5 text-[10.5px] font-bold text-background">{{ displayDiscount(offer) }}% off</span>
+                <div v-if="offer.cachePrice !== null" class="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+                  Cache {{ formatUsd(displayPrice(offer.cachePrice)) }}
+                </div>
+                <div v-if="offer.officialInputPrice !== null || offer.officialOutputPrice !== null" class="mt-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                  <span>{{ t('needtoken.models.officialPriceShort') }}</span>
+                  <span class="line-through">{{ offer.officialInputPrice !== null ? formatUsd(offer.officialInputPrice) : '—' }}</span>
+                  <span>/</span>
+                  <span class="line-through">{{ offer.officialOutputPrice !== null ? formatUsd(offer.officialOutputPrice) : '—' }}</span>
+                  <span v-if="offer.officialCachePrice !== null" class="opacity-80">· Cache {{ formatUsd(offer.officialCachePrice) }}</span>
                 </div>
               </td>
             </template>
             <template v-else-if="offer.unit === 'per_call'">
-              <td colspan="2" class="nt-mono px-3 py-3.5 text-muted-foreground">{{ offer.officialInputPrice !== null ? `${formatUsd(offer.officialInputPrice)} / ${t('needtoken.models.perCallShort')}` : '—' }}</td>
-              <td colspan="2" class="nt-mono bg-emerald-500/8 px-3.5 py-3.5">
-                <div class="flex items-center gap-1.5">
-                  <strong class="text-[14px] font-bold text-foreground">{{ formatUsd(displayPrice(offer.inputPrice)) }}</strong>
+              <td class="nt-mono bg-emerald-500/8 px-3.5 py-3.5 whitespace-nowrap">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">NeedToken</span>
+                  <strong class="text-[13px] font-bold text-foreground">{{ formatUsd(displayPrice(offer.inputPrice)) }}</strong>
                   <span class="text-[11px] text-muted-foreground">/ {{ t('needtoken.models.perCallShort') }}</span>
                   <span v-if="displayDiscount(offer) !== null" class="rounded bg-foreground px-1.5 py-0.5 text-[10.5px] font-bold text-background">{{ displayDiscount(offer) }}% off</span>
+                </div>
+                <div v-if="offer.officialInputPrice !== null" class="mt-1 text-[11.5px] text-muted-foreground line-through">
+                  {{ t('needtoken.models.officialPriceShort') }} {{ formatUsd(offer.officialInputPrice) }} / {{ t('needtoken.models.perCallShort') }}
                 </div>
               </td>
             </template>
             <template v-else>
-              <td colspan="4" class="px-3 py-3.5 text-[12px] text-muted-foreground">{{ t('needtoken.models.conditionalPrice') }}</td>
+              <td class="bg-emerald-500/8 px-3.5 py-3.5 text-[12px] text-muted-foreground">{{ t('needtoken.models.conditionalPrice') }}</td>
             </template>
             <td class="px-3 py-3.5 whitespace-nowrap">
               <span class="nt-mono rounded-full border border-border bg-secondary/50 px-2 py-0.5 text-[11px] text-muted-foreground">{{ supplyLabel(offer) }}</span>
@@ -523,6 +481,7 @@ import { useUserAuthStore } from '../../stores/userAuth'
 import { useAppStore } from '../../stores/app'
 import { CONSOLE_URL, DEFAULT_MODELS } from './config'
 import {
+  buildDynamicPlanMultiplierOptions,
   effectiveDiscountPercent,
   effectivePlanOfferPrice,
   filterOffers,
@@ -582,29 +541,15 @@ const compare = ref<string[]>([])
 const copiedModelId = ref('')
 let copyTimer: ReturnType<typeof setTimeout> | undefined
 
-const planMultiplierOptions = computed(() => {
-  const seen = new Set<number>()
-  const opts: Array<{ key: string; multiplier: number; label: string }> = []
-  for (const plan of pricing.activePlans.value) {
-    const mult = Number(plan.multiplier)
-    if (!Number.isFinite(mult) || mult <= 1.05) continue
-    const rounded = Math.round(mult * 10) / 10
-    if (seen.has(rounded)) continue
-    seen.add(rounded)
-    opts.push({
-      key: `m-${rounded}`,
-      multiplier: rounded,
-      label: t('needtoken.apiServices.pricing.planMultiplierOption', { mult: `${rounded}x` }),
-    })
-  }
-  if (!opts.length) {
-    opts.push(
-      { key: 'm-2', multiplier: 2, label: t('needtoken.apiServices.pricing.planMultiplierOption', { mult: '2x' }) },
-      { key: 'm-3', multiplier: 3, label: t('needtoken.apiServices.pricing.planMultiplierOption', { mult: '3x' }) },
-    )
-  }
-  return opts.sort((a, b) => a.multiplier - b.multiplier).slice(0, 3)
-})
+const hasPerCallModels = computed(() => groupScopedOffers.value.some((o) => o.unit === 'per_call'))
+
+const planMultiplierOptions = computed(() =>
+  buildDynamicPlanMultiplierOptions(pricing.activePlans.value).map((item) => ({
+    key: item.key,
+    multiplier: item.multiplier,
+    label: t('needtoken.apiServices.pricing.planMultiplierOption', { mult: `${item.multiplier}x` }),
+  })),
+)
 
 const displayPrice = (price: number | null) => effectivePlanOfferPrice(price, priceMultiplier.value)
 const displayDiscount = (offer: ModelOffer) => {
@@ -622,16 +567,6 @@ const billingModes = [
 const offers = computed(() => pricing.offers.value)
 const groupScopedOffers = computed(() => selectOffersByGroup(offers.value, selectedGroup.value))
 const uniqueModelCount = computed(() => new Set(offers.value.map(o => o.modelId)).size)
-
-const activeGroupHint = computed(() => {
-  if (!selectedGroup.value) return t('needtoken.models.groupRecommendedHint')
-  if (selectedGroup.value === '__all_offers__') return t('needtoken.models.groupExpandAllHint')
-  const matched = pricing.groups.value.find(g => g.name === selectedGroup.value)
-  if (!matched) return ''
-  return matched.description
-    ? `${matched.description} · ${t('needtoken.models.groupMultiplier', { ratio: matched.ratio })}`
-    : t('needtoken.models.groupMultiplier', { ratio: matched.ratio })
-})
 
 const supplyLabel = (offer: ModelOffer) =>
   offer.supplyLine ? t(`needtoken.supply.${offer.supplyLine}`) : offer.group
@@ -744,16 +679,17 @@ const copyModelId = async (modelId: string) => {
   }
 }
 
-const invokeModelInConsole = (_modelId: string) => {
+const invokeModelInConsole = (modelId: string) => {
   if (appStore.isResellerTenant) {
-    window.open(`${CONSOLE_URL}/playground`, '_blank', 'noopener,noreferrer')
+    window.open(`${CONSOLE_URL}/playground?model=${encodeURIComponent(modelId)}`, '_blank', 'noopener,noreferrer')
     return
   }
+  const target = modelId ? `/me/playground?model=${encodeURIComponent(modelId)}` : '/me/playground'
   if (!userAuth.isAuthenticated) {
-    void router.push({ path: '/auth/login', query: { redirect: '/me/keys' } })
+    void router.push({ path: '/auth/login', query: { redirect: target } })
     return
   }
-  void router.push('/me/keys')
+  void router.push(modelId ? { path: '/me/playground', query: { model: modelId } } : '/me/playground')
 }
 
 onMounted(() => {

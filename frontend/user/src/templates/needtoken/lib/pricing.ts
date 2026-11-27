@@ -322,7 +322,7 @@ export const buildPricingGroups = (
  * 把 new-api 定价表展开成“模型 × 分组”的报价列表。
  * 同一模型在不同分组（供应线）价格不同，分开列出、不混算。
  */
-const inferContextLength = (modelName: string): string | null => {
+export const inferContextLength = (modelName: string): string | null => {
     const n = String(modelName || '').toLowerCase()
     if (!n) return null
     if (/gemini-(?:2\.|3\.|1\.5|pro|flash)/.test(n)) return '1M'
@@ -348,6 +348,38 @@ export const effectivePlanOfferPrice = (price: number | null, multiplier: number
     if (price === null || !Number.isFinite(price) || price < 0) return null
     if (!Number.isFinite(multiplier) || multiplier <= 1) return price
     return price / multiplier
+}
+
+export interface PlanMultiplierOption {
+    key: string
+    planId: number
+    title: string
+    multiplier: number
+    label: string
+}
+
+export const buildDynamicPlanMultiplierOptions = (plans?: readonly PublicPlanOffer[] | null): PlanMultiplierOption[] => {
+    if (!Array.isArray(plans) || !plans.length) return []
+    const seenMult = new Set<number>()
+    const opts: PlanMultiplierOption[] = []
+    for (const plan of plans) {
+        if (!plan) continue
+        const mult = Number(plan.multiplier)
+        if (!Number.isFinite(mult) || mult <= 1.01) continue
+        const rounded = Math.round(mult * 100) / 100
+        if (seenMult.has(rounded)) continue
+        seenMult.add(rounded)
+        const multText = `${Number(rounded.toFixed(2))}x`
+        const title = String(plan.title || '').trim()
+        opts.push({
+            key: `plan-${plan.id || rounded}`,
+            planId: Number(plan.id || 0),
+            title: title || multText,
+            multiplier: rounded,
+            label: title ? `${title} (${multText})` : multText,
+        })
+    }
+    return opts.sort((a, b) => a.multiplier - b.multiplier).slice(0, 4)
 }
 
 export const buildOffers = (response: PricingResponse, options: BuildOffersOptions): ModelOffer[] => {

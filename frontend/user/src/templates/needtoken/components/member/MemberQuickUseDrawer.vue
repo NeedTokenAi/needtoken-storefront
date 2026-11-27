@@ -129,16 +129,29 @@
           <div class="flex min-w-0 items-center gap-1.5">
             <span class="font-semibold">{{ t('needtoken.memberConsole.quickUse.gatewayEndpoint') }}:</span>
             <code class="truncate rounded bg-background px-1.5 py-0.5 font-mono text-foreground">{{ effectiveBaseUrlV1 }}</code>
+            <button
+              type="button"
+              class="inline-flex shrink-0 items-center gap-1 font-medium text-primary hover:underline"
+              @click="copyText(effectiveBaseUrlV1, 'drawer-base-url')"
+            >
+              <Check v-if="copiedTag === 'drawer-base-url'" class="h-3 w-3" />
+              <Copy v-else class="h-3 w-3" />
+              <span>{{ copiedTag === 'drawer-base-url' ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
+            </button>
           </div>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-            @click="copyText(effectiveBaseUrlV1, 'drawer-base-url')"
-          >
-            <Check v-if="copiedTag === 'drawer-base-url'" class="h-3 w-3" />
-            <Copy v-else class="h-3 w-3" />
-            <span>{{ copiedTag === 'drawer-base-url' ? t('needtoken.common.copied') : t('needtoken.common.copy') }}</span>
-          </button>
+          <div class="flex min-w-0 items-center gap-1.5">
+            <span class="font-semibold">{{ t('needtoken.memberConsole.quickUse.siteLogoLabel') }}:</span>
+            <code class="max-w-[200px] truncate rounded bg-background px-1.5 py-0.5 font-mono text-foreground">{{ effectiveSiteLogoUrl }}</code>
+            <button
+              type="button"
+              class="inline-flex shrink-0 items-center gap-1 font-medium text-primary hover:underline"
+              @click="copyText(effectiveSiteLogoUrl, 'drawer-logo-url')"
+            >
+              <Check v-if="copiedTag === 'drawer-logo-url'" class="h-3 w-3" />
+              <Copy v-else class="h-3 w-3" />
+              <span>{{ copiedTag === 'drawer-logo-url' ? t('needtoken.common.copied') : t('needtoken.memberConsole.quickUse.copyLogoUrl') }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -608,8 +621,8 @@ const FALLBACK_TOOLS: QuickToolItem[] = [
     import_type: 'none',
     config_filename: 'opencode.json',
     config_template: '{\n  "$schema": "https://opencode.ai/config.json",\n  "provider": {\n    "needtoken": {\n      "npm": "@ai-sdk/openai-compatible",\n      "name": "NeedToken",\n      "options": {\n        "baseURL": "{{BASE_URL_V1}}",\n        "apiKey": "{{API_KEY}}"\n      },\n      "models": {{ALL_MODELS_MAP_JSON}}\n    }\n  }\n}\n',
-    manual_guide: '1. 下载 opencode.json 放入 ~/.config/opencode/opencode.json，已包含你当前密钥的全部模型。\n2. 后台新增模型后重新下载或让 AI 从 {{MODELS_ENDPOINT}} 刷新 models 字段即可。',
-    ai_prompt_template: '请帮我配置并动态同步本机 OpenCode（~/.config/opencode/opencode.json）：先请求 GET {{MODELS_ENDPOINT}}（Bearer {{API_KEY}}）获取全部最新模型，将 NeedToken（baseURL={{BASE_URL_V1}}、apiKey={{API_KEY}}）及全量模型写入 provider.needtoken.models。',
+    manual_guide: '1. 下载 opencode.json 放入 ~/.config/opencode/opencode.json，已包含你当前密钥的全部模型。\n2. 自定义供应商名 needtoken 与内置 openai 不同，provider.needtoken 同级必须保留 "npm": "@ai-sdk/openai-compatible"（不能省略、不能写进 options，也不能改其他包名）。\n3. 模型 ID 请保持网关原始写法（如 gpt-6-sol，勿把 - 改成 .，并跳过 image/audio/realtime 非对话模型）。\n4. 若曾手改配置后报 unsupported package，请核对 "npm" 字段并执行 rm -rf ~/.cache/opencode 后重启。',
+    ai_prompt_template: '请帮我配置并同步本机 OpenCode（~/.config/opencode/opencode.json）接入 NeedToken 网关：\n1. 先请求 GET {{MODELS_ENDPOINT}}（Header Authorization: Bearer {{API_KEY}}）获取当前密钥可用模型，过滤掉 image/audio/realtime 非对话模型，并严格保留原始模型 ID（不要把 - 改成 .）。\n2. 在 provider.needtoken 同级必须保留 "npm": "@ai-sdk/openai-compatible"、"name": "NeedToken"，options 设为 { "baseURL": "{{BASE_URL_V1}}", "apiKey": "{{API_KEY}}" }，并将 models 写入 provider.needtoken.models（注意："npm" 绝不能省略或放入 options，否则 OpenCode 会报 unsupported package for needtoken/<model>）。\n3. 如曾配置失败报 unsupported package，请先核对配置结构再执行 rm -rf ~/.cache/opencode 后重启验证。',
     docs_url: 'https://opencode.ai/docs/providers/',
     sort_order: 40,
     enabled: true,
@@ -631,6 +644,22 @@ const FALLBACK_TOOLS: QuickToolItem[] = [
     ai_prompt_template: '请帮我在本机配置 NeedToken 网关（如已安装 CC Switch 则新增 Provider，否则直接帮我配置本机 CLI 工具）：Anthropic 地址 {{BASE_URL}}，OpenAI 地址 {{BASE_URL_V1}}，API Key {{API_KEY}}，通过 GET {{MODELS_ENDPOINT}} 自动同步全部可用模型。',
     docs_url: 'https://github.com/farion1231/cc-switch/releases/latest',
     sort_order: 10,
+    enabled: true,
+  },
+  {
+    id: 'tool_magpie',
+    category_id: 'cat_switch_proxy',
+    name: 'Magpie',
+    slug: 'magpie',
+    icon_key: 'magpie',
+    summary: '桌面端 AI Agent 统一路由与配置管理器（支持 Claude Code / Codex / OpenCode / Antigravity / Cursor CLI / VS Code），自动拉取模型与站点图标',
+    tags: ['magpie', 'claude code', 'codex', 'antigravity', 'opencode', 'cursor'],
+    import_type: 'none',
+    config_filename: 'magpie-needtoken-provider.json',
+    config_template: '{\n  "name": "NeedToken",\n  "baseUrl": "{{BASE_URL_V1}}",\n  "anthropicBaseUrl": "{{ANTHROPIC_BASE_URL}}",\n  "geminiBaseUrl": "{{GEMINI_BASE_URL}}",\n  "apiKey": "{{API_KEY}}",\n  "iconUrl": "{{SITE_LOGO_URL}}",\n  "modelsEndpoint": "{{MODELS_ENDPOINT}}",\n  "fetchModels": true\n}\n',
+    manual_guide: '1. 在 Magpie 新增自定义供应商，名称填 NeedToken，Base URL 填 {{BASE_URL_V1}}（Anthropic 协议填写 {{ANTHROPIC_BASE_URL}}），API Key 填 {{API_KEY}}。\n2. 图标设置：点击「获取图标 → 自动」即可识别站点 Logo；若需手动指定，可选择「图片 URL」填入 {{SITE_LOGO_URL}}。\n3. 勾选「拉取模型列表」即可自动同步全部最新可用模型。',
+    ai_prompt_template: '请帮我检查并配置 Magpie 接入 NeedToken 网关：供应商名称 NeedToken，OpenAI Base URL={{BASE_URL_V1}}，Anthropic={{ANTHROPIC_BASE_URL}}，API Key={{API_KEY}}，图标 URL={{SITE_LOGO_URL}}，并请求 GET {{MODELS_ENDPOINT}} 验证可用模型列表。',
+    sort_order: 15,
     enabled: true,
   },
   {
@@ -684,11 +713,28 @@ const FALLBACK_TOOLS: QuickToolItem[] = [
     sort_order: 10,
     enabled: true,
   },
+  {
+    id: 'tool_generic_client',
+    category_id: 'cat_chat_clients',
+    name: '通用 API 客户端 / 其他工具',
+    slug: 'generic-api',
+    icon_key: 'terminal',
+    summary: '聚合 OpenAI / Anthropic / Gemini / Responses 协议地址与站点图标 URL，适配任意支持自定义网关的工具',
+    tags: ['openai', 'anthropic', 'gemini', 'responses', 'logo', '通用'],
+    import_type: 'none',
+    config_filename: 'needtoken-generic-endpoints.json',
+    config_template: '{\n  "name": "NeedToken",\n  "apiKey": "{{API_KEY}}",\n  "openaiBaseUrl": "{{BASE_URL_V1}}",\n  "responsesEndpoint": "{{RESPONSES_ENDPOINT}}",\n  "anthropicBaseUrl": "{{ANTHROPIC_BASE_URL}}",\n  "geminiBaseUrl": "{{GEMINI_BASE_URL}}",\n  "modelsEndpoint": "{{MODELS_ENDPOINT}}",\n  "siteLogoUrl": "{{SITE_LOGO_URL}}",\n  "availableModels": {{ALL_MODELS_JSON}}\n}\n',
+    manual_guide: '1. OpenAI 兼容：Base URL={{BASE_URL_V1}}；Responses={{RESPONSES_ENDPOINT}}。\n2. Anthropic 协议：Base URL={{ANTHROPIC_BASE_URL}}；Gemini 协议：Base URL={{GEMINI_BASE_URL}}。\n3. 站点图标 URL：{{SITE_LOGO_URL}}。',
+    ai_prompt_template: '请帮我配置当前 API 客户端接入 NeedToken：API Key={{API_KEY}}，OpenAI={{BASE_URL_V1}}，Anthropic={{ANTHROPIC_BASE_URL}}，Gemini={{GEMINI_BASE_URL}}，站点图标 URL={{SITE_LOGO_URL}}，并请求 GET {{MODELS_ENDPOINT}} 拉取可用模型。',
+    sort_order: 90,
+    enabled: true,
+  },
 ]
 
 const effectiveBaseUrl = computed(() => (gatewayBaseUrl.value || API_BASE_URL).replace(/\/+$/, '').replace(/\/v1$/, ''))
 const effectiveBaseUrlV1 = computed(() => `${effectiveBaseUrl.value}/v1`)
 const effectiveModelsEndpoint = computed(() => `${effectiveBaseUrlV1.value}/models`)
+const effectiveSiteLogoUrl = computed(() => `${effectiveBaseUrl.value}/logo.png`)
 
 const activeTokens = computed(() => tokens.value.filter(tok => tok.status === 1 && tok.key))
 const selectedToken = computed(() => activeTokens.value.find(tok => tok.id === selectedTokenId.value) || activeTokens.value[0] || null)
@@ -774,6 +820,10 @@ const buildRenderVars = (tool: QuickToolItem) => {
     baseUrl: effectiveBaseUrl.value,
     baseUrlV1: effectiveBaseUrlV1.value,
     modelsEndpoint: effectiveModelsEndpoint.value,
+    siteLogoUrl: effectiveSiteLogoUrl.value,
+    anthropicBaseUrl: effectiveBaseUrl.value,
+    geminiBaseUrl: effectiveBaseUrl.value,
+    responsesEndpoint: `${effectiveBaseUrlV1.value}/responses`,
     model: resolveModelForTool(tool),
     allModels: availableModels.value,
     tokenName: tok?.name || 'NeedToken',

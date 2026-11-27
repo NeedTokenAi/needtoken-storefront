@@ -61,6 +61,12 @@
       <circle cx="6.75" cy="16.25" r="2" fill="currentColor" />
     </svg>
 
+    <!-- Magpie: 喜鹊飞翼矢量徽标 -->
+    <svg v-else-if="resolvedBrand === 'magpie'" viewBox="0 0 24 24" class="h-6 w-6" fill="none" aria-hidden="true">
+      <path d="M4.5 14.5C7.2 9.2 11.4 6.5 16.5 6C15.2 8.4 15.1 10.6 16.2 12.6C13.6 12.6 11.4 13.7 9.6 15.8L12.5 18.2L7.2 17.8L4.5 14.5Z" fill="currentColor" />
+      <path d="M16.5 6L20 5L17.8 8.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+
     <!-- OpenCode: 几何终端内核徽标 -->
     <svg v-else-if="resolvedBrand === 'opencode'" viewBox="0 0 24 24" class="h-6 w-6" fill="none" aria-hidden="true">
       <rect x="3" y="3" width="18" height="18" rx="4.5" stroke="currentColor" stroke-width="1.9" />
@@ -119,11 +125,12 @@ watch(() => props.logoUrl, () => {
   imgBroken.value = false
 })
 
-type BuiltinToolBrand = 'codex' | 'claude' | 'gemini' | 'grok' | 'ccswitch' | 'opencode' | 'cursor' | 'cline' | 't3' | 'terminal' | 'fallback'
+type BuiltinToolBrand = 'codex' | 'claude' | 'gemini' | 'grok' | 'ccswitch' | 'magpie' | 'opencode' | 'cursor' | 'cline' | 't3' | 'terminal' | 'fallback'
 
 const resolvedBrand = computed<BuiltinToolBrand>(() => {
   const hint = `${props.iconKey || ''} ${props.slug || ''} ${props.name || ''}`.toLowerCase()
   if (hint.includes('ccswitch') || hint.includes('cc-switch') || hint.includes('cc switch')) return 'ccswitch'
+  if (hint.includes('magpie')) return 'magpie'
   if (hint.includes('codex') || hint.includes('openai') || hint.includes('chatgpt')) return 'codex'
   if (hint.includes('claude') || hint.includes('anthropic')) return 'claude'
   if (hint.includes('gemini') || hint.includes('google')) return 'gemini'
@@ -148,6 +155,8 @@ const containerStyle = computed<Record<string, string>>(() => {
       return { background: 'rgba(24, 35, 31, 0.1)', color: 'var(--nt-brand-grok, #18231f)' }
     case 'ccswitch':
       return { background: 'rgba(13, 148, 115, 0.14)', color: 'var(--ui-accent, #0d9473)' }
+    case 'magpie':
+      return { background: 'rgba(15, 23, 42, 0.08)', color: '#0f172a' }
     case 'opencode':
       return { background: 'rgba(124, 77, 147, 0.12)', color: '#7c4d93' }
     case 'cursor':

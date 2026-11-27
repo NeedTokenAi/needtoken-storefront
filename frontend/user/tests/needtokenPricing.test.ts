@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+    buildDynamicPlanMultiplierOptions,
     buildOffers,
     buildPricingGroups,
     effectiveDiscountPercent,
@@ -255,4 +256,24 @@ test('buildOffers computes official pricing, ops overrides, discount percent, an
     assert.equal(effectiveDiscountPercent(gpt.officialInputPrice, planPrice), 88)
     assert.equal(effectiveDiscountPercent(5, 5), null)
     assert.equal(effectivePlanOfferPrice(1.2, 0.5), 1.2)
+})
+
+test('buildDynamicPlanMultiplierOptions derives sorted unique multipliers without hardcoded 2x/3x fallback', () => {
+    assert.deepEqual(buildDynamicPlanMultiplierOptions([]), [])
+    assert.deepEqual(
+        buildDynamicPlanMultiplierOptions([
+            { id: 1, title: 'Base 1x', multiplier: 1, price: '10', currency: 'CNY', total_quota_usd: 10, cycle_days: 30, group: 'pool' } as any,
+        ]),
+        [],
+    )
+    const opts = buildDynamicPlanMultiplierOptions([
+        { id: 10, title: 'Pro 3x', multiplier: 3, price: '99', currency: 'CNY', total_quota_usd: 40, cycle_days: 30, group: 'pool' } as any,
+        { id: 11, title: 'Plus 2x', multiplier: 2, price: '49', currency: 'CNY', total_quota_usd: 14, cycle_days: 30, group: 'pool' } as any,
+        { id: 12, title: 'Dup 2x', multiplier: 2, price: '59', currency: 'CNY', total_quota_usd: 17, cycle_days: 30, group: 'pool' } as any,
+        { id: 13, title: 'Ultra 5x', multiplier: 5, price: '199', currency: 'CNY', total_quota_usd: 140, cycle_days: 30, group: 'pool' } as any,
+    ])
+    assert.deepEqual(
+        opts.map((o) => o.multiplier),
+        [2, 3, 5],
+    )
 })
