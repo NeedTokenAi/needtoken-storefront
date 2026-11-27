@@ -434,6 +434,7 @@ import { Check, CreditCard, Gift, HelpCircle, ReceiptText, RefreshCw, Sparkles, 
 import { giftCardAPI, walletAPI, type CaptchaPayload, type GiftCardRedeemResult } from '../../../../api'
 import { useAppStore } from '../../../../stores/app'
 import { useUserProfileStore } from '../../../../stores/userProfile'
+import { useDisplayCurrency } from '../../composables/useDisplayCurrency'
 import { pageAlertToneClass, pageAlertVariant, type PageAlert } from '../../../../utils/alerts'
 import { amountToCents, basisPointsToPercent, calculateFeeCents, centsToAmount, rateToBasisPoints } from '../../../../utils/money'
 import ImageCaptcha from '../../../../components/captcha/ImageCaptcha.vue'
@@ -444,7 +445,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { matchesWalletRecordCategory, type WalletRecordCategoryFilter } from '../../lib/gatewayConsoleHelpers'
+import { listGatewayLogs } from '../../lib/gatewayConsoleApi'
+import {
+  buildApiConsumeWalletRows,
+  matchesWalletRecordCategory,
+  type WalletRecordCategoryFilter,
+  type WalletTransactionRow,
+} from '../../lib/gatewayConsoleHelpers'
 
 const props = defineProps<{
   showGatewayFeatures: boolean
@@ -470,24 +477,16 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userProfileStore = useUserProfileStore()
+const { settlementCurrency, rate: usdCnyRate } = useDisplayCurrency()
 
 // --- Help popover ---
 const helpOpen = ref(false)
 const helpAnchorEl = ref<HTMLElement | null>(null)
 
-// --- Unified wallet + gift card transactions ---
+// --- Unified wallet + gift card + API pay-as-you-go transactions ---
 const txLoading = ref(true)
 const txError = ref('')
-const transactions = ref<Array<{
-  id: number
-  created_at: string
-  type: string
-  direction: string
-  amount: string
-  currency: string
-  balance_after: string
-  remark: string
-}>>([])
+const transactions = ref<WalletTransactionRow[]>([])
 const pagination = ref({
   page: 1,
   page_size: 20,
@@ -535,11 +534,30 @@ const loadTransactions = async (page = 1) => {
   txLoading.value = true
   txError.value = ''
   try {
-    const response = await walletAPI.transactions({
-      page,
-      page_size: pagination.value.page_size,
+    const [response, logsRes] = await Promise.all([
+      walletAPI.transactions({
+        page,
+        page_size: pagination.value.page_size,
+      }),
+      props.showGatewayFeatures && page === 1
+        ? listGatewayLogs({ p: 1, page_size: 50, type: 2 }).catch(() => null)
+        : Promise.resolve(null),
+    ])
+    const baseRows: WalletTransactionRow[] = Array.isArray(response.data.data) ? response.data.data : []
+    const apiRows = logsRes
+      ? buildApiConsumeWalletRows({
+          logs: Array.isArray(logsRes.items) ? logsRes.items : [],
+          quotaPerUnit: logsRes.quota_per_unit || 500_000,
+          siteCurrency: settlementCurrency.value,
+          usdCnyRate: Number(usdCnyRate.value) || null,
+        })
+      : []
+    const merged = [...baseRows, ...apiRows].sort((a, b) => {
+      const ta = Date.parse(a.created_at) || 0
+      const tb = Date.parse(b.created_at) || 0
+      return tb - ta
     })
-    transactions.value = Array.isArray(response.data.data) ? response.data.data : []
+    transactions.value = merged
     pagination.value = response.data.pagination || pagination.value
   } catch (err: any) {
     transactions.value = []

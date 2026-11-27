@@ -90,6 +90,8 @@ export interface GatewayLogItem {
   use_time: number
   is_stream: boolean
   content: string
+  billing_source?: string
+  wallet_quota_deducted?: number
 }
 
 export interface GatewayLogsResponse {

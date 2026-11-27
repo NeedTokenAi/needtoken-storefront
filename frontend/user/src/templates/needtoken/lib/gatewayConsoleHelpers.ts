@@ -127,8 +127,80 @@ export function matchesWalletRecordCategory(type?: string | null, filter: Wallet
   const norm = String(type || '').trim().toLowerCase()
   if (filter === 'gift_card') return norm === 'gift_card_redeem'
   if (filter === 'recharge') return norm === 'recharge' || norm === 'admin_adjust' || norm === 'order_underpaid_credit'
-  if (filter === 'spend') return norm === 'order_pay' || norm === 'order_refund' || norm === 'admin_refund'
+  if (filter === 'spend') return norm === 'order_pay' || norm === 'order_refund' || norm === 'admin_refund' || norm === 'api_consume'
   return true
+}
+
+export interface WalletTransactionRow {
+  id: number | string
+  created_at: string
+  type: string
+  direction: string
+  amount: string
+  currency: string
+  balance_after: string
+  remark: string
+}
+
+export function buildApiConsumeWalletRows(params: {
+  logs: Array<{
+    id: number
+    created_at: number
+    type: number
+    model_name: string
+    token_name?: string
+    quota: number
+    billing_source?: string
+    wallet_quota_deducted?: number
+  }>
+  quotaPerUnit: number
+  siteCurrency: string
+  usdCnyRate?: number | null
+}): WalletTransactionRow[] {
+  const qpu = params.quotaPerUnit > 0 ? params.quotaPerUnit : API_QUOTA_PER_USD
+  const currency = String(params.siteCurrency || 'CNY').trim().toUpperCase() || 'CNY'
+  const rate = currency === 'USD'
+    ? 1
+    : (typeof params.usdCnyRate === 'number' && Number.isFinite(params.usdCnyRate) && params.usdCnyRate > 0 ? params.usdCnyRate : 1)
+  const displayCurrency = currency === 'CNY' && rate === 1 ? 'USD' : currency
+
+  const rows: WalletTransactionRow[] = []
+  for (const item of params.logs || []) {
+    if (!item || item.type !== 2) continue
+    let deductedQuota = 0
+    const src = String(item.billing_source || '').trim().toLowerCase()
+    if (src === 'subscription') {
+      const overflow = Number(item.wallet_quota_deducted || 0)
+      if (!Number.isFinite(overflow) || overflow <= 0) continue
+      deductedQuota = overflow
+    } else if (src === 'wallet' || src === '') {
+      const q = Number(item.quota || 0)
+      if (!Number.isFinite(q) || q <= 0) continue
+      deductedQuota = q
+    } else {
+      continue
+    }
+
+    const usd = deductedQuota / qpu
+    if (!Number.isFinite(usd) || usd <= 0) continue
+    const converted = usd * rate
+    const amountStr = converted >= 0.01 ? converted.toFixed(2) : converted.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
+    const usdStr = usd >= 0.01 ? usd.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : usd.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')
+    const modelPart = item.model_name || 'API'
+    const tokenPart = item.token_name ? ` · ${item.token_name}` : ''
+    const overflowTag = src === 'subscription' ? '（套餐超额）' : ''
+    rows.push({
+      id: `api-${item.id}`,
+      created_at: new Date((item.created_at || 0) * 1000).toISOString(),
+      type: 'api_consume',
+      direction: 'out',
+      amount: amountStr,
+      currency: displayCurrency,
+      balance_after: '',
+      remark: `API 实时扣款${overflowTag} · ${modelPart} ($${usdStr})${tokenPart}`,
+    })
+  }
+  return rows
 }
 
 export function resolveNeedtokenRouteTransitionKey(rawPath?: string | null): string {
@@ -432,6 +504,10 @@ export interface QuickToolRenderVars {
   baseUrl: string
   baseUrlV1: string
   modelsEndpoint?: string
+  siteLogoUrl?: string
+  anthropicBaseUrl?: string
+  geminiBaseUrl?: string
+  responsesEndpoint?: string
   model: string
   allModels?: string[]
   tokenName: string
@@ -450,7 +526,13 @@ export function buildQuickToolModelsMapJson(models: string[]): string {
 export function renderQuickToolTemplate(template: string, vars: QuickToolRenderVars, encodeForUrl = false): string {
   if (!template) return ''
   const v = (raw: string) => (encodeForUrl ? encodeURIComponent(raw) : raw)
-  const modelsEndpoint = vars.modelsEndpoint || `${vars.baseUrlV1.replace(/\/+$/, '')}/models`
+  const cleanBase = vars.baseUrl.replace(/\/+$/, '')
+  const cleanBaseV1 = vars.baseUrlV1.replace(/\/+$/, '')
+  const modelsEndpoint = vars.modelsEndpoint || `${cleanBaseV1}/models`
+  const siteLogoUrl = vars.siteLogoUrl || `${cleanBase}/logo.png`
+  const anthropicBaseUrl = vars.anthropicBaseUrl || cleanBase
+  const geminiBaseUrl = vars.geminiBaseUrl || cleanBase
+  const responsesEndpoint = vars.responsesEndpoint || `${cleanBaseV1}/responses`
   const modelList = [...new Set((vars.allModels || []).map(s => String(s || '').trim()).filter(Boolean))]
   if (!modelList.length && vars.model) {
     modelList.push(vars.model)
@@ -460,6 +542,10 @@ export function renderQuickToolTemplate(template: string, vars: QuickToolRenderV
   return template
     .replace(/\{\{API_KEY\}\}/g, v(vars.apiKey))
     .replace(/\{\{MODELS_ENDPOINT\}\}/g, v(modelsEndpoint))
+    .replace(/\{\{SITE_LOGO_URL\}\}/g, v(siteLogoUrl))
+    .replace(/\{\{ANTHROPIC_BASE_URL\}\}/g, v(anthropicBaseUrl))
+    .replace(/\{\{GEMINI_BASE_URL\}\}/g, v(geminiBaseUrl))
+    .replace(/\{\{RESPONSES_ENDPOINT\}\}/g, v(responsesEndpoint))
     .replace(/\{\{BASE_URL_V1\}\}/g, v(vars.baseUrlV1))
     .replace(/\{\{BASE_URL\}\}/g, v(vars.baseUrl))
     .replace(/\{\{ALL_MODELS_MAP_JSON\}\}/g, v(allModelsMapJson))

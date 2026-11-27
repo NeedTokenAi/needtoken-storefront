@@ -1,11 +1,11 @@
 <template>
   <div ref="scopeEl" class="nt-scope" @pointerover.passive="prefetchLink" @focusin="prefetchLink" @touchstart.passive="prefetchLink">
-    <!-- 会员控制台（/me/*）：独立全视口 App Shell，隐藏店面顶栏与巨型页脚，保留右下角客服浮窗 -->
+    <!-- 会员控制台（/me/*）：独立全视口 App Shell，隐藏店面顶栏与巨型页脚，非 Playground 页面保留右下角客服浮窗 -->
     <template v-if="isMemberConsoleRoute">
       <main class="relative isolate flex-1">
         <slot />
       </main>
-      <SupportWidget :support="support" :raised="false" />
+      <SupportWidget v-if="!isPlaygroundRoute" :support="support" :raised="false" />
     </template>
 
     <!-- 登录/注册/找回密码：轻量专注顶栏 + 一屏居中内容，隐藏页脚与客服浮窗 -->
@@ -271,6 +271,7 @@ const appStore = useAppStore()
 const authStore = useUserAuthStore()
 const isAuthFocusedRoute = computed(() => ['/auth/login', '/auth/register', '/auth/forgot'].includes(route.path))
 const isMemberConsoleRoute = computed(() => isNeedtokenMemberConsolePath(route.path))
+const isPlaygroundRoute = computed(() => route.path === '/me/playground' || route.path.startsWith('/me/playground/'))
 const { summary: apiSummary, loadSummary } = useApiAccountLink()
 const authReturnPath = computed(() => safeAuthReturnPath(route.path.startsWith('/auth/') ? route.query.redirect : route.fullPath, '/me'))
 const loginTarget = computed(() => ({ path: '/auth/login', query: { redirect: authReturnPath.value } }))

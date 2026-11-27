@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  buildApiConsumeWalletRows,
   buildSelectableGroupOptions,
   classifyConsoleModelVendor,
   collectModelsForConsoleGroups,
@@ -278,4 +279,84 @@ test('renderQuickToolTemplate injects member credentials, dynamic model lists, a
     deepLink,
     'ccswitch://v1/import?endpoint=https%3A%2F%2Fapi.needtoken.ai&apiKey=sk-test%2Babc%2F123',
   )
+
+  const multiProto = renderQuickToolTemplate(
+    'logo={{SITE_LOGO_URL}}|claude={{ANTHROPIC_BASE_URL}}|gemini={{GEMINI_BASE_URL}}|resp={{RESPONSES_ENDPOINT}}',
+    {
+      ...vars,
+      siteLogoUrl: 'https://api.needtoken.ai/logo.png',
+      anthropicBaseUrl: 'https://api.needtoken.ai',
+      geminiBaseUrl: 'https://api.needtoken.ai',
+      responsesEndpoint: 'https://api.needtoken.ai/v1/responses',
+    },
+    false,
+  )
+  assert.equal(
+    multiProto,
+    'logo=https://api.needtoken.ai/logo.png|claude=https://api.needtoken.ai|gemini=https://api.needtoken.ai|resp=https://api.needtoken.ai/v1/responses',
+  )
+})
+
+test('buildApiConsumeWalletRows filters pure subscription logs and keeps wallet/overflow deductions', () => {
+  assert.equal(matchesWalletRecordCategory('api_consume', 'spend'), true)
+  assert.equal(matchesWalletRecordCategory('api_consume', 'recharge'), false)
+  assert.equal(matchesWalletRecordCategory('api_consume', 'gift_card'), false)
+
+  const rows = buildApiConsumeWalletRows({
+    logs: [
+      // Pure subscription usage -> excluded
+      {
+        id: 1,
+        created_at: 1700000100,
+        type: 2,
+        model_name: 'gpt-5.4',
+        quota: 500_000,
+        billing_source: 'subscription',
+        wallet_quota_deducted: 0,
+      },
+      // Subscription overflow -> included with overflow deducted quota only
+      {
+        id: 2,
+        created_at: 1700000200,
+        type: 2,
+        model_name: 'gpt-6-sol',
+        token_name: 'main',
+        quota: 1_000_000,
+        billing_source: 'subscription',
+        wallet_quota_deducted: 250_000,
+      },
+      // Direct wallet deduction -> included
+      {
+        id: 3,
+        created_at: 1700000300,
+        type: 2,
+        model_name: 'gpt-6.1-sol',
+        quota: 500_000,
+        billing_source: 'wallet',
+      },
+      // Legacy consume log without billing_source -> fallback included
+      {
+        id: 4,
+        created_at: 1700000400,
+        type: 2,
+        model_name: 'claude-sonnet-4-6',
+        quota: 100_000,
+      },
+    ],
+    siteCurrency: 'CNY',
+    usdCnyRate: 7.2,
+    quotaPerUnit: 500_000,
+  })
+
+  assert.equal(rows.length, 3)
+  assert.equal(rows[0]?.id, 'api-2')
+  assert.equal(rows[0]?.type, 'api_consume')
+  assert.equal(rows[0]?.direction, 'out')
+  assert.equal(rows[0]?.amount, '3.60')
+  assert.equal(rows[0]?.currency, 'CNY')
+  assert.ok(rows[0]?.remark.includes('套餐超额'))
+  assert.equal(rows[1]?.id, 'api-3')
+  assert.equal(rows[1]?.amount, '7.20')
+  assert.equal(rows[2]?.id, 'api-4')
+  assert.equal(rows[2]?.amount, '1.44')
 })
