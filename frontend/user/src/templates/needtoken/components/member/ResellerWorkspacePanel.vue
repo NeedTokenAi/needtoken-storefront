@@ -92,7 +92,7 @@
 
     <!-- 未开通 / 审核中 / 未激活：直接纳管入驻申请 -->
     <div v-else-if="!isActive" class="needtoken-reseller-shell">
-      <ResellerApply />
+      <ResellerApply embedded />
     </div>
 
     <!-- 已激活：按二级 Tab 渲染重构纳管的模块 -->

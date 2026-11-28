@@ -192,6 +192,7 @@ export interface AffiliateDashboardData {
 
 export interface AffiliateCommissionData {
     id: number
+    order_no?: string
     commission_type: string
     commission_amount: string
     status: string

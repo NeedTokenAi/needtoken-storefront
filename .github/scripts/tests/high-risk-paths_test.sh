@@ -107,6 +107,10 @@ high_risk_cases=(
   "frontend/user/src/templates/vault/GuestOrderDetail.vue"
   "frontend/user/src/templates/atelier/OrderDetail.vue"
   "frontend/user/src/templates/atelier/GuestOrderDetail.vue"
+  "internal/modules/settings/contract/wallet_recharge_bonus.go"
+  "frontend/user/src/views/personal/AffiliatePanel.vue"
+  "frontend/user/src/views/reseller/ResellerApply.vue"
+  "frontend/admin/src/views/admin/Wallet.vue"
 )
 
 for path in "${high_risk_cases[@]}" "internal/modules/identity/user/contract/store.go"; do

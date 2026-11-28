@@ -92,6 +92,7 @@ export interface GatewayLogItem {
   content: string
   billing_source?: string
   wallet_quota_deducted?: number
+  balance_after_quota?: number
 }
 
 export interface GatewayLogsResponse {
@@ -100,6 +101,7 @@ export interface GatewayLogsResponse {
   page: number
   page_size: number
   quota_per_unit: number
+  user_quota?: number
 }
 
 export interface GatewayUsageDailyItem {

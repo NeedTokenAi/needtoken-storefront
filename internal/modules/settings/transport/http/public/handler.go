@@ -40,6 +40,14 @@ type Settings interface {
 	GetActiveHomeAnnouncement() (jsonmap.JSON, bool)
 }
 
+type walletRechargeBonusReader interface {
+	GetWalletRechargeBonusMap() map[string]interface{}
+}
+
+type resellerPublicReader interface {
+	ResellerPublicConfig() map[string]interface{}
+}
+
 // PaymentChannels 公开支付渠道端口。
 type PaymentChannels interface {
 	GetOrderPaymentChannels() ([]map[string]interface{}, error)
@@ -206,6 +214,12 @@ func (h *Handler) GetConfig(c *gin.Context) {
 		return
 	}
 	data["affiliate"] = affiliateSetting
+	if bonusReader, ok := h.settings.(walletRechargeBonusReader); ok {
+		data["wallet_recharge_bonus"] = bonusReader.GetWalletRechargeBonusMap()
+	}
+	if resellerReader, ok := h.settings.(resellerPublicReader); ok {
+		data["reseller"] = resellerReader.ResellerPublicConfig()
+	}
 
 	data["smtp_enabled"] = h.settings.GetSMTPEnabled()
 	registrationEnabled, _ := h.settings.GetRegistrationEnabled(true)

@@ -7,7 +7,7 @@
       <template #actions>
         <ResellerCopyButton v-if="detail" :value="detail.order_no" />
         <Button as-child variant="outline" size="sm">
-          <RouterLink to="/reseller/orders">
+          <RouterLink :to="resellerConsolePath(route.path, 'orders')">
             <ArrowLeft class="h-4 w-4" />
             {{ t('resellerConsole.orderDetail.back') }}
           </RouterLink>
@@ -186,6 +186,7 @@ import { formatResellerOrderItemSkuText } from '../../utils/resellerOrderDisplay
 import {
   formatResellerConsoleAmount,
   formatResellerConsoleDate,
+  resellerConsolePath,
   resellerOrderStatusTone,
   resellerProfitStatusKey,
 } from '../../utils/resellerConsole'

@@ -158,7 +158,20 @@
       </div>
 
       <div v-else-if="filteredTransactions.length === 0" class="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-        {{ t('needtoken.memberConsole.assets.recordsEmpty') }}
+        <p>{{ t('needtoken.memberConsole.assets.recordsEmpty') }}</p>
+        <p
+          v-if="recordFilter === 'spend' && showGatewayFeatures && activePlanCount > 0"
+          class="mx-auto mt-2 max-w-md text-xs text-muted-foreground"
+        >
+          {{ t('needtoken.memberConsole.assets.planDeductionUsageHint') }}
+          <button
+            type="button"
+            class="ml-1 font-semibold text-primary hover:underline"
+            @click="$emit('navigate', 'usage')"
+          >
+            {{ t('needtoken.memberConsole.assets.goUsageLogs') }}
+          </button>
+        </p>
       </div>
 
       <div v-else class="overflow-x-auto rounded-xl border">
@@ -177,7 +190,10 @@
             <TableRow v-for="item in filteredTransactions" :key="item.id">
               <TableCell class="whitespace-nowrap px-4 text-xs text-muted-foreground">{{ formatDate(item.created_at) }}</TableCell>
               <TableCell class="whitespace-nowrap px-4">
-                <Badge size="sm" :variant="item.type === 'gift_card_redeem' ? 'accent' : 'secondary'">
+                <Badge
+                  size="sm"
+                  :variant="item.type === 'gift_card_redeem' ? 'accent' : item.type === 'recharge_bonus' ? 'success' : 'secondary'"
+                >
                   {{ transactionTypeLabel(item.type) }}
                 </Badge>
               </TableCell>
@@ -365,6 +381,35 @@
               :placeholder="t('personalCenter.wallet.amountPlaceholder')"
               class="h-11 font-mono"
             />
+            <div v-if="rechargeBonusEnabled" class="mt-2.5 space-y-2 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3 py-2.5 text-xs">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="font-semibold text-emerald-700 dark:text-emerald-300">
+                  {{ t('needtoken.memberConsole.assets.rechargeBonusTitle') }}
+                </span>
+                <span v-if="eligibleForFirstBonus" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                  {{ t('needtoken.memberConsole.assets.firstRechargeEligible') }}
+                </span>
+              </div>
+              <div v-if="rechargeBonusTiers.length > 0" class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="(tier, idx) in rechargeBonusTiers"
+                  :key="idx"
+                  type="button"
+                  class="rounded-lg border border-emerald-500/30 bg-background px-2 py-1 font-mono text-[11px] text-foreground transition-colors hover:border-primary hover:text-primary"
+                  @click="rechargeForm.amount = String(tier.min_amount)"
+                >
+                  {{ formatBonusTierLabel(tier) }}
+                </button>
+              </div>
+              <p v-if="rechargeBonusPreview.totalBonus > 0" class="font-medium text-emerald-700 dark:text-emerald-300">
+                {{
+                  t('needtoken.memberConsole.assets.estimatedBonus', {
+                    bonus: rechargeBonusPreview.totalBonus.toFixed(2),
+                    currency: selectedChannelCurrency,
+                  })
+                }}
+              </p>
+            </div>
           </div>
 
           <div>
@@ -448,7 +493,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { listGatewayLogs } from '../../lib/gatewayConsoleApi'
 import {
   buildApiConsumeWalletRows,
+  calculateWalletRechargeBonusPreview,
   matchesWalletRecordCategory,
+  type WalletRechargeBonusPublicConfig,
+  type WalletRechargeBonusTierConfig,
   type WalletRecordCategoryFilter,
   type WalletTransactionRow,
 } from '../../lib/gatewayConsoleHelpers'
@@ -533,13 +581,16 @@ const signedAmount = (direction: string, amount?: string, currency?: string) => 
 const loadTransactions = async (page = 1) => {
   txLoading.value = true
   txError.value = ''
+  const activeFilter = recordFilter.value
+  const shouldLoadGatewaySpend = props.showGatewayFeatures && page === 1 && (activeFilter === 'all' || activeFilter === 'spend')
   try {
     const [response, logsRes] = await Promise.all([
       walletAPI.transactions({
         page,
         page_size: pagination.value.page_size,
+        category: activeFilter === 'all' ? undefined : activeFilter,
       }),
-      props.showGatewayFeatures && page === 1
+      shouldLoadGatewaySpend
         ? listGatewayLogs({ p: 1, page_size: 50, type: 2 }).catch(() => null)
         : Promise.resolve(null),
     ])
@@ -550,6 +601,7 @@ const loadTransactions = async (page = 1) => {
           quotaPerUnit: logsRes.quota_per_unit || 500_000,
           siteCurrency: settlementCurrency.value,
           usdCnyRate: Number(usdCnyRate.value) || null,
+          userQuota: typeof logsRes.user_quota === 'number' ? logsRes.user_quota : null,
         })
       : []
     const merged = [...baseRows, ...apiRows].sort((a, b) => {
@@ -566,6 +618,10 @@ const loadTransactions = async (page = 1) => {
     txLoading.value = false
   }
 }
+
+watch(recordFilter, () => {
+  void loadTransactions(1)
+})
 
 const changePage = (page: number) => {
   if (page < 1 || page > pagination.value.total_page) return
@@ -739,6 +795,35 @@ const EPAY_ALLOWED_CHANNEL_TYPES = new Set(['wechat', 'wxpay', 'alipay', 'qqpay'
 const selectedChannelCurrency = computed(() => String(appStore.config?.currency || 'CNY'))
 const selectedChannel = computed(() => channels.value.find((item: any) => item.id === rechargeForm.channelId) || null)
 
+const hasPriorPaidRecharge = ref<boolean | null>(null)
+const rechargeBonusConfig = computed(() => (appStore.config?.wallet_recharge_bonus || null) as WalletRechargeBonusPublicConfig | null)
+const rechargeBonusEnabled = computed(() => Boolean(rechargeBonusConfig.value?.enabled))
+const rechargeBonusTiers = computed<WalletRechargeBonusTierConfig[]>(() => {
+  const tiers = rechargeBonusConfig.value?.tiers
+  if (!Array.isArray(tiers)) return []
+  return [...tiers]
+    .filter((item) => Number(item?.min_amount) > 0 && Number(item?.bonus_value) > 0)
+    .sort((a, b) => Number(a.min_amount) - Number(b.min_amount))
+})
+const eligibleForFirstBonus = computed(() => {
+  if (!rechargeBonusEnabled.value) return false
+  if (Number(rechargeBonusConfig.value?.first_recharge_bonus_value || 0) <= 0) return false
+  return hasPriorPaidRecharge.value !== true
+})
+const rechargeBonusPreview = computed(() =>
+  calculateWalletRechargeBonusPreview(rechargeForm.amount, rechargeBonusConfig.value, {
+    isFirstRecharge: hasPriorPaidRecharge.value !== true,
+  }),
+)
+const formatBonusTierLabel = (tier: WalletRechargeBonusTierConfig) => {
+  const minVal = Number(tier.min_amount)
+  const val = Number(tier.bonus_value)
+  if (String(tier.bonus_type || '').toLowerCase() === 'percent') {
+    return t('needtoken.memberConsole.assets.bonusTierPercent', { min: minVal, rate: val })
+  }
+  return t('needtoken.memberConsole.assets.bonusTierFixed', { min: minVal, bonus: val })
+}
+
 const hasChannels = computed(() => {
   const amount = rechargeForm.amount.trim()
   const amountCents = amountToCents(amount)
@@ -887,6 +972,16 @@ watch(channels, (list) => {
 const openRechargeModal = async () => {
   helpOpen.value = false
   rechargeAlert.value = null
+  if (hasPriorPaidRecharge.value === null && rechargeBonusEnabled.value) {
+    void walletAPI.rechargeOrders({ page: 1, page_size: 1, status: 'paid' })
+      .then((res) => {
+        const total = Number(res.data?.pagination?.total || 0)
+        hasPriorPaidRecharge.value = total > 0
+      })
+      .catch(() => {
+        hasPriorPaidRecharge.value = false
+      })
+  }
   await nextTick()
   if (rechargeDialogRef.value && !rechargeDialogRef.value.open) {
     rechargeDialogRef.value.showModal()

@@ -1,6 +1,7 @@
 <template>
   <div class="space-y-5">
     <ResellerSectionHeader
+      v-if="!embedded"
       :title="t('resellerConsole.apply.title')"
       :description="t('resellerConsole.apply.description')"
     />
@@ -19,6 +20,11 @@
       :title="t('resellerConsole.common.loading')"
       :description="t('resellerConsole.common.loadingDescription')"
     />
+
+    <Card v-else-if="resellerSystemDisabled" class="p-6 text-center">
+      <h3 class="text-base font-bold text-foreground">{{ t('resellerConsole.apply.systemDisabledTitle') }}</h3>
+      <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{{ t('resellerConsole.apply.systemDisabledDescription') }}</p>
+    </Card>
 
     <template v-else>
       <!-- 状态 stepper -->
@@ -78,7 +84,7 @@
             <h3 class="mt-3 text-base font-bold text-foreground">{{ t('resellerConsole.apply.unavailableTitle') }}</h3>
             <p class="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{{ t('resellerConsole.apply.unavailableDescription') }}</p>
             <Button as-child class="mt-5">
-              <RouterLink to="/reseller">{{ t('resellerConsole.nav.dashboard') }}</RouterLink>
+              <RouterLink :to="resellerConsolePath(route.path)">{{ t('resellerConsole.nav.dashboard') }}</RouterLink>
             </Button>
           </div>
         </Card>
@@ -90,8 +96,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { BadgeCheck, Check, CheckCircle2, X } from 'lucide-vue-next'
 import { resellerAPI } from '../../api'
+import { useAppStore } from '../../stores/app'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -101,10 +109,18 @@ import ResellerPageState from '../../components/reseller-console/ResellerPageSta
 import ResellerSectionHeader from '../../components/reseller-console/ResellerSectionHeader.vue'
 import { useResellerProfile } from '../../composables/reseller/useResellerProfile'
 import { type PageAlert } from '../../utils/alerts'
+import { resellerConsolePath } from '../../utils/resellerConsole'
 import { getResellerProfileStatusKey } from '../../utils/resellerManagement'
 
+defineProps<{
+  embedded?: boolean
+}>()
+
 const { t } = useI18n()
+const route = useRoute()
+const appStore = useAppStore()
 const { loading, snapshot, state, load } = useResellerProfile()
+const resellerSystemDisabled = computed(() => appStore.config?.reseller?.enabled === false && !snapshot.value?.opened)
 const submitting = ref(false)
 const reason = ref('')
 const alert = ref<PageAlert | null>(null)

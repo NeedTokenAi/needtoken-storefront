@@ -85,7 +85,7 @@ func (h *Handler) OpenAffiliate(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, affiliateapp.ErrDisabled):
-			ginutil.RespondError(c, response.CodeBadRequest, "error.forbidden", nil)
+			ginutil.RespondError(c, response.CodeBadRequest, "error.affiliate_disabled", nil)
 		case errors.Is(err, affiliateapp.ErrNotFound):
 			ginutil.RespondError(c, response.CodeNotFound, "error.user_not_found", nil)
 		default:
@@ -125,7 +125,7 @@ func (h *Handler) GetProductRates(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, affiliateapp.ErrDisabled):
-			ginutil.RespondError(c, response.CodeBadRequest, "error.forbidden", nil)
+			ginutil.RespondError(c, response.CodeBadRequest, "error.affiliate_disabled", nil)
 		case errors.Is(err, affiliateapp.ErrNotOpened):
 			ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 		case errors.Is(err, affiliateapp.ErrNotFound):
@@ -198,7 +198,7 @@ func (h *Handler) ApplyAffiliateWithdraw(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, affiliateapp.ErrDisabled):
-			ginutil.RespondError(c, response.CodeBadRequest, "error.forbidden", nil)
+			ginutil.RespondError(c, response.CodeBadRequest, "error.affiliate_disabled", nil)
 		case errors.Is(err, affiliateapp.ErrNotOpened):
 			ginutil.RespondError(c, response.CodeBadRequest, "error.bad_request", nil)
 		case errors.Is(err, affiliateapp.ErrWithdrawAmountInvalid):

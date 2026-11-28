@@ -37,6 +37,7 @@ type Repository interface {
 	GetRechargeOrdersByPaymentIDs(paymentIDs []uint) ([]walletdomain.RechargeOrder, error)
 	ListRechargeOrdersAdmin(filter RechargeListFilter) ([]walletdomain.RechargeOrder, int64, error)
 	StatsRechargeOrders(filter RechargeListFilter) (map[string]int64, error)
+	HasSuccessfulRechargeBefore(userID, excludeRechargeID uint) (bool, error)
 
 	CreateUnifiedOp(op *walletdomain.UnifiedOp) error
 	GetUnifiedOpByOpID(opID string) (*walletdomain.UnifiedOp, error)

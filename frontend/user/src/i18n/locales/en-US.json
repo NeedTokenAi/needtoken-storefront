@@ -523,6 +523,8 @@
         "google_config_invalid": "Google sign-in configuration is invalid",
         "internal_error": "Internal error"
       },
+      "externalIdentitiesTitle": "Quick Sign-In Connections",
+      "externalIdentitiesSubtitle": "Bind Telegram or Google to sign in with one click",
       "telegramTitle": "Telegram Account",
       "telegramSubtitle": "Bind Telegram to sign in without password",
       "telegramBound": "Bound",
@@ -677,6 +679,7 @@
       },
       "types": {
         "recharge": "Top-up",
+        "recharge_bonus": "Top-up bonus",
         "order_pay": "Order payment",
         "order_refund": "Order refund",
         "gift_card_redeem": "Gift card redeem",
@@ -698,6 +701,7 @@
     "affiliate": {
       "title": "Affiliate Center",
       "subtitle": "Track referrals and commissions, then submit withdraw requests",
+      "systemDisabledNotice": "The affiliate program is currently disabled on this site.",
       "notOpened": "Affiliate is not enabled for your account yet. Open it to get your unique affiliate ID and promotion URL.",
       "openButton": "Open Affiliate",
       "opening": "Opening...",
@@ -1558,6 +1562,8 @@
       "domainCount": "Domains",
       "unavailableTitle": "Application is not required",
       "unavailableDescription": "If access is active, use the other reseller modules directly.",
+      "systemDisabledTitle": "Reseller program unavailable",
+      "systemDisabledDescription": "Self-service reseller applications are currently disabled on this site. Please contact support for assistance.",
       "stepSubmit": "Submit",
       "stepReview": "Review",
       "stepActive": "Active",
@@ -4359,7 +4365,14 @@
         "planQuotaNote": "Deducted first by model group",
         "goWithdraw": "Withdraw",
         "tabGiftCard": "Redeem Gift Card",
-        "tabWallet": "Top Up Balance"
+        "tabWallet": "Top Up Balance",
+        "planDeductionUsageHint": "Subscription quota usage does not deduct from Wallet Balance.",
+        "goUsageLogs": "View Usage & Logs",
+        "rechargeBonusTitle": "Recharge Bonus Promotion",
+        "firstRechargeEligible": "First-recharge bonus eligible",
+        "estimatedBonus": "Estimated extra bonus: +{bonus} {currency} (non-refundable)",
+        "bonusTierPercent": "Top up {min}+ get {rate}%",
+        "bonusTierFixed": "Top up {min}+ get +{bonus}"
       },
       "keys": {
         "title": "API Key Management",

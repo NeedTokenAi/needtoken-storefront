@@ -44,6 +44,7 @@ import (
 	paymentgormstore "github.com/dujiao-next/internal/modules/payment/infrastructure/gormstore"
 	resellercontract "github.com/dujiao-next/internal/modules/reseller/contract"
 	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
+	settingscontract "github.com/dujiao-next/internal/modules/settings/contract"
 	settingsstore "github.com/dujiao-next/internal/modules/settings/infrastructure/gormstore"
 	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
@@ -2415,5 +2416,117 @@ func TestUnifiedBalancePendingRecoveryAndOrderConvergence(t *testing.T) {
 	}
 	if !bridge.balanceOf(user.ID).Equal(decimal.RequireFromString("70.00")) {
 		t.Fatalf("balance must stay 70.00 when not_found closed, got %s", bridge.balanceOf(user.ID).StringFixed(2))
+	}
+}
+
+func TestWalletRechargeBonusFirstAndTieredAndRefundCap(t *testing.T) {
+	svc, db := setupPaymentServiceWalletTest(t)
+	if err := db.AutoMigrate(&settingsstore.SettingRecord{}); err != nil {
+		t.Fatal(err)
+	}
+	settingStore := settingsstore.New(db)
+	settingSvc := settingsapp.NewService(settingStore)
+	svc.settingService = settingSvc
+
+	_, err := settingSvc.UpdateWalletRechargeBonusConfig(settingscontract.WalletRechargeBonusConfig{
+		Enabled:                 true,
+		FirstRechargeBonusType:  settingscontract.WalletBonusTypeFixed,
+		FirstRechargeBonusValue: 5,
+		FirstRechargeMinAmount:  20,
+		Tiers: []settingscontract.WalletRechargeBonusTier{
+			{MinAmount: 100, BonusType: settingscontract.WalletBonusTypeFixed, BonusValue: 15},
+		},
+		MaxBonusPerOrder: 50,
+		CostRatePercent:  100,
+	})
+	if err != nil {
+		t.Fatalf("update bonus config: %v", err)
+	}
+
+	now := time.Now().UTC()
+	user := userdomain.User{
+		Email: "bonus_user@example.com", DisplayName: "BonusUser", PasswordHash: "h",
+		Status: constants.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	createRecharge := func(idx int, amount string) (*paymentdomain.Payment, *walletdomain.RechargeOrder) {
+		p := paymentdomain.Payment{
+			ID: uint(9000 + idx), ChannelID: 1, ProviderType: constants.PaymentProviderOfficial,
+			ChannelType: constants.PaymentChannelTypeAlipay, InteractionMode: constants.PaymentInteractionQR,
+			Amount: money.FromDecimal(decimal.RequireFromString(amount)), Currency: "CNY", Status: constants.PaymentStatusPending,
+			CreatedAt: now, UpdatedAt: now,
+		}
+		if err := db.Create(&p).Error; err != nil {
+			t.Fatal(err)
+		}
+		r := walletdomain.RechargeOrder{
+			ID: uint(9100 + idx), RechargeNo: fmt.Sprintf("RCH-BONUS-%d", idx), UserID: user.ID, PaymentID: p.ID,
+			ChannelID: 1, ProviderType: constants.PaymentProviderOfficial, ChannelType: constants.PaymentChannelTypeAlipay,
+			InteractionMode: constants.PaymentInteractionQR,
+			Amount:          money.FromDecimal(decimal.RequireFromString(amount)),
+			PayableAmount:   money.FromDecimal(decimal.RequireFromString(amount)),
+			FeeRate:         money.FromDecimal(decimal.Zero), FeeAmount: money.FromDecimal(decimal.Zero),
+			Currency: "CNY", Status: constants.WalletRechargeStatusPending, CreatedAt: now, UpdatedAt: now,
+		}
+		if err := db.Create(&r).Error; err != nil {
+			t.Fatal(err)
+		}
+		return &p, &r
+	}
+
+	// 1. 首充 100.00 -> 本金 100 + 满100赠15 + 首充加赠5 = 120.00
+	p1, r1 := createRecharge(1, "100.00")
+	cb1 := buildWalletRechargeCallbackInput(p1, r1, constants.PaymentStatusSuccess, "BONUS-REF-1")
+	if _, err := svc.HandleCallback(cb1); err != nil {
+		t.Fatalf("first recharge callback: %v", err)
+	}
+	// 重复回调不重复发放赠金
+	if _, err := svc.HandleCallback(cb1); err != nil {
+		t.Fatalf("duplicate first recharge callback: %v", err)
+	}
+
+	acc, err := svc.walletSvc.GetAccount(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !acc.Balance.Decimal.Equal(decimal.RequireFromString("120.00")) {
+		t.Fatalf("balance after first recharge = %s, want 120.00", acc.Balance.String())
+	}
+	var bonusCount int64
+	if err := db.Model(&walletdomain.Transaction{}).
+		Where("user_id = ? AND type = ?", user.ID, constants.WalletTxnTypeRechargeBonus).
+		Count(&bonusCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if bonusCount != 1 {
+		t.Fatalf("bonus txn count = %d, want 1", bonusCount)
+	}
+
+	// 2. 二次充值 100.00 -> 仅享受阶梯赠送 15，不再享受首充 5 -> 余额 120 + 115 = 235.00
+	p2, r2 := createRecharge(2, "100.00")
+	if _, err := svc.HandleCallback(buildWalletRechargeCallbackInput(p2, r2, constants.PaymentStatusSuccess, "BONUS-REF-2")); err != nil {
+		t.Fatalf("second recharge callback: %v", err)
+	}
+	acc, err = svc.walletSvc.GetAccount(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !acc.Balance.Decimal.Equal(decimal.RequireFromString("235.00")) {
+		t.Fatalf("balance after second recharge = %s, want 235.00", acc.Balance.String())
+	}
+
+	// 3. 对首笔充值申请超出实付本金 (105 > 100) 的退款应被拒绝（不退赠金）
+	err = svc.walletSvc.RefundRecharge(walletcontract.RechargeRefundInput{
+		RechargeID: r1.ID,
+		AdminID:    1,
+		Amount:     money.FromDecimal(decimal.RequireFromString("105.00")),
+		RequestID:  "refund-bonus-cap-check-0001",
+		Remark:     "exceed paid principal",
+	})
+	if !errors.Is(err, walletcontract.ErrRefundExceeded) {
+		t.Fatalf("expected ErrRefundExceeded when exceeding principal, got %v", err)
 	}
 }

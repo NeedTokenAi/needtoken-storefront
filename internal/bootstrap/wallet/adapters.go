@@ -36,6 +36,13 @@ func (a walletTransportAdapter) ListTransactions(userID uint, page, pageSize int
 	return transactions, total, mapWalletTransportError(err)
 }
 
+func (a walletTransportAdapter) ListTransactionsByCategory(userID uint, page, pageSize int, types []string) ([]walletdomain.Transaction, int64, error) {
+	transactions, total, err := a.wallets.ListTransactions(walletcontract.TransactionListFilter{
+		Page: page, PageSize: pageSize, UserID: userID, Types: types,
+	})
+	return transactions, total, mapWalletTransportError(err)
+}
+
 func (a walletTransportAdapter) ListAdminTransactions(userID uint, page, pageSize int, typ, direction string) ([]walletdomain.Transaction, int64, error) {
 	transactions, total, err := a.wallets.ListTransactions(walletcontract.TransactionListFilter{
 		Page: page, PageSize: pageSize, UserID: userID, Type: typ, Direction: direction,

@@ -35,7 +35,7 @@
             </li>
           </ul>
           <Button as-child class="mt-6">
-            <RouterLink to="/reseller/apply">{{ t('resellerConsole.nav.apply') }}</RouterLink>
+            <RouterLink :to="resellerConsolePath(route.path, 'apply')">{{ t('resellerConsole.nav.apply') }}</RouterLink>
           </Button>
         </div>
       </Card>
@@ -156,7 +156,7 @@
       <Card class="p-5">
         <div class="mb-4 flex items-center justify-between gap-3">
           <h3 class="text-base font-bold text-foreground">{{ t('resellerConsole.orders.title') }}</h3>
-          <RouterLink to="/reseller/orders" class="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+          <RouterLink :to="resellerConsolePath(route.path, 'orders')" class="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
             {{ t('resellerConsole.dashboard.viewOrders') }}
             <ChevronRight class="h-4 w-4" />
           </RouterLink>
@@ -192,7 +192,7 @@
             <RouterLink
               v-for="row in recentOrders"
               :key="row.order_no"
-              :to="`/reseller/orders/${encodeURIComponent(row.order_no)}`"
+              :to="resellerConsolePath(route.path, `orders/${encodeURIComponent(row.order_no)}`)"
               class="block"
             >
               <ResellerRecordCard>
@@ -220,6 +220,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import {
   Banknote,
   CheckCircle2,
@@ -257,6 +258,7 @@ import {
 import {
   formatResellerConsoleAmount,
   formatResellerConsoleDate,
+  resellerConsolePath,
   resellerCurrencyColor,
   resellerOrderStatusColor,
   resellerOrderStatusTone,
@@ -264,6 +266,7 @@ import {
 import { pickPrimaryResellerBalance } from '../../utils/resellerFinance'
 
 const { t, te } = useI18n()
+const route = useRoute()
 const { loading: profileLoading, snapshot: profileSnapshot, state: profileState, load: loadProfile } = useResellerProfile()
 const finance = useResellerFinance()
 const { dashboardLoading, dashboard, balances, loadDashboard, loadBalances } = finance
@@ -335,43 +338,43 @@ const siteBrandConfigured = computed(() => {
 })
 
 const quickActions = computed(() => [
-  { to: '/reseller/withdraws', label: t('resellerConsole.nav.withdraws'), icon: Upload },
-  { to: '/reseller/domains', label: t('resellerConsole.nav.domains'), icon: Globe },
-  { to: '/reseller/products', label: t('resellerConsole.nav.products'), icon: Tag },
-  { to: '/reseller/site', label: t('resellerConsole.nav.site'), icon: Settings },
+  { to: resellerConsolePath(route.path, 'withdraws'), label: t('resellerConsole.nav.withdraws'), icon: Upload },
+  { to: resellerConsolePath(route.path, 'domains'), label: t('resellerConsole.nav.domains'), icon: Globe },
+  { to: resellerConsolePath(route.path, 'products'), label: t('resellerConsole.nav.products'), icon: Tag },
+  { to: resellerConsolePath(route.path, 'site'), label: t('resellerConsole.nav.site'), icon: Settings },
 ])
 
 const setupChecklist = computed(() => [
   {
-    to: '/reseller/apply',
+    to: resellerConsolePath(route.path, 'apply'),
     label: t('resellerConsole.dashboard.setup.profileEnabled'),
     description: settlementText.value,
     icon: CheckCircle2,
     done: profileState.value.profileStatus === 'active',
   },
   {
-    to: '/reseller/domains',
+    to: resellerConsolePath(route.path, 'domains'),
     label: t('resellerConsole.dashboard.setup.primaryDomain'),
     description: primaryDomain.value || t('resellerConsole.dashboard.setup.primaryDomainEmpty'),
     icon: Globe,
     done: Boolean(primaryDomain.value),
   },
   {
-    to: '/reseller/site',
+    to: resellerConsolePath(route.path, 'site'),
     label: t('resellerConsole.dashboard.setup.siteBrand'),
     description: t('resellerConsole.dashboard.setup.siteBrandDescription'),
     icon: Palette,
     done: siteBrandConfigured.value,
   },
   {
-    to: '/reseller/products',
+    to: resellerConsolePath(route.path, 'products'),
     label: t('resellerConsole.dashboard.setup.productRules'),
     description: t('resellerConsole.dashboard.setup.productRulesDescription'),
     icon: Tag,
     done: configuredProductCount.value > 0,
   },
   {
-    to: '/reseller/orders',
+    to: resellerConsolePath(route.path, 'orders'),
     label: t('resellerConsole.dashboard.setup.firstOrder'),
     description: stats.value?.total
       ? t('resellerConsole.dashboard.setup.firstOrderCount', { count: stats.value.total })

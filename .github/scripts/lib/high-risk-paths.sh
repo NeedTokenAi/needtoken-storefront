@@ -81,7 +81,17 @@ is_high_risk_path() {
       frontend/admin/src/components/captcha/TurnstileCaptcha.vue | \
       frontend/admin/src/views/Login.vue | \
       frontend/user/src/composables/useLogin.ts | frontend/user/src/composables/useRegister.ts | \
-      frontend/user/src/types/telegram-webapp.d.ts)
+      frontend/user/src/types/telegram-webapp.d.ts | \
+      internal/modules/affiliate/transport/http/handler.go | \
+      internal/modules/settings/contract/wallet_recharge_bonus.go | \
+      internal/modules/settings/application/general.go | \
+      internal/modules/settings/transport/http/public/handler.go | \
+      frontend/user/src/views/personal/SecurityPanel.vue | \
+      frontend/user/src/components/security/* | \
+      frontend/user/src/views/personal/AffiliatePanel.vue | \
+      frontend/user/src/utils/resellerConsole.ts | \
+      frontend/user/src/views/reseller/* | \
+      frontend/admin/src/views/admin/Wallet.vue)
       return 0
       ;;
     *)
