@@ -12,6 +12,7 @@ import (
 	"github.com/dujiao-next/internal/cache"
 	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/constants"
+	affiliateapp "github.com/dujiao-next/internal/modules/affiliate/application"
 	categoryapp "github.com/dujiao-next/internal/modules/catalog/category/application"
 	categorydomain "github.com/dujiao-next/internal/modules/catalog/category/domain"
 	mappingapp "github.com/dujiao-next/internal/modules/catalog/mapping/application"
@@ -30,7 +31,13 @@ import (
 	paymentapp "github.com/dujiao-next/internal/modules/payment/application"
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
+	resellerapp "github.com/dujiao-next/internal/modules/reseller/application"
+	resellercontract "github.com/dujiao-next/internal/modules/reseller/contract"
+	resellerdomain "github.com/dujiao-next/internal/modules/reseller/domain"
+	resellergormstore "github.com/dujiao-next/internal/modules/reseller/infrastructure/gormstore"
 	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
+	settingscontract "github.com/dujiao-next/internal/modules/settings/contract"
+	settingsintegration "github.com/dujiao-next/internal/modules/settings/schema/integration"
 	siteconnectionapp "github.com/dujiao-next/internal/modules/siteconnection/application"
 	siteconnectioncontract "github.com/dujiao-next/internal/modules/siteconnection/contract"
 	siteconnectiondomain "github.com/dujiao-next/internal/modules/siteconnection/domain"
@@ -138,6 +145,15 @@ func NewHandler(c *container.Container) *opstransport.Handler {
 	if c.WalletService != nil {
 		svc.WithUnifiedOps(&unifiedOpReaderAdapter{wallets: c.WalletService})
 	}
+	svc.WithGrowth(&growthStoreAdapter{
+		cfg:              c.Config,
+		settings:         c.SettingService,
+		affiliate:        c.AffiliateService,
+		wallets:          c.WalletRepo,
+		resellerMgmt:     c.ResellerManagementService,
+		resellerWithdraw: c.ResellerAccountingWithdraw,
+		resellerStore:    c.ResellerStore,
+	})
 	return opstransport.New(svc)
 }
 
@@ -1304,4 +1320,492 @@ func (a *unifiedOpReaderAdapter) ListPendingUnifiedOpsForOps(limit int) ([]opsco
 		})
 	}
 	return out, nil
+}
+
+const opsSystemAdminID uint = 1
+
+type growthStoreAdapter struct {
+	cfg              *config.Config
+	settings         *settingsapp.Service
+	affiliate        *affiliateapp.Service
+	wallets          walletcontract.Repository
+	resellerMgmt     *resellerapp.ManagementService
+	resellerWithdraw *resellerapp.AccountingWithdrawService
+	resellerStore    *resellergormstore.Store
+}
+
+func decimalToMinor(d decimal.Decimal) int64 {
+	return d.Mul(decimal.NewFromInt(100)).Round(0).IntPart()
+}
+
+func (a *growthStoreAdapter) siteCurrency() string {
+	curr := constants.SiteCurrencyDefault
+	if a.settings != nil {
+		if c, err := a.settings.GetSiteCurrency(constants.SiteCurrencyDefault); err == nil && strings.TrimSpace(c) != "" {
+			curr = strings.ToUpper(strings.TrimSpace(c))
+		}
+	}
+	return curr
+}
+
+func (a *growthStoreAdapter) GrowthSummary() (*opscontract.GrowthSummaryResult, error) {
+	siteCurrency := a.siteCurrency()
+	res := &opscontract.GrowthSummaryResult{
+		Source:       "storefront",
+		CollectedAt:  time.Now().UTC(),
+		SiteCurrency: siteCurrency,
+	}
+	res.Affiliate.Stats = opscontract.AffiliateStatsSummary{
+		PendingCommissionByCurrency:   map[string]int64{},
+		AvailableCommissionByCurrency: map[string]int64{},
+		WithdrawnCommissionByCurrency: map[string]int64{},
+		EffectiveCostByCurrency:       map[string]int64{},
+	}
+	res.RechargeBonus.Settings = settingscontract.DefaultWalletRechargeBonusConfig()
+	res.RechargeBonus.Stats = opscontract.RechargeBonusStatsSummary{
+		TotalBonusByCurrency: map[string]int64{},
+		CostByCurrency:       map[string]int64{},
+	}
+	res.Reseller.Stats = opscontract.ResellerStatsSummary{
+		ProfitCostByCurrency: map[string]int64{},
+	}
+
+	if a.settings != nil {
+		if aff, err := a.settings.GetAffiliateSetting(); err == nil {
+			res.Affiliate.Settings = opscontract.AffiliateSettingDTO{
+				Enabled:           aff.Enabled,
+				CommissionRate:    aff.CommissionRate,
+				ConfirmDays:       aff.ConfirmDays,
+				MinWithdrawAmount: aff.MinWithdrawAmount,
+				WithdrawChannels:  aff.WithdrawChannels,
+			}
+		}
+		res.RechargeBonus.Settings = a.settings.GetWalletRechargeBonusConfig()
+	}
+
+	if a.affiliate != nil {
+		var pendingSum, availSum, withdrawnSum decimal.Decimal
+		for page := 1; ; page++ {
+			items, total, err := a.affiliate.ListAdminUsers(affiliateapp.AdminProfileListFilter{Page: page, PageSize: 200})
+			if err != nil {
+				break
+			}
+			res.Affiliate.Stats.ProfileCount = total
+			for _, item := range items {
+				pendingSum = pendingSum.Add(item.Stats.PendingCommission.Decimal)
+				availSum = availSum.Add(item.Stats.AvailableCommission.Decimal)
+				withdrawnSum = withdrawnSum.Add(item.Stats.WithdrawnCommission.Decimal)
+			}
+			if len(items) < 200 || int64(page*200) >= total {
+				break
+			}
+		}
+		res.Affiliate.Stats.PendingCommissionByCurrency[siteCurrency] = decimalToMinor(pendingSum)
+		res.Affiliate.Stats.AvailableCommissionByCurrency[siteCurrency] = decimalToMinor(availSum)
+		res.Affiliate.Stats.WithdrawnCommissionByCurrency[siteCurrency] = decimalToMinor(withdrawnSum)
+		res.Affiliate.Stats.EffectiveCostByCurrency[siteCurrency] = decimalToMinor(availSum.Add(withdrawnSum))
+
+		if _, pendingW, err := a.affiliate.ListAdminWithdraws(affiliateapp.AdminWithdrawListFilter{
+			Page:     1,
+			PageSize: 1,
+			Status:   constants.AffiliateWithdrawStatusPendingReview,
+		}); err == nil {
+			res.Affiliate.Stats.PendingWithdrawCount = pendingW
+		}
+	}
+
+	if a.wallets != nil {
+		costRate := decimal.NewFromFloat(res.RechargeBonus.Settings.CostRatePercent).Div(decimal.NewFromInt(100))
+		bonusSums := map[string]decimal.Decimal{}
+		for page := 1; ; page++ {
+			txns, total, err := a.wallets.ListTransactions(walletcontract.TransactionListFilter{
+				Page:     page,
+				PageSize: 200,
+				Type:     constants.WalletTxnTypeRechargeBonus,
+			})
+			if err != nil {
+				break
+			}
+			res.RechargeBonus.Stats.BonusCount = total
+			for _, txn := range txns {
+				curr := strings.ToUpper(strings.TrimSpace(txn.Currency))
+				if curr == "" {
+					curr = siteCurrency
+				}
+				bonusSums[curr] = bonusSums[curr].Add(txn.Amount.Decimal)
+			}
+			if len(txns) < 200 || int64(page*200) >= total {
+				break
+			}
+		}
+		for curr, sum := range bonusSums {
+			res.RechargeBonus.Stats.TotalBonusByCurrency[curr] = decimalToMinor(sum)
+			res.RechargeBonus.Stats.CostByCurrency[curr] = decimalToMinor(sum.Mul(costRate))
+		}
+	}
+
+	if a.cfg != nil {
+		res.Reseller.Config = opscontract.ResellerConfigSummary{
+			Enabled:               a.cfg.Reseller.Enabled,
+			SelfApplyEnabled:      a.cfg.Reseller.SelfApplyEnabled,
+			SubdomainBase:         strings.TrimSpace(a.cfg.Reseller.SubdomainBase),
+			SettlementConfirmDays: a.cfg.Reseller.SettlementConfirmDays,
+		}
+	}
+
+	if a.resellerStore != nil {
+		if _, total, err := a.resellerStore.ListProfiles(resellercontract.ProfileListFilter{Page: 1, PageSize: 1}); err == nil {
+			res.Reseller.Stats.TotalProfiles = total
+		}
+		if _, pending, err := a.resellerStore.ListProfiles(resellercontract.ProfileListFilter{Page: 1, PageSize: 1, Status: resellerdomain.ProfileStatusPendingReview}); err == nil {
+			res.Reseller.Stats.PendingReviewCount = pending
+		}
+		if _, active, err := a.resellerStore.ListProfiles(resellercontract.ProfileListFilter{Page: 1, PageSize: 1, Status: resellerdomain.ProfileStatusActive}); err == nil {
+			res.Reseller.Stats.ActiveCount = active
+		}
+		if _, pendingW, err := a.resellerStore.ListAdminResellerWithdrawRequests(resellercontract.AdminWithdrawListFilter{
+			Page:     1,
+			PageSize: 1,
+			Status:   resellerdomain.WithdrawStatusPending,
+		}); err == nil {
+			res.Reseller.Stats.PendingWithdrawCount = pendingW
+		}
+		ledgerSums := map[string]decimal.Decimal{}
+		for page := 1; ; page++ {
+			entries, total, err := a.resellerStore.ListAdminResellerLedgerEntries(resellercontract.AdminLedgerListFilter{
+				Page:     page,
+				PageSize: 200,
+			})
+			if err != nil {
+				break
+			}
+			for _, entry := range entries {
+				if entry.Status == resellerdomain.LedgerStatusCanceled {
+					continue
+				}
+				if entry.Type != resellerdomain.LedgerTypeOrderProfit &&
+					entry.Type != resellerdomain.LedgerTypeRefundDeduct &&
+					entry.Type != resellerdomain.LedgerTypeManualAdjust {
+					continue
+				}
+				curr := strings.ToUpper(strings.TrimSpace(entry.Currency))
+				if curr == "" {
+					curr = siteCurrency
+				}
+				ledgerSums[curr] = ledgerSums[curr].Add(entry.Amount.Decimal)
+			}
+			if len(entries) < 200 || int64(page*200) >= total {
+				break
+			}
+		}
+		for curr, sum := range ledgerSums {
+			if sum.IsPositive() {
+				res.Reseller.Stats.ProfitCostByCurrency[curr] = decimalToMinor(sum)
+			} else {
+				res.Reseller.Stats.ProfitCostByCurrency[curr] = 0
+			}
+		}
+	}
+
+	return res, nil
+}
+
+func (a *growthStoreAdapter) UpdateAffiliateSettings(input opscontract.AffiliateSettingDTO) (*opscontract.AffiliateSettingDTO, error) {
+	if a.settings == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	updated, err := a.settings.UpdateAffiliateSetting(settingsintegration.AffiliateSetting{
+		Enabled:           input.Enabled,
+		CommissionRate:    input.CommissionRate,
+		ConfirmDays:       input.ConfirmDays,
+		MinWithdrawAmount: input.MinWithdrawAmount,
+		WithdrawChannels:  input.WithdrawChannels,
+	})
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	_ = cache.DelAllPublicConfig(context.Background())
+	return &opscontract.AffiliateSettingDTO{
+		Enabled:           updated.Enabled,
+		CommissionRate:    updated.CommissionRate,
+		ConfirmDays:       updated.ConfirmDays,
+		MinWithdrawAmount: updated.MinWithdrawAmount,
+		WithdrawChannels:  updated.WithdrawChannels,
+	}, nil
+}
+
+func (a *growthStoreAdapter) ListAffiliateWithdraws(page, pageSize int, status string) (*opscontract.AffiliateWithdrawsResult, error) {
+	if a.affiliate == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	siteCurrency := a.siteCurrency()
+	rows, total, err := a.affiliate.ListAdminWithdraws(affiliateapp.AdminWithdrawListFilter{
+		Page:     page,
+		PageSize: pageSize,
+		Status:   status,
+	})
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	items := make([]opscontract.AffiliateWithdrawItem, 0, len(rows))
+	for _, row := range rows {
+		item := opscontract.AffiliateWithdrawItem{
+			ID:                 row.ID,
+			AffiliateProfileID: row.AffiliateProfileID,
+			AffiliateCode:      row.AffiliateProfile.AffiliateCode,
+			Amount:             row.Amount.String(),
+			Currency:           siteCurrency,
+			Channel:            row.Channel,
+			Account:            row.Account,
+			Status:             row.Status,
+			RejectReason:       row.RejectReason,
+			ProcessedAt:        row.ProcessedAt,
+			CreatedAt:          row.CreatedAt,
+		}
+		if row.AffiliateProfile.UserID > 0 {
+			item.UserID = row.AffiliateProfile.UserID
+		}
+		if row.AffiliateProfile.User.ID > 0 {
+			item.UserEmail = row.AffiliateProfile.User.Email
+		}
+		items = append(items, item)
+	}
+	return &opscontract.AffiliateWithdrawsResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		Items:       items,
+		Total:       total,
+		Page:        page,
+		PageSize:    pageSize,
+	}, nil
+}
+
+func (a *growthStoreAdapter) ReviewAffiliateWithdraw(id uint, action, rejectReason string) (*opscontract.AffiliateWithdrawItem, error) {
+	if a.affiliate == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	row, err := a.affiliate.ReviewWithdraw(opsSystemAdminID, id, action, rejectReason)
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	item := &opscontract.AffiliateWithdrawItem{
+		ID:                 row.ID,
+		AffiliateProfileID: row.AffiliateProfileID,
+		AffiliateCode:      row.AffiliateProfile.AffiliateCode,
+		Amount:             row.Amount.String(),
+		Currency:           a.siteCurrency(),
+		Channel:            row.Channel,
+		Account:            row.Account,
+		Status:             row.Status,
+		RejectReason:       row.RejectReason,
+		ProcessedAt:        row.ProcessedAt,
+		CreatedAt:          row.CreatedAt,
+	}
+	return item, nil
+}
+
+func (a *growthStoreAdapter) UpdateRechargeBonus(input settingscontract.WalletRechargeBonusConfig) (*settingscontract.WalletRechargeBonusConfig, error) {
+	if a.settings == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	updated, err := a.settings.UpdateWalletRechargeBonusConfig(input)
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	_ = cache.DelAllPublicConfig(context.Background())
+	return &updated, nil
+}
+
+func (a *growthStoreAdapter) ListResellerProfiles(page, pageSize int, status, keyword string) (*opscontract.ResellerProfilesResult, error) {
+	if a.resellerStore == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	rows, total, err := a.resellerStore.ListProfiles(resellercontract.ProfileListFilter{
+		Page:     page,
+		PageSize: pageSize,
+		Status:   status,
+		Keyword:  keyword,
+	})
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	items := make([]opscontract.ResellerProfileItem, 0, len(rows))
+	for i := range rows {
+		domains, _ := a.resellerStore.ListDomainsByResellerID(rows[i].ID)
+		items = append(items, mapResellerProfileItem(&rows[i], domains))
+	}
+	return &opscontract.ResellerProfilesResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		Items:       items,
+		Total:       total,
+		Page:        page,
+		PageSize:    pageSize,
+	}, nil
+}
+
+func (a *growthStoreAdapter) ApproveResellerProfile(id uint, input opscontract.ApproveResellerInput) (*opscontract.ResellerProfileItem, error) {
+	if a.resellerMgmt == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	res, err := a.resellerMgmt.ApproveProfile(context.Background(), opsSystemAdminID, id, resellerapp.ResellerApproveInput{
+		DefaultMarkupPercent: decimal.NewFromFloat(input.DefaultMarkupPercent).Round(2),
+		MaxMarkupPercent:     decimal.NewFromFloat(input.MaxMarkupPercent).Round(2),
+	})
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	item := mapResellerProfileItem(res.Profile, nil)
+	return &item, nil
+}
+
+func (a *growthStoreAdapter) RejectResellerProfile(id uint, input opscontract.RejectResellerInput) (*opscontract.ResellerProfileItem, error) {
+	if a.resellerMgmt == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	profile, err := a.resellerMgmt.RejectProfile(opsSystemAdminID, id, input.Reason)
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	item := mapResellerProfileItem(profile, nil)
+	return &item, nil
+}
+
+func (a *growthStoreAdapter) UpdateResellerProfileStatus(id uint, input opscontract.UpdateResellerStatusInput) (*opscontract.ResellerProfileItem, error) {
+	if a.resellerMgmt == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	var (
+		profile *resellerdomain.Profile
+		err     error
+	)
+	if input.Status == resellerdomain.ProfileStatusDisabled {
+		profile, err = a.resellerMgmt.DisableProfile(opsSystemAdminID, id, input.Reason)
+	} else {
+		profile, err = a.resellerMgmt.RestoreProfile(opsSystemAdminID, id)
+	}
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	item := mapResellerProfileItem(profile, nil)
+	return &item, nil
+}
+
+func (a *growthStoreAdapter) ListResellerWithdraws(page, pageSize int, status string) (*opscontract.ResellerWithdrawsResult, error) {
+	if a.resellerStore == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	rows, total, err := a.resellerStore.ListAdminResellerWithdrawRequests(resellercontract.AdminWithdrawListFilter{
+		Page:     page,
+		PageSize: pageSize,
+		Status:   status,
+	})
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	items := make([]opscontract.ResellerWithdrawItem, 0, len(rows))
+	for _, row := range rows {
+		item := opscontract.ResellerWithdrawItem{
+			ID:           row.ID,
+			ResellerID:   row.ResellerID,
+			Amount:       row.Amount.String(),
+			Currency:     row.Currency,
+			Channel:      row.Channel,
+			Account:      row.Account,
+			Status:       row.Status,
+			RejectReason: row.RejectReason,
+			ProcessedAt:  row.ProcessedAt,
+			CreatedAt:    row.CreatedAt,
+		}
+		if row.Profile != nil {
+			item.UserID = row.Profile.UserID
+			if row.Profile.User != nil {
+				item.UserEmail = row.Profile.User.Email
+			}
+		}
+		items = append(items, item)
+	}
+	return &opscontract.ResellerWithdrawsResult{
+		Source:      "storefront",
+		CollectedAt: time.Now().UTC(),
+		Items:       items,
+		Total:       total,
+		Page:        page,
+		PageSize:    pageSize,
+	}, nil
+}
+
+func (a *growthStoreAdapter) ReviewResellerWithdraw(id uint, action, rejectReason string) (*opscontract.ResellerWithdrawItem, error) {
+	if a.resellerWithdraw == nil {
+		return nil, opscontract.ErrNotConfigured
+	}
+	row, err := a.resellerWithdraw.ReviewWithdraw(opsSystemAdminID, id, action, rejectReason)
+	if err != nil {
+		return nil, mapGrowthError(err)
+	}
+	item := &opscontract.ResellerWithdrawItem{
+		ID:           row.ID,
+		ResellerID:   row.ResellerID,
+		Amount:       row.Amount.String(),
+		Currency:     row.Currency,
+		Channel:      row.Channel,
+		Account:      row.Account,
+		Status:       row.Status,
+		RejectReason: row.RejectReason,
+		ProcessedAt:  row.ProcessedAt,
+		CreatedAt:    row.CreatedAt,
+	}
+	return item, nil
+}
+
+func mapResellerProfileItem(profile *resellerdomain.Profile, domains []resellerdomain.Domain) opscontract.ResellerProfileItem {
+	if profile == nil {
+		return opscontract.ResellerProfileItem{}
+	}
+	item := opscontract.ResellerProfileItem{
+		ID:                   profile.ID,
+		UserID:               profile.UserID,
+		Status:               profile.Status,
+		SettlementStatus:     profile.SettlementStatus,
+		ApplyReason:          profile.ApplyReason,
+		RejectReason:         profile.RejectReason,
+		DefaultMarkupPercent: profile.DefaultMarkupPercent.String(),
+		MaxMarkupPercent:     profile.MaxMarkupPercent.String(),
+		ReviewedAt:           profile.ReviewedAt,
+		CreatedAt:            profile.CreatedAt,
+	}
+	if profile.User != nil {
+		item.UserEmail = profile.User.Email
+		item.UserDisplayName = profile.User.DisplayName
+	}
+	for _, d := range domains {
+		if d.IsPrimary || item.PrimaryDomain == "" {
+			item.PrimaryDomain = d.Domain
+		}
+	}
+	return item
+}
+
+func mapGrowthError(err error) error {
+	if err == nil {
+		return nil
+	}
+	switch {
+	case errors.Is(err, affiliateapp.ErrNotFound):
+		return opscontract.ErrNotFound
+	case errors.Is(err, affiliateapp.ErrWithdrawStatusInvalid),
+		errors.Is(err, resellercontract.ErrProfileStatusInvalid),
+		errors.Is(err, resellercontract.ErrWithdrawStatusInvalid),
+		errors.Is(err, resellercontract.ErrMarkupExceeded):
+		return opscontract.ErrInvalidInput
+	default:
+		msg := strings.ToLower(err.Error())
+		if strings.Contains(msg, "not found") {
+			return opscontract.ErrNotFound
+		}
+		if strings.Contains(msg, "invalid") {
+			return opscontract.ErrInvalidInput
+		}
+		return err
+	}
 }

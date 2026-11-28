@@ -123,12 +123,13 @@ const (
 
 // 钱包交易类型常量
 const (
-	WalletTxnTypeRecharge    = "recharge"
-	WalletTxnTypeOrderPay    = "order_pay"
-	WalletTxnTypeOrderRefund = "order_refund"
-	WalletTxnTypeAdminAdjust = "admin_adjust"
-	WalletTxnTypeAdminRefund = "admin_refund"
-	WalletTxnTypeGiftCard    = "gift_card_redeem"
+	WalletTxnTypeRecharge      = "recharge"
+	WalletTxnTypeRechargeBonus = "recharge_bonus"
+	WalletTxnTypeOrderPay      = "order_pay"
+	WalletTxnTypeOrderRefund   = "order_refund"
+	WalletTxnTypeAdminAdjust   = "admin_adjust"
+	WalletTxnTypeAdminRefund   = "admin_refund"
+	WalletTxnTypeGiftCard      = "gift_card_redeem"
 	// WalletTxnTypeOrderUnderpaidCredit 记录"支付成功但金额不足以履约订单"时转入用户余额的款项。
 	WalletTxnTypeOrderUnderpaidCredit = "order_underpaid_credit"
 )

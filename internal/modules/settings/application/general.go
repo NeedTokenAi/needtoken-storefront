@@ -456,3 +456,41 @@ func (s *Service) GetWalletRechargeChannelIDs() []uint {
 	}
 	return result
 }
+
+// GetWalletRechargeBonusConfig 读取并规范化钱包充值福利配置（位于 wallet_config.recharge_bonus）。
+func (s *Service) GetWalletRechargeBonusConfig() settingscontract.WalletRechargeBonusConfig {
+	fallback := settingscontract.DefaultWalletRechargeBonusConfig()
+	if s == nil {
+		return fallback
+	}
+	value, err := s.GetByKey(constants.SettingKeyWalletConfig)
+	if err != nil || value == nil {
+		return fallback
+	}
+	rawBonus, ok := value["recharge_bonus"].(map[string]interface{})
+	if !ok {
+		return fallback
+	}
+	return settingscontract.DecodeWalletRechargeBonusConfig(rawBonus)
+}
+
+// UpdateWalletRechargeBonusConfig 更新 wallet_config.recharge_bonus 并保留原有渠道与仅钱包支付配置。
+func (s *Service) UpdateWalletRechargeBonusConfig(cfg settingscontract.WalletRechargeBonusConfig) (settingscontract.WalletRechargeBonusConfig, error) {
+	normalized := settingscontract.NormalizeWalletRechargeBonusConfig(cfg)
+	if s == nil {
+		return normalized, nil
+	}
+	existing, err := s.GetByKey(constants.SettingKeyWalletConfig)
+	if err != nil {
+		return settingscontract.DefaultWalletRechargeBonusConfig(), err
+	}
+	merged := make(map[string]interface{}, len(existing)+1)
+	for k, v := range existing {
+		merged[k] = v
+	}
+	merged["recharge_bonus"] = settingscontract.EncodeWalletRechargeBonusConfig(normalized)
+	if _, err := s.Update(constants.SettingKeyWalletConfig, merged); err != nil {
+		return settingscontract.DefaultWalletRechargeBonusConfig(), err
+	}
+	return normalized, nil
+}

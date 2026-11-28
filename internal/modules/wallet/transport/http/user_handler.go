@@ -158,13 +158,53 @@ func (h *UserHandler) GetWallet(c *gin.Context) {
 	response.Success(c, walletpresenter.NewWalletAccountResp(account))
 }
 
+type categorizedTransactionLister interface {
+	ListTransactionsByCategory(userID uint, page, pageSize int, types []string) ([]walletdomain.Transaction, int64, error)
+}
+
+func resolveWalletTransactionCategoryTypes(raw string) []string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "recharge":
+		return []string{
+			constants.WalletTxnTypeRecharge,
+			constants.WalletTxnTypeRechargeBonus,
+			constants.WalletTxnTypeAdminAdjust,
+			constants.WalletTxnTypeOrderUnderpaidCredit,
+		}
+	case "gift_card":
+		return []string{constants.WalletTxnTypeGiftCard}
+	case "spend":
+		return []string{
+			constants.WalletTxnTypeOrderPay,
+			constants.WalletTxnTypeOrderRefund,
+			constants.WalletTxnTypeAdminRefund,
+		}
+	default:
+		return nil
+	}
+}
+
 func (h *UserHandler) GetTransactions(c *gin.Context) {
 	uid, ok := ginutil.GetUserID(c)
 	if !ok {
 		return
 	}
 	page, pageSize := ginutil.ParsePagination(c)
-	transactions, total, err := h.wallets.ListTransactions(uid, page, pageSize)
+	types := resolveWalletTransactionCategoryTypes(c.Query("category"))
+	var (
+		transactions []walletdomain.Transaction
+		total        int64
+		err          error
+	)
+	if len(types) > 0 {
+		if lister, ok := h.wallets.(categorizedTransactionLister); ok {
+			transactions, total, err = lister.ListTransactionsByCategory(uid, page, pageSize, types)
+		} else {
+			transactions, total, err = h.wallets.ListTransactions(uid, page, pageSize)
+		}
+	} else {
+		transactions, total, err = h.wallets.ListTransactions(uid, page, pageSize)
+	}
 	if err != nil {
 		ginutil.RespondError(c, response.CodeInternal, "error.user_fetch_failed", err)
 		return

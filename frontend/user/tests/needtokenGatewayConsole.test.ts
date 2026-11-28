@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   buildApiConsumeWalletRows,
   buildSelectableGroupOptions,
+  calculateWalletRechargeBonusPreview,
   classifyConsoleModelVendor,
   collectModelsForConsoleGroups,
   computeCombinedApiQuota,
@@ -301,6 +302,7 @@ test('buildApiConsumeWalletRows filters pure subscription logs and keeps wallet/
   assert.equal(matchesWalletRecordCategory('api_consume', 'spend'), true)
   assert.equal(matchesWalletRecordCategory('api_consume', 'recharge'), false)
   assert.equal(matchesWalletRecordCategory('api_consume', 'gift_card'), false)
+  assert.equal(matchesWalletRecordCategory('recharge_bonus', 'recharge'), true)
 
   const rows = buildApiConsumeWalletRows({
     logs: [
@@ -324,6 +326,7 @@ test('buildApiConsumeWalletRows filters pure subscription logs and keeps wallet/
         quota: 1_000_000,
         billing_source: 'subscription',
         wallet_quota_deducted: 250_000,
+        balance_after_quota: 500_000,
       },
       // Direct wallet deduction -> included
       {
@@ -333,8 +336,9 @@ test('buildApiConsumeWalletRows filters pure subscription logs and keeps wallet/
         model_name: 'gpt-6.1-sol',
         quota: 500_000,
         billing_source: 'wallet',
+        balance_after_quota: 750_000,
       },
-      // Legacy consume log without billing_source -> fallback included
+      // Legacy consume log without billing_source -> fallback via userQuota replay
       {
         id: 4,
         created_at: 1700000400,
@@ -346,6 +350,7 @@ test('buildApiConsumeWalletRows filters pure subscription logs and keeps wallet/
     siteCurrency: 'CNY',
     usdCnyRate: 7.2,
     quotaPerUnit: 500_000,
+    userQuota: 500_000,
   })
 
   assert.equal(rows.length, 3)
@@ -353,10 +358,27 @@ test('buildApiConsumeWalletRows filters pure subscription logs and keeps wallet/
   assert.equal(rows[0]?.type, 'api_consume')
   assert.equal(rows[0]?.direction, 'out')
   assert.equal(rows[0]?.amount, '3.60')
+  assert.equal(rows[0]?.balance_after, '7.20')
   assert.equal(rows[0]?.currency, 'CNY')
   assert.ok(rows[0]?.remark.includes('套餐超额'))
   assert.equal(rows[1]?.id, 'api-3')
   assert.equal(rows[1]?.amount, '7.20')
+  assert.equal(rows[1]?.balance_after, '10.80')
   assert.equal(rows[2]?.id, 'api-4')
   assert.equal(rows[2]?.amount, '1.44')
+  assert.equal(rows[2]?.balance_after, '18.00')
+
+  const bonusPreview = calculateWalletRechargeBonusPreview(
+    100,
+    {
+      enabled: true,
+      first_recharge_bonus_type: 'fixed',
+      first_recharge_bonus_value: 5,
+      first_recharge_min_amount: 20,
+      max_bonus_per_order: 25,
+      tiers: [{ min_amount: 100, bonus_type: 'percent', bonus_value: 15 }],
+    },
+    { isFirstRecharge: true },
+  )
+  assert.deepEqual(bonusPreview, { tierBonus: 15, firstBonus: 5, totalBonus: 20 })
 })

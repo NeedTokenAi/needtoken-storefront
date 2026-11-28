@@ -9,8 +9,11 @@ import (
 
 	paymentcontract "github.com/dujiao-next/internal/modules/payment/contract"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
+	settingscontract "github.com/dujiao-next/internal/modules/settings/contract"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
 	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
+	"github.com/dujiao-next/internal/shared/money"
+	"github.com/shopspring/decimal"
 )
 
 func (s *PaymentService) handleWalletRechargeCallback(payment *paymentdomain.Payment, status string, input PaymentCallbackInput) (*paymentdomain.Payment, error) {
@@ -86,15 +89,18 @@ func (s *PaymentService) applyWalletRechargePaymentUpdate(payment *paymentdomain
 	paymentVal := payment
 	newlySucceeded := false
 	var rechargeUnifiedOp *walletdomain.UnifiedOp
+	var bonusUnifiedOp *walletdomain.UnifiedOp
 
-	// 在事务前读取站点币种，防止历史异币充值单入账到同一个钱包。
+	// 在事务前读取站点币种与充值福利配置，避免事务内读 settings 引发 SQLite 自锁。
 	currency := constants.SiteCurrencyDefault
+	bonusCfg := settingscontract.DefaultWalletRechargeBonusConfig()
 	if status == constants.PaymentStatusSuccess && s.settingService != nil {
 		var err error
 		currency, err = s.settingService.GetSiteCurrency(constants.SiteCurrencyDefault)
 		if err != nil {
 			return nil, false, ErrPaymentUpdateFailed
 		}
+		bonusCfg = s.settingService.GetWalletRechargeBonusConfig()
 	}
 
 	err := s.paymentRepo.WithinTransaction(func(tx paymentcontract.Transaction) error {
@@ -213,6 +219,42 @@ func (s *PaymentService) applyWalletRechargePaymentUpdate(payment *paymentdomain
 				}
 				rechargeUnifiedOp = op
 			}
+			if bonusCfg.Enabled {
+				hasPrior, priorErr := rechargeRepo.HasSuccessfulRechargeBefore(recharge.UserID, recharge.ID)
+				if priorErr != nil {
+					return priorErr
+				}
+				bonusAmount, bonusDesc := bonusCfg.CalculateBonus(recharge.Amount.Decimal, !hasPrior)
+				if bonusAmount.GreaterThan(decimal.Zero) {
+					bonusMoney := money.FromDecimal(bonusAmount)
+					bonusRef := fmt.Sprintf("recharge:%d:bonus", recharge.ID)
+					if _, _, err := s.walletSvc.CreditInTransaction(walletTx, walletcontract.CreditInput{
+						UserID:    recharge.UserID,
+						Amount:    bonusMoney,
+						Currency:  recharge.Currency,
+						Type:      constants.WalletTxnTypeRechargeBonus,
+						Reference: bonusRef,
+						Remark:    bonusDesc,
+					}); err != nil {
+						return err
+					}
+					if s.walletSvc.HasUnifiedBalance() {
+						bOp, enqErr := s.walletSvc.EnqueueUnifiedCreditInTx(
+							walletTx,
+							recharge.UserID,
+							nil,
+							bonusMoney,
+							recharge.Currency,
+							bonusRef,
+							bonusDesc,
+						)
+						if enqErr != nil {
+							return enqErr
+						}
+						bonusUnifiedOp = bOp
+					}
+				}
+			}
 			newlySucceeded = true
 			recharge.Status = constants.WalletRechargeStatusSuccess
 			paidAt := now
@@ -238,6 +280,9 @@ func (s *PaymentService) applyWalletRechargePaymentUpdate(payment *paymentdomain
 	}
 	if rechargeUnifiedOp != nil && s.walletSvc != nil {
 		s.walletSvc.FlushUnifiedCreditOp(rechargeUnifiedOp)
+	}
+	if bonusUnifiedOp != nil && s.walletSvc != nil {
+		s.walletSvc.FlushUnifiedCreditOp(bonusUnifiedOp)
 	}
 	return paymentVal, newlySucceeded, nil
 }

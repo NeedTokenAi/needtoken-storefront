@@ -107,6 +107,26 @@ func (a publicConfigSettingsAdapter) GetActiveHomeAnnouncement() (jsonmap.JSON, 
 	return a.settings.GetActiveHomeAnnouncement()
 }
 
+func (a publicConfigSettingsAdapter) GetWalletRechargeBonusMap() map[string]interface{} {
+	if a.settings == nil {
+		return nil
+	}
+	return a.settings.GetWalletRechargeBonusConfig().PublicMap()
+}
+
+func (a publicConfigSettingsAdapter) ResellerPublicConfig() map[string]interface{} {
+	if a.cfg == nil {
+		return map[string]interface{}{
+			"enabled":            false,
+			"self_apply_enabled": false,
+		}
+	}
+	return map[string]interface{}{
+		"enabled":            a.cfg.Reseller.Enabled,
+		"self_apply_enabled": a.cfg.Reseller.SelfApplyEnabled,
+	}
+}
+
 type publicConfigPaymentAdapter struct {
 	payments *paymentapp.PaymentService
 }

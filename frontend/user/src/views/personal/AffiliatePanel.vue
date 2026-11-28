@@ -52,6 +52,10 @@
         </div>
       </template>
 
+      <div v-else-if="!affiliateEnabled" class="rounded-xl border border-dashed bg-muted/20 p-5">
+        <p class="text-sm text-muted-foreground">{{ t('personalCenter.affiliate.systemDisabledNotice') }}</p>
+      </div>
+
       <div v-else class="rounded-xl border border-dashed p-5">
         <p class="text-sm text-muted-foreground">{{ t('personalCenter.affiliate.notOpened') }}</p>
         <Button type="button" :disabled="opening" class="mt-4 font-bold" @click="openAffiliate">
@@ -133,7 +137,7 @@
           </TableHeader>
           <TableBody>
             <TableRow v-for="item in commissions" :key="item.id">
-              <TableCell class="px-4 tabular-nums text-xs text-foreground">-</TableCell>
+              <TableCell class="px-4 tabular-nums text-xs text-foreground">{{ item.order_no || `#${item.id}` }}</TableCell>
               <TableCell class="px-4 tabular-nums text-xs text-foreground">{{ item.commission_amount }}</TableCell>
               <TableCell class="px-4">
                 <Badge :variant="commissionStatusVariant(item.status)" size="sm">
@@ -266,6 +270,8 @@ const withdrawForm = reactive({
   account: '',
 })
 
+const affiliateEnabled = computed(() => appStore.config?.affiliate?.enabled !== false)
+
 const channelOptions = computed(() => {
   const channels = appStore.config?.affiliate?.withdraw_channels
   if (!Array.isArray(channels)) return []
@@ -297,9 +303,11 @@ const loadDashboard = async () => {
     const response = await affiliateAPI.dashboard()
     dashboard.value = response.data.data || null
   } catch (err: any) {
-    panelAlert.value = {
-      level: 'error',
-      message: err?.message || t('personalCenter.affiliate.errors.loadFailed'),
+    if (affiliateEnabled.value) {
+      panelAlert.value = {
+        level: 'error',
+        message: err?.message || t('personalCenter.affiliate.errors.loadFailed'),
+      }
     }
   }
 }

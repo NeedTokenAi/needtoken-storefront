@@ -28,51 +28,63 @@
         <AlertDescription>{{ securityAlert.message }}</AlertDescription>
       </Alert>
 
-      <TelegramBindingSection
-        :telegram-enabled="telegramEnabled"
-        :telegram-bound="telegramBound"
-        :loading-telegram-binding="userProfileStore.loadingTelegramBinding"
-        :avatar-url="userProfileStore.telegramBinding?.avatar_url || ''"
-        :telegram-display-name="telegramDisplayName"
-        :provider-user-id="userProfileStore.telegramBinding?.provider_user_id || '-'"
-        :formatted-auth-at="formatDate(userProfileStore.telegramBinding?.auth_at) || '-'"
-        :unbinding-telegram="userProfileStore.unbindingTelegram"
-        :can-unbind-telegram="canUnbindTelegram"
-        :show-telegram-mini-app-entry="showTelegramMiniAppEntry"
-        :show-mini-app-bind-action="showMiniAppBindAction"
-        :show-telegram-widget="showTelegramWidget"
-        :show-telegram-oidc-bind="showTelegramOidcBind"
-        :binding-telegram="userProfileStore.bindingTelegram"
-        :mini-app-init-data="miniAppInitData"
-        ref="telegramSectionRef"
-        @unbind="handleUnbindTelegram"
-        @mini-app-bind="handleTelegramMiniAppBind"
-        @open-mini-app-entry="openTelegramMiniAppEntry"
-        @oidc-bind="startTelegramOidcBind"
-      />
+      <section class="mb-6 overflow-hidden rounded-2xl border bg-card" aria-labelledby="external-identities-heading">
+        <div class="border-b bg-muted/25 px-4 py-3">
+          <h3 id="external-identities-heading" class="text-sm font-semibold text-foreground">
+            {{ t('personalCenter.security.externalIdentitiesTitle') }}
+          </h3>
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            {{ t('personalCenter.security.externalIdentitiesSubtitle') }}
+          </p>
+        </div>
+        <div class="divide-y divide-border">
+          <TelegramBindingSection
+            :telegram-enabled="telegramEnabled"
+            :telegram-bound="telegramBound"
+            :loading-telegram-binding="userProfileStore.loadingTelegramBinding"
+            :avatar-url="userProfileStore.telegramBinding?.avatar_url || ''"
+            :telegram-display-name="telegramDisplayName"
+            :provider-user-id="userProfileStore.telegramBinding?.provider_user_id || '-'"
+            :formatted-auth-at="formatDate(userProfileStore.telegramBinding?.auth_at) || '-'"
+            :unbinding-telegram="userProfileStore.unbindingTelegram"
+            :can-unbind-telegram="canUnbindTelegram"
+            :show-telegram-mini-app-entry="showTelegramMiniAppEntry"
+            :show-mini-app-bind-action="showMiniAppBindAction"
+            :show-telegram-widget="showTelegramWidget"
+            :show-telegram-oidc-bind="showTelegramOidcBind"
+            :binding-telegram="userProfileStore.bindingTelegram"
+            :mini-app-init-data="miniAppInitData"
+            ref="telegramSectionRef"
+            @unbind="handleUnbindTelegram"
+            @mini-app-bind="handleTelegramMiniAppBind"
+            @open-mini-app-entry="openTelegramMiniAppEntry"
+            @oidc-bind="startTelegramOidcBind"
+          />
 
-      <GoogleBindingSection
-        :google-enabled="googleAuthorizationEnabled"
-        :google-bound="googleBound"
-        :loading-google-binding="userProfileStore.loadingGoogleBinding"
-        :client-id="googleClientID"
-        :locale="googleButtonLocale"
-        :avatar-url="userProfileStore.googleBinding?.avatar_url || ''"
-        :google-display-name="googleDisplayName"
-        :email="userProfileStore.googleBinding?.email || userProfileStore.googleBinding?.username || ''"
-        :provider-user-id="userProfileStore.googleBinding?.provider_user_id || '-'"
-        :formatted-auth-at="formatDate(userProfileStore.googleBinding?.auth_at) || '-'"
-        :binding-google="userProfileStore.bindingGoogle"
-        :unbinding-google="userProfileStore.unbindingGoogle"
-        :can-unbind-google="canUnbindGoogle"
-        :is-telegram-mini-app="isTelegramMiniApp"
-        :google-ux-mode="googleIdentityUXMode"
-        :google-login-uri="googleRedirectLoginURI"
-        :prepare-redirect="prepareGoogleRedirectBind"
-        @credential="handleGoogleBind"
-        @script-error="handleGoogleScriptError"
-        @unbind="handleUnbindGoogle"
-      />
+          <GoogleBindingSection
+            :google-enabled="googleAuthorizationEnabled"
+            :google-bound="googleBound"
+            :loading-google-binding="userProfileStore.loadingGoogleBinding"
+            :client-id="googleClientID"
+            :locale="googleButtonLocale"
+            :avatar-url="userProfileStore.googleBinding?.avatar_url || ''"
+            :google-display-name="googleDisplayName"
+            :email="userProfileStore.googleBinding?.email || userProfileStore.googleBinding?.username || ''"
+            :provider-user-id="userProfileStore.googleBinding?.provider_user_id || '-'"
+            :formatted-auth-at="formatDate(userProfileStore.googleBinding?.auth_at) || '-'"
+            :binding-google="userProfileStore.bindingGoogle"
+            :unbinding-google="userProfileStore.unbindingGoogle"
+            :can-unbind-google="canUnbindGoogle"
+            :is-telegram-mini-app="isTelegramMiniApp"
+            :google-ux-mode="googleIdentityUXMode"
+            :google-login-uri="googleRedirectLoginURI"
+            :prepare-redirect="prepareGoogleRedirectBind"
+            @credential="handleGoogleBind"
+            @script-error="handleGoogleScriptError"
+            @unbind="handleUnbindGoogle"
+          />
+        </div>
+      </section>
 
       <EmailChangeForm
         :current-email-display="currentEmailDisplay"

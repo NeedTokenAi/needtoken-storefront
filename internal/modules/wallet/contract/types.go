@@ -18,6 +18,7 @@ type TransactionListFilter struct {
 	UserID      uint
 	OrderID     uint
 	Type        string
+	Types       []string
 	Direction   string
 	CreatedFrom *time.Time
 	CreatedTo   *time.Time

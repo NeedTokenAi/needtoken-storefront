@@ -19,6 +19,7 @@ type Handler struct {
 	slo       opscontract.SLORevokeHandler
 	ugcClaims opscontract.UniversalGiftCardClaimLookup
 	radar     opscontract.RadarSubscriptionHandler
+	growth    opscontract.GrowthHandler
 }
 
 func New(reader opscontract.Reader) *Handler {
@@ -34,6 +35,9 @@ func New(reader opscontract.Reader) *Handler {
 	}
 	if r, ok := reader.(opscontract.RadarSubscriptionHandler); ok {
 		h.radar = r
+	}
+	if g, ok := reader.(opscontract.GrowthHandler); ok {
+		h.growth = g
 	}
 	return h
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/dujiao-next/internal/constants"
 	"github.com/dujiao-next/internal/persistence/gormutil"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -163,6 +164,9 @@ func (s *Store) ListTransactions(filter walletcontract.TransactionListFilter) ([
 	}
 	if filter.Type != "" {
 		query = query.Where("type = ?", filter.Type)
+	}
+	if len(filter.Types) > 0 {
+		query = query.Where("type IN ?", filter.Types)
 	}
 	if filter.Direction != "" {
 		query = query.Where("direction = ?", filter.Direction)
@@ -373,4 +377,24 @@ func (s *Store) ListRechargeRefunds(id uint) ([]walletdomain.Transaction, error)
 	rows := []walletdomain.Transaction{}
 	err := s.db.Where("recharge_order_id = ? AND type = ? AND deleted_at IS NULL", id, "admin_refund").Order("id DESC").Find(&rows).Error
 	return rows, err
+}
+
+func (s *Store) HasSuccessfulRechargeBefore(userID, excludeRechargeID uint) (bool, error) {
+	if userID == 0 {
+		return false, nil
+	}
+	query := s.db.Model(&walletdomain.RechargeOrder{}).
+		Where("user_id = ? AND deleted_at IS NULL AND status IN ?", userID, []string{
+			constants.WalletRechargeStatusSuccess,
+			constants.WalletRechargeStatusPartiallyRefunded,
+			constants.WalletRechargeStatusRefunded,
+		})
+	if excludeRechargeID > 0 {
+		query = query.Where("id <> ?", excludeRechargeID)
+	}
+	var count int64
+	if err := query.Limit(1).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

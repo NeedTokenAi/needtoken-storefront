@@ -138,7 +138,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { AlertTriangle, Banknote, CheckCircle2, ChevronRight, ShoppingBag } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -157,11 +157,13 @@ import { useResellerOrders } from '../../composables/reseller/useResellerOrders'
 import {
   formatResellerConsoleAmount,
   formatResellerConsoleDate,
+  resellerConsolePath,
   resellerOrderStatusTone,
   resellerProfitStatusKey,
 } from '../../utils/resellerConsole'
 
 const { t, te } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const { loading, error, rows, stats, pagination, load, loadStats } = useResellerOrders()
 const filters = reactive({ order_no: '', status: 'all', created_from: '', created_to: '' })
@@ -195,7 +197,7 @@ const currentParams = () => ({
 
 const reload = () => Promise.all([load({ ...currentParams(), page: 1 }), loadStats(currentParams())])
 const goPage = (page: number) => load({ ...currentParams(), page })
-const goDetail = (orderNo: string) => router.push(`/reseller/orders/${encodeURIComponent(orderNo)}`)
+const goDetail = (orderNo: string) => router.push(resellerConsolePath(route.path, `orders/${encodeURIComponent(orderNo)}`))
 
 const resetFilters = () => {
   filters.order_no = ''

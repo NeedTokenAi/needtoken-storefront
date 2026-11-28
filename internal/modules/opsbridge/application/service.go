@@ -54,6 +54,7 @@ type Service struct {
 	ugcClaims       opscontract.UniversalGiftCardClaimStore
 	radarStore      opscontract.RadarSubscriptionStore
 	unifiedOps      opscontract.UnifiedOpReader
+	growth          opscontract.GrowthStore
 }
 
 func New(orders ordercontract.Store, payments paymentcontract.Store, procurements procurementcontract.Repository) *Service {

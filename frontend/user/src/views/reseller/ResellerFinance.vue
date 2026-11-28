@@ -6,7 +6,7 @@
     >
       <template #actions>
         <Button as-child size="sm">
-          <RouterLink to="/reseller/withdraws">
+          <RouterLink :to="resellerConsolePath(route.path, 'withdraws')">
             <Upload class="h-4 w-4" />
             {{ t('resellerConsole.nav.withdraws') }}
           </RouterLink>
@@ -25,7 +25,7 @@
 
       <ResellerPageState v-if="balances.length === 0" :title="t('personalCenter.reseller.balanceEmpty')" :icon="Banknote">
         <Button as-child>
-          <RouterLink to="/reseller/products">{{ t('resellerConsole.nav.products') }}</RouterLink>
+          <RouterLink :to="resellerConsolePath(route.path, 'products')">{{ t('resellerConsole.nav.products') }}</RouterLink>
         </Button>
       </ResellerPageState>
 
@@ -63,6 +63,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { BadgeCheck, Banknote, Upload, Wallet } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -81,10 +82,11 @@ import {
   RESELLER_BALANCE_STATUS_NEGATIVE_BALANCE,
   RESELLER_BALANCE_STATUS_NORMAL,
 } from '../../constants/reseller'
-import { formatResellerConsoleAmount, resellerCurrencyColor } from '../../utils/resellerConsole'
+import { formatResellerConsoleAmount, resellerConsolePath, resellerCurrencyColor } from '../../utils/resellerConsole'
 import { getResellerFinanceStatusView, pickPrimaryResellerBalance } from '../../utils/resellerFinance'
 
 const { t } = useI18n()
+const route = useRoute()
 const { dashboardLoading, balanceLoading, dashboard, balances, loadDashboard, loadBalances } = useResellerFinance()
 
 const balanceList = computed(() => (balances.value.length ? balances.value : dashboard.value?.balances || []))

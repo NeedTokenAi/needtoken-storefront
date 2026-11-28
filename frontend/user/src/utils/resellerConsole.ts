@@ -52,7 +52,7 @@ export const getResellerConsoleState = (snapshot?: ResellerManagementSnapshotDat
   const canApply = snapshot?.can_apply === true
   const modules = {} as Record<ResellerModuleKey, ResellerConsoleModuleState>
 
-  modules.apply = { visible: true, enabled: canApply || profileStatus !== 'active' }
+  modules.apply = { visible: true, enabled: canApply }
   for (const key of activeModules) {
     modules[key] = {
       visible: true,
@@ -163,3 +163,9 @@ export const resellerOrderStatusColor = (status?: string): string => {
 
 export const resellerCurrencyColor = (index: number): string =>
   RESELLER_CHART_PALETTE[index % RESELLER_CHART_PALETTE.length] ?? '#6366f1'
+
+export const resellerConsolePath = (currentPath?: string | null, subPath = ''): string => {
+  const base = String(currentPath || '').startsWith('/me/reseller') ? '/me/reseller' : '/reseller'
+  const cleanSub = String(subPath || '').trim().replace(/^\/+/, '')
+  return cleanSub ? `${base}/${cleanSub}` : base
+}

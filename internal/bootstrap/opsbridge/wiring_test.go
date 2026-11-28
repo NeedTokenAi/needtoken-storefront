@@ -12,7 +12,11 @@ import (
 
 	"github.com/dujiao-next/internal/app/container"
 	catalogproductbootstrap "github.com/dujiao-next/internal/bootstrap/catalogproduct"
+	"github.com/dujiao-next/internal/config"
 	"github.com/dujiao-next/internal/constants"
+	affiliateapp "github.com/dujiao-next/internal/modules/affiliate/application"
+	affiliatedomain "github.com/dujiao-next/internal/modules/affiliate/domain"
+	affiliategormstore "github.com/dujiao-next/internal/modules/affiliate/infrastructure/gormstore"
 	cardsecretdomain "github.com/dujiao-next/internal/modules/cardsecret/domain"
 	cardsecretgormstore "github.com/dujiao-next/internal/modules/cardsecret/infrastructure/gormstore"
 	cartdomain "github.com/dujiao-next/internal/modules/cart/domain"
@@ -36,6 +40,12 @@ import (
 	ordergormstore "github.com/dujiao-next/internal/modules/order/infrastructure/gormstore"
 	paymentdomain "github.com/dujiao-next/internal/modules/payment/domain"
 	paymentgormstore "github.com/dujiao-next/internal/modules/payment/infrastructure/gormstore"
+	resellerapp "github.com/dujiao-next/internal/modules/reseller/application"
+	resellerdomain "github.com/dujiao-next/internal/modules/reseller/domain"
+	resellergormstore "github.com/dujiao-next/internal/modules/reseller/infrastructure/gormstore"
+	settingsapp "github.com/dujiao-next/internal/modules/settings/application"
+	settingscontract "github.com/dujiao-next/internal/modules/settings/contract"
+	settingsgormstore "github.com/dujiao-next/internal/modules/settings/infrastructure/gormstore"
 	walletapp "github.com/dujiao-next/internal/modules/wallet/application"
 	walletcontract "github.com/dujiao-next/internal/modules/wallet/contract"
 	walletdomain "github.com/dujiao-next/internal/modules/wallet/domain"
@@ -715,5 +725,166 @@ func TestOrderRefundBridgeReflectsUnifiedBalanceSyncStateAndPendingOps(t *testin
 	pendingOps, err := reader.ListPendingUnifiedOpsForOps(50)
 	if err != nil || len(pendingOps) != 1 || pendingOps[0].OpID != res.BalanceSyncOpID || pendingOps[0].LastError != "new-api unavailable" {
 		t.Fatalf("expected pending unified ops from adapter, got %+v err=%v", pendingOps, err)
+	}
+}
+func TestOpsBridgeGrowthSummaryAndMutations(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	dsn := fmt.Sprintf("file:opsbridge_growth_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+
+	if err := db.AutoMigrate(
+		&settingsgormstore.SettingRecord{},
+		&userdomain.User{},
+		&walletdomain.Account{},
+		&walletdomain.Transaction{},
+		&affiliatedomain.Profile{},
+		&affiliatedomain.Click{},
+		&affiliatedomain.Commission{},
+		&affiliatedomain.WithdrawRequest{},
+		&resellerdomain.Profile{},
+		&resellerdomain.Domain{},
+		&resellerdomain.LedgerEntry{},
+		&resellerdomain.WithdrawRequest{},
+		&resellerdomain.BalanceAccount{},
+	); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	now := time.Now().UTC()
+	settingSvc := settingsapp.NewService(settingsgormstore.New(db))
+	userStore := usergormstore.New(db)
+	walletRepo := walletgormstore.New(db)
+	affiliateStore := affiliategormstore.New(db)
+	affiliateSvc := affiliateapp.NewService(affiliateStore, userStore, nil, nil, nil, settingSvc)
+	resellerStore := resellergormstore.New(db)
+	resellerMgmt := resellerapp.NewManagementService(resellerStore, config.ResellerConfig{Enabled: true, SelfApplyEnabled: true})
+	resellerWithdrawSvc := resellerapp.NewAccountingWithdrawService(resellerStore)
+
+	user := userdomain.User{
+		Email: "growth_user@example.com", DisplayName: "GrowthUser", PasswordHash: "h",
+		Status: constants.UserStatusActive, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	affProfile := affiliatedomain.Profile{
+		UserID: user.ID, AffiliateCode: "GRW12345", Status: constants.AffiliateProfileStatusActive, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&affProfile).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&affiliatedomain.Commission{
+		AffiliateProfileID: affProfile.ID, OrderID: 10, CommissionType: "order", BaseAmount: money.FromDecimal(decimal.NewFromInt(100)),
+		RatePercent: money.FromDecimal(decimal.NewFromInt(10)), CommissionAmount: money.FromDecimal(decimal.NewFromInt(10)),
+		Status: constants.AffiliateCommissionStatusAvailable, CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&walletdomain.Transaction{
+		UserID: user.ID, Type: constants.WalletTxnTypeRechargeBonus, Direction: constants.WalletTxnDirectionIn,
+		Amount: money.FromDecimal(decimal.NewFromInt(15)), Currency: "CNY", Reference: "recharge:1:bonus", Remark: "福利赠送",
+		CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	resProfile := resellerdomain.Profile{
+		UserID: user.ID, Status: resellerdomain.ProfileStatusPendingReview, SettlementStatus: resellerdomain.SettlementStatusNormal,
+		ApplyReason: "apply reseller", CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&resProfile).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&resellerdomain.LedgerEntry{
+		ResellerID: resProfile.ID, Type: resellerdomain.LedgerTypeOrderProfit,
+		Amount: money.FromDecimal(decimal.NewFromInt(20)), Currency: "CNY",
+		IdempotencyKey: "reseller:profit:1", Status: resellerdomain.LedgerStatusAvailable,
+		CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	c := &container.Container{
+		Config:                     &config.Config{Reseller: config.ResellerConfig{Enabled: true, SelfApplyEnabled: true}},
+		SettingService:             settingSvc,
+		AffiliateService:           affiliateSvc,
+		WalletRepo:                 walletRepo,
+		ResellerManagementService:  resellerMgmt,
+		ResellerAccountingWithdraw: resellerWithdrawSvc,
+		ResellerStore:              resellerStore,
+	}
+	h := NewHandler(c)
+	r := gin.New()
+	g := r.Group("/api/v1/channel/needtoken-ops")
+	g.GET("/growth/summary", h.GrowthSummary)
+	g.PATCH("/affiliate/settings", h.UpdateAffiliateSettings)
+	g.PATCH("/wallet/recharge-bonus", h.UpdateRechargeBonus)
+	g.POST("/resellers/:id/approve", h.ApproveResellerProfile)
+
+	req := func(method, path string, body any) *httptest.ResponseRecorder {
+		var raw []byte
+		if body != nil {
+			raw, _ = json.Marshal(body)
+		}
+		httpReq := httptest.NewRequest(method, "/api/v1/channel/needtoken-ops"+path, bytes.NewReader(raw))
+		if body != nil {
+			httpReq.Header.Set("Content-Type", "application/json")
+		}
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httpReq)
+		return rec
+	}
+
+	// 1. 更新推广设置与充值福利
+	affRec := req(http.MethodPatch, "/affiliate/settings", opscontract.AffiliateSettingDTO{
+		Enabled: true, CommissionRate: 12.5, ConfirmDays: 7, MinWithdrawAmount: 50, WithdrawChannels: []string{"alipay"},
+	})
+	if affRec.Code != http.StatusOK {
+		t.Fatalf("update affiliate settings code=%d body=%s", affRec.Code, affRec.Body.String())
+	}
+	bonusRec := req(http.MethodPatch, "/wallet/recharge-bonus", settingscontract.WalletRechargeBonusConfig{
+		Enabled: true, FirstRechargeBonusType: "fixed", FirstRechargeBonusValue: 5, FirstRechargeMinAmount: 20, CostRatePercent: 80,
+		Tiers: []settingscontract.WalletRechargeBonusTier{{MinAmount: 100, BonusType: "fixed", BonusValue: 15}},
+	})
+	if bonusRec.Code != http.StatusOK {
+		t.Fatalf("update recharge bonus code=%d body=%s", bonusRec.Code, bonusRec.Body.String())
+	}
+
+	// 2. 审批分销商申请
+	appRec := req(http.MethodPost, fmt.Sprintf("/resellers/%d/approve", resProfile.ID), opscontract.ApproveResellerInput{
+		DefaultMarkupPercent: 10, MaxMarkupPercent: 50,
+	})
+	if appRec.Code != http.StatusOK {
+		t.Fatalf("approve reseller code=%d body=%s", appRec.Code, appRec.Body.String())
+	}
+
+	// 3. 查询汇总核对三大成本指标（10 CNY = 1000分；15*80% = 1200分；20 CNY = 2000分）
+	sumRec := req(http.MethodGet, "/growth/summary", nil)
+	if sumRec.Code != http.StatusOK {
+		t.Fatalf("growth summary code=%d body=%s", sumRec.Code, sumRec.Body.String())
+	}
+	var sumEnv struct {
+		Data opscontract.GrowthSummaryResult `json:"data"`
+	}
+	if err := json.Unmarshal(sumRec.Body.Bytes(), &sumEnv); err != nil {
+		t.Fatalf("unmarshal growth summary: %v", err)
+	}
+	d := sumEnv.Data
+	if !d.Affiliate.Settings.Enabled || d.Affiliate.Stats.EffectiveCostByCurrency["CNY"] != 1000 {
+		t.Fatalf("unexpected affiliate summary: %+v", d.Affiliate)
+	}
+	if !d.RechargeBonus.Settings.Enabled || d.RechargeBonus.Stats.TotalBonusByCurrency["CNY"] != 1500 || d.RechargeBonus.Stats.CostByCurrency["CNY"] != 1200 {
+		t.Fatalf("unexpected recharge bonus summary: %+v", d.RechargeBonus)
+	}
+	if d.Reseller.Stats.ActiveCount != 1 || d.Reseller.Stats.ProfitCostByCurrency["CNY"] != 2000 {
+		t.Fatalf("unexpected reseller summary: %+v", d.Reseller)
 	}
 }

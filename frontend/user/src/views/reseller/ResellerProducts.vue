@@ -12,7 +12,7 @@
           </a>
         </Button>
         <Button as-child variant="outline" size="sm">
-          <RouterLink to="/reseller/orders">
+          <RouterLink :to="resellerConsolePath(route.path, 'orders')">
             <ShoppingBag class="h-4 w-4" />
             {{ t('resellerConsole.products.viewOrders') }}
           </RouterLink>
@@ -82,6 +82,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { ExternalLink, Gauge, Globe, Percent, ShoppingBag, SlidersHorizontal, Tag, ToggleLeft } from 'lucide-vue-next'
 import type { ResellerDomainData } from '../../api/types'
 import { Button } from '@/components/ui/button'
@@ -93,8 +94,10 @@ import {
   RESELLER_DOMAIN_STATUS_ACTIVE,
   RESELLER_DOMAIN_VERIFICATION_VERIFIED,
 } from '../../constants/reseller'
+import { resellerConsolePath } from '../../utils/resellerConsole'
 
 const { t } = useI18n()
+const route = useRoute()
 const { snapshot, load } = useResellerProfile()
 
 const isActiveVerifiedDomain = (domain: ResellerDomainData) =>

@@ -523,6 +523,8 @@
         "google_config_invalid": "Google 登入配置異常",
         "internal_error": "系統錯誤"
       },
+      "externalIdentitiesTitle": "快捷登入帳號關聯",
+      "externalIdentitiesSubtitle": "綁定 Telegram 或 Google 後，可直接使用對應帳號一鍵登入",
       "telegramTitle": "Telegram 帳號",
       "telegramSubtitle": "綁定後可直接使用 Telegram 登入站點",
       "telegramBound": "已綁定",
@@ -677,6 +679,7 @@
       },
       "types": {
         "recharge": "餘額儲值",
+        "recharge_bonus": "儲值贈送",
         "order_pay": "訂單支付",
         "order_refund": "訂單退款",
         "gift_card_redeem": "禮品卡兌換",
@@ -698,6 +701,7 @@
     "affiliate": {
       "title": "推廣返利",
       "subtitle": "查看推廣數據與佣金，並提交提現申請",
+      "systemDisabledNotice": "站點暫未開啟推廣返利活動，敬請期待。",
       "notOpened": "你尚未開通推廣返利，開通後可獲得專屬聯盟ID與推廣連結。",
       "openButton": "立即開通",
       "opening": "開通中...",
@@ -1558,6 +1562,8 @@
       "domainCount": "域名數量",
       "unavailableTitle": "目前無需提交申請",
       "unavailableDescription": "如狀態已啟用，可直接使用其他分銷模組。",
+      "systemDisabledTitle": "分銷系統暫未開放",
+      "systemDisabledDescription": "站點暫未開啟自助分銷功能，如需開通請聯絡站點客服。",
       "stepSubmit": "提交申請",
       "stepReview": "平台審核",
       "stepActive": "已啟用",
@@ -4359,7 +4365,14 @@
         "planQuotaNote": "優先按模型分組扣減",
         "goWithdraw": "前往提領",
         "tabGiftCard": "兌換禮品卡",
-        "tabWallet": "餘額儲值"
+        "tabWallet": "餘額儲值",
+        "planDeductionUsageHint": "目前僅見訂閱套餐呼叫時，套餐內抵扣不會扣減錢包餘額。",
+        "goUsageLogs": "查看用量與日誌",
+        "rechargeBonusTitle": "儲值福利活動",
+        "firstRechargeEligible": "首儲享額外贈送",
+        "estimatedBonus": "預計額外贈送 +{bonus} {currency}（退款不退贈金）",
+        "bonusTierPercent": "滿 {min} 送 {rate}%",
+        "bonusTierFixed": "滿 {min} 送 {bonus}"
       },
       "keys": {
         "title": "API 金鑰管理",

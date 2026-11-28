@@ -126,7 +126,7 @@ export function matchesWalletRecordCategory(type?: string | null, filter: Wallet
   if (filter === 'all') return true
   const norm = String(type || '').trim().toLowerCase()
   if (filter === 'gift_card') return norm === 'gift_card_redeem'
-  if (filter === 'recharge') return norm === 'recharge' || norm === 'admin_adjust' || norm === 'order_underpaid_credit'
+  if (filter === 'recharge') return norm === 'recharge' || norm === 'recharge_bonus' || norm === 'admin_adjust' || norm === 'order_underpaid_credit'
   if (filter === 'spend') return norm === 'order_pay' || norm === 'order_refund' || norm === 'admin_refund' || norm === 'api_consume'
   return true
 }
@@ -152,10 +152,12 @@ export function buildApiConsumeWalletRows(params: {
     quota: number
     billing_source?: string
     wallet_quota_deducted?: number
+    balance_after_quota?: number
   }>
   quotaPerUnit: number
   siteCurrency: string
   usdCnyRate?: number | null
+  userQuota?: number | null
 }): WalletTransactionRow[] {
   const qpu = params.quotaPerUnit > 0 ? params.quotaPerUnit : API_QUOTA_PER_USD
   const currency = String(params.siteCurrency || 'CNY').trim().toUpperCase() || 'CNY'
@@ -163,6 +165,17 @@ export function buildApiConsumeWalletRows(params: {
     ? 1
     : (typeof params.usdCnyRate === 'number' && Number.isFinite(params.usdCnyRate) && params.usdCnyRate > 0 ? params.usdCnyRate : 1)
   const displayCurrency = currency === 'CNY' && rate === 1 ? 'USD' : currency
+
+  const formatConverted = (val: number, keepZero = false) => {
+    if (!Number.isFinite(val)) return ''
+    const safe = Math.max(0, val)
+    if (safe === 0) return keepZero ? '0.00' : ''
+    return safe >= 0.01 ? safe.toFixed(2) : safe.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
+  }
+
+  let runningQuota = typeof params.userQuota === 'number' && Number.isFinite(params.userQuota) && params.userQuota >= 0
+    ? params.userQuota
+    : null
 
   const rows: WalletTransactionRow[] = []
   for (const item of params.logs || []) {
@@ -184,7 +197,19 @@ export function buildApiConsumeWalletRows(params: {
     const usd = deductedQuota / qpu
     if (!Number.isFinite(usd) || usd <= 0) continue
     const converted = usd * rate
-    const amountStr = converted >= 0.01 ? converted.toFixed(2) : converted.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
+    const amountStr = formatConverted(converted)
+    if (!amountStr) continue
+
+    let afterQuota: number | null = null
+    if (typeof item.balance_after_quota === 'number' && Number.isFinite(item.balance_after_quota)) {
+      afterQuota = Math.max(0, item.balance_after_quota)
+      runningQuota = afterQuota + deductedQuota
+    } else if (runningQuota !== null) {
+      afterQuota = Math.max(0, runningQuota)
+      runningQuota += deductedQuota
+    }
+    const balanceAfterStr = afterQuota !== null ? formatConverted((afterQuota / qpu) * rate, true) : ''
+
     const usdStr = usd >= 0.01 ? usd.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : usd.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')
     const modelPart = item.model_name || 'API'
     const tokenPart = item.token_name ? ` · ${item.token_name}` : ''
@@ -196,11 +221,76 @@ export function buildApiConsumeWalletRows(params: {
       direction: 'out',
       amount: amountStr,
       currency: displayCurrency,
-      balance_after: '',
+      balance_after: balanceAfterStr,
       remark: `API 实时扣款${overflowTag} · ${modelPart} ($${usdStr})${tokenPart}`,
     })
   }
   return rows
+}
+
+export interface WalletRechargeBonusTierConfig {
+  min_amount: number
+  bonus_type: 'fixed' | 'percent' | string
+  bonus_value: number
+}
+
+export interface WalletRechargeBonusPublicConfig {
+  enabled?: boolean
+  first_recharge_bonus_type?: 'fixed' | 'percent' | string
+  first_recharge_bonus_value?: number
+  first_recharge_min_amount?: number
+  max_bonus_per_order?: number
+  tiers?: WalletRechargeBonusTierConfig[]
+}
+
+export function calculateWalletRechargeBonusPreview(
+  amountRaw: string | number,
+  cfg?: WalletRechargeBonusPublicConfig | null,
+  options?: { isFirstRecharge?: boolean },
+): { tierBonus: number; firstBonus: number; totalBonus: number } {
+  const amount = Number(amountRaw)
+  if (!cfg?.enabled || !Number.isFinite(amount) || amount <= 0) {
+    return { tierBonus: 0, firstBonus: 0, totalBonus: 0 }
+  }
+  let tierBonus = 0
+  const tiers = Array.isArray(cfg.tiers) ? [...cfg.tiers].sort((a, b) => Number(a.min_amount) - Number(b.min_amount)) : []
+  let matchedTier: WalletRechargeBonusTierConfig | null = null
+  for (const t of tiers) {
+    if (Number(t.min_amount) > 0 && amount >= Number(t.min_amount)) {
+      matchedTier = t
+    }
+  }
+  if (matchedTier) {
+    const val = Number(matchedTier.bonus_value) || 0
+    if (val > 0) {
+      tierBonus = String(matchedTier.bonus_type || '').toLowerCase() === 'percent'
+        ? (amount * val) / 100
+        : val
+    }
+  }
+
+  let firstBonus = 0
+  if (options?.isFirstRecharge !== false) {
+    const firstVal = Number(cfg.first_recharge_bonus_value) || 0
+    const firstMin = Number(cfg.first_recharge_min_amount) || 0
+    if (firstVal > 0 && amount >= firstMin) {
+      firstBonus = String(cfg.first_recharge_bonus_type || '').toLowerCase() === 'percent'
+        ? (amount * firstVal) / 100
+        : firstVal
+    }
+  }
+
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  let total = round2(tierBonus + firstBonus)
+  const cap = Number(cfg.max_bonus_per_order) || 0
+  if (cap > 0 && total > cap) {
+    total = round2(cap)
+  }
+  return {
+    tierBonus: round2(tierBonus),
+    firstBonus: round2(firstBonus),
+    totalBonus: total,
+  }
 }
 
 export function resolveNeedtokenRouteTransitionKey(rawPath?: string | null): string {

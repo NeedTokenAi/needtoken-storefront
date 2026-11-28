@@ -471,6 +471,8 @@
         "google_config_invalid": "Google 登录配置异常",
         "internal_error": "系统错误"
       },
+      "externalIdentitiesTitle": "快捷登录账号关联",
+      "externalIdentitiesSubtitle": "绑定 Telegram 或 Google 后，可直接使用对应账号一键登录",
       "telegramTitle": "Telegram 账号",
       "telegramSubtitle": "绑定后可直接使用 Telegram 登录站点",
       "telegramBound": "已绑定",
@@ -625,6 +627,7 @@
       },
       "types": {
         "recharge": "余额充值",
+        "recharge_bonus": "充值赠送",
         "order_pay": "订单支付",
         "order_refund": "订单退款",
         "gift_card_redeem": "礼品卡兑换",
@@ -643,9 +646,10 @@
         "rechargeStateFailed": "充值支付未成功，请更换渠道后重试"
       }
     },
-    "affiliate": {
+      "affiliate": {
       "title": "推广返利",
       "subtitle": "查看推广数据与佣金，并提交提现申请",
+      "systemDisabledNotice": "站点暂未开启推广返利活动，敬请期待。",
       "notOpened": "你还没有开通推广返利，开通后可获得专属联盟ID与推广链接。",
       "openButton": "立即开通",
       "opening": "开通中...",
@@ -1506,6 +1510,8 @@
       "domainCount": "域名数量",
       "unavailableTitle": "当前无需提交申请",
       "unavailableDescription": "如状态已启用，可直接使用其他分销模块。",
+      "systemDisabledTitle": "分销系统暂未开放",
+      "systemDisabledDescription": "站点暂未开启自助分销功能，如需开通请联系站点客服。",
       "stepSubmit": "提交申请",
       "stepReview": "平台审核",
       "stepActive": "已启用",
@@ -4359,7 +4365,14 @@
         "planQuotaNote": "优先按模型分组扣减",
         "goWithdraw": "前往提现",
         "tabGiftCard": "兑换礼品卡",
-        "tabWallet": "余额充值"
+        "tabWallet": "余额充值",
+        "planDeductionUsageHint": "当前仅见订阅套餐调用时，套餐内抵扣不会扣减钱包余额。",
+        "goUsageLogs": "查看用量与日志",
+        "rechargeBonusTitle": "充值福利活动",
+        "firstRechargeEligible": "首充享额外赠送",
+        "estimatedBonus": "预计额外赠送 +{bonus} {currency}（退款不退赠金）",
+        "bonusTierPercent": "满 {min} 送 {rate}%",
+        "bonusTierFixed": "满 {min} 送 {bonus}"
       },
       "keys": {
         "title": "API 密钥管理",
